@@ -26,6 +26,7 @@ type Branch struct {
 	Paused               bool   `json:"paused"`
 	OpenTime             string `json:"open_time"`
 	CloseTime            string `json:"close_time"`
+	NotifySMS            bool   `json:"notify_sms"`
 	OpenNow              bool   `json:"open_now"`
 }
 
@@ -57,13 +58,13 @@ func (b *Branch) isOpen(now time.Time) bool {
 
 const branchCols = `id, merchant_id, slug, name, name_en, address, phone, timezone, currency, tax_rate_bp,
 	tax_inclusive, service_charge_bp, packaging_fee, min_order_amount, accept_timeout_minutes,
-	delivery_enabled, pickup_enabled, paused, open_time, close_time`
+	delivery_enabled, pickup_enabled, paused, open_time, close_time, notify_sms`
 
 func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 	var b Branch
 	err := row.Scan(&b.ID, &b.MerchantID, &b.Slug, &b.Name, &b.NameEn, &b.Address, &b.Phone, &b.Timezone,
 		&b.Currency, &b.TaxRateBP, &b.TaxInclusive, &b.ServiceChargeBP, &b.PackagingFee, &b.MinOrderAmount,
-		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime)
+		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime, &b.NotifySMS)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, ErrNotFound
@@ -124,6 +125,7 @@ type Item struct {
 	DeliveryAvailable bool          `json:"delivery_available"`
 	PickupAvailable   bool          `json:"pickup_available"`
 	Sort              int           `json:"sort"`
+	StationID         *int64        `json:"station_id"`
 	Groups            []OptionGroup `json:"groups"`
 }
 
@@ -171,7 +173,7 @@ func loadZones(ctx context.Context, q Querier, branchID int64, activeOnly bool) 
 // groups. publishedOnly hides drafts (customer view).
 func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly bool) ([]*Item, error) {
 	rows, err := q.Query(ctx, `SELECT id, category_id, name, name_en, description, image_url, price, published,
-		sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort
+		sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort, station_id
 		FROM menu_items WHERE branch_id=$1 AND NOT archived AND (published OR NOT $2) ORDER BY sort, id`,
 		branchID, publishedOnly)
 	if err != nil {
@@ -183,7 +185,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 		it := &Item{Groups: []OptionGroup{}}
 		if err := rows.Scan(&it.ID, &it.CategoryID, &it.Name, &it.NameEn, &it.Description, &it.ImageURL,
 			&it.Price, &it.Published, &it.SoldOut, &it.StockQty, &it.NeedsPrep, &it.DeliveryAvailable,
-			&it.PickupAvailable, &it.Sort); err != nil {
+			&it.PickupAvailable, &it.Sort, &it.StationID); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -304,6 +306,7 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 				it.SoldOut = true
 			}
 			it.StockQty = nil
+			it.StationID = nil
 		}
 	}
 	return &Storefront{Branch: b, Zones: zones, Categories: cats}, nil

@@ -27,8 +27,10 @@ func main() {
 	}
 	defer pool.Close()
 
-	a := app.New(pool, cfg.AppSecret)
-	a.OTPDevEcho = cfg.OTPDevEcho
+	a, err := app.NewFromConfig(pool, cfg)
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
 	if cfg.OTPDevEcho {
 		log.Print("WARNING: OTP_DEV_ECHO is on; verification codes are returned in API responses. Never use in production.")
 	}

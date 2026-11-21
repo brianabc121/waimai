@@ -84,6 +84,16 @@ func (a *App) Accept(ctx context.Context, orderID int64, expectedVersion int, ac
 		if _, err := tx.Exec(ctx, `UPDATE order_items SET prep_status='ready' WHERE order_id=$1 AND NOT needs_prep`, o.ID); err != nil {
 			return err
 		}
+		// Dispatch: fix each item's station as configured right now. Items whose
+		// station is missing or inactive stay unassigned and show a warning.
+		if _, err := tx.Exec(ctx, `UPDATE order_items oi SET station_id = s.id, station_name = s.name
+			FROM menu_items m JOIN kitchen_stations s ON s.id = m.station_id AND s.active
+			WHERE oi.order_id=$1 AND oi.needs_prep AND m.id = oi.item_id`, o.ID); err != nil {
+			return err
+		}
+		if err := a.notifyCustomer(ctx, tx, o.ID, "accepted"); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `UPDATE orders SET acceptance_status='accepted', accepted_at=now(),
 			packing_status='waiting_items', version=version+1, updated_at=now() WHERE id=$1`, o.ID); err != nil {
 			return err
@@ -110,7 +120,7 @@ func (a *App) Reject(ctx context.Context, orderID int64, expectedVersion int, re
 		if err := checkVersion(o, expectedVersion); err != nil {
 			return err
 		}
-		return closeOrder(ctx, tx, o, "rejected", reason, actor)
+		return a.closeOrder(ctx, tx, o, "rejected", reason, actor)
 	})
 }
 
@@ -132,7 +142,7 @@ func (a *App) StaffCancel(ctx context.Context, orderID int64, expectedVersion in
 		if err := checkVersion(o, expectedVersion); err != nil {
 			return err
 		}
-		return closeOrder(ctx, tx, o, "cancelled", reason, actor)
+		return a.closeOrder(ctx, tx, o, "cancelled", reason, actor)
 	})
 }
 
@@ -188,7 +198,7 @@ func (a *App) AssignRider(ctx context.Context, orderID, riderID int64, actor Act
 // handoff records the physical handover. Store staff and the assigned rider
 // both call it; the first valid confirmation wins and the other side gets the
 // current state back.
-func handoff(ctx context.Context, tx pgx.Tx, o *lockedOrder, actor Actor) error {
+func (a *App) handoff(ctx context.Context, tx pgx.Tx, o *lockedOrder, actor Actor) error {
 	if o.Acceptance != "accepted" {
 		return ErrInvalidState("order is not active")
 	}
@@ -231,11 +241,14 @@ func handoff(ctx context.Context, tx pgx.Tx, o *lockedOrder, actor Actor) error 
 	if err := audit(ctx, tx, o.BranchID, o.ID, actor, "order.handed_off", map[string]any{"rider_id": riderID}); err != nil {
 		return err
 	}
+	if err := a.notifyCustomer(ctx, tx, o.ID, "out_for_delivery"); err != nil {
+		return err
+	}
 	return notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID, RiderIDs: []int64{riderID}})
 }
 
 func (a *App) StaffHandoff(ctx context.Context, orderID int64, actor Actor) (*Order, error) {
-	return a.command(ctx, orderID, func(tx pgx.Tx, o *lockedOrder) error { return handoff(ctx, tx, o, actor) })
+	return a.command(ctx, orderID, func(tx pgx.Tx, o *lockedOrder) error { return a.handoff(ctx, tx, o, actor) })
 }
 
 // ---- kitchen ----
@@ -357,6 +370,11 @@ func (a *App) Pack(ctx context.Context, orderID int64, bags, manifestVersion int
 		if err := audit(ctx, tx, o.BranchID, o.ID, actor, "order.packed", map[string]any{"bags": bags}); err != nil {
 			return err
 		}
+		if o.ServiceType == "pickup" {
+			if err := a.notifyCustomer(ctx, tx, o.ID, "ready_for_pickup"); err != nil {
+				return err
+			}
+		}
 		riders := []int64{}
 		var riderID int64
 		if err := tx.QueryRow(ctx, `SELECT rider_id FROM delivery_tasks WHERE order_id=$1 AND status='assigned'`,
@@ -404,7 +422,7 @@ func (a *App) riderCommand(ctx context.Context, taskID, riderID int64, fn func(t
 
 func (a *App) RiderPickup(ctx context.Context, taskID, riderID int64) (*Order, error) {
 	return a.riderCommand(ctx, taskID, riderID, func(tx pgx.Tx, o *lockedOrder, _ string) error {
-		return handoff(ctx, tx, o, Actor{Type: "rider", ID: riderID})
+		return a.handoff(ctx, tx, o, Actor{Type: "rider", ID: riderID})
 	})
 }
 
@@ -572,4 +590,68 @@ func (a *App) Reconcile(ctx context.Context, id, amountReturned int64, note stri
 		return nil, wrap("load cash", err)
 	}
 	return out[0], nil
+}
+
+// ---- failed deliveries ----
+
+// Redeliver sends a failed delivery out again: the food is back at the store,
+// so the order returns to "awaiting handoff" with a (possibly different) rider.
+func (a *App) Redeliver(ctx context.Context, orderID, riderID int64, actor Actor) (*Order, error) {
+	return a.command(ctx, orderID, func(tx pgx.Tx, o *lockedOrder) error {
+		if o.Acceptance != "accepted" || o.Fulfillment != "delivery_failed" {
+			return ErrInvalidState("only a failed delivery can be sent out again")
+		}
+		var ok bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM user_branch_roles r JOIN users u ON u.id = r.user_id
+			WHERE r.user_id=$1 AND r.branch_id=$2 AND r.role='rider' AND u.active)`, riderID, o.BranchID).Scan(&ok); err != nil {
+			return err
+		}
+		if !ok {
+			return ErrValidation("rider not found in this branch")
+		}
+		var prev int64
+		if err := tx.QueryRow(ctx, `SELECT rider_id FROM delivery_tasks WHERE order_id=$1 FOR UPDATE`, o.ID).Scan(&prev); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE delivery_tasks SET rider_id=$2, assignment_version=assignment_version+1,
+			status='assigned', fail_reason='', assigned_at=now(), picked_up_at=NULL, arrived_at=NULL WHERE order_id=$1`,
+			o.ID, riderID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE orders SET fulfillment_status='awaiting_handoff', handed_off_at=NULL,
+			version=version+1, updated_at=now() WHERE id=$1`, o.ID); err != nil {
+			return err
+		}
+		if err := audit(ctx, tx, o.BranchID, o.ID, actor, "delivery.redeliver",
+			map[string]any{"rider_id": riderID, "previous_rider_id": prev}); err != nil {
+			return err
+		}
+		return notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID, RiderIDs: []int64{riderID, prev}})
+	})
+}
+
+// CloseFailed ends a failed delivery without another attempt. The food was
+// made, so limited stock is not returned and nothing is recorded as paid.
+func (a *App) CloseFailed(ctx context.Context, orderID int64, reason string, actor Actor) (*Order, error) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return nil, ErrValidation("reason is required")
+	}
+	return a.command(ctx, orderID, func(tx pgx.Tx, o *lockedOrder) error {
+		if o.Acceptance != "accepted" || o.Fulfillment != "delivery_failed" {
+			return ErrInvalidState("only a failed delivery can be closed this way")
+		}
+		if _, err := tx.Exec(ctx, `UPDATE orders SET acceptance_status='cancelled', close_reason=$2, closed_at=now(),
+			version=version+1, updated_at=now() WHERE id=$1`, o.ID, reason); err != nil {
+			return err
+		}
+		if err := audit(ctx, tx, o.BranchID, o.ID, actor, "order.closed_after_failed_delivery",
+			map[string]any{"reason": reason}); err != nil {
+			return err
+		}
+		if err := a.notifyCustomer(ctx, tx, o.ID, "cancelled"); err != nil {
+			return err
+		}
+		return notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID})
+	})
 }

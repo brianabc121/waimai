@@ -47,7 +47,7 @@ docker compose run --rm seed    # 可选：载入演示数据
 | 平台管理（创建商户） | `/login` | `admin` |
 | 第二个商户（验证隔离） | `/login` | `owner2`，门店 `/s/bgc` |
 
-开发时设置 `OTP_DEV_ECHO=true`，验证码会直接显示在结账页。生产环境必须关闭，并接入短信服务商（实现 `app.SMSSender` 接口）。
+开发时设置 `OTP_DEV_ECHO=true`，验证码会直接显示在结账页。生产环境必须关闭，并用 `SMS_PROVIDER` 选择短信服务商（`twilio`，或用 `webhook` 接本地短信网关，见 `.env.example`）。
 
 ## 测试
 
@@ -81,7 +81,8 @@ e2e/                浏览器端到端脚本
 ## 上线前必须处理
 
 - 把 `APP_SECRET` 换成随机值，`COOKIE_SECURE=true`，`OTP_DEV_ECHO=false`。
-- 接入真实的短信服务商。目前验证码只写日志。
+- 设置 `SMS_PROVIDER` 和对应凭证，并用真实手机号实测一次。默认的 `log` 只写日志，不会真的发短信。Twilio 和 webhook 两种实现目前只经过本地模拟服务测试，没有用真实账号发过短信。
+- 设置 `PUBLIC_BASE_URL`，否则状态短信里没有订单链接。
 - 在 Nginx 上配置 HTTPS 并启用 HTTP/2。
 - 数据库开启自动备份和时间点恢复，并做一次恢复演练。
 - 如果数据库地址经过事务级连接池，单独设置 `LISTEN_DATABASE_URL` 为直连地址。

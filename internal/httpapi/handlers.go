@@ -528,7 +528,19 @@ func (s *Server) itemAction(c *gin.Context) {
 	if !allowed(c, bid, kitchenRoles) {
 		return
 	}
-	o, err := s.App.SetItemStatus(c, orderID, itemID, c.Param("action"), staffActor(c))
+	var o *app.Order
+	if c.Param("action") == "station" {
+		var in struct {
+			StationID *int64 `json:"station_id"`
+			Reason    string `json:"reason"`
+		}
+		if !bind(c, &in) {
+			return
+		}
+		o, err = s.App.MoveItemStation(c, orderID, itemID, in.StationID, in.Reason, staffActor(c))
+	} else {
+		o, err = s.App.SetItemStatus(c, orderID, itemID, c.Param("action"), staffActor(c))
+	}
 	if err != nil {
 		fail(c, err)
 		return
@@ -640,4 +652,74 @@ func (s *Server) createMerchant(c *gin.Context) {
 		return
 	}
 	c.JSON(200, m)
+}
+
+// ---- failed deliveries ----
+
+func (s *Server) redeliverOrder(c *gin.Context) {
+	s.orderCmd(c, deskRoles, func(id int64, in orderCommand) (*app.Order, error) {
+		return s.App.Redeliver(c, id, in.RiderID, staffActor(c))
+	})
+}
+
+func (s *Server) closeFailedOrder(c *gin.Context) {
+	s.orderCmd(c, deskRoles, func(id int64, in orderCommand) (*app.Order, error) {
+		return s.App.CloseFailed(c, id, in.Reason, staffActor(c))
+	})
+}
+
+// ---- kitchen stations ----
+
+func (s *Server) listStations(c *gin.Context) {
+	bid, ok := branchScope(c, allStaff)
+	if !ok {
+		return
+	}
+	st, err := s.App.ListStations(c, bid)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"stations": st})
+}
+
+func (s *Server) saveStation(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	id, ok := optionalID(c)
+	if !ok {
+		return
+	}
+	var in app.StationInput
+	if !bind(c, &in) {
+		return
+	}
+	id, err := s.App.SaveStation(c, bid, id, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"id": id})
+}
+
+func (s *Server) assignStation(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	var in struct {
+		ItemIDs   []int64 `json:"item_ids"`
+		StationID *int64  `json:"station_id"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	n, err := s.App.AssignStation(c, bid, in.ItemIDs, in.StationID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"updated": n})
 }

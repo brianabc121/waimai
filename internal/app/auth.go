@@ -374,7 +374,8 @@ func (a *App) RequestOTP(ctx context.Context, phone string) (devCode string, err
 	if err != nil {
 		return "", err
 	}
-	if err := a.SMS.Send(ctx, phone, code); err != nil {
+	msg := fmt.Sprintf("验证码 %s，5 分钟内有效。Your verification code is %s, valid for 5 minutes.", code, code)
+	if err := a.SMS.Send(ctx, phone, msg); err != nil {
 		return "", wrap("send sms", err)
 	}
 	if a.OTPDevEcho {

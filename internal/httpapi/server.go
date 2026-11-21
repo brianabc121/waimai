@@ -245,6 +245,8 @@ func (s *Server) Router() *gin.Engine {
 	auth.POST("/merchant/orders/:id/cancel", s.cancelOrder)
 	auth.POST("/merchant/orders/:id/assign-rider", s.assignRider)
 	auth.POST("/merchant/orders/:id/handoff", s.handoffOrder)
+	auth.POST("/merchant/orders/:id/redeliver", s.redeliverOrder)
+	auth.POST("/merchant/orders/:id/close-failed", s.closeFailedOrder)
 
 	// merchant configuration
 	auth.GET("/merchant/branches/:bid/menu", s.adminMenu)
@@ -256,6 +258,10 @@ func (s *Server) Router() *gin.Engine {
 	auth.POST("/merchant/branches/:bid/zones", s.saveZone)
 	auth.PUT("/merchant/branches/:bid/zones/:id", s.saveZone)
 	auth.PUT("/merchant/branches/:bid/settings", s.saveSettings)
+	auth.GET("/merchant/branches/:bid/stations", s.listStations)
+	auth.POST("/merchant/branches/:bid/stations", s.saveStation)
+	auth.PUT("/merchant/branches/:bid/stations/:id", s.saveStation)
+	auth.POST("/merchant/branches/:bid/station-assignments", s.assignStation)
 	auth.GET("/merchant/branches/:bid/staff", s.listStaff)
 	auth.POST("/merchant/branches/:bid/staff", s.createStaff)
 	auth.PATCH("/merchant/branches/:bid/staff/:id", s.patchStaff)

@@ -88,6 +88,16 @@ const dict: Record<string, [string, string]> = {
   'c.pending': ['待核款', 'Pending'], 'c.reconciled': ['已核款', 'Reconciled'], 'c.discrepancy': ['有差异', 'Discrepancy'], no_cash: ['暂无代收记录', 'No collections yet'],
   share_link: ['顾客点餐链接', 'Customer link'], merchants: ['商户', 'Merchants'], new_merchant: ['创建商户', 'New merchant'],
   merchant_name: ['商户名', 'Merchant name'], branch_name: ['门店名', 'Store name'], slug: ['链接标识', 'Link slug'], owner_account: ['店主账号', 'Owner account'], create: ['创建', 'Create'],
+  stations: ['后厨工作台', 'Kitchen stations'], station: ['工作台', 'Station'], new_station: ['新增工作台', 'New station'],
+  stations_hint: ['接单时菜品按这里的归属分到各工作台。停用的工作台不再接新任务，已有任务仍可处理。', 'Items are routed to stations when an order is accepted. A disabled station gets no new work but can finish what it has.'],
+  items_n: ['{n} 个菜品', '{n} items'], tasks_n: ['{n} 个在制', '{n} in progress'],
+  unassigned: ['未分台', 'Unassigned'], all_stations: ['全部', 'All'],
+  unassigned_warn: ['有 {n} 个待制作的菜没有分到工作台，请在这里处理或改派。', '{n} items to prepare have no station. Handle them here or move them.'],
+  move_to: ['改派到', 'Move to'],
+  notify_sms: ['订单状态短信通知顾客', 'Text customers about order status'],
+  redeliver: ['重新配送', 'Send out again'], close_failed: ['结束订单（不再配送）', 'Close order (no redelivery)'],
+  failed_hint: ['配送异常：请联系顾客后选择重新配送或结束订单。', 'Delivery failed. Contact the customer, then send it out again or close the order.'],
+  choose_rider: ['选择骑手', 'Choose rider'],
   conflict: ['订单已被其他人更新，已刷新', 'Someone else updated this order. Refreshed.'],
 }
 

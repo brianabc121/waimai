@@ -400,3 +400,67 @@ func TestSSE(t *testing.T) {
 		t.Fatal("branch 2 received a hint about branch 1's order")
 	}
 }
+
+func TestStationsAndFailedDeliveryOverHTTP(t *testing.T) {
+	f1, f2 := newFixture(t), newFixture(t)
+	b1 := fmt.Sprint(f1.branchID)
+	owner, owner2 := login(t, f1.owner), login(t, f2.owner)
+	cashier, kitchen, rider := login(t, f1.cashier), login(t, f1.kitchen), login(t, f1.rider)
+
+	// only managers define stations; other merchants see nothing
+	cashier.want(403, "FORBIDDEN", "POST", "/merchant/branches/"+b1+"/stations", map[string]any{"name": "Fryer", "active": true})
+	owner2.want(404, "NOT_FOUND", "GET", "/merchant/branches/"+b1+"/stations", nil)
+	st := owner.want(200, "", "POST", "/merchant/branches/"+b1+"/stations", map[string]any{"name": "Fryer", "active": true})
+	st2 := owner.want(200, "", "POST", "/merchant/branches/"+b1+"/stations", map[string]any{"name": "Bar", "active": true})
+	foreign := owner2.want(200, "", "POST", "/merchant/branches/"+fmt.Sprint(f2.branchID)+"/stations", map[string]any{"name": "X", "active": true})
+	// a station of another store cannot be used here
+	owner.want(422, "VALIDATION", "POST", "/merchant/branches/"+b1+"/station-assignments",
+		map[string]any{"item_ids": []int64{f1.itemID}, "station_id": foreign["id"]})
+	up := owner.want(200, "", "POST", "/merchant/branches/"+b1+"/station-assignments",
+		map[string]any{"item_ids": []int64{f1.itemID}, "station_id": st["id"]})
+	if up["updated"].(float64) != 1 {
+		t.Fatalf("assign: %v", up)
+	}
+
+	orderID, _ := f1.order(t, verifiedCustomer(t))
+	oid := fmt.Sprint(orderID)
+	o := cashier.want(200, "", "POST", "/merchant/orders/"+oid+"/accept", map[string]any{})
+	it := o["items"].([]any)[0].(map[string]any)
+	if it["station_name"] != "Fryer" {
+		t.Fatalf("item should be routed to the fryer: %v", it)
+	}
+	itemID := fmt.Sprint(int64(it["id"].(float64)))
+	owner2.want(404, "NOT_FOUND", "POST", "/kitchen/items/"+itemID+"/station", map[string]any{"station_id": nil})
+	kitchen.want(422, "VALIDATION", "POST", "/kitchen/items/"+itemID+"/station", map[string]any{"station_id": foreign["id"]})
+	o = kitchen.want(200, "", "POST", "/kitchen/items/"+itemID+"/station", map[string]any{"station_id": st2["id"]})
+	if o["items"].([]any)[0].(map[string]any)["station_name"] != "Bar" {
+		t.Fatalf("move: %v", o["items"])
+	}
+	list := kitchen.want(200, "", "GET", "/merchant/branches/"+b1+"/stations", nil)
+	if n := list["stations"].([]any)[1].(map[string]any)["open_tasks"].(float64); n != 1 {
+		t.Fatalf("bar should hold one open task, got %v", n)
+	}
+
+	// failed delivery: redeliver, fail again, close
+	o = kitchen.want(200, "", "POST", "/kitchen/items/"+itemID+"/ready", nil)
+	kitchen.want(200, "", "POST", "/kitchen/orders/"+oid+"/pack", map[string]any{"bags": 1, "manifest_version": o["manifest_version"]})
+	o = cashier.want(200, "", "POST", "/merchant/orders/"+oid+"/assign-rider", map[string]any{"rider_id": f1.riderID})
+	taskID := fmt.Sprint(int64(o["delivery"].(map[string]any)["id"].(float64)))
+	cashier.want(409, "INVALID_STATE", "POST", "/merchant/orders/"+oid+"/redeliver", map[string]any{"rider_id": f1.riderID})
+	rider.want(200, "", "POST", "/rider/tasks/"+taskID+"/pickup", nil)
+	rider.want(200, "", "POST", "/rider/tasks/"+taskID+"/fail", map[string]any{"reason": "nobody home"})
+	kitchen.want(403, "FORBIDDEN", "POST", "/merchant/orders/"+oid+"/redeliver", map[string]any{"rider_id": f1.riderID})
+	owner2.want(404, "NOT_FOUND", "POST", "/merchant/orders/"+oid+"/close-failed", map[string]any{"reason": "x"})
+	cashier.want(422, "VALIDATION", "POST", "/merchant/orders/"+oid+"/redeliver", map[string]any{"rider_id": f2.riderID})
+	o = cashier.want(200, "", "POST", "/merchant/orders/"+oid+"/redeliver", map[string]any{"rider_id": f1.riderID})
+	if o["fulfillment_status"] != "awaiting_handoff" {
+		t.Fatalf("redeliver: %v", o["fulfillment_status"])
+	}
+	rider.want(200, "", "POST", "/rider/tasks/"+taskID+"/pickup", nil)
+	rider.want(200, "", "POST", "/rider/tasks/"+taskID+"/fail", map[string]any{"reason": "wrong address"})
+	cashier.want(422, "VALIDATION", "POST", "/merchant/orders/"+oid+"/close-failed", map[string]any{"reason": " "})
+	o = cashier.want(200, "", "POST", "/merchant/orders/"+oid+"/close-failed", map[string]any{"reason": "customer unreachable"})
+	if o["acceptance_status"] != "cancelled" || o["payment_status"] != "unpaid" {
+		t.Fatalf("close: %v %v", o["acceptance_status"], o["payment_status"])
+	}
+}

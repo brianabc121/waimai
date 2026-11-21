@@ -15,6 +15,15 @@ type Config struct {
 	OTPDevEcho        bool
 	EmbedWorker       bool
 	StaticDir         string
+	PublicBaseURL     string // customer-facing origin, for order links in SMS
+
+	SMSProvider        string // log (default), webhook, twilio
+	SMSWebhookURL      string
+	SMSWebhookAuth     string
+	TwilioAccountSID   string
+	TwilioAuthToken    string
+	TwilioFrom         string
+	TwilioMessagingSID string
 }
 
 func env(key, def string) string {
@@ -43,6 +52,15 @@ func Load() Config {
 		OTPDevEcho:   envBool("OTP_DEV_ECHO", false),
 		EmbedWorker:  envBool("EMBED_WORKER", false),
 		StaticDir:    env("STATIC_DIR", ""),
+
+		PublicBaseURL:      env("PUBLIC_BASE_URL", ""),
+		SMSProvider:        env("SMS_PROVIDER", "log"),
+		SMSWebhookURL:      env("SMS_WEBHOOK_URL", ""),
+		SMSWebhookAuth:     env("SMS_WEBHOOK_AUTH", ""),
+		TwilioAccountSID:   env("TWILIO_ACCOUNT_SID", ""),
+		TwilioAuthToken:    env("TWILIO_AUTH_TOKEN", ""),
+		TwilioFrom:         env("TWILIO_FROM", ""),
+		TwilioMessagingSID: env("TWILIO_MESSAGING_SERVICE_SID", ""),
 	}
 	c.ListenDatabaseURL = env("LISTEN_DATABASE_URL", c.DatabaseURL)
 	return c
