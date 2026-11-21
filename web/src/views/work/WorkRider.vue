@@ -110,6 +110,16 @@ async function fail(o: Order) {
 }
 const branchName = computed(() => currentRole()?.branch_name ?? '')
 
+// Tell the store which new assignments this rider has had on screen.
+const seen = new Set<number>()
+watch([current, () => props.active], () => {
+  if (!props.active || document.visibilityState !== 'visible') return
+  const ids = current.value.filter(o => st(o) === 'assigned' && !o.delivery!.seen_at && !seen.has(o.delivery!.id)).map(o => o.delivery!.id)
+  if (!ids.length) return
+  ids.forEach(id => seen.add(id))
+  post('/rider/seen', { ids }).catch(() => ids.forEach(id => seen.delete(id)))
+}, { immediate: true })
+
 // ---- shift and position ----
 // The position is read only on duty and only while the rider identity is in front.
 watch([() => props.active, () => duty.on], ([active, on]) => track(active && on, () => current.value.length > 0), { immediate: true })

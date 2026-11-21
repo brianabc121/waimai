@@ -87,7 +87,7 @@ await shot(desk, '05-desk')
 await desk.click('.detail button:has-text("接单")')
 await desk.waitForSelector('.detail select')
 // 小王 holds two posts: packing and rider
-await desk.selectOption('.detail select', { label: '小王' })
+await desk.selectOption('.detail select', await desk.locator('.detail select option[data-rider=wang1]').getAttribute('value'))
 await desk.waitForSelector('.detail :text("小王")')
 await expectStatus('备餐中')   // pushed to the customer page over SSE, no reload
 step('cashier accepted; customer page updated live to "preparing"')

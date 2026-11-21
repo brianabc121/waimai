@@ -31,6 +31,7 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
       <router-link v-if="manager" to="/merchant/templates">{{ t('templates') }}</router-link>
       <router-link v-if="manager" to="/merchant/promos">{{ t('promos') }}</router-link>
       <router-link v-if="manager" to="/merchant/cash">{{ t('cash') }}</router-link>
+      <router-link v-if="desk" to="/merchant/riders">{{ t('riders') }}</router-link>
       <router-link v-if="manager" to="/merchant/delivery-map">{{ t('delivery_map') }}</router-link>
       <router-link v-if="manager" to="/merchant/staff">{{ t('staff') }}</router-link>
       <router-link v-if="manager" to="/merchant/settings">{{ t('settings') }}</router-link>

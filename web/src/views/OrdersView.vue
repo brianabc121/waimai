@@ -4,18 +4,19 @@ import { ApiError, get, post } from '../api'
 import { both, minutesSince, money, reasonText, t, whenText } from '../i18n'
 import { useLive } from '../live'
 import { session } from '../session'
-import type { Order } from '../types'
+import type { Order, RiderInfo } from '../types'
+import './work/strings'
 import TotalsTable from './TotalsTable.vue'
 
 const bid = session.branchId!
 const scope = ref<'active' | 'history'>('active')
 const orders = ref<Order[]>([])
-const riders = ref<{ id: number; display_name: string }[]>([])
+const riders = ref<RiderInfo[]>([])
 const selectedId = ref<number | null>(null)
 const error = ref('')
 const sound = ref(localStorage.getItem('order-sound') !== 'off')
 const now = ref(Date.now())
-setInterval(() => (now.value = Date.now()), 30000)
+setInterval(() => (now.value = Date.now()), 15000)
 
 let knownPending = new Set<number>()
 let first = true
@@ -44,9 +45,21 @@ async function load() {
     if (!first && [...pending].some(id => !knownPending.has(id))) chime()
     knownPending = pending; first = false
   }
-  if (riders.value.length === 0) riders.value = (await get(`/merchant/branches/${bid}/riders`)).riders
+  // Riders come in the order to pick from: on duty and near the store first.
+  riders.value = (await get(`/merchant/branches/${bid}/riders`)).riders
 }
 const { online, refreshNow } = useLive(() => `/merchant/branches/${bid}/events`, load)
+
+const km = (m: number) => m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`
+function riderLabel(r: RiderInfo) {
+  const parts = [r.display_name, !r.on_duty ? t('st.now.off_duty') : r.contact === 'lost' ? t('rd.lost') : r.contact === 'none' ? t('rd.no_position') : t('st.now.on_duty')]
+  if (r.distance_m != null && r.contact === 'ok') parts.push(km(r.distance_m))
+  if (r.active_deliveries) parts.push(t('rd.carrying', { n: r.active_deliveries }))
+  return parts.join(' · ')
+}
+// Two minutes after assigning, a delivery the rider has not had on screen is flagged.
+const unread = (o: Order) => !!o.delivery && o.delivery.status === 'assigned' && !o.delivery.seen_at &&
+  o.acceptance_status === 'accepted' && now.value - new Date(o.delivery.assigned_at).getTime() > 120000
 
 const selected = computed(() => orders.value.find(o => o.id === selectedId.value) ?? null)
 const pendingCount = computed(() => orders.value.filter(o => o.acceptance_status === 'pending').length)
@@ -118,6 +131,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
           <div class="row wrap" style="margin-top:8px;gap:6px">
             <span class="tag brand" v-if="o.scheduled_for">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span>
             <span class="tag" :class="accTag(o.acceptance_status)">{{ t('a.' + o.acceptance_status) }}</span>
+            <span v-if="unread(o)" class="tag bad" :data-unread="o.public_no">{{ t('rd.unread') }}</span>
             <span class="tag" v-if="o.acceptance_status === 'accepted'">{{ t('p.' + o.packing_status) }}</span>
             <span class="tag" v-if="o.acceptance_status === 'accepted'">{{ t('f.' + o.fulfillment_status) }}</span>
             <span class="tag" :class="o.payment_status === 'paid' ? 'ok' : ''">{{ t(o.payment_status) }}</span>
@@ -165,8 +179,11 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
 
           <div v-if="selected.delivery" class="row between">
             <span class="muted">{{ t('rider') }}</span>
-            <span>{{ selected.delivery.rider_name }} <span class="tag">{{ selected.delivery.status }}</span></span>
+            <span>{{ selected.delivery.rider_name }} <span class="tag">{{ selected.delivery.status }}</span>
+              <span v-if="unread(selected)" class="tag bad" data-testid="rider-unread">{{ t('rd.unread') }}</span></span>
           </div>
+          <div v-if="selected.delivery && unread(selected)" class="banner warn small">{{ t('rd.unread_hint', { name: selected.delivery.rider_name }) }}
+            <a v-if="selected.delivery.rider_phone" :href="'tel:' + selected.delivery.rider_phone">{{ selected.delivery.rider_phone }}</a></div>
           <div v-if="selected.delivery?.fail_reason" class="banner bad">{{ selected.delivery.fail_reason }}</div>
           <div v-if="selected.bags" class="row between"><span class="muted">{{ t('bags') }}</span><b>{{ selected.bags }}</b></div>
           <div v-if="selected.cash" class="row between"><span class="muted">{{ t('collected') }}</span>
@@ -181,7 +198,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
               <span>{{ selected.delivery ? t('reassign') : t('assign_rider') }}</span>
               <select :value="selected.delivery?.rider_id ?? 0" @change="assign(selected, $event)">
                 <option :value="0">—</option>
-                <option v-for="r in riders" :key="r.id" :value="r.id">{{ r.display_name }}</option>
+                <option v-for="r in riders" :key="r.id" :value="r.id" :data-rider="r.username">{{ riderLabel(r) }}</option>
               </select>
             </label>
             <button v-if="selected.fulfillment_status === 'awaiting_handoff' && selected.delivery" class="btn primary" @click="act(selected, 'handoff')">{{ t('handoff_rider') }}</button>
@@ -191,7 +208,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
               <div class="banner warn">{{ t('failed_hint') }}</div>
               <div class="row wrap">
                 <select :value="redeliverTo || selected.delivery?.rider_id || 0" :aria-label="t('choose_rider')" style="flex:1 1 160px" @change="redeliverTo = Number(($event.target as HTMLSelectElement).value)">
-                  <option v-for="r in riders" :key="r.id" :value="r.id">{{ r.display_name }}</option>
+                  <option v-for="r in riders" :key="r.id" :value="r.id" :data-rider="r.username">{{ riderLabel(r) }}</option>
                 </select>
                 <button class="btn primary" @click="redeliver(selected)">{{ t('redeliver') }}</button>
               </div>
