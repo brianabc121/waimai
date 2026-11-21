@@ -58,7 +58,7 @@ func (a *App) SaveCategory(ctx context.Context, branchID, id int64, in CategoryI
 			RETURNING id`, branchID, in.Name, in.NameEn, in.Sort).Scan(&id)
 	} else {
 		err = a.DB.QueryRow(ctx, `UPDATE menu_categories SET name=$3, name_en=$4, sort=$5
-			WHERE id=$1 AND branch_id=$2 RETURNING id`, id, branchID, in.Name, in.NameEn, in.Sort).Scan(&id)
+			WHERE id=$1 AND branch_id=$2 AND NOT archived RETURNING id`, id, branchID, in.Name, in.NameEn, in.Sort).Scan(&id)
 	}
 	if isNoRows(err) {
 		return 0, ErrNotFound
@@ -129,7 +129,7 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 	}
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
 		var ok bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM menu_categories WHERE id=$1 AND branch_id=$2)`,
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM menu_categories WHERE id=$1 AND branch_id=$2 AND NOT archived)`,
 			in.CategoryID, branchID).Scan(&ok); err != nil {
 			return err
 		}

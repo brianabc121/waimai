@@ -27,7 +27,16 @@ export const router = createRouter({
     { path: '/kitchen', component: () => import('./views/StaffLayout.vue'), meta: { staff: true },
       children: [{ path: '', component: () => import('./views/KitchenView.vue') }] },
     { path: '/rider', component: () => import('./views/RiderView.vue'), meta: { staff: true } },
-    { path: '/admin', component: () => import('./views/AdminView.vue'), meta: { staff: true } },
+    {
+      path: '/admin', component: () => import('./views/admin/AdminLayout.vue'), meta: { staff: true },
+      children: [
+        { path: '', redirect: '/admin/merchants' },
+        { path: 'merchants', component: () => import('./views/admin/AdminMerchants.vue'), meta: { title: 'ad.merchants' } },
+        { path: 'merchants/:id', component: () => import('./views/admin/AdminMerchantDetail.vue'), props: true, meta: { title: 'ad.merchants' } },
+        { path: 'items', component: () => import('./views/admin/AdminItems.vue'), meta: { title: 'ad.items' } },
+        { path: 'audit', component: () => import('./views/admin/AdminAudit.vue'), meta: { title: 'ad.audit' } },
+      ],
+    },
     { path: '/ticket/:id', component: () => import('./views/TicketView.vue'), props: true, meta: { staff: true } },
     { path: '/:rest(.*)*', component: () => import('./views/NotFound.vue') },
   ],

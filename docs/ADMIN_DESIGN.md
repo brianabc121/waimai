@@ -1,6 +1,12 @@
-# 平台管理员后台 · 设计方案 v0.1
+# 平台管理员后台 · 设计方案 v1.0
 
-2026-11-21 · 待 brian 确认后开始写代码
+2026-11-21 · brian 已确认，第 9 节的问题全部按推荐做法
+
+| 批次 | 状态 |
+|---|---|
+| 第一批：商户、门店、账号、商品、操作记录、只读进入门店 | 已实现 |
+| 第二批：Worker 和任务队列 | 进行中 |
+| 第三批：API 监控和总览 | 待做 |
 
 本稿是 [DESIGN.md](DESIGN.md) 的补充，只讲平台管理员（`platform_admin`）这一端。现在的 `/admin` 页面只有“商户列表 + 新建商户”一张表单（`web/src/views/AdminView.vue`，接口 `GET｜POST /api/v1/admin/merchants`）。本稿把它扩成一个完整后台。
 
@@ -203,6 +209,18 @@ CREATE INDEX admin_audit_logs_created_idx ON admin_audit_logs (created_at DESC);
 
 审计行和业务改动在同一个事务里写。
 
+### 3.5 实现时的调整（第一批）
+
+写代码时有几处和上面的草案不同，以这里为准：
+
+- **删除商户不改账号的启用状态。** 被删商户和被删门店的角色在登录时直接不可见，已有会话当场清掉。这样恢复商户时员工原样回来，不用记谁原来是停用的。
+- **暂停原因和时间单独存。** `merchants` 多了 `suspend_reason`、`suspended_at`，列表里能看到。
+- **最近登录。** `users` 多了 `last_login_at`，登录时更新。
+- **分类也是归档。** 已归档的商品仍然引用分类，所以分类加了 `archived` 列，删除分类是打标记。
+- **商品改动的操作记录。** 商户、门店、账号的操作记录和业务改动在同一个事务里。商品和分类的保存复用商家端的用例，操作记录在保存成功后紧接着写，不在同一个事务里。批量操作和删除分类仍在同一个事务里。
+- **新增门店时**，该商户现有的店主自动成为新门店的店主。
+- **只读进入门店** 时，平台管理员的写请求返回 `403 READ_ONLY`。
+
 ## 4. 接口
 
 都在 `/api/v1/admin` 下，沿用现有的 `requireUser` 加 `requireAdmin` 中间件和统一错误格式。列表接口统一 `?q=&status=&page=&page_size=`，返回 `{items, total}`。
@@ -213,8 +231,8 @@ CREATE INDEX admin_audit_logs_created_idx ON admin_audit_logs (created_at DESC);
 | API 监控 | `GET /admin/metrics/api?range=1h｜6h｜24h｜7d`（时间序列加接口排行） · `GET /admin/metrics/errors?route=&status=` |
 | Worker | `GET /admin/worker`（实例、周期任务、队列统计） · `GET /admin/jobs?status=&kind=` · `GET /admin/jobs/{id}` · `POST /admin/jobs/{id}/retry` · `POST /admin/jobs/{id}/discard` |
 | 商户 | `GET /admin/merchants` · `POST /admin/merchants` · `GET /admin/merchants/{id}` · `PUT /admin/merchants/{id}` · `POST /admin/merchants/{id}/suspend｜resume｜restore` · `DELETE /admin/merchants/{id}` |
-| 门店 | `POST /admin/merchants/{id}/branches` · `PUT /admin/branches/{bid}` · `DELETE /admin/branches/{bid}` |
-| 账号 | `GET /admin/merchants/{id}/users` · `POST /admin/branches/{bid}/users` · `PATCH /admin/users/{id}`（停用、改角色） · `POST /admin/users/{id}/reset-password` |
+| 门店 | `GET /admin/branches`（全部门店，给选择框用） · `GET /admin/branches/{bid}` · `POST /admin/merchants/{id}/branches` · `PUT /admin/branches/{bid}` · `DELETE /admin/branches/{bid}` |
+| 账号 | 账号列表在 `GET /admin/merchants/{id}` 里 · `POST /admin/branches/{bid}/users` · `PATCH /admin/users/{id}`（启用、停用） · `POST /admin/users/{id}/reset-password` |
 | 商品 | `GET /admin/items?q=&merchant_id=&branch_id=&status=`（跨商户搜索） · `GET /admin/branches/{bid}/menu` · `POST｜PUT /admin/branches/{bid}/categories[/{id}]` · `DELETE /admin/branches/{bid}/categories/{id}` · `POST｜PUT｜PATCH /admin/branches/{bid}/items[/{id}]` · `POST /admin/branches/{bid}/items/bulk` |
 | 操作记录 | `GET /admin/audit?admin_id=&action=&from=&to=` |
 

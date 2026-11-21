@@ -61,7 +61,8 @@ func (a *App) loadUser(ctx context.Context, id int64) (*User, error) {
 		return nil, err
 	}
 	rows, err := a.DB.Query(ctx, `SELECT r.branch_id, b.name, b.slug, b.currency, r.role FROM user_branch_roles r
-		JOIN branches b ON b.id = r.branch_id WHERE r.user_id=$1 ORDER BY r.branch_id`, id)
+		JOIN branches b ON b.id = r.branch_id JOIN merchants m ON m.id = b.merchant_id
+		WHERE r.user_id=$1 AND b.deleted_at IS NULL AND m.deleted_at IS NULL ORDER BY r.branch_id`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +100,9 @@ func (a *App) Login(ctx context.Context, username, password string) (token strin
 	token, th := newToken()
 	if _, err = a.DB.Exec(ctx, `INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1,$2,$3)`,
 		th, id, time.Now().Add(SessionTTL)); err != nil {
+		return "", nil, err
+	}
+	if _, err = a.DB.Exec(ctx, `UPDATE users SET last_login_at = now() WHERE id=$1`, id); err != nil {
 		return "", nil, err
 	}
 	u, err = a.loadUser(ctx, id)
@@ -229,87 +233,7 @@ func (a *App) SetStaffActive(ctx context.Context, branchID, userID int64, active
 	})
 }
 
-// ---- platform admin ----
-
-type NewMerchant struct {
-	MerchantName string  `json:"merchant_name"`
-	BranchName   string  `json:"branch_name"`
-	BranchNameEn string  `json:"branch_name_en"`
-	Slug         string  `json:"slug"`
-	Timezone     string  `json:"timezone"`
-	Currency     string  `json:"currency"`
-	Owner        NewUser `json:"owner"`
-}
-
-type MerchantSummary struct {
-	MerchantID   int64  `json:"merchant_id"`
-	MerchantName string `json:"merchant_name"`
-	BranchID     int64  `json:"branch_id"`
-	BranchName   string `json:"branch_name"`
-	Slug         string `json:"slug"`
-}
-
 var slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,40}$`)
-
-// CreateMerchant creates a merchant, its first branch and the owner account.
-func (a *App) CreateMerchant(ctx context.Context, in NewMerchant) (*MerchantSummary, error) {
-	in.Slug = strings.ToLower(strings.TrimSpace(in.Slug))
-	if strings.TrimSpace(in.MerchantName) == "" || strings.TrimSpace(in.BranchName) == "" {
-		return nil, ErrValidation("merchant_name and branch_name are required")
-	}
-	if !slugRe.MatchString(in.Slug) {
-		return nil, ErrValidation("slug must be lowercase letters, digits and dashes")
-	}
-	if in.Timezone == "" {
-		in.Timezone = "Asia/Manila"
-	}
-	if _, err := time.LoadLocation(in.Timezone); err != nil {
-		return nil, ErrValidation("unknown timezone")
-	}
-	if in.Currency == "" {
-		in.Currency = "PHP"
-	}
-	in.Owner.Role = "owner"
-	out := &MerchantSummary{MerchantName: in.MerchantName, BranchName: in.BranchName, Slug: in.Slug}
-	err := a.inTx(ctx, func(tx pgx.Tx) error {
-		if err := tx.QueryRow(ctx, `INSERT INTO merchants (name) VALUES ($1) RETURNING id`, in.MerchantName).
-			Scan(&out.MerchantID); err != nil {
-			return err
-		}
-		err := tx.QueryRow(ctx, `INSERT INTO branches (merchant_id, slug, name, name_en, timezone, currency)
-			VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (slug) DO NOTHING RETURNING id`,
-			out.MerchantID, in.Slug, in.BranchName, in.BranchNameEn, in.Timezone, in.Currency).Scan(&out.BranchID)
-		if isNoRows(err) {
-			return Err(http.StatusConflict, "SLUG_TAKEN", "this store link is already in use")
-		} else if err != nil {
-			return err
-		}
-		_, err = createUser(ctx, tx, in.Owner, out.BranchID)
-		return err
-	})
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (a *App) ListMerchants(ctx context.Context) ([]MerchantSummary, error) {
-	rows, err := a.DB.Query(ctx, `SELECT m.id, m.name, b.id, b.name, b.slug FROM merchants m
-		JOIN branches b ON b.merchant_id = m.id ORDER BY m.id, b.id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []MerchantSummary{}
-	for rows.Next() {
-		var m MerchantSummary
-		if err := rows.Scan(&m.MerchantID, &m.MerchantName, &m.BranchID, &m.BranchName, &m.Slug); err != nil {
-			return nil, err
-		}
-		out = append(out, m)
-	}
-	return out, rows.Err()
-}
 
 // EnsurePlatformAdmin creates or resets the platform admin account (used by seed and first-run setup).
 func (a *App) EnsurePlatformAdmin(ctx context.Context, username, password string) error {

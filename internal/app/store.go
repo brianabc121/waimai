@@ -31,7 +31,15 @@ type Branch struct {
 	SchedulingEnabled    bool   `json:"scheduling_enabled"`
 	PrepMinutes          int    `json:"prep_minutes"`
 	OpenNow              bool   `json:"open_now"`
+	// Suspended is set by the platform on the whole merchant. Customers cannot
+	// order; staff can still sign in and finish the orders already in progress.
+	Suspended bool `json:"suspended"`
 }
+
+var errStoreClosed = Err(http.StatusConflict, "STORE_CLOSED", "the store is not taking orders right now")
+
+// takesOrders is false while the store paused itself or the platform suspended the merchant.
+func (b *Branch) takesOrders() bool { return !b.Paused && !b.Suspended }
 
 func (b *Branch) taxConfig() TaxConfig {
 	return TaxConfig{TaxRateBP: b.TaxRateBP, TaxInclusive: b.TaxInclusive,
@@ -73,7 +81,7 @@ func (b *Branch) scheduleLimit(now time.Time) time.Time {
 // opening hours.
 func (b *Branch) Slots(now time.Time) []time.Time {
 	out := []time.Time{}
-	if !b.SchedulingEnabled || b.Paused {
+	if !b.SchedulingEnabled || !b.takesOrders() {
 		return out
 	}
 	t := now.Add(time.Duration(b.PrepMinutes) * time.Minute).Truncate(slotStep).Add(slotStep)
@@ -105,14 +113,15 @@ func (b *Branch) checkSchedule(now, at time.Time) error {
 
 const branchCols = `id, merchant_id, slug, name, name_en, address, phone, timezone, currency, tax_rate_bp,
 	tax_inclusive, service_charge_bp, packaging_fee, min_order_amount, accept_timeout_minutes,
-	delivery_enabled, pickup_enabled, paused, open_time, close_time, notify_sms, scheduling_enabled, prep_minutes`
+	delivery_enabled, pickup_enabled, paused, open_time, close_time, notify_sms, scheduling_enabled, prep_minutes,
+	(SELECT m.status = 'suspended' FROM merchants m WHERE m.id = branches.merchant_id)`
 
 func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 	var b Branch
 	err := row.Scan(&b.ID, &b.MerchantID, &b.Slug, &b.Name, &b.NameEn, &b.Address, &b.Phone, &b.Timezone,
 		&b.Currency, &b.TaxRateBP, &b.TaxInclusive, &b.ServiceChargeBP, &b.PackagingFee, &b.MinOrderAmount,
 		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime, &b.NotifySMS,
-		&b.SchedulingEnabled, &b.PrepMinutes)
+		&b.SchedulingEnabled, &b.PrepMinutes, &b.Suspended)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, ErrNotFound
@@ -124,7 +133,8 @@ func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 }
 
 func branchBySlug(ctx context.Context, q Querier, slug string) (*Branch, error) {
-	return scanBranch(q.QueryRow(ctx, `SELECT `+branchCols+` FROM branches WHERE slug=$1`, slug))
+	return scanBranch(q.QueryRow(ctx, `SELECT `+branchCols+` FROM branches WHERE slug=$1 AND deleted_at IS NULL
+		AND EXISTS (SELECT 1 FROM merchants m WHERE m.id = branches.merchant_id AND m.deleted_at IS NULL)`, slug))
 }
 
 func (a *App) BranchByID(ctx context.Context, id int64) (*Branch, error) {
@@ -298,7 +308,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 }
 
 func loadMenu(ctx context.Context, q Querier, branchID int64, publishedOnly bool) ([]Category, error) {
-	rows, err := q.Query(ctx, `SELECT id, name, name_en, sort FROM menu_categories WHERE branch_id=$1 ORDER BY sort, id`, branchID)
+	rows, err := q.Query(ctx, `SELECT id, name, name_en, sort FROM menu_categories WHERE branch_id=$1 AND NOT archived ORDER BY sort, id`, branchID)
 	if err != nil {
 		return nil, err
 	}
@@ -347,6 +357,8 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	if err != nil {
 		return nil, err
 	}
+	// The storefront shows a suspended merchant the same way as a paused store.
+	b.Paused = !b.takesOrders()
 	zones, err := loadZones(ctx, a.DB, b.ID, true)
 	if err != nil {
 		return nil, err

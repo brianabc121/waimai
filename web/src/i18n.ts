@@ -86,6 +86,8 @@ const dict: Record<string, [string, string]> = {
   'role.owner': ['店主', 'Owner'], 'role.manager': ['店长', 'Manager'], 'role.cashier': ['收银 / 接单', 'Cashier'], 'role.kitchen': ['后厨 / 打包', 'Kitchen'], 'role.rider': ['骑手', 'Rider'],
   returned: ['交回金额', 'Returned'], reconcile: ['确认核款', 'Reconcile'], due: ['应收', 'Due'], diff: ['差额', 'Difference'],
   'c.pending': ['待核款', 'Pending'], 'c.reconciled': ['已核款', 'Reconciled'], 'c.discrepancy': ['有差异', 'Discrepancy'], no_cash: ['暂无代收记录', 'No collections yet'],
+  admin_viewing: ['平台管理员只读查看：可以看这家店的后台，但不能替商家操作。', 'Platform view, read-only: you can look at this store but not act for the merchant.'],
+  admin_back: ['返回平台后台', 'Back to the platform'],
   share_link: ['顾客点餐链接', 'Customer link'], merchants: ['商户', 'Merchants'], new_merchant: ['创建商户', 'New merchant'],
   merchant_name: ['商户名', 'Merchant name'], branch_name: ['门店名', 'Store name'], slug: ['链接标识', 'Link slug'], owner_account: ['店主账号', 'Owner account'], create: ['创建', 'Create'],
   stations: ['后厨工作台', 'Kitchen stations'], station: ['工作台', 'Station'], new_station: ['新增工作台', 'New station'],
@@ -182,6 +184,9 @@ const dict: Record<string, [string, string]> = {
   published_ok: ['已发布', 'Published'], preview_table: ['08', '08'],
   conflict: ['订单已被其他人更新，已刷新', 'Someone else updated this order. Refreshed.'],
 }
+
+// extend adds the texts of a lazily loaded area (the platform back office).
+export function extend(more: Record<string, [string, string]>) { Object.assign(dict, more) }
 
 export function t(key: string, vars: Record<string, string | number> = {}): string {
   const e = dict[key]

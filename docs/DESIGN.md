@@ -200,7 +200,7 @@ deploy/           Nginx 配置
 
 | 角色 | 范围 |
 |---|---|
-| `platform_admin` | 创建商户、门店和店主账号 |
+| `platform_admin` | 平台后台：商户、门店、账号、商品的增删改查，监控，只读查看任一门店后台。见 [ADMIN_DESIGN.md](ADMIN_DESIGN.md) |
 | `owner`、`manager` | 本店全部操作，包括菜单、配送区、设置、员工、核款 |
 | `cashier` | 订单工作台、接拒单、指派骑手、自取交付 |
 | `kitchen` | 后厨总览、制作项状态、打包、交接 |
