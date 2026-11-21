@@ -2,7 +2,7 @@
 
 面向海外华人餐厅的点餐系统，覆盖自营外卖、自取和堂食。外卖闭环：顾客点餐下单，商家接单，后厨制作和打包，骑手配送和代收现金，门店核款。堂食闭环：店员开台，顾客扫桌码或用桌上平板点菜和加菜，后厨按工作台制作，上桌，柜台收款关台。
 
-设计依据是 [docs/DESIGN.md](docs/DESIGN.md)。部署到服务器见 [docs/DEPLOY.md](docs/DEPLOY.md)。
+设计依据是 [docs/DESIGN.md](docs/DESIGN.md)。部署到服务器见 [docs/DEPLOY.md](docs/DEPLOY.md)。 配送地图（商家画配送区、顾客地图定位）的设计见 [docs/MAP_ZONES_DESIGN.md](docs/MAP_ZONES_DESIGN.md)，需要 Google 地图密钥，见部署文档第 13 节。
 
 ## 技术栈
 

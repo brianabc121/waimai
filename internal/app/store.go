@@ -389,6 +389,7 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	}
 	// The storefront shows a suspended merchant the same way as a paused store.
 	b.Paused = !b.takesOrders()
+	a.forCustomer(b)
 	zones, err := loadZones(ctx, a.DB, b.ID, true)
 	if err != nil {
 		return nil, err

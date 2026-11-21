@@ -208,3 +208,35 @@ func TestMapZones(t *testing.T) {
 		t.Fatalf("zones after switching back: %+v", menu.Zones)
 	}
 }
+
+// Without a platform map key customers cannot pin an address: a store that
+// was switched to the map still sells by zone list.
+func TestMapModeNeedsPlatformKey(t *testing.T) {
+	s := newStore(t, true)
+	a, ctx := testApp, context.Background()
+	store := m(500, 500)
+	_, err := a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: store[0], Lng: store[1]})
+	noErr(t, err)
+	id, err := a.SaveZone(ctx, s.branchID, 0, app.ZoneInput{Name: "drawn", Fee: 1000, Active: true, Polygon: box(0, 0, 1000, 1000)})
+	noErr(t, err)
+	_, err = a.SaveZoneMode(ctx, s.branchID, app.ZoneModeInput{ZoneMode: "map", ZoneToleranceM: 200})
+	noErr(t, err)
+
+	off := *a
+	off.MapsOff = true
+	sf, err := off.Storefront(ctx, s.slug)
+	noErr(t, err)
+	if sf.Branch.ZoneMode != "list" {
+		t.Fatalf("storefront zone mode = %q, want list", sf.Branch.ZoneMode)
+	}
+	in := app.QuoteInput{ServiceType: "delivery", ZoneID: &id, Items: s.cart()}
+	_, err = off.CreateQuote(ctx, s.slug, in, "+639170000001")
+	noErr(t, err)
+	_, err = a.CreateQuote(ctx, s.slug, in, "+639170000001")
+	wantCode(t, err, "OUT_OF_ZONE") // with a key the pin is required
+
+	_, err = a.SaveZoneMode(ctx, s.branchID, app.ZoneModeInput{ZoneMode: "list", ZoneToleranceM: 200})
+	noErr(t, err)
+	_, err = off.SaveZoneMode(ctx, s.branchID, app.ZoneModeInput{ZoneMode: "map", ZoneToleranceM: 200})
+	wantCode(t, err, "MAPS_DISABLED")
+}

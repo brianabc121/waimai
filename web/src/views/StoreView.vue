@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ApiError, get } from '../api'
+import { ApiError, get, post } from '../api'
 import { addLine, clearLines, linePrice, useCart } from '../cart'
 import { locale, money, pick, promoLabel, setLocale, t } from '../i18n'
 import { defaultTemplate, themeVars } from '../theme'
-import type { Item, Storefront } from '../types'
+import type { Item, Located, Storefront } from '../types'
 import MenuList from './MenuList.vue'
+
+// The map is only downloaded when a customer opens "where to deliver".
+const DeliveryPicker = defineAsyncComponent(() => import('./DeliveryPicker.vue'))
 
 const props = defineProps<{ slug: string }>()
 const router = useRouter()
@@ -27,11 +30,33 @@ async function load() {
     if (cart.service === 'delivery' && !s.branch.delivery_enabled) cart.service = 'pickup'
     if (cart.service === 'pickup' && !s.branch.pickup_enabled) cart.service = 'delivery'
     if (cart.zoneId && !s.zones.some(z => z.id === cart.zoneId)) cart.zoneId = null
+    if (s.branch.zone_mode === 'map') await relocate(s)
   } catch (e) {
     error.value = e instanceof ApiError && e.status === 404 ? t('not_found') : t('offline')
   }
 }
 onMounted(load)
+
+// In map mode the delivery area follows the saved pin; areas may have been
+// redrawn since the last visit, so the server is asked again.
+const mapMode = computed(() => store.value?.branch.zone_mode === 'map')
+const showPicker = ref(false)
+const near = ref(0)
+async function relocate(s: Storefront) {
+  near.value = 0
+  if (cart.lat == null || cart.lng == null) { cart.zoneId = null; return }
+  const r = await post<Located>(`/stores/${props.slug}/locate`, { lat: cart.lat, lng: cart.lng }).catch(() => null)
+  if (!r) return
+  cart.zoneId = r.zone && s.zones.some(z => z.id === r.zone!.id) ? r.zone.id : null
+  if (r.zone) near.value = r.distance_m
+  else cart.lat = cart.lng = null
+}
+function pickerClosed() { showPicker.value = false; if (store.value) relocate(store.value) }
+function toPickup() { cart.service = 'pickup'; showPicker.value = false }
+function checkout() {
+  if (cart.service === 'delivery' && mapMode.value && !zone.value) { showPicker.value = true; return }
+  router.push(`/s/${props.slug}/checkout`)
+}
 
 const tpl = computed(() => store.value?.templates?.delivery ?? defaultTemplate('delivery'))
 const cur = computed(() => store.value?.branch.currency ?? 'PHP')
@@ -178,7 +203,15 @@ function qtyOf(it: Item) {
 
       <!-- menu (C01) -->
       <template v-else>
-        <div class="section" v-if="cart.service === 'delivery'" style="padding-bottom:0">
+        <div class="section" v-if="cart.service === 'delivery' && mapMode" style="padding-bottom:0">
+          <button type="button" class="card row between" style="width:100%;text-align:left;cursor:pointer" data-testid="deliver-to" @click="showPicker = true">
+            <span v-if="zone"><span class="muted small">{{ t('deliver_where') }}</span><br /><b>{{ cart.placeLabel || pick(zone.name, zone.name_en) }}</b>
+              <span class="small muted"><br />{{ pick(zone.name, zone.name_en) }} · {{ t('delivery_fee') }} {{ money(zone.fee, cur) }}<template v-if="zone.eta_minutes"> · {{ t('eta_min', { n: zone.eta_minutes }) }}</template></span></span>
+            <span v-else><b>📍 {{ t('pin_needed') }}</b></span>
+            <span class="muted">›</span>
+          </button>
+        </div>
+        <div class="section" v-else-if="cart.service === 'delivery'" style="padding-bottom:0">
           <label class="field" style="margin:0">
             <span>{{ t('deliver_to') }}</span>
             <select v-model="cart.zoneId">
@@ -202,10 +235,12 @@ function qtyOf(it: Item) {
             <button class="btn" @click="showCart = true">{{ t('cart') }} · {{ count }}</button>
             <span class="price bold grow right">{{ money(subtotal, cur) }}</span>
             <button class="btn primary" :disabled="!canOrder || hasUnavailable || minimum > subtotal"
-              @click="router.push(`/s/${slug}/checkout`)">{{ t('checkout') }}</button>
+              @click="checkout">{{ t('checkout') }}</button>
           </div>
         </div>
       </div>
+
+      <DeliveryPicker v-if="showPicker" :store="store" @close="pickerClosed" @pickup="toPickup" />
 
       <!-- item options (C04/C05) -->
       <div class="sheet-mask" v-if="sheet.item" @click.self="sheet.item = null">

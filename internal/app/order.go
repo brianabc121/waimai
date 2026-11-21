@@ -407,6 +407,7 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		}
 
 		// Re-price against the live menu; anything that moved needs a new confirmation.
+		a.forCustomer(b)
 		cur, err := computeQuote(ctx, tx, b, quoted.Input, phone)
 		if err != nil {
 			return err

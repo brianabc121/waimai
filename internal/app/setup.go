@@ -12,6 +12,7 @@ func NewFromConfig(pool *pgxpool.Pool, cfg config.Config) (*App, error) {
 	a := New(pool, cfg.AppSecret)
 	a.OTPDevEcho = cfg.OTPDevEcho
 	a.PublicBaseURL = cfg.PublicBaseURL
+	a.MapsOff = cfg.GoogleMapsKey == ""
 	sender, err := sms.FromConfig(cfg)
 	if err != nil {
 		return nil, err

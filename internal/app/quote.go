@@ -305,7 +305,7 @@ func (a *App) CreateQuote(ctx context.Context, slug string, in QuoteInput, phone
 	if err != nil {
 		return nil, err
 	}
-	quote, err := computeQuote(ctx, a.DB, b, in, phone)
+	quote, err := computeQuote(ctx, a.DB, a.forCustomer(b), in, phone)
 	if err != nil {
 		return nil, err
 	}

@@ -40,7 +40,9 @@ function problem(o: Order) {
   if (reason?.trim()) void act(o, 'fail', { reason })
 }
 
-const mapUrl = (o: Order) => 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(`${o.address_line} ${o.zone_name}`)
+// The customer's pin when there is one: an exact point beats a typed address.
+const mapUrl = (o: Order) => 'https://www.google.com/maps/dir/?api=1&destination=' +
+  encodeURIComponent(o.dest_lat != null && o.dest_lng != null ? `${o.dest_lat},${o.dest_lng}` : `${o.address_line} ${o.zone_name}`)
 async function out() { await logout(); router.replace('/login') }
 </script>
 
@@ -72,7 +74,8 @@ async function out() { await logout(); router.replace('/login') }
         <template v-else>
           <div>
             <div class="bold">{{ o.customer_name }}</div>
-            <div>{{ o.zone_name }} · {{ o.address_line }} {{ o.address_unit }}</div>
+            <div>{{ o.zone_name }} · {{ o.address_line }} {{ o.address_unit }}
+              <span v-if="o.zone_distance_m" class="tag warn">{{ t('outside_zone', { n: o.zone_distance_m }) }}</span></div>
             <div v-if="o.address_note" class="banner warn small" style="margin-top:6px">{{ o.address_note }}</div>
           </div>
           <div class="row">

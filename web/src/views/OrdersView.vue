@@ -144,7 +144,9 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
           <div>
             <div class="muted small">{{ t('customer') }}</div>
             <div>{{ selected.customer_name }} · <a :href="'tel:' + selected.customer_phone">{{ selected.customer_phone }}</a></div>
-            <div v-if="selected.service_type === 'delivery'">{{ selected.zone_name }} · {{ selected.address_line }} {{ selected.address_unit }}</div>
+            <div v-if="selected.service_type === 'delivery'">{{ selected.zone_name }} · {{ selected.address_line }} {{ selected.address_unit }}
+              <span v-if="selected.zone_distance_m" class="tag warn" data-testid="outside-zone">{{ t('outside_zone', { n: selected.zone_distance_m }) }}</span>
+              <a v-if="selected.dest_lat != null" class="small" target="_blank" rel="noopener" :href="`https://www.google.com/maps/search/?api=1&query=${selected.dest_lat},${selected.dest_lng}`">{{ t('view_on_map') }}</a></div>
             <div v-else>{{ t('pickup_code') }} <b>{{ selected.pickup_code }}</b></div>
             <div v-if="selected.address_note" class="small">{{ t('address_note') }}: {{ selected.address_note }}</div>
             <div v-if="selected.note" class="banner warn small" style="margin-top:6px">{{ t('order_note') }}: {{ selected.note }}</div>
