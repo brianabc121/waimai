@@ -26,14 +26,28 @@ func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
+// migrateLockKey is the advisory lock that serialises concurrent migrators.
+const migrateLockKey = 727301
+
 // Migrate applies all embedded migrations. It is run by a one-off process
-// (cmd/migrate), never by api or worker at startup.
+// (cmd/migrate), never by api or worker at startup. A session advisory lock
+// makes two migrators that start at the same time (two deploy jobs, or test
+// packages running in parallel) take turns instead of colliding.
 func Migrate(ctx context.Context, url string) error {
 	sqlDB, err := sql.Open("pgx", url)
 	if err != nil {
 		return err
 	}
 	defer sqlDB.Close()
+	lock, err := sqlDB.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+	if _, err := lock.ExecContext(ctx, "SELECT pg_advisory_lock($1)", migrateLockKey); err != nil {
+		return err
+	}
+	defer lock.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", migrateLockKey) //nolint:errcheck
 	goose.SetBaseFS(migrations)
 	goose.SetLogger(goose.NopLogger())
 	if err := goose.SetDialect("postgres"); err != nil {
