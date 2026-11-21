@@ -213,12 +213,12 @@ func (s *Server) listRiders(c *gin.Context) {
 	if !ok {
 		return
 	}
-	riders, err := s.App.ListRiders(c, bid)
+	riders, store, err := s.App.RiderBoard(c, bid)
 	if err != nil {
 		fail(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"riders": riders})
+	c.JSON(200, gin.H{"riders": riders, "store": store})
 }
 
 func (s *Server) getOrder(c *gin.Context) {
@@ -1070,4 +1070,27 @@ func (s *Server) removeDevice(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"ok": true})
+}
+
+func (s *Server) riderSeen(c *gin.Context) {
+	var in struct {
+		IDs []int64 `json:"ids"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	if err := s.App.MarkSeen(c, currentUser(c).ID, in.IDs); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (s *Server) customerTracking(c *gin.Context) {
+	t, err := s.App.OrderTracking(c, c.Param("token"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, t)
 }

@@ -44,7 +44,7 @@ export interface OrderItem {
 }
 export interface DeliveryTask {
   id: number; rider_id: number; rider_name: string; rider_phone: string; assignment_version: number
-  status: string; fail_reason: string
+  status: string; fail_reason: string; assigned_at: string; seen_at: string | null
 }
 export interface Cash {
   id: number; order_id: number; public_no: string; rider_name: string; amount_due: number; amount_collected: number
@@ -82,4 +82,6 @@ export interface Post { kind: 'station' | 'packing' | 'rider'; station_id: numbe
 // role is back-office access (owner, manager, cashier, staff); posts say what the person works on.
 export interface BranchRole { branch_id: number; branch_name: string; slug: string; currency: string; role: string; posts: Post[] }
 export interface StaffMember { id: number; username: string; display_name: string; phone: string; role: string; active: boolean; posts: Post[]; open_tasks: number; active_deliveries: number; on_duty: boolean }
+export interface RiderInfo extends StaffMember { lat: number | null; lng: number | null; accuracy: number | null; battery: number | null; located_at: string | null; contact: '' | 'ok' | 'none' | 'lost'; distance_m: number | null }
+export interface Tracking { active: boolean; rider_name?: string; rider_phone?: string; lat: number | null; lng: number | null; located_at: string | null; dest_lat: number | null; dest_lng: number | null; distance_m: number | null }
 export interface User { id: number; username: string; display_name: string; is_platform_admin: boolean; roles: BranchRole[] }

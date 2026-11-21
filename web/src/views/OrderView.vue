@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import { ApiError, get, post } from '../api'
 import { locale, money, pick, reasonText, setLocale, t, whenText } from '../i18n'
 import { useLive } from '../live'
 import type { Order } from '../types'
 import TotalsTable from './TotalsTable.vue'
+
+// Only customers whose order is on its way download the map.
+const TrackRider = defineAsyncComponent(() => import('./TrackRider.vue'))
 
 const props = defineProps<{ token: string }>()
 const order = ref<Order | null>(null)
@@ -72,6 +75,8 @@ async function cancel() {
             <span>{{ t(order.payment_method) }} · <span class="tag" :class="order.payment_status === 'paid' ? 'ok' : 'warn'">{{ t(order.payment_status) }}</span></span></div>
           <button v-if="order.display_status === 'pending_acceptance'" class="btn danger block" @click="cancel">{{ t('cancel_order') }}</button>
         </div>
+
+        <TrackRider v-if="order.delivery && ['out_for_delivery', 'rider_arrived'].includes(order.display_status)" :token="token" />
 
         <div class="card stack">
           <h2>{{ t('order_summary') }}</h2>

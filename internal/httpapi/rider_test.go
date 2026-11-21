@@ -67,3 +67,39 @@ func TestRiderAppOverHTTP(t *testing.T) {
 		t.Fatalf("signing out should end the shift: %v", riders)
 	}
 }
+
+// The rider list with positions is for the order desk only; the customer's
+// tracking link answers by order token and gives nothing away before pickup.
+func TestRiderBoardAndTrackingOverHTTP(t *testing.T) {
+	f := newFixture(t)
+	owner, rider := login(t, f.owner), login(t, f.rider)
+	ridersURL := fmt.Sprintf("/merchant/branches/%d/riders", f.branchID)
+	rider.want(403, "FORBIDDEN", "GET", ridersURL, nil)
+
+	rider.want(200, "", "POST", "/rider/duty", map[string]any{"on_duty": true})
+	rider.want(200, "", "POST", "/rider/locations", map[string]any{"points": []map[string]any{
+		{"lat": 14.55, "lng": 121.02, "at": time.Now().UTC().Format(time.RFC3339)}}})
+	out := owner.want(200, "", "GET", ridersURL, nil)
+	r := out["riders"].([]any)[0].(map[string]any)
+	if r["contact"] != "ok" || r["lat"].(float64) != 14.55 || out["store"] != nil {
+		t.Fatalf("rider board: %v", out)
+	}
+
+	id, token := f.order(t, verifiedCustomer(t))
+	anon := newClient(t)
+	anon.want(404, "NOT_FOUND", "GET", "/customer/orders/nope/tracking", nil)
+	if tr := anon.want(200, "", "GET", "/customer/orders/"+token+"/tracking", nil); tr["active"] != false || tr["lat"] != nil {
+		t.Fatalf("tracking before pickup: %v", tr)
+	}
+	o := owner.want(200, "", "POST", fmt.Sprintf("/merchant/orders/%d/accept", id), map[string]any{"expected_version": 1})
+	o = owner.want(200, "", "POST", fmt.Sprintf("/merchant/orders/%d/assign-rider", id), map[string]any{"rider_id": f.riderID, "expected_version": o["version"]})
+	task := o["delivery"].(map[string]any)
+	if task["seen_at"] != nil {
+		t.Fatalf("a new assignment is unseen: %v", task)
+	}
+	rider.want(200, "", "POST", "/rider/seen", map[string]any{"ids": []any{task["id"]}})
+	o = owner.want(200, "", "GET", fmt.Sprintf("/merchant/orders/%d", id), nil)
+	if o["delivery"].(map[string]any)["seen_at"] == nil {
+		t.Fatalf("the desk should see that the rider looked: %v", o["delivery"])
+	}
+}

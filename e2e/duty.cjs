@@ -1,6 +1,6 @@
 // The rider side of the workbench in a real browser: clocking on, sharing the
-// position, taking delivery steps without signal and sending them once the
-// network is back, and the installable page (manifest and service worker).
+// position, the desk's rider page, the customer's tracking map, delivery
+// steps taken without signal, and the installable page.
 // Usage: BASE_URL=http://localhost:8080 node e2e/duty.cjs   (needs seed data)
 const { chromium } = require('playwright')
 const { mkdirSync } = require('node:fs')
@@ -65,7 +65,7 @@ await login(desk, 'cashier1')
 await desk.click(`.ord:has-text("${orderNo}")`)
 await desk.click('.detail button:has-text("接单")')
 await desk.waitForSelector('.detail select')
-await desk.selectOption('.detail select', { label: '小王' })
+await desk.selectOption('.detail select', await desk.locator('.detail select option[data-rider=wang1]').getAttribute('value'))
 await desk.waitForSelector('.detail :text("小王")')
 step(`order ${orderNo} accepted and assigned to 小王`)
 
@@ -111,6 +111,21 @@ await owner.locator('tr[data-staff="rider1"]:has-text("没上班")').waitFor()
 await shot(owner, 'd03-staff-on-duty')
 step('clocked on: position reached the server, the staff page shows who is on duty')
 
+// ---- the desk's rider page: the list in picking order and a pin on the map ----
+await owner.click('.staffbar a:has-text("骑手")')
+await owner.waitForURL('**/merchant/riders')
+await owner.locator('[data-rider=wang1]:has-text("上班中")').waitFor()
+await owner.locator('[data-rider=wang1]:has-text("1 单在送")').waitFor()
+await owner.locator('[data-rider-pin=wang1]').waitFor()
+const firstRider = await owner.locator('.rrow').first().getAttribute('data-rider')
+if (firstRider !== 'wang1') throw new Error('the rider on duty should be listed first, got ' + firstRider)
+await shot(owner, 'd03b-riders-map')
+// The rider had the assignment on screen, so the desk does not flag it.
+const seenOrder = (await api(owner, 'GET', '/merchant/branches/1/orders?scope=active')).body.orders.find(o => o.public_no === orderNo)
+if (!seenOrder?.delivery?.seen_at) throw new Error('the assignment should be marked as seen by the rider')
+step('riders page: on duty first, a pin on the map; the assignment is marked seen')
+await owner.goto(BASE + '/merchant/staff')
+
 // Switching back to the in-store identity pauses the position.
 await rider.click('[data-testid=identity]')
 await rider.click('[data-testid=switch-go]')
@@ -122,27 +137,36 @@ await rider.waitForSelector('[data-testid=duty][data-on=true]')
 const task = rider.locator(`[data-delivery="${orderNo}"]`)
 await task.locator('[data-act=open]').click()
 await rider.waitForSelector('[data-act=pickup]:not([disabled])')
-await rider.context().setOffline(true)
+if (await cust.locator('[data-testid=tracking]').count()) throw new Error('the customer must not see the rider before pickup')
 await rider.click('[data-act=pickup]')
-await rider.locator('[data-testid=ops-waiting]:has-text("1 个操作")').waitFor()
+await expectStatus('配送中')
+// On the way: the customer sees where the rider is.
+await cust.locator('[data-testid=tracking][data-has-position=true]').waitFor()
+await cust.locator('[data-testid=tracking-map] [data-testid=rider-pin]').waitFor()
+await shot(cust, 'd03c-customer-tracking')
+step('the customer sees the rider on a map once the order is on its way')
+
+await rider.waitForSelector('[data-act=arrive]')
+await rider.context().setOffline(true)
 await rider.click('[data-act=arrive]')
-await rider.locator('[data-testid=ops-waiting]:has-text("2 个操作")').waitFor()
+await rider.locator('[data-testid=ops-waiting]:has-text("1 个操作")').waitFor()
 await rider.click('.quick button:has-text("刚好")')
 await shot(rider, 'd04-offline-steps')
 await rider.click('[data-act=deliver]')
-await rider.locator('[data-testid=ops-waiting]:has-text("3 个操作")').waitFor()
+await rider.locator('[data-testid=ops-waiting]:has-text("2 个操作")').waitFor()
 await rider.click('[data-testid=tab-done]')
 await rider.locator(`[data-done="${orderNo}"]`).waitFor()   // shown as delivered while it waits
-if (!(await cust.locator('[data-testid=status]').innerText()).includes('等待骑手取餐')) throw new Error('nothing may reach the server while offline')
+if (!(await cust.locator('[data-testid=status]').innerText()).includes('配送中')) throw new Error('nothing may reach the server while offline')
 // The page opens again without signal, with the tasks and the waiting steps.
 await rider.reload()
-await rider.locator('[data-testid=ops-waiting]:has-text("3 个操作")').waitFor()
+await rider.locator('[data-testid=ops-waiting]:has-text("2 个操作")').waitFor()
 await shot(rider, 'd05-offline-reopened')
-step('offline: three steps saved on the phone; the page reopened without signal')
+step('offline: two steps saved on the phone; the page reopened without signal')
 
 await rider.context().setOffline(false)
 await rider.locator('[data-testid=ops-waiting]').waitFor({ state: 'detached', timeout: 15000 })
 await expectStatus('已送达')
+await cust.locator('[data-testid=tracking]').waitFor({ state: 'detached' })   // delivered: the rider is no longer shown
 const cash = (await api(owner, 'GET', '/merchant/branches/1/cash')).body
 const mine = (cash?.collections ?? cash?.items ?? []).filter(c => c.public_no === orderNo)
 if (mine.length > 1) throw new Error('the cash was recorded more than once')

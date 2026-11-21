@@ -204,7 +204,7 @@ func (a *App) AssignRider(ctx context.Context, orderID, riderID int64, actor Act
 		default:
 			riders = append(riders, prev)
 			if _, err := tx.Exec(ctx, `UPDATE delivery_tasks SET rider_id=$2, assignment_version=assignment_version+1,
-				status='assigned', assigned_at=now() WHERE order_id=$1`, o.ID, riderID); err != nil {
+				status='assigned', assigned_at=now(), seen_at=NULL WHERE order_id=$1`, o.ID, riderID); err != nil {
 				return err
 			}
 		}
@@ -670,7 +670,8 @@ func (a *App) Redeliver(ctx context.Context, orderID, riderID int64, actor Actor
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE delivery_tasks SET rider_id=$2, assignment_version=assignment_version+1,
-			status='assigned', fail_reason='', assigned_at=now(), picked_up_at=NULL, arrived_at=NULL WHERE order_id=$1`,
+			status='assigned', fail_reason='', assigned_at=now(), picked_up_at=NULL, arrived_at=NULL, seen_at=NULL
+			WHERE order_id=$1`,
 			o.ID, riderID); err != nil {
 			return err
 		}

@@ -33,17 +33,19 @@ type OrderItem struct {
 }
 
 type DeliveryTask struct {
-	ID                int64      `json:"id"`
-	RiderID           int64      `json:"rider_id"`
-	RiderName         string     `json:"rider_name"`
-	RiderPhone        string     `json:"rider_phone"`
-	AssignmentVersion int        `json:"assignment_version"`
-	Status            string     `json:"status"`
-	FailReason        string     `json:"fail_reason"`
-	AssignedAt        time.Time  `json:"assigned_at"`
-	PickedUpAt        *time.Time `json:"picked_up_at"`
-	ArrivedAt         *time.Time `json:"arrived_at"`
-	DeliveredAt       *time.Time `json:"delivered_at"`
+	ID                int64     `json:"id"`
+	RiderID           int64     `json:"rider_id"`
+	RiderName         string    `json:"rider_name"`
+	RiderPhone        string    `json:"rider_phone"`
+	AssignmentVersion int       `json:"assignment_version"`
+	Status            string    `json:"status"`
+	FailReason        string    `json:"fail_reason"`
+	AssignedAt        time.Time `json:"assigned_at"`
+	// SeenAt is when the rider first had this assignment on screen.
+	SeenAt      *time.Time `json:"seen_at"`
+	PickedUpAt  *time.Time `json:"picked_up_at"`
+	ArrivedAt   *time.Time `json:"arrived_at"`
+	DeliveredAt *time.Time `json:"delivered_at"`
 }
 
 type CashCollection struct {
@@ -239,7 +241,7 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 	}
 
 	rows, err = q.Query(ctx, `SELECT t.id, t.order_id, t.rider_id, u.display_name, u.phone, t.assignment_version,
-		t.status, t.fail_reason, t.assigned_at, t.picked_up_at, t.arrived_at, t.delivered_at
+		t.status, t.fail_reason, t.assigned_at, t.picked_up_at, t.arrived_at, t.delivered_at, t.seen_at
 		FROM delivery_tasks t JOIN users u ON u.id = t.rider_id WHERE t.order_id = ANY($1)`, ids)
 	if err != nil {
 		return nil, err
@@ -248,7 +250,7 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 		var t DeliveryTask
 		var orderID int64
 		if err := rows.Scan(&t.ID, &orderID, &t.RiderID, &t.RiderName, &t.RiderPhone, &t.AssignmentVersion,
-			&t.Status, &t.FailReason, &t.AssignedAt, &t.PickedUpAt, &t.ArrivedAt, &t.DeliveredAt); err != nil {
+			&t.Status, &t.FailReason, &t.AssignedAt, &t.PickedUpAt, &t.ArrivedAt, &t.DeliveredAt, &t.SeenAt); err != nil {
 			rows.Close()
 			return nil, err
 		}

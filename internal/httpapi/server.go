@@ -263,6 +263,7 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/customer/orders/:token", s.customerOrder)
 	api.POST("/customer/orders/:token/cancel", s.limit(s.publicWrites), s.customerCancel)
 	api.GET("/customer/orders/:token/events", s.customerEvents)
+	api.GET("/customer/orders/:token/tracking", s.customerTracking)
 
 	// dine-in guests: scanned table code or paired tablet
 	api.POST("/table-sessions/exchange", s.limit(s.tableLimit), s.exchangeTableCode)
@@ -352,6 +353,7 @@ func (s *Server) Router() *gin.Engine {
 	auth.GET("/rider/tasks", s.riderTasks)
 	auth.GET("/rider/events", s.riderEvents)
 	auth.POST("/rider/tasks/:id/:action", s.riderAction)
+	auth.POST("/rider/seen", s.riderSeen)
 	auth.GET("/rider/duty", s.riderDuty)
 	auth.POST("/rider/duty", s.setRiderDuty)
 	auth.POST("/rider/locations", s.riderLocations)

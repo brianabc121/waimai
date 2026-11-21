@@ -387,3 +387,131 @@ func TestFCMSender(t *testing.T) {
 		t.Fatal("a missing file must be refused")
 	}
 }
+
+// The order desk sees riders in the order it should pick them, knows when a
+// rider has not looked at an assignment, and the customer sees the rider only
+// while the order is on its way.
+func TestRiderBoardSeenAndTracking(t *testing.T) {
+	a := need(t)
+	ctx := context.Background()
+	s := newStore(t, true)
+	_, err := a.DB.Exec(ctx, `UPDATE branches SET lat=14.5500, lng=121.0200 WHERE id=$1`, s.branchID)
+	noErr(t, err)
+	far, err := a.CreateStaff(ctx, s.branchID, app.NewUser{Username: uniq("r"), Password: "password1", DisplayName: "Far", Role: "staff",
+		Posts: []app.PostInput{{Kind: app.PostRider}}})
+	noErr(t, err)
+	silent, err := a.CreateStaff(ctx, s.branchID, app.NewUser{Username: uniq("r"), Password: "password1", DisplayName: "Silent", Role: "staff",
+		Posts: []app.PostInput{{Kind: app.PostRider}}})
+	noErr(t, err)
+
+	now := time.Now()
+	for id, at := range map[int64]app.LocationPoint{
+		s.rider1: {Lat: 14.5510, Lng: 121.0200, At: now}, // about 110 m from the store
+		far:      {Lat: 14.5800, Lng: 121.0200, At: now}, // about 3.3 km
+	} {
+		_, err = a.SetDuty(ctx, id, true, "")
+		noErr(t, err)
+		_, err = a.ReportLocations(ctx, id, []app.LocationPoint{at})
+		noErr(t, err)
+	}
+	_, err = a.SetDuty(ctx, silent, true, "") // on duty, never reported a position
+	noErr(t, err)
+
+	board, at, err := a.RiderBoard(ctx, s.branchID)
+	noErr(t, err)
+	if at == nil || at[0] != 14.55 {
+		t.Fatalf("store position: %v", at)
+	}
+	order := []int64{}
+	byID := map[int64]app.RiderInfo{}
+	for _, r := range board {
+		order = append(order, r.ID)
+		byID[r.ID] = r
+	}
+	if len(order) != 4 || order[0] != s.rider1 || order[1] != far || order[2] != silent || order[3] != s.rider2 {
+		t.Fatalf("board order %v, want near, far, silent, off duty", order)
+	}
+	if d := byID[s.rider1].DistanceM; d == nil || *d < 90 || *d > 130 {
+		t.Fatalf("distance to the near rider: %v", d)
+	}
+	if byID[s.rider1].Contact != "ok" || byID[silent].Contact != "none" || byID[s.rider2].Contact != "" || byID[s.rider2].Lat != nil {
+		t.Fatalf("contact: %+v", byID)
+	}
+	// Nothing for more than five minutes: out of contact, behind riders without a position.
+	_, err = a.DB.Exec(ctx, `UPDATE rider_status SET located_at = now() - interval '6 minutes' WHERE user_id=$1`, s.rider1)
+	noErr(t, err)
+	board, _, err = a.RiderBoard(ctx, s.branchID)
+	noErr(t, err)
+	if board[0].ID != far || board[2].ID != s.rider1 || board[2].Contact != "lost" {
+		t.Fatalf("a rider out of contact should drop behind: %v %v %v", board[0].ID, board[1].ID, board[2].ID)
+	}
+	_, err = a.ReportLocations(ctx, s.rider1, []app.LocationPoint{{Lat: 14.5510, Lng: 121.0200, At: time.Now()}})
+	noErr(t, err)
+
+	// An order with a pin, assigned to the near rider.
+	q := s.quote(t, "delivery", []app.QuoteLineInput{{ItemID: s.water, Qty: 1}})
+	p, err := a.PlaceOrder(ctx, s.slug, "+639170000001", uniq("k"), app.PlaceOrderInput{QuoteID: q.ID, CustomerName: "Ann", AddressLine: "1 Main St"})
+	noErr(t, err)
+	o, err := a.OrderByToken(ctx, p.AccessToken)
+	noErr(t, err)
+	_, err = a.DB.Exec(ctx, `UPDATE orders SET dest_lat=14.5600, dest_lng=121.0200 WHERE id=$1`, o.ID)
+	noErr(t, err)
+	o, err = a.Accept(ctx, o.ID, o.Version, s.staff)
+	noErr(t, err)
+	o, err = a.AssignRider(ctx, o.ID, s.rider1, s.staff)
+	noErr(t, err)
+	if o.Delivery.SeenAt != nil {
+		t.Fatal("a fresh assignment has not been seen")
+	}
+	tr, err := a.OrderTracking(ctx, p.AccessToken)
+	noErr(t, err)
+	if tr.Active || tr.Lat != nil || tr.RiderName != "" {
+		t.Fatalf("the customer must not see the rider before pickup: %+v", tr)
+	}
+
+	// Only the assigned rider can mark it seen; it shows on the order.
+	noErr(t, a.MarkSeen(ctx, far, []int64{o.Delivery.ID}))
+	o, _ = a.GetOrder(ctx, o.ID)
+	if o.Delivery.SeenAt != nil {
+		t.Fatal("another rider must not mark it seen")
+	}
+	noErr(t, a.MarkSeen(ctx, s.rider1, []int64{o.Delivery.ID}))
+	o, _ = a.GetOrder(ctx, o.ID)
+	if o.Delivery.SeenAt == nil {
+		t.Fatal("the assignment should be marked seen")
+	}
+	// Reassigning starts over.
+	o, err = a.AssignRider(ctx, o.ID, far, s.staff)
+	noErr(t, err)
+	if o.Delivery.SeenAt != nil {
+		t.Fatal("a reassigned delivery has not been seen by the new rider")
+	}
+	o, err = a.AssignRider(ctx, o.ID, s.rider1, s.staff)
+	noErr(t, err)
+
+	_, err = a.Pack(ctx, o.ID, 1, o.ManifestVersion, s.staff)
+	noErr(t, err)
+	_, err = a.RiderPickup(ctx, o.Delivery.ID, s.rider1)
+	noErr(t, err)
+	tr, err = a.OrderTracking(ctx, p.AccessToken)
+	noErr(t, err)
+	if !tr.Active || tr.RiderName != "R1" || tr.Lat == nil || tr.DistanceM == nil || *tr.DistanceM < 900 || *tr.DistanceM > 1100 {
+		t.Fatalf("tracking on the way: %+v", tr)
+	}
+	// A stale position is not shown, and neither is one after the shift.
+	_, err = a.DB.Exec(ctx, `UPDATE rider_status SET located_at = now() - interval '11 minutes' WHERE user_id=$1`, s.rider1)
+	noErr(t, err)
+	if tr, _ = a.OrderTracking(ctx, p.AccessToken); !tr.Active || tr.Lat != nil {
+		t.Fatalf("a stale position: %+v", tr)
+	}
+	_, err = a.ReportLocations(ctx, s.rider1, []app.LocationPoint{{Lat: 14.5590, Lng: 121.0200, At: time.Now()}})
+	noErr(t, err)
+	_, err = a.RiderDeliver(ctx, o.Delivery.ID, s.rider1, o.Totals.Total)
+	noErr(t, err)
+	if tr, _ = a.OrderTracking(ctx, p.AccessToken); tr.Active || tr.Lat != nil {
+		t.Fatalf("after delivery the rider is none of the customer's business: %+v", tr)
+	}
+	if _, err = a.OrderTracking(ctx, "no-such-token"); err == nil {
+		t.Fatal("an unknown token must not track anything")
+	}
+}
