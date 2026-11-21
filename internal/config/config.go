@@ -14,9 +14,12 @@ type Config struct {
 	AppSecret         string
 	CookieSecure      bool
 	OTPDevEcho        bool
-	EmbedWorker       bool
-	StaticDir         string
-	PublicBaseURL     string // customer-facing origin, for order links in SMS
+	// GoogleMapsKey is the browser key for the delivery map. Empty turns the
+	// map features off; "stub" serves a tile-less map for tests and demos.
+	GoogleMapsKey string
+	EmbedWorker   bool
+	StaticDir     string
+	PublicBaseURL string // customer-facing origin, for order links in SMS
 
 	SMSProvider        string // log (default), webhook, twilio
 	SMSWebhookURL      string
@@ -46,13 +49,14 @@ func envBool(key string, def bool) bool {
 
 func Load() Config {
 	c := Config{
-		Addr:         env("ADDR", ":8080"),
-		DatabaseURL:  env("DATABASE_URL", "postgres://postgres@localhost:5432/waimai?sslmode=disable"),
-		AppSecret:    env("APP_SECRET", "dev-secret-change-me"),
-		CookieSecure: envBool("COOKIE_SECURE", false),
-		OTPDevEcho:   envBool("OTP_DEV_ECHO", false),
-		EmbedWorker:  envBool("EMBED_WORKER", false),
-		StaticDir:    env("STATIC_DIR", ""),
+		Addr:          env("ADDR", ":8080"),
+		DatabaseURL:   env("DATABASE_URL", "postgres://postgres@localhost:5432/waimai?sslmode=disable"),
+		AppSecret:     env("APP_SECRET", "dev-secret-change-me"),
+		CookieSecure:  envBool("COOKIE_SECURE", false),
+		OTPDevEcho:    envBool("OTP_DEV_ECHO", false),
+		EmbedWorker:   envBool("EMBED_WORKER", false),
+		StaticDir:     env("STATIC_DIR", ""),
+		GoogleMapsKey: env("GOOGLE_MAPS_API_KEY", ""),
 
 		PublicBaseURL:      env("PUBLIC_BASE_URL", ""),
 		SMSProvider:        env("SMS_PROVIDER", "log"),

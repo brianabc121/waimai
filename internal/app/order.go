@@ -64,16 +64,21 @@ type CashCollection struct {
 // Order is the full staff-facing view. Customer and rider views are trimmed
 // from it in views.go.
 type Order struct {
-	ID                int64     `json:"id"`
-	MerchantID        int64     `json:"-"`
-	BranchID          int64     `json:"branch_id"`
-	PublicNo          string    `json:"public_no"`
-	PickupCode        string    `json:"pickup_code"`
-	Channel           string    `json:"channel"`
-	ServiceType       string    `json:"service_type"`
-	CustomerName      string    `json:"customer_name"`
-	CustomerPhone     string    `json:"customer_phone"`
-	ZoneName          string    `json:"zone_name"`
+	ID            int64  `json:"id"`
+	MerchantID    int64  `json:"-"`
+	BranchID      int64  `json:"branch_id"`
+	PublicNo      string `json:"public_no"`
+	PickupCode    string `json:"pickup_code"`
+	Channel       string `json:"channel"`
+	ServiceType   string `json:"service_type"`
+	CustomerName  string `json:"customer_name"`
+	CustomerPhone string `json:"customer_phone"`
+	ZoneName      string `json:"zone_name"`
+	// DestLat/DestLng is the customer's pin (map-mode stores only);
+	// ZoneDistanceM is how far outside the zone it was, nil when inside.
+	DestLat           *float64  `json:"dest_lat"`
+	DestLng           *float64  `json:"dest_lng"`
+	ZoneDistanceM     *int      `json:"zone_distance_m"`
 	AddressLine       string    `json:"address_line"`
 	AddressUnit       string    `json:"address_unit"`
 	AddressNote       string    `json:"address_note"`
@@ -154,7 +159,7 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	o.accept_deadline, o.created_at, o.accepted_at, o.packed_at, o.handed_off_at, o.completed_at, o.closed_at,
 	o.token_nonce, COALESCE(o.promotion_id, 0), o.promotion_name, o.promotion_name_en, o.scheduled_for, o.release_at,
 	(SELECT b.timezone FROM branches b WHERE b.id = o.branch_id), o.session_id, o.table_name, o.amount_received,
-	o.payment_note`
+	o.payment_note, o.dest_lat, o.dest_lng, o.zone_distance_m`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}}
@@ -166,7 +171,8 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.FulfillmentStatus, &o.PaymentStatus, &o.CloseReason, &o.Bags, &o.Version, &o.ManifestVersion,
 		&o.AcceptDeadline, &o.CreatedAt, &o.AcceptedAt, &o.PackedAt, &o.HandedOffAt, &o.CompletedAt, &o.ClosedAt,
 		&o.tokenNonce, &t.PromotionID, &t.PromotionName, &t.PromotionNameEn, &o.ScheduledFor, &o.ReleaseAt,
-		&o.Timezone, &o.SessionID, &o.TableName, &o.AmountReceived, &o.PaymentNote)
+		&o.Timezone, &o.SessionID, &o.TableName, &o.AmountReceived, &o.PaymentNote, &o.DestLat, &o.DestLng,
+		&o.ZoneDistanceM)
 	if err != nil {
 		return nil, err
 	}
@@ -424,21 +430,27 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			payMethod = "pay_at_pickup"
 		}
 		t := cur.Totals
+		// The pin is only meaningful where the server matched the zone from it.
+		var destLat, destLng *float64
+		if cur.ServiceType == "delivery" && b.ZoneMode == "map" {
+			destLat, destLng = cur.Input.Lat, cur.Input.Lng
+		}
 		var orderID int64
 		err = tx.QueryRow(ctx, `INSERT INTO orders (merchant_id, branch_id, public_no, pickup_code,
 			access_token_hash, token_nonce, service_type, customer_name, customer_phone, zone_id, zone_name,
 			address_line, address_unit, address_note, note, currency, subtotal, packaging_fee, delivery_fee,
 			service_charge, tax_amount, tax_inclusive, tax_rate_bp, discount, total, payment_method, accept_deadline,
-			promotion_id, promotion_name, promotion_name_en, scheduled_for, release_at)
+			promotion_id, promotion_name, promotion_name_en, scheduled_for, release_at, dest_lat, dest_lng,
+			zone_distance_m)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
 				now() + make_interval(mins => $27), NULLIF($28, 0), $29, $30,
-				$31::timestamptz, $31::timestamptz - make_interval(mins => $32))
+				$31::timestamptz, $31::timestamptz - make_interval(mins => $32), $33, $34, $35)
 			RETURNING id`,
 			b.MerchantID, b.ID, publicNo, pickupCode, hashToken(token), nonce, cur.ServiceType, in.CustomerName,
 			phone, cur.ZoneID, cur.ZoneName, in.AddressLine, in.AddressUnit, in.AddressNote, in.Note, b.Currency,
 			t.Subtotal, t.PackagingFee, t.DeliveryFee, t.ServiceCharge, t.TaxAmount, t.TaxInclusive, t.TaxRateBP,
 			t.Discount, t.Total, payMethod, b.AcceptTimeoutMinutes, t.PromotionID, t.PromotionName,
-			t.PromotionNameEn, cur.ScheduledFor, b.PrepMinutes).Scan(&orderID)
+			t.PromotionNameEn, cur.ScheduledFor, b.PrepMinutes, destLat, destLng, cur.ZoneDistanceM).Scan(&orderID)
 		if err != nil {
 			return wrap("insert order", err)
 		}

@@ -20,9 +20,13 @@ type QuoteLineInput struct {
 }
 
 type QuoteInput struct {
-	ServiceType string           `json:"service_type"`
-	ZoneID      *int64           `json:"zone_id"`
-	Items       []QuoteLineInput `json:"items"`
+	ServiceType string `json:"service_type"`
+	ZoneID      *int64 `json:"zone_id"`
+	// Lat/Lng is where the customer dropped the pin. Stores in map mode
+	// decide the zone from it and ignore ZoneID.
+	Lat   *float64         `json:"lat"`
+	Lng   *float64         `json:"lng"`
+	Items []QuoteLineInput `json:"items"`
 	// ScheduledFor is nil for "as soon as possible".
 	ScheduledFor *time.Time `json:"scheduled_for"`
 }
@@ -48,17 +52,20 @@ type QuoteLine struct {
 }
 
 type Quote struct {
-	ID           string      `json:"id"`
-	BranchID     int64       `json:"branch_id"`
-	Currency     string      `json:"currency"`
-	ServiceType  string      `json:"service_type"`
-	ZoneID       *int64      `json:"zone_id"`
-	ZoneName     string      `json:"zone_name"`
-	ScheduledFor *time.Time  `json:"scheduled_for"`
-	Lines        []QuoteLine `json:"lines"`
-	Totals       Totals      `json:"totals"`
-	ExpiresAt    time.Time   `json:"expires_at"`
-	Input        QuoteInput  `json:"input"`
+	ID          string `json:"id"`
+	BranchID    int64  `json:"branch_id"`
+	Currency    string `json:"currency"`
+	ServiceType string `json:"service_type"`
+	ZoneID      *int64 `json:"zone_id"`
+	ZoneName    string `json:"zone_name"`
+	// ZoneDistanceM is set when the pin is outside the zone's outline and was
+	// matched by tolerance.
+	ZoneDistanceM *int        `json:"zone_distance_m"`
+	ScheduledFor  *time.Time  `json:"scheduled_for"`
+	Lines         []QuoteLine `json:"lines"`
+	Totals        Totals      `json:"totals"`
+	ExpiresAt     time.Time   `json:"expires_at"`
+	Input         QuoteInput  `json:"input"`
 }
 
 // computeQuote validates the cart against the live menu and prices it. It is
@@ -98,16 +105,35 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		ScheduledFor: in.ScheduledFor}
 	var deliveryFee, minOrder int64
 	if in.ServiceType == "delivery" {
-		if in.ZoneID == nil {
-			return nil, Err(http.StatusUnprocessableEntity, "OUT_OF_ZONE", "choose a delivery area")
-		}
 		var z Zone
-		err := q.QueryRow(ctx, `SELECT id, name, name_en, fee, min_order FROM delivery_zones
-			WHERE id=$1 AND branch_id=$2 AND active`, *in.ZoneID, b.ID).Scan(&z.ID, &z.Name, &z.NameEn, &z.Fee, &z.MinOrder)
-		if isNoRows(err) {
-			return nil, Err(http.StatusUnprocessableEntity, "OUT_OF_ZONE", "this area is not served")
-		} else if err != nil {
-			return nil, err
+		if b.ZoneMode == "map" {
+			// The zone comes from the pin, never from the browser's zone_id.
+			if in.Lat == nil || in.Lng == nil {
+				return nil, Err(http.StatusUnprocessableEntity, "OUT_OF_ZONE", "locate the delivery address on the map")
+			}
+			loc, err := locate(ctx, q, b, LatLng{*in.Lat, *in.Lng})
+			if err != nil {
+				return nil, err
+			}
+			if loc.Zone == nil {
+				return nil, ErrD(http.StatusUnprocessableEntity, "OUT_OF_ZONE", "this location is outside the delivery area",
+					map[string]any{"nearest": loc.Nearest})
+			}
+			z = *loc.Zone
+			if loc.DistanceM > 0 {
+				quote.ZoneDistanceM = &loc.DistanceM
+			}
+		} else {
+			if in.ZoneID == nil {
+				return nil, Err(http.StatusUnprocessableEntity, "OUT_OF_ZONE", "choose a delivery area")
+			}
+			err := q.QueryRow(ctx, `SELECT id, name, name_en, fee, min_order FROM delivery_zones
+				WHERE id=$1 AND branch_id=$2 AND active`, *in.ZoneID, b.ID).Scan(&z.ID, &z.Name, &z.NameEn, &z.Fee, &z.MinOrder)
+			if isNoRows(err) {
+				return nil, Err(http.StatusUnprocessableEntity, "OUT_OF_ZONE", "this area is not served")
+			} else if err != nil {
+				return nil, err
+			}
 		}
 		quote.ZoneID, quote.ZoneName = &z.ID, z.Name
 		deliveryFee = z.Fee
@@ -133,6 +159,52 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		quote.Totals.PromotionID, quote.Totals.PromotionName, quote.Totals.PromotionNameEn = promo.ID, promo.Name, promo.NameEn
 	}
 	return quote, nil
+}
+
+// Location is the answer to "can you deliver here?".
+type Location struct {
+	// Zone is nil when the point is out of range.
+	Zone *Zone `json:"zone"`
+	// DistanceM is 0 inside the zone, otherwise the metres outside its outline
+	// (within the store's tolerance).
+	DistanceM int `json:"distance_m"`
+	// Nearest is set when out of range and at least one zone is drawn.
+	Nearest *NearestZone `json:"nearest"`
+}
+
+type NearestZone struct {
+	Name      string `json:"name"`
+	NameEn    string `json:"name_en"`
+	DistanceM int    `json:"distance_m"`
+}
+
+func locate(ctx context.Context, q Querier, b *Branch, at LatLng) (*Location, error) {
+	if !validLatLng(at) {
+		return nil, ErrValidation("invalid coordinates")
+	}
+	zones, err := loadZones(ctx, q, b.ID, true)
+	if err != nil {
+		return nil, err
+	}
+	hit, nearest := matchZone(zones, at, b.ZoneToleranceM)
+	out := &Location{}
+	if hit != nil {
+		z := *hit.Zone
+		z.Polygon = nil // the caller already has the outlines
+		out.Zone, out.DistanceM = &z, hit.DistanceM
+	} else if nearest != nil {
+		out.Nearest = &NearestZone{Name: nearest.Zone.Name, NameEn: nearest.Zone.NameEn, DistanceM: nearest.DistanceM}
+	}
+	return out, nil
+}
+
+// Locate tells a customer which zone a pin falls in before they build a quote.
+func (a *App) Locate(ctx context.Context, slug string, lat, lng float64) (*Location, error) {
+	b, err := branchBySlug(ctx, a.DB, slug)
+	if err != nil {
+		return nil, err
+	}
+	return locate(ctx, a.DB, b, LatLng{lat, lng})
 }
 
 // priceLines validates cart lines against the live menu and prices them. It is

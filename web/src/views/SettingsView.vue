@@ -16,7 +16,6 @@ const saved = ref(false)
 const s = reactive({ name: '', name_en: '', address: '', phone: '', tax: 12, tax_inclusive: true, service: 0, packaging: 0,
   min_order: 0, accept_timeout_minutes: 10, delivery_enabled: true, pickup_enabled: true, paused: false, open_time: '00:00', close_time: '00:00', notify_sms: true, scheduling_enabled: false, prep_minutes: 30 })
 const st = reactive({ id: 0, name: '', name_en: '', active: true })
-const z = reactive({ id: 0, name: '', name_en: '', fee: 0, min_order: 0, active: true })
 const u = reactive({ username: '', password: '', display_name: '', phone: '', role: 'cashier' })
 
 async function load() {
@@ -52,14 +51,6 @@ async function saveStation() {
   if (await run(() => st.id ? put(`/merchant/branches/${bid}/stations/${st.id}`, body) : post(`/merchant/branches/${bid}/stations`, body))) editStation(null)
 }
 
-function editZone(zone: Zone | null) {
-  Object.assign(z, zone ? { id: zone.id, name: zone.name, name_en: zone.name_en, fee: toMajor(zone.fee), min_order: toMajor(zone.min_order), active: zone.active }
-    : { id: 0, name: '', name_en: '', fee: 0, min_order: 0, active: true })
-}
-async function saveZone() {
-  const body = { name: z.name, name_en: z.name_en, fee: toMinor(z.fee), min_order: toMinor(z.min_order), active: z.active, sort: 0 }
-  if (await run(() => z.id ? put(`/merchant/branches/${bid}/zones/${z.id}`, body) : post(`/merchant/branches/${bid}/zones`, body))) editZone(null)
-}
 async function addStaff() {
   if (await run(() => post(`/merchant/branches/${bid}/staff`, { ...u }))) Object.assign(u, { username: '', password: '', display_name: '', phone: '' })
 }
@@ -104,24 +95,9 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
 
     <div class="card stack">
       <h2>{{ t('zones') }}</h2>
-      <table class="data">
-        <thead><tr><th>{{ t('name_zh') }}</th><th>{{ t('fee') }}</th><th>{{ t('min_order') }}</th><th></th><th></th></tr></thead>
-        <tbody><tr v-for="zone in zones" :key="zone.id">
-          <td>{{ both(zone.name, zone.name_en) }}</td><td class="price">{{ money(zone.fee, branch.currency) }}</td>
-          <td class="price">{{ zone.min_order ? money(zone.min_order, branch.currency) : '—' }}</td>
-          <td><span class="tag" :class="zone.active ? 'ok' : ''">{{ zone.active ? t('enabled') : t('disabled') }}</span></td>
-          <td class="right"><button class="btn small" @click="editZone(zone)">{{ t('edit') }}</button></td>
-        </tr></tbody>
-      </table>
-      <form class="row wrap" @submit.prevent="saveZone">
-        <input v-model="z.name" :placeholder="t('name_zh')" required style="flex:1 1 140px" />
-        <input v-model="z.name_en" :placeholder="t('name_en')" style="flex:1 1 140px" />
-        <input type="number" min="0" step="0.01" v-model.number="z.fee" :title="t('fee')" style="flex:0 1 100px" />
-        <input type="number" min="0" step="0.01" v-model.number="z.min_order" :title="t('min_order')" style="flex:0 1 100px" />
-        <label class="check" style="margin:0"><input type="checkbox" v-model="z.active" />{{ t('enabled') }}</label>
-        <button class="btn primary">{{ z.id ? t('save') : t('new_zone') }}</button>
-        <button v-if="z.id" type="button" class="btn" @click="editZone(null)">{{ t('cancel') }}</button>
-      </form>
+      <p class="muted">{{ t('zones_moved') }}</p>
+      <div><span v-for="zone in zones" :key="zone.id" class="tag" :class="zone.active ? 'ok' : ''" style="margin:0 6px 6px 0">{{ both(zone.name, zone.name_en) }} · {{ money(zone.fee, branch.currency) }}</span></div>
+      <router-link class="btn" to="/merchant/delivery-map" data-testid="to-delivery-map">{{ t('delivery_map') }}</router-link>
     </div>
 
     <div class="card stack">

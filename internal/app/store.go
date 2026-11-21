@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 )
@@ -31,6 +32,13 @@ type Branch struct {
 	SchedulingEnabled    bool   `json:"scheduling_enabled"`
 	PrepMinutes          int    `json:"prep_minutes"`
 	OpenNow              bool   `json:"open_now"`
+	// Lat/Lng is where the store is, set on the delivery map page.
+	Lat *float64 `json:"lat"`
+	Lng *float64 `json:"lng"`
+	// ZoneMode is "list" (the customer picks a zone by name) or "map" (the
+	// customer drops a pin and matchZone decides).
+	ZoneMode       string `json:"zone_mode"`
+	ZoneToleranceM int    `json:"zone_tolerance_m"`
 	// Suspended is set by the platform on the whole merchant. Customers cannot
 	// order; staff can still sign in and finish the orders already in progress.
 	Suspended bool `json:"suspended"`
@@ -114,6 +122,7 @@ func (b *Branch) checkSchedule(now, at time.Time) error {
 const branchCols = `id, merchant_id, slug, name, name_en, address, phone, timezone, currency, tax_rate_bp,
 	tax_inclusive, service_charge_bp, packaging_fee, min_order_amount, accept_timeout_minutes,
 	delivery_enabled, pickup_enabled, paused, open_time, close_time, notify_sms, scheduling_enabled, prep_minutes,
+	lat, lng, zone_mode, zone_tolerance_m,
 	(SELECT m.status = 'suspended' FROM merchants m WHERE m.id = branches.merchant_id)`
 
 func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
@@ -121,7 +130,7 @@ func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 	err := row.Scan(&b.ID, &b.MerchantID, &b.Slug, &b.Name, &b.NameEn, &b.Address, &b.Phone, &b.Timezone,
 		&b.Currency, &b.TaxRateBP, &b.TaxInclusive, &b.ServiceChargeBP, &b.PackagingFee, &b.MinOrderAmount,
 		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime, &b.NotifySMS,
-		&b.SchedulingEnabled, &b.PrepMinutes, &b.Suspended)
+		&b.SchedulingEnabled, &b.PrepMinutes, &b.Lat, &b.Lng, &b.ZoneMode, &b.ZoneToleranceM, &b.Suspended)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, ErrNotFound
@@ -130,6 +139,14 @@ func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 	}
 	b.OpenNow = b.isOpen(time.Now())
 	return &b, nil
+}
+
+// latLng is the store's position, nil until the merchant has set it.
+func (b *Branch) latLng() *LatLng {
+	if b.Lat == nil || b.Lng == nil {
+		return nil
+	}
+	return &LatLng{*b.Lat, *b.Lng}
 }
 
 func branchBySlug(ctx context.Context, q Querier, slug string) (*Branch, error) {
@@ -149,6 +166,10 @@ type Zone struct {
 	MinOrder int64  `json:"min_order"`
 	Active   bool   `json:"active"`
 	Sort     int    `json:"sort"`
+	// Polygon is the outline drawn on the map; empty while not drawn.
+	Polygon    Polygon `json:"polygon"`
+	Color      string  `json:"color"`
+	EtaMinutes *int    `json:"eta_minutes"`
 }
 
 type Option struct {
@@ -213,7 +234,8 @@ type Category struct {
 }
 
 func loadZones(ctx context.Context, q Querier, branchID int64, activeOnly bool) ([]Zone, error) {
-	rows, err := q.Query(ctx, `SELECT id, name, name_en, fee, min_order, active, sort FROM delivery_zones
+	rows, err := q.Query(ctx, `SELECT id, name, name_en, fee, min_order, active, sort, polygon, color, eta_minutes
+		FROM delivery_zones
 		WHERE branch_id=$1 AND (active OR NOT $2) ORDER BY sort, id`, branchID, activeOnly)
 	if err != nil {
 		return nil, err
@@ -222,8 +244,16 @@ func loadZones(ctx context.Context, q Querier, branchID int64, activeOnly bool) 
 	zones := []Zone{}
 	for rows.Next() {
 		var z Zone
-		if err := rows.Scan(&z.ID, &z.Name, &z.NameEn, &z.Fee, &z.MinOrder, &z.Active, &z.Sort); err != nil {
+		var poly []byte
+		if err := rows.Scan(&z.ID, &z.Name, &z.NameEn, &z.Fee, &z.MinOrder, &z.Active, &z.Sort, &poly, &z.Color,
+			&z.EtaMinutes); err != nil {
 			return nil, err
+		}
+		z.Polygon = Polygon{}
+		if poly != nil {
+			if err := json.Unmarshal(poly, &z.Polygon); err != nil {
+				return nil, wrap("zone polygon", err)
+			}
 		}
 		zones = append(zones, z)
 	}

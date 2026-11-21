@@ -21,6 +21,7 @@ export const router = createRouter({
         { path: 'templates', component: () => import('./views/TemplatesView.vue') },
         { path: 'promos', component: () => import('./views/PromosView.vue') },
         { path: 'cash', component: () => import('./views/CashView.vue') },
+        { path: 'delivery-map', component: () => import('./views/DeliveryMapView.vue') },
         { path: 'settings', component: () => import('./views/SettingsView.vue') },
       ],
     },

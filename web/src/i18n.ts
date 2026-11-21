@@ -77,6 +77,8 @@ const dict: Record<string, [string, string]> = {
   option_groups: ['规格组', 'Option groups'], add_group: ['添加规格组', 'Add group'], add_option: ['添加选项', 'Add option'],
   min_sel: ['最少选', 'Min'], max_sel: ['最多选', 'Max'], extra: ['加价', 'Extra'], delete: ['删除', 'Delete'], archive: ['下架删除', 'Remove'],
   mark_sold_out: ['标记售罄', 'Mark sold out'], restore: ['恢复供应', 'Back in stock'], publish: ['发布', 'Publish'], unpublish: ['转为草稿', 'Unpublish'],
+  delivery_map: ['配送地图', 'Delivery map'], zones_moved: ['配送区、店铺位置和配送范围在“配送地图”页面管理。', 'Delivery areas, the store location and outlines are managed on the Delivery map page.'],
+  map_stub: ['测试底图，没有连接 Google 地图', 'Test map, not connected to Google Maps'], map_auth_failed: ['Google 地图拒绝了密钥，请检查密钥、域名限制和结算账号。', 'Google Maps rejected the key. Check the key, its referrer restriction and billing.'], map_load_failed: ['地图加载失败，请检查网络后刷新。', 'The map failed to load. Check the connection and reload.'],
   zones: ['配送区', 'Delivery areas'], fee: ['配送费', 'Fee'], enabled: ['启用', 'Enabled'], new_zone: ['新增配送区', 'New area'],
   store_settings: ['门店设置', 'Store settings'], tax_rate: ['税率 %', 'Tax rate %'], tax_inclusive: ['菜单价已含税', 'Menu prices include tax'],
   service_rate: ['服务费 %', 'Service charge %'], accept_timeout: ['接单超时（分钟）', 'Accept timeout (min)'],
