@@ -240,7 +240,7 @@ async function saveTable(tb: DiningTable | null, patch: Partial<DiningTable> = {
               <span v-if="bill.order.payment_note"> · {{ bill.order.payment_note }}</span></div>
           </template>
 
-          <DineMenu v-else-if="mode === 'add' && store" ref="menu" :categories="store.categories" :currency="cur" :busy="busy" wide
+          <DineMenu v-else-if="mode === 'add' && store" ref="menu" :categories="store.categories" :currency="cur" :busy="busy" layout="grid"
             :storage-key="`staff-cart:${bill.session_id}`" @submit="addBatch" />
 
           <template v-else-if="mode === 'pay'">

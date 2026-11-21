@@ -338,6 +338,8 @@ type Storefront struct {
 	// Slots are the times an order can be scheduled for (empty when the store
 	// does not take scheduled orders).
 	Slots []time.Time `json:"slots"`
+	// Templates is the published look of each ordering channel.
+	Templates map[string]Template `json:"templates"`
 }
 
 func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) {
@@ -376,5 +378,9 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &Storefront{Branch: b, Zones: zones, Categories: cats, Promotions: promos, Slots: b.Slots(time.Now())}, nil
+	tpl, err := a.PublishedTemplates(ctx, b.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &Storefront{Branch: b, Zones: zones, Categories: cats, Promotions: promos, Slots: b.Slots(time.Now()), Templates: tpl}, nil
 }

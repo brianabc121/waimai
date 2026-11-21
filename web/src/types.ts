@@ -22,7 +22,10 @@ export interface Promotion {
   starts_at: string | null; ends_at: string | null; daily_start: string; daily_end: string
   total_quota: number | null; per_phone_limit: number | null; used_count: number; status: string; live_now: boolean
 }
-export interface Storefront { branch: Branch; zones: Zone[]; categories: Category[]; promotions: Promotion[]; slots: string[] }
+export interface Template { layout: 'list' | 'featured' | 'grid'; theme_color: string; logo_url: string; cover_url: string }
+export type Channel = 'delivery' | 'qr' | 'ipad'
+export interface ChannelTemplate { channel: Channel; published: Template; draft: Template | null; published_at: string | null }
+export interface Storefront { branch: Branch; zones: Zone[]; categories: Category[]; promotions: Promotion[]; slots: string[]; templates: Record<Channel, Template> }
 export interface Totals {
   subtotal: number; packaging_fee: number; delivery_fee: number; service_charge: number
   tax_amount: number; tax_inclusive: boolean; tax_rate_bp: number; discount: number; total: number

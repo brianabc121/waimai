@@ -167,6 +167,19 @@ const dict: Record<string, [string, string]> = {
   waiting_open: ['欢迎光临，请稍候，店员开台后即可点菜', 'Welcome! You can order as soon as the staff opens this table.'],
   submit_failed: ['没有收到结果，请再点一次，不会重复下单', 'No response received. Tap again; the order will not be duplicated.'],
   's.completed': ['已完成', 'Completed'], 'f.dined': ['已结账', 'Closed'],
+  // templates
+  signature: ['招牌推荐', 'Signature dishes'], templates: ['模板', 'Templates'],
+  'ch.delivery': ['外卖和自取', 'Delivery & pickup'], 'ch.qr': ['扫码堂食', 'Table QR'], 'ch.ipad': ['平板堂食', 'Table tablet'],
+  'ly.list': ['左栏列表', 'List with side rail'], 'ly.featured': ['招牌推荐', 'Signature strip'], 'ly.grid': ['双列商品', 'Card grid'],
+  'ly.list.d': ['左边分类，右边逐行列出，适合菜多的门店', 'Categories on the left, one dish per row. Good for long menus.'],
+  'ly.featured.d': ['顶部大图推荐第一个分类的菜，下面是完整菜单', 'Large cards for the first category on top, full menu below.'],
+  'ly.grid.d': ['图片在上的卡片，适合有菜品照片的门店和平板', 'Picture-on-top cards. Good with photos and on tablets.'],
+  layout: ['布局', 'Layout'], theme_color: ['主题色', 'Theme colour'], logo_url: ['店标图片链接', 'Logo image URL'], cover_url: ['封面图片链接', 'Cover image URL'],
+  https_only: ['只接受 https 链接，留空则不显示', 'https links only. Leave empty to hide.'],
+  in_use: ['当前使用', 'Live'], has_draft: ['有未发布的修改', 'Unpublished changes'], save_draft: ['保存草稿', 'Save draft'],
+  publish_tpl: ['发布到这个入口', 'Publish to this channel'], discard: ['放弃修改', 'Discard changes'], preview: ['预览', 'Preview'],
+  preview_hint: ['预览用的是本店已发布的菜单。发布前顾客看到的仍是当前模板。', 'The preview uses your published menu. Guests keep seeing the live template until you publish.'],
+  published_ok: ['已发布', 'Published'], preview_table: ['08', '08'],
   conflict: ['订单已被其他人更新，已刷新', 'Someone else updated this order. Refreshed.'],
 }
 

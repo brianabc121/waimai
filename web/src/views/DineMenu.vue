@@ -4,10 +4,11 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { newKey } from '../api'
 import { linePrice, type CartLine } from '../cart'
-import { locale, money, pick, t } from '../i18n'
+import { money, pick, t } from '../i18n'
 import type { BatchLine, Category, Item } from '../types'
+import MenuList from './MenuList.vue'
 
-const props = defineProps<{ categories: Category[]; currency: string; busy: boolean; storageKey: string; wide?: boolean }>()
+const props = defineProps<{ categories: Category[]; currency: string; busy: boolean; storageKey: string; layout: string }>()
 const emit = defineEmits<{ submit: [lines: BatchLine[], expectedTotal: number, key: string] }>()
 
 // The cart and its idempotency key survive a reload, so a batch whose answer
@@ -24,7 +25,6 @@ const state = reactive<Saved>(restore())
 watch(() => state.lines, () => { state.key = newKey() }, { deep: true })
 watch(state, s => sessionStorage.setItem(props.storageKey, JSON.stringify(s)), { deep: true })
 
-const cats = computed(() => props.categories.filter(c => c.items.length))
 const items = computed(() => new Map(props.categories.flatMap(c => c.items).map(i => [i.id, i])))
 const count = computed(() => state.lines.reduce((n, l) => n + l.qty, 0))
 const total = computed(() => state.lines.reduce((s, l) => s + (linePrice(l, items.value) ?? 0) * l.qty, 0))
@@ -83,7 +83,6 @@ function changeQty(i: number, d: number) {
   if (state.lines.length === 0) review.value = false
 }
 const qtyOf = (it: Item) => state.lines.filter(l => l.item_id === it.id).reduce((n, l) => n + l.qty, 0)
-function scrollTo(id: number) { document.getElementById('dcat-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
 
 function send() {
   if (props.busy || hasBad.value || count.value === 0) return
@@ -96,37 +95,8 @@ defineExpose({ clear, count })
 
 <template>
   <div>
-    <div class="cats">
-      <button v-for="c in cats" :key="c.id" @click="scrollTo(c.id)">{{ pick(c.name, c.name_en) }}</button>
-    </div>
-    <div class="section stack">
-      <div v-for="c in cats" :key="c.id" :id="'dcat-' + c.id" class="stack" style="scroll-margin-top:60px">
-        <h2>{{ pick(c.name, c.name_en) }}</h2>
-        <div :class="wide ? 'grid' : 'stack'">
-          <div v-for="it in c.items" :key="it.id" class="card item" :class="{ off: it.sold_out }">
-            <img v-if="it.image_url" :src="it.image_url" alt="" />
-            <div class="grow">
-              <div class="bold">{{ pick(it.name, it.name_en) }}</div>
-              <div class="muted small" v-if="locale === 'zh' && it.name_en">{{ it.name_en }}</div>
-              <div class="muted small" v-if="it.description">{{ it.description }}</div>
-              <div class="row between" style="margin-top:8px">
-                <span class="price bold">{{ money(it.price, currency) }}</span>
-                <span v-if="it.sold_out" class="tag">{{ t('sold_out') }}</span>
-                <button v-else-if="it.groups.length" class="btn small primary" @click="open(it)">
-                  {{ t('choose') }}<span v-if="qtyOf(it)"> · {{ qtyOf(it) }}</span></button>
-                <span v-else class="stepper">
-                  <template v-if="qtyOf(it)">
-                    <button @click="changeQty(state.lines.findIndex(l => l.item_id === it.id), -1)" aria-label="-">−</button>
-                    <span>{{ qtyOf(it) }}</span>
-                  </template>
-                  <button class="fill" @click="open(it)" aria-label="+">+</button>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <MenuList :categories="categories" :currency="currency" :layout="layout" :can-order="it => !it.sold_out" :qty-of="qtyOf"
+      @add="open" @dec="it => changeQty(state.lines.findIndex(l => l.item_id === it.id), -1)" />
 
     <div class="dbar" v-if="count > 0">
       <button class="btn" @click="review = true">{{ t('cart') }} · {{ count }}</button>
@@ -186,12 +156,6 @@ defineExpose({ clear, count })
 </template>
 
 <style scoped>
-.cats { display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px; position: sticky; top: 0; background: var(--bg); z-index: 10; }
-.cats button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 14px; white-space: nowrap; cursor: pointer; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-.item { display: flex; gap: 12px; }
-.item img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; flex: none; }
-.item.off { opacity: .55; }
 .opt { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .opt.off { opacity: .5; }
 .dbar { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 14px calc(12px + env(safe-area-inset-bottom));

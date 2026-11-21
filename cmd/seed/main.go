@@ -144,6 +144,16 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 		must(a.SetPromotionStatus(ctx, bid, id, "active", app.Actor{Type: "system"}))
 	}
 
+	// One template per channel so the three layouts can be compared right away.
+	for ch, t := range map[string]app.Template{
+		"delivery": {Layout: "list", ThemeColor: "#d9480f"},
+		"qr":       {Layout: "featured", ThemeColor: "#0b7285"},
+		"ipad":     {Layout: "grid", ThemeColor: "#5f3dc4"},
+	} {
+		must(a.SaveTemplateDraft(ctx, bid, ch, t))
+		must(a.PublishTemplate(ctx, bid, ch, app.Actor{Type: "system"}))
+	}
+
 	// Dine-in tables 01 to 08. Their QR links are shown on the Tables screen.
 	for i := 1; i <= 8; i++ {
 		_, err := a.SaveTable(ctx, bid, 0, app.TableInput{Name: fmt.Sprintf("%02d", i), Active: true, Sort: i})

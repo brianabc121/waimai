@@ -24,3 +24,4 @@ run: build
 e2e:
 	node e2e/flow.cjs
 	node e2e/dinein.cjs
+	node e2e/templates.cjs
