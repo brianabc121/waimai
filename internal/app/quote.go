@@ -61,7 +61,9 @@ type Quote struct {
 // computeQuote validates the cart against the live menu and prices it. It is
 // used both when quoting and again, inside the order transaction, to detect
 // changes since the quote was issued.
-func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput) (*Quote, error) {
+// phone is the verified customer when known; it only matters for promotions
+// with a per-customer limit.
+func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phone string) (*Quote, error) {
 	if b.Paused {
 		return nil, Err(http.StatusConflict, "STORE_CLOSED", "the store is not taking orders right now")
 	}
@@ -189,17 +191,25 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput) (*Qu
 		return nil, ErrD(http.StatusUnprocessableEntity, "BELOW_MINIMUM", "order is below the minimum amount",
 			map[string]any{"minimum": minOrder, "subtotal": subtotal})
 	}
-	quote.Totals = ComputeTotals(subtotal, deliveryFee, b.taxConfig())
+	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active'", phone)
+	if err != nil {
+		return nil, err
+	}
+	promo, d := bestPromotion(promos, time.Now(), b.location(), in.ServiceType, subtotal, deliveryFee)
+	quote.Totals = ComputeTotals(subtotal, deliveryFee, b.taxConfig(), d)
+	if promo != nil {
+		quote.Totals.PromotionID, quote.Totals.PromotionName, quote.Totals.PromotionNameEn = promo.ID, promo.Name, promo.NameEn
+	}
 	return quote, nil
 }
 
 // CreateQuote prices a cart and stores the result for confirmation.
-func (a *App) CreateQuote(ctx context.Context, slug string, in QuoteInput) (*Quote, error) {
+func (a *App) CreateQuote(ctx context.Context, slug string, in QuoteInput, phone string) (*Quote, error) {
 	b, err := branchBySlug(ctx, a.DB, slug)
 	if err != nil {
 		return nil, err
 	}
-	quote, err := computeQuote(ctx, a.DB, b, in)
+	quote, err := computeQuote(ctx, a.DB, b, in, phone)
 	if err != nil {
 		return nil, err
 	}

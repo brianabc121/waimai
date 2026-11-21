@@ -77,7 +77,10 @@ func (s *Server) createQuote(c *gin.Context) {
 	if !bind(c, &in) {
 		return
 	}
-	q, err := s.App.CreateQuote(c, c.Param("slug"), in)
+	// The phone is optional here: a verified customer gets promotions checked
+	// against their own usage; an anonymous one is checked again when ordering.
+	phone, _ := s.customerPhone(c)
+	q, err := s.App.CreateQuote(c, c.Param("slug"), in, phone)
 	if err != nil {
 		fail(c, err)
 		return
@@ -722,4 +725,79 @@ func (s *Server) assignStation(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"updated": n})
+}
+
+// ---- promotions ----
+
+func (s *Server) listPromotions(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	ps, err := s.App.ListPromotions(c, bid)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"promotions": ps})
+}
+
+func (s *Server) savePromotion(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	id, ok := optionalID(c)
+	if !ok {
+		return
+	}
+	var in app.PromotionInput
+	if !bind(c, &in) {
+		return
+	}
+	id, err := s.App.SavePromotion(c, bid, id, in, staffActor(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"id": id})
+}
+
+func (s *Server) setPromotionStatus(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	id, ok := optionalID(c)
+	if !ok {
+		return
+	}
+	var in struct {
+		Status string `json:"status"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	if err := s.App.SetPromotionStatus(c, bid, id, in.Status, staffActor(c)); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (s *Server) trialPromotions(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	var in app.TrialInput
+	if !bind(c, &in) {
+		return
+	}
+	res, err := s.App.TrialPromotions(c, bid, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, res)
 }

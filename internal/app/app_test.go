@@ -142,7 +142,7 @@ func (s *store) quote(t *testing.T, service string, lines []app.QuoteLineInput) 
 	if service == "delivery" {
 		in.ZoneID = &s.zoneID
 	}
-	q, err := testApp.CreateQuote(context.Background(), s.slug, in)
+	q, err := testApp.CreateQuote(context.Background(), s.slug, in, "+639170000001")
 	noErr(t, err)
 	return q
 }
@@ -160,7 +160,7 @@ func (s *store) place(t *testing.T, service string, lines []app.QuoteLineInput) 
 
 func TestComputeTotals(t *testing.T) {
 	// subtotal 520.00, packaging 10.00, delivery 69.00, service 5%, tax 12%
-	incl := app.ComputeTotals(52000, 6900, app.TaxConfig{TaxRateBP: 1200, TaxInclusive: true, ServiceChargeBP: 500, PackagingFee: 1000})
+	incl := app.ComputeTotals(52000, 6900, app.TaxConfig{TaxRateBP: 1200, TaxInclusive: true, ServiceChargeBP: 500, PackagingFee: 1000}, app.Discount{})
 	if incl.ServiceCharge != 2600 {
 		t.Fatalf("service charge = %d", incl.ServiceCharge)
 	}
@@ -168,11 +168,11 @@ func TestComputeTotals(t *testing.T) {
 	if incl.TaxAmount != 5957 || incl.Total != 52000+1000+6900+2600 {
 		t.Fatalf("inclusive: %+v", incl)
 	}
-	excl := app.ComputeTotals(52000, 6900, app.TaxConfig{TaxRateBP: 1200, TaxInclusive: false, ServiceChargeBP: 500, PackagingFee: 1000})
+	excl := app.ComputeTotals(52000, 6900, app.TaxConfig{TaxRateBP: 1200, TaxInclusive: false, ServiceChargeBP: 500, PackagingFee: 1000}, app.Discount{})
 	if excl.TaxAmount != 6672 || excl.Total != 52000+1000+6900+2600+6672 {
 		t.Fatalf("exclusive: %+v", excl)
 	}
-	zero := app.ComputeTotals(46000, 6900, app.TaxConfig{})
+	zero := app.ComputeTotals(46000, 6900, app.TaxConfig{}, app.Discount{})
 	if zero.Total != 52900 || zero.TaxAmount != 0 {
 		t.Fatalf("zero config: %+v", zero)
 	}
@@ -201,17 +201,17 @@ func TestQuoteValidation(t *testing.T) {
 	ctx := context.Background()
 	a := testApp
 	// required option missing
-	_, err := a.CreateQuote(ctx, s.slug, app.QuoteInput{ServiceType: "pickup", Items: []app.QuoteLineInput{{ItemID: s.chicken, Qty: 1}}})
+	_, err := a.CreateQuote(ctx, s.slug, app.QuoteInput{ServiceType: "pickup", Items: []app.QuoteLineInput{{ItemID: s.chicken, Qty: 1}}}, "")
 	wantCode(t, err, "OPTIONS_INVALID")
 	// delivery without a zone
-	_, err = a.CreateQuote(ctx, s.slug, app.QuoteInput{ServiceType: "delivery", Items: []app.QuoteLineInput{{ItemID: s.tea, Qty: 1}}})
+	_, err = a.CreateQuote(ctx, s.slug, app.QuoteInput{ServiceType: "delivery", Items: []app.QuoteLineInput{{ItemID: s.tea, Qty: 1}}}, "")
 	wantCode(t, err, "OUT_OF_ZONE")
 	// more than the limited stock
-	_, err = a.CreateQuote(ctx, s.slug, app.QuoteInput{ServiceType: "pickup", Items: []app.QuoteLineInput{{ItemID: s.limited, Qty: 2}}})
+	_, err = a.CreateQuote(ctx, s.slug, app.QuoteInput{ServiceType: "pickup", Items: []app.QuoteLineInput{{ItemID: s.limited, Qty: 2}}}, "")
 	wantCode(t, err, "ITEM_UNAVAILABLE")
 	// item from another store
 	other := newStore(t, true)
-	_, err = a.CreateQuote(ctx, s.slug, app.QuoteInput{ServiceType: "pickup", Items: []app.QuoteLineInput{{ItemID: other.tea, Qty: 1}}})
+	_, err = a.CreateQuote(ctx, s.slug, app.QuoteInput{ServiceType: "pickup", Items: []app.QuoteLineInput{{ItemID: other.tea, Qty: 1}}}, "")
 	wantCode(t, err, "ITEM_UNAVAILABLE")
 
 	q := s.quote(t, "delivery", s.cart())

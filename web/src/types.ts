@@ -15,10 +15,17 @@ export interface Item {
   delivery_available: boolean; pickup_available: boolean; sort: number; station_id: number | null; groups: OptionGroup[]
 }
 export interface Category { id: number; name: string; name_en: string; sort: number; items: Item[] }
-export interface Storefront { branch: Branch; zones: Zone[]; categories: Category[] }
+export interface Promotion {
+  id: number; name: string; name_en: string; kind: 'amount_off' | 'percent_off' | 'free_delivery'
+  threshold: number; value: number; max_discount: number | null; applies_delivery: boolean; applies_pickup: boolean
+  starts_at: string | null; ends_at: string | null; daily_start: string; daily_end: string
+  total_quota: number | null; per_phone_limit: number | null; used_count: number; status: string; live_now: boolean
+}
+export interface Storefront { branch: Branch; zones: Zone[]; categories: Category[]; promotions: Promotion[] }
 export interface Totals {
   subtotal: number; packaging_fee: number; delivery_fee: number; service_charge: number
   tax_amount: number; tax_inclusive: boolean; tax_rate_bp: number; discount: number; total: number
+  promotion_id: number; promotion_name: string; promotion_name_en: string
 }
 export interface LineOption { group: string; group_en: string; name: string; name_en: string; price_delta: number }
 export interface OrderItem {

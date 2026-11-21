@@ -464,3 +464,64 @@ func TestStationsAndFailedDeliveryOverHTTP(t *testing.T) {
 		t.Fatalf("close: %v %v", o["acceptance_status"], o["payment_status"])
 	}
 }
+
+func TestPromotionsOverHTTP(t *testing.T) {
+	f1, f2 := newFixture(t), newFixture(t)
+	b1 := fmt.Sprint(f1.branchID)
+	owner, owner2, cashier := login(t, f1.owner), login(t, f2.owner), login(t, f1.cashier)
+	body := map[string]any{"name": "满50减10", "kind": "amount_off", "threshold": 5000, "value": 1000,
+		"applies_delivery": true, "applies_pickup": true, "per_phone_limit": 1}
+
+	cashier.want(403, "FORBIDDEN", "POST", "/merchant/branches/"+b1+"/promotions", body)
+	cashier.want(403, "FORBIDDEN", "GET", "/merchant/branches/"+b1+"/promotions", nil)
+	owner2.want(404, "NOT_FOUND", "POST", "/merchant/branches/"+b1+"/promotions", body)
+	owner.want(422, "VALIDATION", "POST", "/merchant/branches/"+b1+"/promotions", map[string]any{"name": "x", "kind": "amount_off"})
+	p := owner.want(200, "", "POST", "/merchant/branches/"+b1+"/promotions", body)
+	pid := fmt.Sprint(int64(p["id"].(float64)))
+	// another merchant cannot publish or edit it, even through their own branch
+	owner2.want(404, "NOT_FOUND", "POST", "/merchant/branches/"+b1+"/promotions/"+pid+"/status", map[string]any{"status": "active"})
+	owner2.want(404, "NOT_FOUND", "POST", "/merchant/branches/"+fmt.Sprint(f2.branchID)+"/promotions/"+pid+"/status", map[string]any{"status": "active"})
+	owner2.want(404, "NOT_FOUND", "PUT", "/merchant/branches/"+fmt.Sprint(f2.branchID)+"/promotions/"+pid, body)
+
+	anon := newClient(t)
+	if sf := anon.want(200, "", "GET", "/stores/"+f1.slug, nil); len(sf["promotions"].([]any)) != 0 {
+		t.Fatal("a draft must not be advertised")
+	}
+	owner.want(200, "", "POST", "/merchant/branches/"+b1+"/promotions/"+pid+"/status", map[string]any{"status": "active"})
+	sf := anon.want(200, "", "GET", "/stores/"+f1.slug, nil)
+	adv := sf["promotions"].([]any)[0].(map[string]any)
+	if adv["used_count"].(float64) != 0 || adv["per_phone_limit"] != nil {
+		t.Fatalf("storefront leaks usage numbers: %v", adv)
+	}
+	trial := owner.want(200, "", "POST", "/merchant/branches/"+b1+"/promotion-trial",
+		map[string]any{"service_type": "delivery", "subtotal": 6900, "delivery_fee": 5000})
+	if trial["totals"].(map[string]any)["discount"].(float64) != 1000 {
+		t.Fatalf("trial: %v", trial)
+	}
+
+	// a verified customer uses it once; their next quote is at full price
+	cust := verifiedCustomer(t)
+	orderID, token := f1.order(t, cust)
+	o := anon.want(200, "", "GET", "/customer/orders/"+token, nil)
+	tot := o["totals"].(map[string]any)
+	if tot["discount"].(float64) != 1000 || tot["promotion_name"] != "满50减10" {
+		t.Fatalf("order totals: %v", tot)
+	}
+	quote := map[string]any{"service_type": "delivery", "zone_id": f1.zoneID, "items": []map[string]any{{"item_id": f1.itemID, "qty": 1}}}
+	if q := cust.want(200, "", "POST", "/stores/"+f1.slug+"/quotes", quote); q["totals"].(map[string]any)["discount"].(float64) != 0 {
+		t.Fatal("the once-per-customer offer was quoted twice")
+	}
+	if q := anon.want(200, "", "POST", "/stores/"+f1.slug+"/quotes", quote); q["totals"].(map[string]any)["discount"].(float64) != 1000 {
+		t.Fatal("an anonymous visitor should still see the offer")
+	}
+	list := owner.want(200, "", "GET", "/merchant/branches/"+b1+"/promotions", nil)
+	if list["promotions"].([]any)[0].(map[string]any)["used_count"].(float64) != 1 {
+		t.Fatalf("used_count: %v", list)
+	}
+	// rejecting gives the use back
+	cashier.want(200, "", "POST", "/merchant/orders/"+fmt.Sprint(orderID)+"/reject", map[string]any{"reason": "busy"})
+	list = owner.want(200, "", "GET", "/merchant/branches/"+b1+"/promotions", nil)
+	if list["promotions"].([]any)[0].(map[string]any)["used_count"].(float64) != 0 {
+		t.Fatalf("used_count after reject: %v", list)
+	}
+}

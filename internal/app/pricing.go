@@ -20,7 +20,11 @@ type Totals struct {
 	TaxInclusive  bool  `json:"tax_inclusive"`
 	TaxRateBP     int   `json:"tax_rate_bp"`
 	Discount      int64 `json:"discount"`
-	Total         int64 `json:"total"`
+	// The promotion behind Discount, if any (0 / empty when none applied).
+	PromotionID     int64  `json:"promotion_id"`
+	PromotionName   string `json:"promotion_name"`
+	PromotionNameEn string `json:"promotion_name_en"`
+	Total           int64  `json:"total"`
 }
 
 // mulDivRound returns a*b/d rounded half up.
@@ -29,16 +33,22 @@ func mulDivRound(a, b, d int64) int64 {
 }
 
 // ComputeTotals implements docs/DESIGN.md §4.2. The delivery fee is not taxed.
-func ComputeTotals(subtotal, deliveryFee int64, cfg TaxConfig) Totals {
+// A discount on goods lowers the amount that service charge and tax are
+// computed on; a delivery discount only lowers the amount due.
+func ComputeTotals(subtotal, deliveryFee int64, cfg TaxConfig, d Discount) Totals {
+	d.Goods = min(d.Goods, subtotal)
+	d.Delivery = min(d.Delivery, deliveryFee)
+	goods := subtotal - d.Goods
 	t := Totals{
 		Subtotal:     subtotal,
 		PackagingFee: cfg.PackagingFee,
 		DeliveryFee:  deliveryFee,
 		TaxInclusive: cfg.TaxInclusive,
 		TaxRateBP:    cfg.TaxRateBP,
+		Discount:     d.total(),
 	}
-	t.ServiceCharge = mulDivRound(subtotal, int64(cfg.ServiceChargeBP), 10000)
-	base := subtotal + t.PackagingFee + t.ServiceCharge
+	t.ServiceCharge = mulDivRound(goods, int64(cfg.ServiceChargeBP), 10000)
+	base := goods + t.PackagingFee + t.ServiceCharge
 	rate := int64(cfg.TaxRateBP)
 	if cfg.TaxInclusive {
 		t.TaxAmount = mulDivRound(base, rate, 10000+rate)

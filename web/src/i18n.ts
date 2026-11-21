@@ -98,6 +98,27 @@ const dict: Record<string, [string, string]> = {
   redeliver: ['重新配送', 'Send out again'], close_failed: ['结束订单（不再配送）', 'Close order (no redelivery)'],
   failed_hint: ['配送异常：请联系顾客后选择重新配送或结束订单。', 'Delivery failed. Contact the customer, then send it out again or close the order.'],
   choose_rider: ['选择骑手', 'Choose rider'],
+  promos: ['活动', 'Promotions'], new_promo: ['新建活动', 'New promotion'], no_promos: ['还没有活动', 'No promotions yet'],
+  promos_hint: ['一张订单只用一个活动，系统自动选对顾客最划算的那个。已下的订单保留当时的优惠，不受之后修改影响。', 'One promotion per order: the system picks the one that saves the customer the most. Existing orders keep the discount they got.'],
+  promo_name: ['活动', 'Promotion'], promo_rule: ['规则', 'Rule'], promo_when: ['时间', 'When'], promo_usage: ['已用', 'Used'],
+  promo_name_ph: ['例如：满300减30', 'e.g. Spend 300, save 30'], promo_kind: ['类型', 'Type'],
+  'kind.amount_off': ['满减', 'Amount off'], 'kind.percent_off': ['折扣', 'Percent off'], 'kind.free_delivery': ['免配送费', 'Free delivery'],
+  promo_threshold: ['菜品满多少可用', 'Minimum spend'], promo_amount: ['减多少', 'Amount off'], promo_percent: ['优惠百分比（10 表示九折）', 'Percent off (10 = 10% off)'],
+  promo_cap: ['最多减', 'Maximum discount'], promo_starts: ['开始日期时间', 'Starts'], promo_ends: ['结束日期时间', 'Ends'],
+  promo_daily_start: ['每天开始', 'Daily from'], promo_daily_end: ['每天结束', 'Daily until'],
+  promo_quota: ['总名额（单）', 'Total uses'], promo_per_phone: ['每个手机号限用次数', 'Uses per phone number'],
+  promo_time_hint: ['每天的开始和结束相同表示全天。结束早于开始表示跨午夜（例如 22:00 到 02:00），按门店当地时间计算。', 'Equal daily times mean all day. An end before the start crosses midnight (e.g. 22:00 to 02:00), in the store\'s local time.'],
+  promo_end_confirm: ['结束后不能再启用，确定结束这个活动？', 'An ended promotion cannot be reactivated. End it?'],
+  'promo.draft': ['草稿', 'Draft'], 'promo.active': ['进行中', 'Live'], 'promo.paused': ['已暂停', 'Paused'], 'promo.ended': ['已结束', 'Ended'],
+  'promo.not_live': ['已发布，当前不在时段或名额已满', 'Published, not live right now'],
+  pause: ['暂停', 'Pause'], resume: ['恢复', 'Resume'], end: ['结束', 'End'], daily: ['每天', 'Daily'], always: ['长期', 'Always'],
+  per_customer_n: ['每人限 {n} 次', '{n} per customer'],
+  trial: ['试算', 'Trial calculation'], trial_run: ['试算', 'Calculate'], trial_wins: ['采用', 'Applied'],
+  trial_hint: ['输入一张单的金额，看现在会用哪个活动。草稿和暂停的活动也会参与试算，方便发布前检查。', 'Enter an order amount to see which promotion would apply now. Drafts and paused promotions are included so you can check before publishing.'],
+  'why.outside_time': ['不在活动时间', 'Outside its time'], 'why.service_type': ['不适用这种取餐方式', 'Not for this service type'],
+  'why.below_threshold': ['未达到门槛', 'Below the minimum spend'], 'why.quota_used_up': ['名额已用完', 'No uses left'],
+  'why.customer_limit': ['顾客已达上限', 'Customer limit reached'], 'why.not_active': ['未启用', 'Not active'],
+  discount: ['优惠', 'Discount'], more_for_promo: ['再买 {amt} 可享「{name}」', 'Add {amt} more for "{name}"'],
   conflict: ['订单已被其他人更新，已刷新', 'Someone else updated this order. Refreshed.'],
 }
 
@@ -124,6 +145,21 @@ export function money(minor: number, currency = 'PHP'): string {
   const v = minor / 100
   const s = Number.isInteger(v) ? String(v) : v.toFixed(2)
   return (symbols[currency] ?? currency + ' ') + s.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+// promoLabel describes a promotion's rule in the current language.
+export function promoLabel(p: { kind: string; threshold: number; value: number; max_discount: number | null }, currency: string): string {
+  const zh = locale.value === 'zh'
+  const th = p.threshold > 0 ? money(p.threshold, currency) : ''
+  let what = ''
+  if (p.kind === 'amount_off') what = zh ? `减${money(p.value, currency)}` : `${money(p.value, currency)} off`
+  else if (p.kind === 'percent_off') {
+    const pct = p.value / 100
+    what = zh ? `${(100 - pct) / 10}折` : `${pct}% off`
+    if (p.max_discount) what += zh ? `（最多减${money(p.max_discount, currency)}）` : ` (up to ${money(p.max_discount, currency)})`
+  } else what = zh ? '免配送费' : 'Free delivery'
+  if (!th) return what
+  return zh ? `满${th}${what}` : `${what} over ${th}`
 }
 
 // Staff type amounts in major units; the API wants minor units.
