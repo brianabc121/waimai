@@ -30,7 +30,9 @@ export const router = createRouter({
     {
       path: '/admin', component: () => import('./views/admin/AdminLayout.vue'), meta: { staff: true },
       children: [
-        { path: '', redirect: '/admin/merchants' },
+        { path: '', redirect: '/admin/dashboard' },
+        { path: 'dashboard', component: () => import('./views/admin/AdminDashboard.vue'), meta: { title: 'ad.dashboard' } },
+        { path: 'api', component: () => import('./views/admin/AdminApi.vue'), meta: { title: 'ad.api' } },
         { path: 'merchants', component: () => import('./views/admin/AdminMerchants.vue'), meta: { title: 'ad.merchants' } },
         { path: 'merchants/:id', component: () => import('./views/admin/AdminMerchantDetail.vue'), props: true, meta: { title: 'ad.merchants' } },
         { path: 'items', component: () => import('./views/admin/AdminItems.vue'), meta: { title: 'ad.items' } },

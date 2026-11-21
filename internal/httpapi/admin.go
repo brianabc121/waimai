@@ -74,6 +74,9 @@ func (s *Server) adminRoutes(admin *gin.RouterGroup) {
 	admin.PUT("/branches/:bid/items/:id", s.adminSaveItem)
 	admin.PATCH("/branches/:bid/items/:id", s.adminPatchItem)
 
+	admin.GET("/overview", s.adminOverview)
+	admin.GET("/metrics/api", s.adminAPIMetrics)
+	admin.GET("/metrics/errors", s.adminAPIErrors)
 	admin.GET("/worker", s.adminWorker)
 	admin.GET("/jobs", s.adminListJobs)
 	admin.POST("/jobs/retry-failed", s.adminRetryFailedJobs)
@@ -402,6 +405,36 @@ func (s *Server) adminBulkItems(c *gin.Context) {
 func (s *Server) adminAudit(c *gin.Context) {
 	l, err := s.App.ListAdminAudit(c, app.AuditFilter{AdminID: queryInt(c, "admin_id"), Action: c.Query("action"),
 		From: queryTime(c, "from"), To: queryTime(c, "to"), Page: queryPage(c)})
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, l)
+}
+
+// ---- overview and API metrics ----
+
+func (s *Server) adminOverview(c *gin.Context) {
+	o, err := s.App.AdminOverview(c)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, o)
+}
+
+func (s *Server) adminAPIMetrics(c *gin.Context) {
+	m, err := s.App.APIMetrics(c, c.DefaultQuery("range", "1h"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, m)
+}
+
+func (s *Server) adminAPIErrors(c *gin.Context) {
+	l, err := s.App.ListAPIErrors(c, app.APIErrorFilter{Route: c.Query("route"), Status: int(queryInt(c, "status")),
+		Since: c.Query("range"), Page: queryPage(c)})
 	if err != nil {
 		fail(c, err)
 		return

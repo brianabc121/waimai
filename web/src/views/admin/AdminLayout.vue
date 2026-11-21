@@ -21,6 +21,8 @@ async function out() { await logout(); session.loaded = true; router.replace('/l
     <nav class="adm-side">
       <div class="brand">{{ t('ad.product') }}<small>{{ t('ad.title') }}</small></div>
       <div class="grp">{{ t('ad.g_monitor') }}</div>
+      <router-link to="/admin/dashboard">{{ t('ad.dashboard') }}</router-link>
+      <router-link to="/admin/api">{{ t('ad.api') }}</router-link>
       <router-link to="/admin/worker">{{ t('ad.worker') }}<span v-if="monitor.failedJobs" class="badge" data-testid="failed-badge">{{ monitor.failedJobs }}</span></router-link>
       <div class="grp">{{ t('ad.g_merchants') }}</div>
       <router-link to="/admin/merchants">{{ t('ad.merchants') }}</router-link>

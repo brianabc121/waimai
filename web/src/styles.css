@@ -121,10 +121,10 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
 .adm .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .adm .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
 .adm .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
-.adm-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.adm-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: start; }
-.adm-grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-.adm-grid5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+.adm-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.adm-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.adm-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.adm-grid5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
 .adm .stat .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; margin-top: 4px; }
 .adm .health .state { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 700; margin: 6px 0 4px; }
 .adm .dot { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 700; flex: none; }
@@ -150,3 +150,27 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
   .adm-side .brand, .adm-side .grp { display: none; }
   .adm-grid2, .adm-grid3, .adm-grid4, .adm-grid5 { grid-template-columns: 1fr 1fr; }
 }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.adm .chart { position: relative; min-width: 0; }
+.adm .chart svg { max-width: 100%; }
+.adm .chart svg { display: block; outline: none; touch-action: pan-y; }
+.adm .chart svg:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+.adm .chart .legend { justify-content: flex-end; margin-bottom: 2px; }
+.adm .chart .legend i.lines { height: 2px; width: 14px; border-radius: 1px; vertical-align: 3px; }
+.adm .chart .grid line { stroke: #eceef0; stroke-width: 1; }
+.adm .chart text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.adm .chart text.none { font-size: 13px; }
+.adm .chart .wash { fill: #1f2328; fill-opacity: .06; }
+.adm .chart .cross { stroke: #9aa1ab; stroke-width: 1; }
+.adm .chart .tip { position: absolute; top: 26px; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.12); padding: 7px 10px; font-size: 12.5px; pointer-events: none; white-space: nowrap; z-index: 5; }
+.adm .chart .tip .when { color: var(--muted); margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+.adm .chart .tip .r { display: flex; align-items: center; gap: 6px; }
+.adm .chart .tip .r i { width: 12px; height: 2px; border-radius: 1px; flex: none; }
+.adm .chart .tip .r b { font-variant-numeric: tabular-nums; min-width: 44px; }
+.adm .chart .tip .r span { color: var(--muted); }
+.adm table.data th.sort { cursor: pointer; user-select: none; }
+.adm table.data th.sort:hover { color: var(--ink); }
+.adm table.data tr.click { cursor: pointer; }
+.adm .health a.card { color: inherit; display: block; }
+.adm .health a.card:hover, .adm .stat a.card:hover { border-color: #c9ced6; }
+.adm .stat a.card { color: inherit; display: block; }
