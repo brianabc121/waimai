@@ -102,6 +102,14 @@ func (a *App) runJob(ctx context.Context, j *claimedJob) error {
 		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
 		return a.SMS.Send(ctx, p.Phone, p.Message)
+	case "menu_import":
+		var p struct {
+			ID int64 `json:"id"`
+		}
+		if err := json.Unmarshal(j.Payload, &p); err != nil {
+			return err
+		}
+		return a.parseMenuImport(ctx, p.ID)
 	default:
 		return fmt.Errorf("unknown job kind %q", j.Kind)
 	}

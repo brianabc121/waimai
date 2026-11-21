@@ -2,7 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { get, post } from '../api'
-import { locale, money, pick, setLocale, t, toMajor, toMinor } from '../i18n'
+import { locale, money, pick, setLocale, t, toMajor, toMinor, whenText } from '../i18n'
 import { useLive } from '../live'
 import { logout, session } from '../session'
 import type { Order } from '../types'
@@ -58,7 +58,7 @@ async function out() { await logout(); router.replace('/login') }
       <div v-if="current.length === 0" class="card muted">{{ t('no_tasks') }}</div>
 
       <div v-for="o in current" :key="o.id" class="card stack">
-        <div class="row between"><h2>{{ o.public_no }}</h2><span class="tag brand">{{ t('f.' + (o.fulfillment_status === 'none' ? 'none' : o.fulfillment_status)) }}</span></div>
+        <div class="row between"><h2>{{ o.public_no }} <span class="tag info" v-if="o.scheduled_for">{{ whenText(o.scheduled_for, o.timezone) }}</span></h2><span class="tag brand">{{ t('f.' + (o.fulfillment_status === 'none' ? 'none' : o.fulfillment_status)) }}</span></div>
 
         <!-- R01: pick up at the store -->
         <template v-if="o.delivery!.status === 'assigned'">

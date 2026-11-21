@@ -14,7 +14,7 @@ const error = ref('')
 const saved = ref(false)
 
 const s = reactive({ name: '', name_en: '', address: '', phone: '', tax: 12, tax_inclusive: true, service: 0, packaging: 0,
-  min_order: 0, accept_timeout_minutes: 10, delivery_enabled: true, pickup_enabled: true, paused: false, open_time: '00:00', close_time: '00:00', notify_sms: true })
+  min_order: 0, accept_timeout_minutes: 10, delivery_enabled: true, pickup_enabled: true, paused: false, open_time: '00:00', close_time: '00:00', notify_sms: true, scheduling_enabled: false, prep_minutes: 30 })
 const st = reactive({ id: 0, name: '', name_en: '', active: true })
 const z = reactive({ id: 0, name: '', name_en: '', fee: 0, min_order: 0, active: true })
 const u = reactive({ username: '', password: '', display_name: '', phone: '', role: 'cashier' })
@@ -26,7 +26,8 @@ async function load() {
   Object.assign(s, { name: b.name, name_en: b.name_en, address: b.address, phone: b.phone, tax: b.tax_rate_bp / 100,
     tax_inclusive: b.tax_inclusive, service: b.service_charge_bp / 100, packaging: toMajor(b.packaging_fee), min_order: toMajor(b.min_order_amount),
     accept_timeout_minutes: b.accept_timeout_minutes, delivery_enabled: b.delivery_enabled, pickup_enabled: b.pickup_enabled,
-    paused: b.paused, open_time: b.open_time, close_time: b.close_time, notify_sms: b.notify_sms })
+    paused: b.paused, open_time: b.open_time, close_time: b.close_time, notify_sms: b.notify_sms,
+    scheduling_enabled: b.scheduling_enabled, prep_minutes: b.prep_minutes })
   staff.value = (await get(`/merchant/branches/${bid}/staff`)).staff
 }
 onMounted(load)
@@ -40,7 +41,8 @@ const saveSettings = () => run(() => put(`/merchant/branches/${bid}/settings`, {
   name: s.name, name_en: s.name_en, address: s.address, phone: s.phone, tax_rate_bp: Math.round(s.tax * 100), tax_inclusive: s.tax_inclusive,
   service_charge_bp: Math.round(s.service * 100), packaging_fee: toMinor(s.packaging), min_order_amount: toMinor(s.min_order),
   accept_timeout_minutes: s.accept_timeout_minutes, delivery_enabled: s.delivery_enabled, pickup_enabled: s.pickup_enabled,
-  paused: s.paused, open_time: s.open_time, close_time: s.close_time, notify_sms: s.notify_sms }))
+  paused: s.paused, open_time: s.open_time, close_time: s.close_time, notify_sms: s.notify_sms,
+  scheduling_enabled: s.scheduling_enabled, prep_minutes: s.prep_minutes }))
 
 function editStation(x: Station | null) {
   Object.assign(st, x ? { id: x.id, name: x.name, name_en: x.name_en, active: x.active } : { id: 0, name: '', name_en: '', active: true })
@@ -89,12 +91,13 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
         <label class="field"><span>{{ t('packaging_fee') }} ({{ branch.currency }})</span><input type="number" min="0" step="0.01" v-model.number="s.packaging" /></label>
         <label class="field"><span>{{ t('min_order') }} ({{ branch.currency }})</span><input type="number" min="0" step="0.01" v-model.number="s.min_order" /></label>
         <label class="field"><span>{{ t('accept_timeout') }}</span><input type="number" min="1" max="120" v-model.number="s.accept_timeout_minutes" /></label>
-        <span></span>
+        <label class="field"><span>{{ t('prep_minutes') }}</span><input type="number" min="5" max="240" v-model.number="s.prep_minutes" /></label>
         <label class="check"><input type="checkbox" v-model="s.tax_inclusive" />{{ t('tax_inclusive') }}</label>
         <label class="check"><input type="checkbox" v-model="s.paused" />{{ t('pause_orders') }}</label>
         <label class="check"><input type="checkbox" v-model="s.delivery_enabled" />{{ t('delivery') }}</label>
         <label class="check"><input type="checkbox" v-model="s.pickup_enabled" />{{ t('pickup') }}</label>
         <label class="check"><input type="checkbox" v-model="s.notify_sms" />{{ t('notify_sms') }}</label>
+        <label class="check"><input type="checkbox" v-model="s.scheduling_enabled" />{{ t('scheduling_enabled') }}</label>
       </div>
       <button class="btn primary">{{ t('save') }}</button>
     </form>

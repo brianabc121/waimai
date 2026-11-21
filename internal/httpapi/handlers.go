@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -800,4 +801,87 @@ func (s *Server) trialPromotions(c *gin.Context) {
 		return
 	}
 	c.JSON(200, res)
+}
+
+// ---- menu import (Excel) ----
+
+func (s *Server) menuImportTemplate(c *gin.Context) {
+	if _, ok := branchScope(c, managerRoles); !ok {
+		return
+	}
+	b, err := app.MenuImportTemplate()
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.Header("Content-Disposition", `attachment; filename="menu-template.xlsx"`)
+	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", b)
+}
+
+// uploadMenuImport takes the .xlsx as the raw request body; the file name
+// comes in the query string. The body is capped before it is read.
+func (s *Server) uploadMenuImport(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	const limit = 2 << 20
+	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, limit+1))
+	if err != nil || len(body) > limit {
+		fail(c, app.Err(http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", "the file is larger than 2 MB"))
+		return
+	}
+	id, err := s.App.CreateMenuImport(c, bid, c.Query("filename"), body, staffActor(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"id": id})
+}
+
+func (s *Server) listMenuImports(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	list, err := s.App.ListMenuImports(c, bid)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"imports": list})
+}
+
+func (s *Server) getMenuImport(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	m, err := s.App.GetMenuImport(c, bid, id)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, m)
+}
+
+func (s *Server) applyMenuImport(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	m, err := s.App.ApplyMenuImport(c, bid, id, staffActor(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, m)
 }

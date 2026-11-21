@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { get } from '../api'
-import { both, money, t } from '../i18n'
+import { both, money, t, whenText } from '../i18n'
 import type { Order } from '../types'
 import TotalsTable from './TotalsTable.vue'
 
@@ -17,6 +17,7 @@ const print = () => window.print()
   <div class="ticket" v-if="o">
     <button class="btn primary no-print" @click="print">{{ t('print') }}</button>
     <h1>{{ o.public_no }}</h1>
+    <p v-if="o.scheduled_for"><b>{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</b></p>
     <p><b>{{ t(o.service_type) }}</b> · {{ new Date(o.created_at).toLocaleString() }}</p>
     <p>{{ o.customer_name }} · {{ o.customer_phone }}</p>
     <p v-if="o.service_type === 'delivery'">{{ o.zone_name }} · {{ o.address_line }} {{ o.address_unit }}<br />{{ o.address_note }}</p>

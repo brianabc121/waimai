@@ -4,6 +4,7 @@ export interface Branch {
   packaging_fee: number; min_order_amount: number; accept_timeout_minutes: number
   delivery_enabled: boolean; pickup_enabled: boolean; paused: boolean
   open_time: string; close_time: string; open_now: boolean; notify_sms: boolean
+  scheduling_enabled: boolean; prep_minutes: number
 }
 export interface Station { id: number; name: string; name_en: string; active: boolean; sort: number; item_count: number; open_tasks: number }
 export interface Zone { id: number; name: string; name_en: string; fee: number; min_order: number; active: boolean; sort: number }
@@ -21,7 +22,7 @@ export interface Promotion {
   starts_at: string | null; ends_at: string | null; daily_start: string; daily_end: string
   total_quota: number | null; per_phone_limit: number | null; used_count: number; status: string; live_now: boolean
 }
-export interface Storefront { branch: Branch; zones: Zone[]; categories: Category[]; promotions: Promotion[] }
+export interface Storefront { branch: Branch; zones: Zone[]; categories: Category[]; promotions: Promotion[]; slots: string[] }
 export interface Totals {
   subtotal: number; packaging_fee: number; delivery_fee: number; service_charge: number
   tax_amount: number; tax_inclusive: boolean; tax_rate_bp: number; discount: number; total: number
@@ -47,9 +48,18 @@ export interface Order {
   address_note: string; note: string; currency: string; totals: Totals; payment_method: string
   acceptance_status: string; packing_status: string; fulfillment_status: string; payment_status: string
   display_status: string; close_reason: string; bags: number | null; version: number; manifest_version: number
-  accept_deadline: string; created_at: string; items: OrderItem[]; delivery: DeliveryTask | null; cash: Cash | null
+  accept_deadline: string; scheduled_for: string | null; release_at: string | null; timezone: string; created_at: string; items: OrderItem[]; delivery: DeliveryTask | null; cash: Cash | null
 }
-export interface Quote { id: string; currency: string; service_type: string; zone_name: string; totals: Totals; expires_at: string
+export interface Quote { id: string; currency: string; service_type: string; zone_name: string; scheduled_for: string | null; totals: Totals; expires_at: string
   lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string }[] }
+export interface ImportRow {
+  line: number; category: string; name: string; name_en: string; description: string; price: number; station: string
+  action: string; old_price?: number; errors: string[]
+}
+export interface MenuImport {
+  id: number; filename: string; status: 'pending' | 'parsed' | 'failed' | 'applied'; error: string
+  total_rows: number; valid_rows: number; error_rows: number; created_count: number; updated_count: number
+  created_at: string; rows: ImportRow[]
+}
 export interface BranchRole { branch_id: number; branch_name: string; slug: string; currency: string; role: string }
 export interface User { id: number; username: string; display_name: string; is_platform_admin: boolean; roles: BranchRole[] }

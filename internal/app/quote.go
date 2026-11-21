@@ -23,6 +23,8 @@ type QuoteInput struct {
 	ServiceType string           `json:"service_type"`
 	ZoneID      *int64           `json:"zone_id"`
 	Items       []QuoteLineInput `json:"items"`
+	// ScheduledFor is nil for "as soon as possible".
+	ScheduledFor *time.Time `json:"scheduled_for"`
 }
 
 type LineOption struct {
@@ -46,16 +48,17 @@ type QuoteLine struct {
 }
 
 type Quote struct {
-	ID          string      `json:"id"`
-	BranchID    int64       `json:"branch_id"`
-	Currency    string      `json:"currency"`
-	ServiceType string      `json:"service_type"`
-	ZoneID      *int64      `json:"zone_id"`
-	ZoneName    string      `json:"zone_name"`
-	Lines       []QuoteLine `json:"lines"`
-	Totals      Totals      `json:"totals"`
-	ExpiresAt   time.Time   `json:"expires_at"`
-	Input       QuoteInput  `json:"input"`
+	ID           string      `json:"id"`
+	BranchID     int64       `json:"branch_id"`
+	Currency     string      `json:"currency"`
+	ServiceType  string      `json:"service_type"`
+	ZoneID       *int64      `json:"zone_id"`
+	ZoneName     string      `json:"zone_name"`
+	ScheduledFor *time.Time  `json:"scheduled_for"`
+	Lines        []QuoteLine `json:"lines"`
+	Totals       Totals      `json:"totals"`
+	ExpiresAt    time.Time   `json:"expires_at"`
+	Input        QuoteInput  `json:"input"`
 }
 
 // computeQuote validates the cart against the live menu and prices it. It is
@@ -67,7 +70,15 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 	if b.Paused {
 		return nil, Err(http.StatusConflict, "STORE_CLOSED", "the store is not taking orders right now")
 	}
-	if !b.isOpen(time.Now()) {
+	if in.ScheduledFor != nil {
+		at := in.ScheduledFor.UTC().Truncate(time.Minute)
+		in.ScheduledFor = &at
+		// A scheduled order may be placed while the store is closed, as long
+		// as it is open at the chosen time.
+		if err := b.checkSchedule(time.Now(), *in.ScheduledFor); err != nil {
+			return nil, err
+		}
+	} else if !b.isOpen(time.Now()) {
 		return nil, Err(http.StatusConflict, "STORE_CLOSED", "the store is closed")
 	}
 	switch in.ServiceType {
@@ -89,7 +100,8 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		return nil, ErrValidation("too many lines")
 	}
 
-	quote := &Quote{BranchID: b.ID, Currency: b.Currency, ServiceType: in.ServiceType, Input: in, Lines: []QuoteLine{}}
+	quote := &Quote{BranchID: b.ID, Currency: b.Currency, ServiceType: in.ServiceType, Input: in, Lines: []QuoteLine{},
+		ScheduledFor: in.ScheduledFor}
 	var deliveryFee, minOrder int64
 	if in.ServiceType == "delivery" {
 		if in.ZoneID == nil {

@@ -119,6 +119,25 @@ const dict: Record<string, [string, string]> = {
   'why.below_threshold': ['未达到门槛', 'Below the minimum spend'], 'why.quota_used_up': ['名额已用完', 'No uses left'],
   'why.customer_limit': ['顾客已达上限', 'Customer limit reached'], 'why.not_active': ['未启用', 'Not active'],
   discount: ['优惠', 'Discount'], more_for_promo: ['再买 {amt} 可享「{name}」', 'Add {amt} more for "{name}"'],
+  when: ['时间', 'When'], asap: ['尽快', 'As soon as possible'], today: ['今天', 'Today'], tomorrow: ['明天', 'Tomorrow'],
+  deliver_at: ['预约送达', 'Deliver at'], pickup_at: ['预约取餐', 'Pick up at'], scheduled: ['预约', 'Scheduled'],
+  schedule_invalid: ['这个时间已经不能预约，请重新选择', 'That time is no longer available. Please choose another.'],
+  closed_can_schedule: ['现在休息中，可以预约稍后的时间', 'Closed right now. You can order ahead for later.'],
+  pick_time: ['请选择时间', 'Choose a time'],
+  's.scheduled': ['已接单，会按预约时间准备', 'Accepted. It will be prepared for your chosen time.'],
+  scheduling_enabled: ['接受预约单', 'Take scheduled orders'], prep_minutes: ['备餐提前量（分钟）', 'Preparation lead time (min)'],
+  kitchen_from: ['后厨开始', 'Kitchen starts'],
+  import_excel: ['导入 Excel', 'Import Excel'], download_template: ['下载模板', 'Download template'], upload: ['上传', 'Upload'],
+  import_hint: ['按模板填写后上传。新菜品会先存为草稿，同分类同名的菜品会更新价格等信息。规格在导入后到菜品里编辑。', 'Fill in the template and upload it. New dishes are saved as drafts; a dish with the same category and name is updated. Options are edited on the dish afterwards.'],
+  import_parsing: ['正在解析…', 'Parsing…'], import_failed: ['文件无法导入', 'The file could not be imported'],
+  import_summary: ['共 {total} 行，{valid} 行可导入，{bad} 行有错误', '{total} rows: {valid} can be imported, {bad} have errors'],
+  import_apply: ['导入 {n} 行', 'Import {n} rows'], import_done: ['已导入：新增 {c} 个草稿，更新 {u} 个', 'Imported: {c} new drafts, {u} updated'],
+  import_line: ['行', 'Row'], import_result: ['结果', 'Result'], 'act.create': ['新增（草稿）', 'New (draft)'], 'act.update': ['更新', 'Update'],
+  'ie.category_required': ['缺少分类', 'Category missing'], 'ie.name_required': ['缺少菜名', 'Name missing'],
+  'ie.price_required': ['缺少价格', 'Price missing'], 'ie.price_invalid': ['价格格式不对', 'Invalid price'],
+  'ie.station_unknown': ['工作台不存在或已停用', 'Unknown or disabled station'], 'ie.yes_no_invalid': ['是/否 填写不对', 'Use yes or no'],
+  'ie.stock_invalid': ['库存格式不对', 'Invalid stock'], 'ie.text_too_long': ['文字太长', 'Text too long'],
+  'ie.duplicate_of_line': ['和第 {n} 行重复', 'Duplicate of row {n}'],
   conflict: ['订单已被其他人更新，已刷新', 'Someone else updated this order. Refreshed.'],
 }
 
@@ -160,6 +179,24 @@ export function promoLabel(p: { kind: string; threshold: number; value: number; 
   } else what = zh ? '免配送费' : 'Free delivery'
   if (!th) return what
   return zh ? `满${th}${what}` : `${what} over ${th}`
+}
+
+// whenText shows a scheduled time as "今天 18:30" / "Tomorrow 11:00", in the
+// given time zone (the store's for customers; the device's for staff).
+export function whenText(iso: string, timeZone?: string): string {
+  const d = new Date(iso)
+  const day = (x: Date) => x.toLocaleDateString('en-CA', { timeZone })
+  const time = d.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' })
+  const today = day(new Date()), tomorrow = day(new Date(Date.now() + 86400000))
+  const label = day(d) === today ? t('today') : day(d) === tomorrow ? t('tomorrow')
+    : d.toLocaleDateString(locale.value === 'zh' ? 'zh-CN' : 'en-US', { timeZone, month: 'short', day: 'numeric' })
+  return `${label} ${time}`
+}
+
+// importError turns a row error code from the server into text.
+export function importError(code: string): string {
+  const [k, n] = code.split(':')
+  return dict['ie.' + k] ? t('ie.' + k, { n: n ?? '' }) : code
 }
 
 // Staff type amounts in major units; the API wants minor units.
