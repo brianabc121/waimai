@@ -13,7 +13,7 @@ const stations = ref<Station[]>([])
 // Remembered per device, since a screen usually sits at one station.
 const station = ref<'all' | 'none' | number>(JSON.parse(localStorage.getItem(`kds-station-${bid}`) || '"all"'))
 function setStation(v: 'all' | 'none' | number) { station.value = v; localStorage.setItem(`kds-station-${bid}`, JSON.stringify(v)) }
-const tab = ref<'cook' | 'pack'>('cook')
+const tab = ref<'cook' | 'pack' | 'serve'>('cook')
 const error = ref('')
 const now = ref(Date.now())
 setInterval(() => (now.value = Date.now()), 30000)
@@ -33,11 +33,17 @@ const { online, lastSync, refreshNow } = useLive(() => `/merchant/branches/${bid
   if (typeof station.value === 'number' && !s.stations.some(x => x.id === station.value)) setStation('all')
 })
 
-const live = (o: Order) => o.items.filter(i => i.prep_status !== 'cancelled')
+// A table's bill stays open for the whole meal: dishes already at the table drop off the screen.
+const live = (o: Order) => o.items.filter(i => i.prep_status !== 'cancelled' && !i.served_at)
+const dine = (o: Order) => o.service_type === 'dine_in'
 const cancelled = computed(() => orders.value.filter(o => o.acceptance_status === 'cancelled'))
-const cooking = computed(() => orders.value.filter(o => o.acceptance_status === 'accepted' && o.packing_status === 'waiting_items'))
-const packing = computed(() => orders.value.filter(o => o.acceptance_status === 'accepted' && o.packing_status !== 'none'))
 const open = (i: OrderItem) => i.needs_prep && (i.prep_status === 'pending' || i.prep_status === 'preparing')
+const cooking = computed(() => orders.value.filter(o => o.acceptance_status === 'accepted' && (dine(o) ? live(o).some(open) : o.packing_status === 'waiting_items')))
+const packing = computed(() => orders.value.filter(o => o.acceptance_status === 'accepted' && !dine(o) && o.packing_status !== 'none'))
+// Dine-in dishes that are ready and waiting to be carried to the table.
+const toServe = (o: Order) => live(o).filter(i => i.prep_status === 'ready')
+const serving = computed(() => orders.value.filter(o => o.acceptance_status === 'accepted' && dine(o) && toServe(o).length > 0))
+const serveCount = computed(() => serving.value.reduce((n, o) => n + toServe(o).length, 0))
 const atStation = (i: OrderItem) => station.value === 'all' || (station.value === 'none' ? i.needs_prep && i.station_id === null : i.station_id === station.value)
 // Lines shown on a ticket for the chosen station; the "all" view shows every line.
 const lines = (o: Order) => live(o).filter(atStation)
@@ -62,6 +68,7 @@ async function run(fn: () => Promise<unknown>) {
 }
 const itemAction = (it: OrderItem, action: string) => run(() => post(`/kitchen/items/${it.id}/${action}`))
 const pack = (o: Order) => run(() => post(`/kitchen/orders/${o.id}/pack`, { bags: check(o).bags, manifest_version: o.manifest_version }))
+const serve = (it: OrderItem) => run(() => post(`/merchant/bill-items/${it.id}/serve`))
 const handoff = (o: Order) => run(() => post(`/merchant/orders/${o.id}/handoff`))
 
 function tick(o: Order, it: OrderItem) {
@@ -77,6 +84,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
       <div class="seg light">
         <button :class="{ on: tab === 'cook' }" @click="tab = 'cook'">{{ t('to_cook') }} · {{ cooking.length }}</button>
         <button :class="{ on: tab === 'pack' }" @click="tab = 'pack'">{{ t('to_pack') }} · {{ packing.length }}</button>
+        <button :class="{ on: tab === 'serve' }" data-test="tab-serve" @click="tab = 'serve'">{{ t('to_serve') }} · {{ serveCount }}</button>
       </div>
       <span class="muted small" v-if="lastSync">{{ t('synced') }} {{ lastSync.toLocaleTimeString() }}</span>
     </div>
@@ -104,14 +112,16 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
       <div class="cols">
         <div v-for="o in shown" :key="o.id" class="card stack">
           <div class="row between">
-            <h2>{{ o.public_no }} <span class="tag brand">{{ t(o.service_type) }}</span>
+            <h2><template v-if="dine(o)">{{ t('table') }} {{ o.table_name }}</template><template v-else>{{ o.public_no }}</template>
+              <span class="tag brand" style="margin-left:4px">{{ t(o.service_type) }}</span>
               <span class="tag info" v-if="o.scheduled_for" style="margin-left:4px">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span></h2>
-            <span class="tag" :class="waited(o) >= 20 ? 'bad' : waited(o) >= 10 ? 'warn' : ''">{{ waited(o) }} {{ t('min') }}</span>
+            <span v-if="!dine(o)" class="tag" :class="waited(o) >= 20 ? 'bad' : waited(o) >= 10 ? 'warn' : ''">{{ waited(o) }} {{ t('min') }}</span>
+            <span v-else class="small muted">{{ o.public_no }}</span>
           </div>
           <div v-if="o.note" class="banner warn small">{{ t('order_note') }}: {{ o.note }}</div>
           <div v-for="it in lines(o)" :key="it.id" class="kline" :class="it.prep_status">
             <div class="grow">
-              <div class="kname">{{ it.qty }} × {{ both(it.name, it.name_en) }}</div>
+              <div class="kname">{{ it.qty }} × {{ both(it.name, it.name_en) }}<span v-if="dine(o)" class="small muted" style="font-weight:400"> · {{ t('batch_n', { n: it.batch_seq }) }}</span></div>
               <div class="small" v-if="stations.length && it.needs_prep">
                 <span class="tag" :class="it.station_id === null ? 'warn' : 'info'">{{ it.station_name || t('unassigned') }}</span>
                 <select v-if="open(it)" class="mv" :value="it.station_id ?? ''" :title="t('move_to')" :aria-label="t('move_to')" @change="move(it, $event)">
@@ -128,6 +138,24 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
               <button v-if="it.prep_status !== 'ready'" class="btn small ok" @click="itemAction(it, 'ready')">{{ t('ready') }}</button>
               <button v-else class="btn small" @click="itemAction(it, 'undo')">{{ t('undo') }}</button>
             </template>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- serving: dine-in dishes ready for the table -->
+    <template v-else-if="tab === 'serve'">
+      <div v-if="serving.length === 0" class="card muted">{{ t('kitchen_empty') }}</div>
+      <div class="cols">
+        <div v-for="o in serving" :key="o.id" class="card stack">
+          <div class="row between"><h2>{{ t('table') }} {{ o.table_name }}</h2><span class="small muted">{{ o.public_no }}</span></div>
+          <div v-for="it in toServe(o)" :key="it.id" class="kline ready">
+            <div class="grow">
+              <div class="kname">{{ it.qty }} × {{ both(it.name, it.name_en) }}</div>
+              <div class="small" v-if="it.options.length">{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</div>
+              <div class="small bold" v-if="it.note" style="color:var(--warn)">{{ t('note') }}: {{ it.note }}</div>
+            </div>
+            <button class="btn small ok" @click="serve(it)">{{ t('serve') }}</button>
           </div>
         </div>
       </div>

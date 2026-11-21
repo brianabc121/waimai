@@ -31,7 +31,7 @@ export function useLive(url: () => string | null, refresh: () => Promise<void> |
 
   function connect() {
     const u = url()
-    if (!u || stopped) return
+    if (!u || stopped || es) return
     es = new EventSource('/api/v1' + u, { withCredentials: true })
     es.addEventListener('ready', () => { online.value = true; void run(); schedule() })
     es.addEventListener('refresh', () => void run())
@@ -45,6 +45,10 @@ export function useLive(url: () => string | null, refresh: () => Promise<void> |
       }
     }
   }
+
+  // For screens whose stream is refused until they hold a credential
+  // (a table tablet before pairing): try again now instead of waiting.
+  function reconnect() { es?.close(); es = null; connect() }
 
   const onVisible = () => { if (document.visibilityState === 'visible') void run() }
 
@@ -60,5 +64,5 @@ export function useLive(url: () => string | null, refresh: () => Promise<void> |
     window.clearTimeout(timer)
     document.removeEventListener('visibilitychange', onVisible)
   })
-  return { online, lastSync, refreshNow: run }
+  return { online, lastSync, refreshNow: run, reconnect }
 }

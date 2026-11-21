@@ -21,6 +21,7 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
       </select>
       <b v-else>{{ currentRole()?.branch_name }}</b>
       <router-link v-if="desk" to="/merchant/orders">{{ t('orders') }}</router-link>
+      <router-link v-if="desk" to="/merchant/tables">{{ t('tables') }}</router-link>
       <router-link v-if="role !== 'rider'" to="/kitchen">{{ t('kitchen') }}</router-link>
       <router-link v-if="role !== 'rider'" to="/merchant/menu">{{ t('menu_admin') }}</router-link>
       <router-link v-if="manager" to="/merchant/promos">{{ t('promos') }}</router-link>

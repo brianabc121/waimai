@@ -32,6 +32,9 @@ type Server struct {
 	publicWrites *limiter // quotes, orders
 	otpLimit     *limiter
 	loginLimit   *limiter
+	// Guests at the tables usually share the restaurant's one public address,
+	// so the dine-in limit is per address but much wider.
+	tableLimit *limiter
 }
 
 func NewServer(a *app.App, cfg config.Config, hub *Hub) *Server {
@@ -39,6 +42,7 @@ func NewServer(a *app.App, cfg config.Config, hub *Hub) *Server {
 		publicWrites: newLimiter(60, 30),
 		otpLimit:     newLimiter(6, 6),
 		loginLimit:   newLimiter(10, 10),
+		tableLimit:   newLimiter(600, 200),
 	}
 }
 
@@ -230,6 +234,13 @@ func (s *Server) Router() *gin.Engine {
 	api.POST("/customer/orders/:token/cancel", s.limit(s.publicWrites), s.customerCancel)
 	api.GET("/customer/orders/:token/events", s.customerEvents)
 
+	// dine-in guests: scanned table code or paired tablet
+	api.POST("/table-sessions/exchange", s.limit(s.tableLimit), s.exchangeTableCode)
+	api.POST("/table-devices/pair", s.limit(s.loginLimit), s.pairDevice)
+	api.GET("/table-sessions/current", s.currentTable)
+	api.POST("/table-sessions/current/batches", s.limit(s.tableLimit), s.guestBatch)
+	api.GET("/table-sessions/current/events", s.tableEvents)
+
 	// auth
 	api.POST("/auth/login", s.limit(s.loginLimit), s.login)
 	api.POST("/auth/logout", s.logout)
@@ -249,6 +260,18 @@ func (s *Server) Router() *gin.Engine {
 	auth.POST("/merchant/orders/:id/handoff", s.handoffOrder)
 	auth.POST("/merchant/orders/:id/redeliver", s.redeliverOrder)
 	auth.POST("/merchant/orders/:id/close-failed", s.closeFailedOrder)
+
+	// dine-in: tables, sessions, bills
+	auth.GET("/merchant/branches/:bid/tables", s.listTables)
+	auth.POST("/merchant/branches/:bid/tables", s.saveTable)
+	auth.PUT("/merchant/branches/:bid/tables/:id", s.saveTable)
+	auth.POST("/merchant/branches/:bid/table-devices/:id/revoke", s.revokeTableDevice)
+	auth.POST("/merchant/tables/:id/open", s.openTable)
+	auth.POST("/merchant/tables/:id/devices", s.pairTableDevice)
+	auth.GET("/merchant/table-sessions/:id", s.getBill)
+	auth.POST("/merchant/table-sessions/:id/batches", s.staffBatch)
+	auth.POST("/merchant/table-sessions/:id/close", s.closeTable)
+	auth.POST("/merchant/bill-items/:id/:action", s.billItem)
 
 	// merchant configuration
 	auth.GET("/merchant/branches/:bid/menu", s.adminMenu)

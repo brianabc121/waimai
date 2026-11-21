@@ -33,6 +33,7 @@ export interface OrderItem {
   id: number; item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number
   options: LineOption[]; note: string; needs_prep: boolean; prep_status: string
   station_id: number | null; station_name: string
+  batch_seq: number; batch_source: string; served_at: string | null; void_reason?: string
 }
 export interface DeliveryTask {
   id: number; rider_id: number; rider_name: string; rider_phone: string; assignment_version: number
@@ -43,13 +44,20 @@ export interface Cash {
   reconcile_status: string; amount_returned: number | null; note: string; created_at: string
 }
 export interface Order {
-  id: number; branch_id: number; public_no: string; pickup_code: string; service_type: 'delivery' | 'pickup'
+  id: number; branch_id: number; public_no: string; pickup_code: string; service_type: 'delivery' | 'pickup' | 'dine_in'
   customer_name: string; customer_phone: string; zone_name: string; address_line: string; address_unit: string
   address_note: string; note: string; currency: string; totals: Totals; payment_method: string
   acceptance_status: string; packing_status: string; fulfillment_status: string; payment_status: string
   display_status: string; close_reason: string; bags: number | null; version: number; manifest_version: number
   accept_deadline: string; scheduled_for: string | null; release_at: string | null; timezone: string; created_at: string; items: OrderItem[]; delivery: DeliveryTask | null; cash: Cash | null
+  session_id: number | null; table_name: string; amount_received: number | null; payment_note: string
 }
+export interface TableDevice { id: number; name: string; paired: boolean; paired_at: string | null }
+export interface TableSummary { id: number; order_id: number; public_no: string; guests: number; opened_at: string; total: number; item_count: number; unserved: number }
+export interface DiningTable { id: number; name: string; qr_token: string; active: boolean; sort: number; session: TableSummary | null; devices: TableDevice[] }
+export interface Bill { session_id: number; table_id: number; table_name: string; status: 'open' | 'closed'; guests: number; opened_at: string; closed_at: string | null; order: Order }
+export interface TableAccess { slug: string; store_name: string; table_name: string; mode: 'qr' | 'ipad' }
+export interface BatchLine { item_id: number; qty: number; option_ids: number[]; note: string }
 export interface Quote { id: string; currency: string; service_type: string; zone_name: string; scheduled_for: string | null; totals: Totals; expires_at: string
   lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string }[] }
 export interface ImportRow {

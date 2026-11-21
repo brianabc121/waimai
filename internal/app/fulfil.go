@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -15,10 +16,12 @@ import (
 func (a *App) ListOrders(ctx context.Context, branchID int64, scope string) ([]*Order, error) {
 	active := `o.acceptance_status = 'pending' OR (o.acceptance_status = 'accepted'
 		AND o.fulfillment_status NOT IN ('delivered','picked_up'))`
+	// Dine-in bills live on the tables screen, not in the delivery/pickup desk.
+	const notDineIn = ` AND o.service_type <> 'dine_in'`
 	if scope == "history" {
-		return queryOrders(ctx, a.DB, `o.branch_id=$1 AND NOT (`+active+`) ORDER BY o.created_at DESC LIMIT 100`, branchID)
+		return queryOrders(ctx, a.DB, `o.branch_id=$1`+notDineIn+` AND NOT (`+active+`) ORDER BY o.created_at DESC LIMIT 100`, branchID)
 	}
-	return queryOrders(ctx, a.DB, `o.branch_id=$1 AND (`+active+`) ORDER BY o.created_at`, branchID)
+	return queryOrders(ctx, a.DB, `o.branch_id=$1`+notDineIn+` AND (`+active+`) ORDER BY o.created_at`, branchID)
 }
 
 // OrderBranch returns the branch an order belongs to, for permission checks.
@@ -50,6 +53,15 @@ func (a *App) command(ctx context.Context, orderID int64, fn func(tx pgx.Tx, o *
 	return loadOrder(ctx, a.DB, orderID)
 }
 
+// notDineIn guards the delivery and pickup commands: a dine-in bill is only
+// changed through its table session.
+func notDineIn(o *lockedOrder) error {
+	if o.ServiceType == "dine_in" {
+		return ErrInvalidState("this is a dine-in bill; use the tables screen")
+	}
+	return nil
+}
+
 func checkVersion(o *lockedOrder, expected int) error {
 	if expected != 0 && expected != o.Version {
 		return ErrVersion
@@ -72,6 +84,9 @@ func recomputePacking(ctx context.Context, tx pgx.Tx, orderID int64) error {
 // initialises packing.
 func (a *App) Accept(ctx context.Context, orderID int64, expectedVersion int, actor Actor) (*Order, error) {
 	return a.command(ctx, orderID, func(tx pgx.Tx, o *lockedOrder) error {
+		if err := notDineIn(o); err != nil {
+			return err
+		}
 		if o.Acceptance == "accepted" && expectedVersion == 0 {
 			return nil
 		}
@@ -114,6 +129,9 @@ func (a *App) Reject(ctx context.Context, orderID int64, expectedVersion int, re
 		return nil, ErrValidation("reason is required")
 	}
 	return a.command(ctx, orderID, func(tx pgx.Tx, o *lockedOrder) error {
+		if err := notDineIn(o); err != nil {
+			return err
+		}
 		if o.Acceptance != "pending" {
 			return ErrInvalidState("order is not pending")
 		}
@@ -131,6 +149,9 @@ func (a *App) StaffCancel(ctx context.Context, orderID int64, expectedVersion in
 		return nil, ErrValidation("reason is required")
 	}
 	return a.command(ctx, orderID, func(tx pgx.Tx, o *lockedOrder) error {
+		if err := notDineIn(o); err != nil {
+			return err
+		}
 		if o.Acceptance != "accepted" {
 			return ErrInvalidState("only accepted orders can be cancelled; reject pending orders instead")
 		}
@@ -150,6 +171,9 @@ func (a *App) StaffCancel(ctx context.Context, orderID int64, expectedVersion in
 // assignment_version and changes rider_id, which locks the previous rider out.
 func (a *App) AssignRider(ctx context.Context, orderID, riderID int64, actor Actor) (*Order, error) {
 	return a.command(ctx, orderID, func(tx pgx.Tx, o *lockedOrder) error {
+		if err := notDineIn(o); err != nil {
+			return err
+		}
 		if o.ServiceType != "delivery" {
 			return ErrInvalidState("pickup orders have no rider")
 		}
@@ -248,7 +272,12 @@ func (a *App) handoff(ctx context.Context, tx pgx.Tx, o *lockedOrder, actor Acto
 }
 
 func (a *App) StaffHandoff(ctx context.Context, orderID int64, actor Actor) (*Order, error) {
-	return a.command(ctx, orderID, func(tx pgx.Tx, o *lockedOrder) error { return a.handoff(ctx, tx, o, actor) })
+	return a.command(ctx, orderID, func(tx pgx.Tx, o *lockedOrder) error {
+		if err := notDineIn(o); err != nil {
+			return err
+		}
+		return a.handoff(ctx, tx, o, actor)
+	})
 }
 
 // ---- kitchen ----
@@ -277,12 +306,13 @@ func (a *App) ItemOrder(ctx context.Context, itemID int64) (orderID, branchID in
 // SetItemStatus applies a kitchen action to one order item: start, ready or undo.
 func (a *App) SetItemStatus(ctx context.Context, orderID, itemID int64, action string, actor Actor) (*Order, error) {
 	return a.command(ctx, orderID, func(tx pgx.Tx, o *lockedOrder) error {
-		if o.Acceptance != "accepted" {
+		if o.Acceptance != "accepted" || o.Fulfillment == "dined" {
 			return ErrInvalidState("order is not active")
 		}
 		var cur string
-		if err := tx.QueryRow(ctx, `SELECT prep_status FROM order_items WHERE id=$1 AND order_id=$2 FOR UPDATE`,
-			itemID, o.ID).Scan(&cur); err != nil {
+		var served *time.Time
+		if err := tx.QueryRow(ctx, `SELECT prep_status, served_at FROM order_items WHERE id=$1 AND order_id=$2 FOR UPDATE`,
+			itemID, o.ID).Scan(&cur, &served); err != nil {
 			if isNoRows(err) {
 				return ErrNotFound
 			}
@@ -315,6 +345,9 @@ func (a *App) SetItemStatus(ctx context.Context, orderID, itemID int64, action s
 			}
 			if o.Packing == "packed" {
 				return ErrInvalidState("the order is already packed")
+			}
+			if served != nil {
+				return ErrInvalidState("the dish was already served")
 			}
 			next = "preparing"
 		default:
@@ -349,6 +382,9 @@ func (a *App) Pack(ctx context.Context, orderID int64, bags, manifestVersion int
 		return nil, ErrValidation("bags must be between 1 and 50")
 	}
 	return a.command(ctx, orderID, func(tx pgx.Tx, o *lockedOrder) error {
+		if err := notDineIn(o); err != nil {
+			return err
+		}
 		if o.Acceptance != "accepted" {
 			return ErrInvalidState("order is not active")
 		}
