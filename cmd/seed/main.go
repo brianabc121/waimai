@@ -129,6 +129,19 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 	item(app.ItemInput{CategoryID: drinks, Name: "珍珠奶茶", NameEn: "Bubble Milk Tea", Price: 11900, NeedsPrep: true, StationID: bar})
 	item(app.ItemInput{CategoryID: drinks, Name: "瓶装水", NameEn: "Bottled Water", Price: 3000, NeedsPrep: false})
 
+	i64 := func(v int64) *int64 { return &v }
+	for _, p := range []app.PromotionInput{
+		{Name: "满200减20", NameEn: "Save 20 over 200", Kind: "amount_off", Threshold: 20000, Value: 2000,
+			AppliesDelivery: true, AppliesPickup: true},
+		{Name: "满500免配送费", NameEn: "Free delivery over 500", Kind: "free_delivery", Threshold: 50000, AppliesDelivery: true},
+		{Name: "夜宵九折", NameEn: "Late-night 10% off", Kind: "percent_off", Value: 1000, MaxDiscount: i64(10000),
+			DailyStart: "22:00", DailyEnd: "02:00", AppliesDelivery: true, AppliesPickup: true},
+	} {
+		id, err := a.SavePromotion(ctx, bid, 0, p, app.Actor{Type: "system"})
+		must(err)
+		must(a.SetPromotionStatus(ctx, bid, id, "active", app.Actor{Type: "system"}))
+	}
+
 	for _, u := range []app.NewUser{
 		{Username: "cashier1", DisplayName: "收银 小陈", Role: "cashier"},
 		{Username: "kitchen1", DisplayName: "后厨 阿明", Role: "kitchen"},

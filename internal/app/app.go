@@ -116,7 +116,7 @@ func audit(ctx context.Context, tx pgx.Tx, branchID, orderID int64, actor Actor,
 		actorID = &actor.ID
 	}
 	_, err := tx.Exec(ctx, `INSERT INTO audit_logs (branch_id, order_id, actor_type, actor_id, action, detail)
-		VALUES ($1,$2,$3,$4,$5,$6)`, branchID, orderID, actor.Type, actorID, action, b)
+		VALUES ($1,NULLIF($2::bigint, 0),$3,$4,$5,$6)`, branchID, orderID, actor.Type, actorID, action, b)
 	return err
 }
 

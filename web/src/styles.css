@@ -53,6 +53,7 @@ label.check { display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
 
 .totals { width: 100%; border-collapse: collapse; }
 .totals td { padding: 3px 0; } .totals td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.totals tr.disc td { color: var(--brand-dark); }
 .totals tr.sum td { padding-top: 8px; border-top: 1px solid var(--line); font-weight: 700; font-size: 17px; }
 
 table.data { width: 100%; border-collapse: collapse; background: #fff; }

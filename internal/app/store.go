@@ -280,9 +280,10 @@ func loadMenu(ctx context.Context, q Querier, branchID int64, publishedOnly bool
 
 // Storefront is the anonymous, cacheable view of a branch.
 type Storefront struct {
-	Branch     *Branch    `json:"branch"`
-	Zones      []Zone     `json:"zones"`
-	Categories []Category `json:"categories"`
+	Branch     *Branch     `json:"branch"`
+	Zones      []Zone      `json:"zones"`
+	Categories []Category  `json:"categories"`
+	Promotions []Promotion `json:"promotions"`
 }
 
 func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) {
@@ -309,5 +310,9 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 			it.StationID = nil
 		}
 	}
-	return &Storefront{Branch: b, Zones: zones, Categories: cats}, nil
+	promos, err := livePromotions(ctx, a.DB, b)
+	if err != nil {
+		return nil, err
+	}
+	return &Storefront{Branch: b, Zones: zones, Categories: cats, Promotions: promos}, nil
 }

@@ -15,6 +15,7 @@ export const router = createRouter({
         { path: '', redirect: '/merchant/orders' },
         { path: 'orders', component: () => import('./views/OrdersView.vue') },
         { path: 'menu', component: () => import('./views/MenuView.vue') },
+        { path: 'promos', component: () => import('./views/PromosView.vue') },
         { path: 'cash', component: () => import('./views/CashView.vue') },
         { path: 'settings', component: () => import('./views/SettingsView.vue') },
       ],

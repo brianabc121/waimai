@@ -134,7 +134,7 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	o.tax_rate_bp, o.discount, o.total, o.payment_method, o.acceptance_status, o.packing_status,
 	o.fulfillment_status, o.payment_status, o.close_reason, o.bags, o.version, o.manifest_version,
 	o.accept_deadline, o.created_at, o.accepted_at, o.packed_at, o.handed_off_at, o.completed_at, o.closed_at,
-	o.token_nonce`
+	o.token_nonce, COALESCE(o.promotion_id, 0), o.promotion_name, o.promotion_name_en`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}}
@@ -145,7 +145,7 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&t.TaxRateBP, &t.Discount, &t.Total, &o.PaymentMethod, &o.AcceptanceStatus, &o.PackingStatus,
 		&o.FulfillmentStatus, &o.PaymentStatus, &o.CloseReason, &o.Bags, &o.Version, &o.ManifestVersion,
 		&o.AcceptDeadline, &o.CreatedAt, &o.AcceptedAt, &o.PackedAt, &o.HandedOffAt, &o.CompletedAt, &o.ClosedAt,
-		&o.tokenNonce)
+		&o.tokenNonce, &t.PromotionID, &t.PromotionName, &t.PromotionNameEn)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +358,7 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		}
 
 		// Re-price against the live menu; anything that moved needs a new confirmation.
-		cur, err := computeQuote(ctx, tx, b, quoted.Input)
+		cur, err := computeQuote(ctx, tx, b, quoted.Input, phone)
 		if err != nil {
 			return err
 		}
@@ -392,16 +392,23 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		err = tx.QueryRow(ctx, `INSERT INTO orders (merchant_id, branch_id, public_no, pickup_code,
 			access_token_hash, token_nonce, service_type, customer_name, customer_phone, zone_id, zone_name,
 			address_line, address_unit, address_note, note, currency, subtotal, packaging_fee, delivery_fee,
-			service_charge, tax_amount, tax_inclusive, tax_rate_bp, discount, total, payment_method, accept_deadline)
+			service_charge, tax_amount, tax_inclusive, tax_rate_bp, discount, total, payment_method, accept_deadline,
+			promotion_id, promotion_name, promotion_name_en)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-				now() + make_interval(mins => $27))
+				now() + make_interval(mins => $27), NULLIF($28, 0), $29, $30)
 			RETURNING id`,
 			b.MerchantID, b.ID, publicNo, pickupCode, hashToken(token), nonce, cur.ServiceType, in.CustomerName,
 			phone, cur.ZoneID, cur.ZoneName, in.AddressLine, in.AddressUnit, in.AddressNote, in.Note, b.Currency,
 			t.Subtotal, t.PackagingFee, t.DeliveryFee, t.ServiceCharge, t.TaxAmount, t.TaxInclusive, t.TaxRateBP,
-			t.Discount, t.Total, payMethod, b.AcceptTimeoutMinutes).Scan(&orderID)
+			t.Discount, t.Total, payMethod, b.AcceptTimeoutMinutes, t.PromotionID, t.PromotionName,
+			t.PromotionNameEn).Scan(&orderID)
 		if err != nil {
 			return wrap("insert order", err)
+		}
+		if t.PromotionID != 0 {
+			if err := claimPromotion(ctx, tx, b.ID, t.PromotionID, orderID, phone, t.Discount); err != nil {
+				return err
+			}
 		}
 		var batchID int64
 		if err := tx.QueryRow(ctx, `INSERT INTO order_batches (order_id, seq) VALUES ($1, 1) RETURNING id`,
@@ -452,6 +459,9 @@ func (a *App) OrderByToken(ctx context.Context, token string) (*Order, error) {
 // items and the delivery task cancelled and records the reason.
 func (a *App) closeOrder(ctx context.Context, tx pgx.Tx, o *lockedOrder, status, reason string, actor Actor) error {
 	if err := releaseStock(ctx, tx, o.ID); err != nil {
+		return err
+	}
+	if err := releasePromotion(ctx, tx, o.ID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE order_items SET prep_status='cancelled' WHERE order_id=$1`, o.ID); err != nil {

@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError, get } from '../api'
 import { addLine, clearLines, linePrice, useCart } from '../cart'
-import { locale, money, pick, setLocale, t } from '../i18n'
+import { locale, money, pick, promoLabel, setLocale, t } from '../i18n'
 import type { Item, Storefront } from '../types'
 
 const props = defineProps<{ slug: string }>()
@@ -44,6 +44,12 @@ const subtotal = computed(() => cart.lines.reduce((s, l) => s + (linePrice(l, it
 const zone = computed(() => store.value?.zones.find(z => z.id === cart.zoneId) ?? null)
 const minimum = computed(() => cart.service === 'delivery' && store.value
   ? Math.max(store.value.branch.min_order_amount, zone.value?.min_order ?? 0) : 0)
+// Promotions for the chosen service, and a nudge towards the nearest one not yet reached.
+const promos = computed(() => (store.value?.promotions ?? []).filter(p => cart.service === 'delivery' ? p.applies_delivery : p.applies_pickup && p.kind !== 'free_delivery'))
+const nextPromo = computed(() => {
+  const ahead = promos.value.filter(p => p.threshold > subtotal.value).sort((a, b) => a.threshold - b.threshold)[0]
+  return ahead && subtotal.value > 0 ? ahead : null
+})
 const hasUnavailable = computed(() => cart.lines.some(l => {
   const it = items.value.get(l.item_id)
   return !it || !orderable(it) || linePrice(l, items.value) === null
@@ -144,6 +150,10 @@ function scrollTo(id: number) {
         <div class="banner warn">{{ store.branch.paused ? t('paused') : t('closed') }}</div>
       </div>
 
+      <div class="section promos" v-if="tab === 'menu' && promos.length">
+        <span v-for="p in promos" :key="p.id" class="tag brand" :title="pick(p.name, p.name_en)">{{ promoLabel(p, cur) }}</span>
+      </div>
+
       <!-- store info (C02) -->
       <div v-if="tab === 'info'" class="section">
         <div class="card stack">
@@ -210,6 +220,7 @@ function scrollTo(id: number) {
       <div class="bottombar" v-if="count > 0">
         <div>
           <div v-if="minimum > subtotal" class="small muted" style="margin-bottom:6px">{{ t('below_min', { amt: money(minimum - subtotal, cur) }) }}</div>
+          <div v-else-if="nextPromo" class="small" style="margin-bottom:6px;color:var(--brand-dark)">{{ t('more_for_promo', { amt: money(nextPromo.threshold - subtotal, cur), name: promoLabel(nextPromo, cur) }) }}</div>
           <div class="row between">
             <button class="btn" @click="showCart = true">{{ t('cart') }} · {{ count }}</button>
             <span class="price bold grow right">{{ money(subtotal, cur) }}</span>
@@ -274,6 +285,7 @@ function scrollTo(id: number) {
 </template>
 
 <style scoped>
+.promos { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 0; }
 .cats { display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px; position: sticky; top: 0; background: var(--bg); z-index: 10; }
 .cats button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 14px; white-space: nowrap; cursor: pointer; }
 .item { display: flex; gap: 12px; }
