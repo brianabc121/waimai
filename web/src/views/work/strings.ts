@@ -53,6 +53,12 @@ extend({
   'wk.push': ['新任务推送', 'Push for new deliveries'], 'wk.push.on': ['已开启', 'On'], 'wk.push.enable': ['开启', 'Turn on'], 'wk.push.disable': ['关闭', 'Turn off'],
   'wk.push.denied': ['浏览器不允许通知，请在浏览器设置里打开', 'Notifications are blocked in the browser settings'],
   'wk.push.hint': ['有新配送单、改派、取消时，这台设备锁屏也会收到提醒', 'This device is told about new, reassigned and cancelled deliveries even when locked'],
+  'wk.geo.app': ['锁屏或切到别的应用时也会继续上报，状态栏会有提示', 'Your position is shared with the screen off too; a notice stays in the status bar'],
+  'wk.geo.denied_app': ['没有定位权限，门店看不到你的位置。请在应用设置里把“位置”改成允许', 'Location is blocked. Allow it in the app settings'],
+  'wk.push.denied_app': ['通知被关掉了，请在应用设置里打开通知', 'Notifications are off. Turn them on in the app settings'],
+  'wk.app_settings': ['打开应用设置', 'Open app settings'],
+  'wk.battery': ['锁屏后收不到新单或位置断了？', 'Missing reminders or position with the screen off?'],
+  'wk.battery_hint': ['有些手机会为了省电把后台应用停掉。请在应用设置的“电池”里选“无限制”或“不优化”，并允许自启动。', 'Some phones stop background apps to save power. In the app settings, set Battery to "Unrestricted" and allow auto-start.'],
   'wk.install': ['添加到主屏幕后，可以像 App 一样打开', 'Add this page to your home screen to open it like an app'],
 
   'st.count': ['{a} 人在职 · {d} 人已停用', '{a} active · {d} disabled'], 'st.search': ['搜姓名、账号、手机', 'Search name, username, phone'],

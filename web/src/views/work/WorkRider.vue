@@ -9,7 +9,9 @@ import { both, money, t, toMajor, toMinor, whenText } from '../../i18n'
 import { useLive } from '../../live'
 import { currentRole, reloadUser, session } from '../../session'
 import type { Order } from '../../types'
-import { duty, flush, loadDuty, setDuty, track } from './duty'
+import { duty, flush, loadDuty, openAppSettings, setDuty, track } from './duty'
+import { native } from './native'
+import { askNotifications } from './push'
 import { enqueue, overlay, queue, send } from './offline'
 
 const props = defineProps<{ tab: 'tasks' | 'done'; active: boolean }>()
@@ -114,11 +116,14 @@ watch([() => props.active, () => duty.on], ([active, on]) => track(active && on,
 const dutyBusy = ref(false)
 async function toggleDuty() {
   dutyBusy.value = true; error.value = ''
-  try { await setDuty(!duty.on) } catch (e) { error.value = (e as Error).message }
+  try {
+    await setDuty(!duty.on)
+    if (duty.on) void askNotifications()
+  } catch (e) { error.value = (e as Error).message }
   dutyBusy.value = false
 }
 const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active ? t('wk.geo.paused')
-  : duty.geo === 'ok' ? t('wk.geo.ok') : duty.geo === 'denied' ? t('wk.geo.denied')
+  : duty.geo === 'ok' ? t('wk.geo.ok') : duty.geo === 'denied' ? t(native ? 'wk.geo.denied_app' : 'wk.geo.denied')
   : duty.geo === 'unsupported' ? t('wk.geo.unsupported') : t('wk.geo.searching'))
 </script>
 
@@ -210,7 +215,8 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
             <div class="small muted" data-testid="geo-text">{{ geoText }}</div></div>
           <button class="btn" :class="{ primary: !duty.on }" :disabled="dutyBusy" data-act="duty" @click="toggleDuty">{{ duty.on ? t('wk.duty.end') : t('wk.duty.start') }}</button>
         </div>
-        <div v-if="duty.on && active && duty.geo !== 'denied' && duty.geo !== 'unsupported'" class="small muted">{{ t('wk.geo.screen') }}</div>
+        <div v-if="duty.on && active && duty.geo !== 'denied' && duty.geo !== 'unsupported'" class="small muted">{{ t(native ? 'wk.geo.app' : 'wk.geo.screen') }}</div>
+        <button v-if="native && duty.on && duty.geo === 'denied'" class="btn small" @click="openAppSettings">{{ t('wk.app_settings') }}</button>
       </div>
 
       <template v-if="tab === 'tasks'">

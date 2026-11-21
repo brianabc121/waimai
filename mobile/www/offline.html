@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>员工工作台</title>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; background: #fff; color: #222; }
+  main { padding: 24px; max-width: 420px; text-align: center; line-height: 1.6; }
+  h1 { color: #d9480f; font-size: 22px; }
+  button { margin-top: 12px; padding: 12px 28px; font-size: 16px; border: 0; border-radius: 10px; background: #d9480f; color: #fff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>连不上服务器</h1>
+  <p>请检查手机的网络，然后重试。</p>
+  <p style="color:#777">Cannot reach the server. Check the connection and try again.</p>
+  <button onclick="history.length > 1 ? history.back() : location.reload()">重试 Retry</button>
+</main>
+</body>
+</html>

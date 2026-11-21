@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">员工工作台</string>
+    <string name="title_activity_main">员工工作台</string>
+    <string name="package_name">app.waimai.workbench</string>
+    <string name="custom_url_scheme">app.waimai.workbench</string>
+    <!-- The notice Android shows while a rider on duty shares their position. -->
+    <string name="capacitor_background_geolocation_notification_channel_name">上班中的位置上报</string>
+    <string name="capacitor_background_geolocation_notification_icon">drawable/ic_stat_work</string>
+</resources>

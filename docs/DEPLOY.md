@@ -46,6 +46,7 @@ chmod 600 .env
 | `HTTP_PORT` | 保持 `127.0.0.1:8000`，只让本机的 Caddy 访问 |
 | `GOOGLE_MAPS_API_KEY` | 选填。配送地图用的 Google 地图密钥，申请方法见第 13 节。不填也能正常运行，只是没有地图 |
 | `VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJECT` | 选填。员工工作台的浏览器推送，生成方法见第 14 节。不填也能正常运行，只是骑手锁屏时收不到新单提醒 |
+| `FCM_SERVICE_ACCOUNT` | 选填。给安卓 App 发推送用的 Firebase 密钥，见第 15 节。不填时 App 能用，只是收不到推送 |
 
 注意：不要把仓库根目录的 `.env.example` 直接用于 Compose。它是给本机开发用的，里面的数据库地址是 `localhost`，在容器里连不上。
 
@@ -347,4 +348,93 @@ Google 地图在中国大陆不能正常访问，在大陆打开时地图会加�
 - 安卓的 Chrome 直接支持。iPhone 要求 iOS 16.4 以上，并且必须先“添加到主屏幕”，从桌面图标打开后才能开启推送。
 - 推送只是提醒，内容只有单号和地址。推送丢了不会丢单，打开工作台就能看到任务。
 - 发送情况可以在平台后台的 Worker 页面看到，推送失败会自动重试。
+
+## 15. 安卓 App（员工工作台）
+
+安卓 App 是给骑手用的：锁屏也能收到新配送单，上班时切到别的应用也继续上报位置。店内员工用浏览器版就够了。
+
+App 只是一个外壳，打开的还是你服务器上的 `/work` 页面，所以以后页面更新不用重新装 App。因为每家的服务器地址和推送密钥都不一样，安装包要你自己打一次，全程在 GitHub 网页上点，不需要装开发工具。
+
+你需要准备：系统已经按前面的步骤上线，有一个 HTTPS 地址；一个 Google 账号（建 Firebase 项目用，免费）。
+
+### 15.1 建 Firebase 项目（推送用）
+
+1. 打开 <https://console.firebase.google.com>，用 Google 账号登录，点“创建项目”，名字随意，Google Analytics 可以关掉。
+2. 在项目首页点安卓图标“添加应用”。“Android 软件包名称”必须填 `app.waimai.workbench`，其余不用填。
+3. 下载它给你的 `google-services.json`，后面的“下一步”一路点完即可。这个文件给 App 用。
+4. 点左上角齿轮进“项目设置”，打开“服务账号”标签，点“生成新的私钥”，会下载一个 `.json` 文件。这个文件给服务器用，等同于密码，不要发给别人，也不要提交到代码仓库。
+
+暂时不想弄推送可以跳过这一小节，App 照样能用，之后补上再重新打包一次。
+
+### 15.2 服务器这边
+
+把第 4 步下载的私钥文件压成一行，写进服务器的 `.env`：
+
+```bash
+# 在放着私钥文件的电脑上执行，把输出的那一行复制下来
+python3 -c "import json,sys; print(json.dumps(json.load(open(sys.argv[1]))))" 下载的文件.json
+```
+
+```bash
+# 服务器 .env 里加一行，注意两边是单引号
+FCM_SERVICE_ACCOUNT='这里粘贴那一行'
+```
+
+然后 `docker compose up -d` 重启。
+
+### 15.3 做一个签名密钥（只做一次）
+
+安卓要求安装包带签名，而且以后的新版本必须用同一个密钥签名才能覆盖安装。在任何一台装了 Java 的电脑上执行（服务器上没有 Java 的话，用 Docker 也行）：
+
+```bash
+docker run --rm -v "$PWD":/out eclipse-temurin:21 keytool -genkeypair \
+  -keystore /out/workbench.jks -alias workbench -keyalg RSA -keysize 2048 -validity 10000 \
+  -storepass '换成你的密码' -keypass '换成你的密码' -dname "CN=Workbench"
+base64 -w0 workbench.jks > workbench.jks.txt
+```
+
+把 `workbench.jks` 和密码存到安全的地方。**丢了以后就没法给已经装了 App 的手机发更新，只能让大家卸载重装。**
+
+### 15.4 在 GitHub 上填三样东西
+
+打开代码仓库的 Settings，左边选 Secrets and variables 下的 Actions。
+
+在 **Variables** 标签里新建：
+
+| 名字 | 值 |
+|---|---|
+| `WORKBENCH_URL` | 你的地址，例如 `https://order.example.com`，结尾不带斜杠 |
+
+在 **Secrets** 标签里新建：
+
+| 名字 | 值 |
+|---|---|
+| `GOOGLE_SERVICES_JSON` | 15.1 第 3 步下载的 `google-services.json` 的全部内容 |
+| `ANDROID_KEYSTORE_BASE64` | `workbench.jks.txt` 的全部内容 |
+| `ANDROID_KEYSTORE_PASSWORD` | 15.3 里你设的密码 |
+
+### 15.5 打包和下载
+
+1. 打开仓库的 Actions 标签，左边选 “Android app”，点 “Run workflow”。
+2. 大约五分钟后这次运行变成绿色。点进去，页面上会写明这次打包用的服务器地址、有没有推送、是不是正式签名。
+3. 在页面底部的 Artifacts 里下载 `workbench-android-数字`，解压得到 `app-release.apk`。
+
+没有填签名密钥时打出来的是 `app-debug.apk`，可以先装上看看，但以后换成正式签名的版本时要先卸载。
+
+### 15.6 发给骑手
+
+1. 把 `app-release.apk` 发给骑手（聊天软件、网盘都行）。
+2. 骑手点开安装。手机会提示“不允许安装未知来源的应用”，按提示给发文件的那个软件开一次权限即可。
+3. 打开 App，用自己的账号登录，切到骑手身份，点“上班”。手机会依次问通知权限和定位权限，都选允许。定位那一步请选“使用应用时允许”，上班期间状态栏会一直有一条“正在上报位置”的提示，这是正常的，下班后消失。
+4. 国产手机（小米、华为、OPPO、vivo 等）省电管得很严，可能锁屏几分钟后就把 App 停掉。在 App 的“我的”里点“打开应用设置”，把电池改成“无限制”，并允许自启动。
+
+### 15.7 更新
+
+页面和功能的更新都在服务器上，骑手不用做任何事。只有外壳本身变了（比如加了新的手机权限）才需要重新打包，届时再点一次 “Run workflow”，把新的安装包发给骑手覆盖安装。
+
+### 15.8 目前的限制
+
+- 这个 App 还没有在真手机上验证过。云端只能确认安装包能打出来、签名和权限正确；锁屏推送和后台定位在各品牌手机上的实际表现，要请你或骑手装上跑一两天，把遇到的问题告诉我。
+- 国内不能访问 Google 服务的手机收不到 Firebase 推送。在这类手机上，App 开着时任务仍然实时出现，只是锁屏时没有提醒。
+- iPhone 版在后面的批次做。
 
