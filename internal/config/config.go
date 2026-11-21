@@ -4,12 +4,13 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
 	Addr              string
 	DatabaseURL       string
-	ListenDatabaseURL string // direct (non-pooled) connection used for LISTEN
+	ListenDatabaseURL string // direct (non-pooled) connection: LISTEN and migrations
 	AppSecret         string
 	CookieSecure      bool
 	OTPDevEcho        bool
@@ -62,6 +63,29 @@ func Load() Config {
 		TwilioFrom:         env("TWILIO_FROM", ""),
 		TwilioMessagingSID: env("TWILIO_MESSAGING_SERVICE_SID", ""),
 	}
-	c.ListenDatabaseURL = env("LISTEN_DATABASE_URL", c.DatabaseURL)
+	// DIRECT_DATABASE_URL (older name: LISTEN_DATABASE_URL) is only needed when
+	// DATABASE_URL goes through a transaction-mode pooler.
+	c.ListenDatabaseURL = env("DIRECT_DATABASE_URL", env("LISTEN_DATABASE_URL", c.DatabaseURL))
+	if c.ListenDatabaseURL != c.DatabaseURL {
+		c.DatabaseURL = PoolerSafe(c.DatabaseURL)
+	}
 	return c
+}
+
+// PoolerSafe makes a connection URL usable through a transaction-mode pooler
+// (PgBouncer and the "pooled" endpoints of managed databases). Such a pooler
+// hands every transaction to whichever server connection is free, so named
+// prepared statements, which pgx caches per connection by default, end up on
+// the wrong connection ("prepared statement already exists / does not exist").
+// cache_describe keeps typed parameters but never leaves a statement behind.
+// A mode already chosen in the URL is kept.
+func PoolerSafe(url string) string {
+	if strings.Contains(url, "default_query_exec_mode=") {
+		return url
+	}
+	sep := "?"
+	if strings.Contains(url, "?") {
+		sep = "&"
+	}
+	return url + sep + "default_query_exec_mode=cache_describe"
 }

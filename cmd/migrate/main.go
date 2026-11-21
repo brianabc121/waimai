@@ -11,7 +11,9 @@ import (
 
 func main() {
 	cfg := config.Load()
-	if err := db.Migrate(context.Background(), cfg.DatabaseURL); err != nil {
+	// Migrations hold a session lock, so they use the direct connection when
+	// the main one goes through a pooler.
+	if err := db.Migrate(context.Background(), cfg.ListenDatabaseURL); err != nil {
 		log.Fatalf("migrate: %v", err)
 	}
 	log.Print("migrations applied")

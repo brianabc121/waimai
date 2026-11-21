@@ -61,7 +61,10 @@ await cust.waitForSelector('.banner.ok')
 await shot(cust, '03-checkout')
 const total = (await cust.locator('.totals tr.sum td').last().innerText()).trim()
 const disc = (await cust.locator('.totals tr.disc').innerText()).replace(/\s+/g, ' ')
-if (!disc.includes('满200减20') || !disc.includes('20')) throw new Error('promotion missing at checkout: ' + disc)
+// The store picks whichever live promotion saves more: normally 满200减20, but
+// between 22:00 and 02:00 store time the late-night 10% off wins.
+const promoName = ['满200减20', '夜宵九折'].find(n => disc.includes(n))
+if (!promoName) throw new Error('promotion missing at checkout: ' + disc)
 await placeBtn.click()
 await cust.waitForURL('**/o/**')
 await cust.waitForSelector('[data-testid=status]')
@@ -72,7 +75,7 @@ const expectStatus = async (text) => {
 await expectStatus('等待商家接单')
 const orderNo = (await cust.locator('.topbar h1').innerText()).replace('订单号', '').trim()
 await shot(cust, '04-pending')
-await cust.locator('.totals tr.disc:has-text("满200减20")').waitFor()   // the order keeps the discount
+await cust.locator(`.totals tr.disc:has-text("${promoName}")`).waitFor()   // the order keeps the discount
 step(`customer placed ${orderNo}, total ${total}`)
 
 // ---- cashier accepts and assigns ----
