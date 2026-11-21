@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="map.css">
 </head>
 <body>
-<!-- 原型：用 ?s=overview｜draw｜overlap｜form｜location 切换五个状态。底图是示意图，正式版换成 Google 地图。 -->
+<!-- 原型：用 ?s=overview｜draw｜snap｜overlap｜form｜gap｜location 切换七个状态。底图是示意图，正式版换成 Google 地图。 -->
 <nav class="staffbar">
   <b>马卡蒂小馆</b>
   <a>订单</a><a>桌台</a><a>后厨</a><a>菜单</a><a>模板</a><a>活动</a><a>核款</a><a class="on">配送地图</a><a>设置</a>
@@ -36,7 +36,7 @@
 var s = new URLSearchParams(location.search).get('s') || 'overview';
 var svg = document.getElementById('svg'), panel = document.getElementById('panel'), hint = document.getElementById('hint');
 document.querySelectorAll('.tools span').forEach(function (e) {
-  if (e.dataset.t === (s === 'form' || s === 'overlap' ? 'draw' : s)) e.className = 'on';
+  if (e.dataset.t === (s === 'form' || s === 'overlap' || s === 'snap' ? 'draw' : s === 'gap' ? 'overview' : s)) e.className = 'on';
   e.onclick = function () { location.search = '?s=' + (e.dataset.t === 'circle' ? 'overview' : e.dataset.t); };
 });
 baseMap(svg);
@@ -57,7 +57,9 @@ if (s === 'overview') {
     ZONES.map(function (z) { return zoneRow(z); }).join('') +
     '<p class="small muted">拖动 ⋮⋮ 调整顺序。两个区域重叠的地方，按排在前面的区域计费。</p></section>' +
     '<section><h2>顾客怎么选配送区</h2><div class="seg"><span class="on">地图定位</span><span>列表选择</span></div>' +
-    '<p class="small muted" style="margin-top:8px">顾客下单时在地图上定位送餐地址，系统自动判断属于哪个区域，范围外不能下外卖单。</p></section>' +
+    '<p class="small muted" style="margin-top:8px">顾客下单时在地图上定位送餐地址，系统自动判断属于哪个区域，范围外不能下外卖单。</p>' +
+    '<div class="row between" style="margin-top:10px"><span>圈外容差</span><span class="row" style="gap:6px"><b class="num">200 米</b><a class="btn small" href="?s=gap">查看</a></span></div>' +
+    '<p class="small muted" style="margin-top:4px">不在任何圈里，但离最近的区域不超过 200 米的顾客，按最近的区域算。区域之间的小缝因此不会漏单。</p></section>' +
     '<section><div class="banner ok">3 个区域都已画好范围，覆盖面积约 6.8 km²</div></section>';
 }
 
@@ -131,6 +133,56 @@ if (s === 'overlap') {
   panel.innerHTML = '<section><h2>新区域已闭合</h2><div class="kv"><span>顶点</span><span class="num">7 个</span><span>面积</span><span class="num">约 1.6 km²</span><span>重叠</span><span class="num">1 个区域，约 0.2 km²</span></div></section>' +
     '<section><p class="muted small" style="margin-bottom:8px">重叠的区域</p><div class="row"><span class="sw" style="background:#2a78d6"></span><span class="grow">马卡蒂 CBD</span><span class="small muted num">₱49 · 起送 ₱200</span></div></section>' +
     '<section><p class="small muted">选好以后还能改：在区域表单里点“改选”，或者在配送区列表里拖动顺序，排在前面的覆盖排在后面的。</p></section>';
+}
+
+if (s === 'snap') {
+  document.getElementById('map').classList.add('drawing');
+  ZONES.slice().reverse().forEach(function (z) { drawZone(svg, z, { dim: z.id !== 'cbd', label: false }); });
+  pin(svg, STORE, { text: '马卡蒂小馆' });
+  // 已有区域的顶点显示出来，当吸附目标
+  ZONES[0].pts.forEach(function (p) { svg.appendChild(el('rect', { x: p[0] - 4, y: p[1] - 4, width: 8, height: 8, fill: '#fff', stroke: ZONES[0].color, 'stroke-width': 1.5, transform: 'rotate(45 ' + p[0] + ' ' + p[1] + ')' })); });
+  var sp = [[300, 520], [350, 470], [470, 520]], tgt = [600, 480];
+  svg.appendChild(el('polyline', { points: sp.join(' '), fill: 'none', stroke: NEWZ.color, 'stroke-width': 3, 'stroke-linejoin': 'round' }));
+  svg.appendChild(el('polyline', { points: [sp[2], tgt].join(' '), fill: 'none', stroke: NEWZ.color, 'stroke-width': 2, 'stroke-dasharray': '7 6' }));
+  sp.forEach(function (p, i) { svg.appendChild(el('circle', { cx: p[0], cy: p[1], r: i ? 6 : 9, fill: i ? '#fff' : NEWZ.color, stroke: i ? NEWZ.color : '#fff', 'stroke-width': 2.5 })); });
+  svg.appendChild(el('circle', { cx: tgt[0], cy: tgt[1], r: 17, fill: '#ffd43b', 'fill-opacity': .35, stroke: '#e0a100', 'stroke-width': 2 }));
+  svg.appendChild(el('circle', { cx: tgt[0], cy: tgt[1], r: 6, fill: '#fff', stroke: NEWZ.color, 'stroke-width': 2.5 }));
+  svg.appendChild(el('path', { d: 'M' + (tgt[0] + 9) + ' ' + (tgt[1] + 14) + 'h22M' + (tgt[0] + 20) + ' ' + (tgt[1] + 3) + 'v22', stroke: '#1f2328', 'stroke-width': 2 }));
+  svg.appendChild(el('rect', { x: tgt[0] - 96, y: tgt[1] - 50, width: 192, height: 24, rx: 6, fill: '#1f2328' }));
+  svg.appendChild(el('text', { x: tgt[0], y: tgt[1] - 33.5, 'text-anchor': 'middle', 'font-size': 12, fill: '#fff' }, '已吸附到“马卡蒂 CBD”的顶点'));
+  hint.hidden = false;
+  hint.innerHTML = '鼠标靠近已有区域的顶点或边线会自动吸上去，两个区域就贴在一起，不留缝 · 按住 <kbd>Alt</kbd> 临时关闭吸附';
+  panel.innerHTML = '<section><h2>正在画新区域</h2><div class="kv"><span>已点</span><span class="num">3 个点</span><span>吸附</span><span>2 个点贴着“马卡蒂 CBD”</span></div></section>' +
+    '<section><div class="row between"><span>自动吸附到已有区域</span><span class="switch"></span></div><p class="small muted" style="margin-top:6px">离已有区域的顶点或边线不到 12 像素时吸上去。放大地图可以吸得更准。</p></section>' +
+    '<section><div class="banner info">想让两个区域紧挨着，沿着旧区域的菱形顶点一个个点过去就行。也可以故意画进旧区域一点，闭合时再选谁覆盖谁。</div></section>' +
+    '<div class="foot"><a class="btn">↶ 撤销上一个点</a><a class="btn" href="?s=overview">取消</a><a class="btn primary grow" href="?s=overlap">完成</a></div>';
+}
+
+if (s === 'gap') {
+  ZONES.slice().reverse().forEach(function (z) { drawZone(svg, z); });
+  var defs2 = el('defs', {}), pat2 = el('pattern', { id: 'gh', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
+  pat2.appendChild(el('rect', { width: 6, height: 6, fill: '#ffd43b' })); pat2.appendChild(el('rect', { width: 2.5, height: 6, fill: '#1f2328' }));
+  defs2.appendChild(pat2); svg.appendChild(defs2);
+  [[[640,380],[660,390],[612,488],[600,480]], [[360,300],[470,262],[590,290],[640,380],[648,372],[592,286],[470,258],[358,296]]].forEach(function (g) {
+    svg.appendChild(el('polygon', { points: g.join(' '), fill: 'url(#gh)', stroke: '#1f2328', 'stroke-width': 1.2, 'stroke-linejoin': 'round' }));
+  });
+  pin(svg, STORE, { text: '马卡蒂小馆' });
+  function callout(x, y, tx, ty, t) {
+    svg.appendChild(el('line', { x1: x, y1: y, x2: tx, y2: ty, stroke: '#1f2328', 'stroke-width': 1.5 }));
+    var w = t.length * 12.2 + 20;
+    svg.appendChild(el('rect', { x: tx - w / 2, y: ty - 13, width: w, height: 26, rx: 6, fill: '#1f2328' }));
+    svg.appendChild(el('text', { x: tx, y: ty + 4.5, 'text-anchor': 'middle', 'font-size': 12, fill: '#fff' }, t));
+  }
+  callout(628, 436, 716, 232, '缝宽约 60 米，按近的算');
+  callout(420, 277, 250, 228, '缝宽约 15 米，按近的算');
+  panel.innerHTML = storeCard +
+    '<section><h2>区域之间的缝</h2><div class="banner warn" style="margin-bottom:10px">发现 2 处缝隙。缝里的顾客不在任何一个圈里，但离最近的区域都在 200 米容差以内，会按最近的区域算，不会被拒。</div>' +
+    '<div class="zone" style="grid-template-columns:minmax(0,1fr) auto"><div><div class="bold">马卡蒂 CBD ↔ BGC</div><div class="small muted">最宽约 60 米 · 长约 700 米</div></div><div class="row" style="gap:6px"><a class="btn small">定位</a><a class="btn small primary">一键补齐</a></div></div>' +
+    '<div class="zone" style="grid-template-columns:minmax(0,1fr) auto"><div><div class="bold">马卡蒂 CBD ↔ 波布拉西翁 / Rockwell</div><div class="small muted">最宽约 15 米 · 长约 1.9 公里</div></div><div class="row" style="gap:6px"><a class="btn small">定位</a><a class="btn small primary">一键补齐</a></div></div>' +
+    '<p class="small muted">“一键补齐”把排在后面的区域的边线贴到前面那个区域的边线上，缝就没了，可以撤销。也可以自己拖顶点，靠近时会自动吸附。</p></section>' +
+    '<section><h2>圈外容差</h2><div class="two"><label class="field" style="margin:0"><span>离最近的区域不超过（米）</span><input class="num" value="200"></label><div class="small muted" style="align-self:end">填 0 就严格按圈，圈外一律不送。</div></div>' +
+    '<p class="small muted" style="margin-top:8px">顾客不在任何圈里，但在容差以内，就按最近的区域收费和配送。注意最外圈也会跟着向外放宽这么多米。</p></section>' +
+    '<div class="foot"><a class="btn grow" href="?s=overview">返回</a><a class="btn primary grow" href="?s=overview">保存</a></div>';
 }
 
 if (s === 'location') {
