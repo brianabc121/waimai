@@ -117,3 +117,53 @@ func TestAdminBackOffice(t *testing.T) {
 		t.Fatal("the generated password leaked into the audit trail")
 	}
 }
+
+func TestAdminWorkerAndJobs(t *testing.T) {
+	f := newFixture(t)
+	admin, owner := adminClient(t), login(t, f.owner)
+	ctx := context.Background()
+
+	var id int64
+	if err := a.DB.QueryRow(ctx, `INSERT INTO jobs (kind, payload, status, attempts, last_error, finished_at)
+		VALUES ('sms', '{"phone":"+639171234589","message":"hi https://x.test/o/secretToken"}', 'failed', 5, 'provider down', now())
+		RETURNING id`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	job := "/admin/jobs/" + fmt.Sprint(id)
+
+	for _, r := range [][2]string{{"GET", "/admin/worker"}, {"GET", "/admin/jobs"}, {"GET", job},
+		{"POST", job + "/retry"}, {"POST", job + "/discard"}, {"POST", "/admin/jobs/retry-failed"}} {
+		owner.want(403, "FORBIDDEN", r[0], r[1], map[string]any{})
+		newClient(t).want(401, "UNAUTHENTICATED", r[0], r[1], map[string]any{})
+	}
+
+	out := admin.want(200, "", "GET", "/admin/worker", nil)
+	if len(out["tasks"].([]any)) != 4 || out["queue"].(map[string]any)["failed"].(float64) < 1 {
+		t.Fatalf("worker status: %v", out)
+	}
+	out = admin.want(200, "", "GET", "/admin/jobs?status=failed&kind=sms", nil)
+	row := out["items"].([]any)[0].(map[string]any)
+	if row["subject"] != "+63917•••••89" || row["message"] != nil {
+		t.Fatalf("job row leaks personal data: %v", row)
+	}
+	admin.want(422, "VALIDATION", "GET", "/admin/jobs?status=nope", nil)
+	out = admin.want(200, "", "GET", job, nil)
+	if msg := out["message"].(string); strings.Contains(msg, "secretToken") {
+		t.Fatalf("order link not cut: %q", msg)
+	}
+	admin.want(404, "NOT_FOUND", "GET", "/admin/jobs/999999999", nil)
+	admin.want(404, "NOT_FOUND", "POST", job+"/explode", map[string]any{})
+
+	admin.want(200, "", "POST", job+"/discard", map[string]any{})
+	admin.want(200, "", "POST", job+"/retry", map[string]any{})
+	admin.want(409, "INVALID_STATE", "POST", job+"/retry", map[string]any{})
+	admin.want(200, "", "POST", job+"/discard", map[string]any{})
+	out = admin.want(200, "", "GET", job, nil)
+	if out["status"] != "discarded" {
+		t.Fatalf("job: %v", out)
+	}
+	out = admin.want(200, "", "GET", "/admin/audit?action=job.discard", nil)
+	if out["total"].(float64) < 2 {
+		t.Fatalf("job actions are not in the audit log: %v", out)
+	}
+}

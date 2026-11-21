@@ -118,14 +118,22 @@ func (a *App) runJob(ctx context.Context, j *claimedJob) error {
 // RunJobs processes due jobs until none are left. External calls happen
 // outside any database transaction.
 func (a *App) RunJobs(ctx context.Context) error {
+	_, err := a.runJobs(ctx)
+	return err
+}
+
+// runJobs is RunJobs that also reports how many jobs it ran.
+func (a *App) runJobs(ctx context.Context) (int, error) {
+	n := 0
 	for ctx.Err() == nil {
 		j, err := a.claimJob(ctx)
 		if err != nil {
-			return err
+			return n, err
 		}
 		if j == nil {
-			return nil
+			return n, nil
 		}
+		n++
 		runErr := a.runJob(ctx, j)
 		switch {
 		case runErr == nil:
@@ -142,8 +150,8 @@ func (a *App) RunJobs(ctx context.Context) error {
 				j.ID, j.Token, runErr.Error(), delay.Seconds())
 		}
 		if err != nil {
-			return err
+			return n, err
 		}
 	}
-	return ctx.Err()
+	return n, ctx.Err()
 }

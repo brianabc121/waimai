@@ -25,3 +25,20 @@ export interface AuditEntry {
   id: number; admin_id: number; admin_name: string; action: string; target_type: string; target_id: number | null
   detail: Record<string, unknown>; ip: string; created_at: string
 }
+export interface WorkerInstance {
+  instance: string; hostname: string; embedded: boolean; started_at: string; last_beat_at: string; last_loop_ms: number; online: boolean
+}
+export interface WorkerTask {
+  task: string; interval_seconds: number; last_started_at: string | null; last_ok_at: string | null; last_duration_ms: number
+  last_count: number; last_error: string; last_error_at: string | null; runs: number; failures: number; ok: boolean
+}
+export interface QueueKind { kind: string; pending: number; running: number; failed: number; done_24h: number }
+export interface WorkerStatus {
+  now: string; instances: WorkerInstance[]; tasks: WorkerTask[]
+  queue: { pending: number; running: number; failed: number; done_24h: number; oldest_wait_seconds: number; by_kind: QueueKind[] }
+}
+export type JobStatus = 'pending' | 'running' | 'done' | 'failed' | 'discarded'
+export interface JobRow {
+  id: number; kind: string; status: JobStatus; attempts: number; max_attempts: number; subject: string
+  run_at: string; created_at: string; finished_at: string | null; last_error: string; message?: string
+}

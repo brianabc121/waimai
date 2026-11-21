@@ -40,8 +40,14 @@ func main() {
 
 	hub := httpapi.NewHub()
 	go hub.Listen(ctx, cfg.ListenDatabaseURL)
+	workerDone := make(chan struct{})
 	if cfg.EmbedWorker {
-		go a.RunWorker(ctx, log.Printf)
+		go func() {
+			defer close(workerDone)
+			a.RunWorker(ctx, log.Printf, true)
+		}()
+	} else {
+		close(workerDone)
 	}
 
 	srv := &http.Server{Addr: cfg.Addr, Handler: httpapi.NewServer(a, cfg, hub).Router(),
@@ -57,4 +63,5 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
+	<-workerDone // lets the embedded worker sign off before the pool closes
 }

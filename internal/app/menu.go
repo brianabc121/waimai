@@ -4,7 +4,6 @@ import (
 	"context"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -390,41 +389,11 @@ func (a *App) Cleanup(ctx context.Context) error {
 		`DELETE FROM idempotency_records WHERE created_at < now() - interval '48 hours'`,
 		`DELETE FROM quotes WHERE used_order_id IS NULL AND expires_at < now() - interval '1 hour'`,
 		`DELETE FROM jobs WHERE status <> 'pending' AND finished_at < now() - interval '14 days'`,
+		`DELETE FROM worker_instances WHERE last_beat_at < now() - interval '1 day'`,
 	} {
 		if _, err := a.DB.Exec(ctx, q); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-// RunWorker loops until ctx is cancelled.
-func (a *App) RunWorker(ctx context.Context, logf func(string, ...any)) {
-	tick := time.NewTicker(5 * time.Second)
-	defer tick.Stop()
-	lastCleanup := time.Time{}
-	for {
-		if n, err := a.ExpirePendingOrders(ctx); err != nil {
-			logf("worker: expire pending orders: %v", err)
-		} else if n > 0 {
-			logf("worker: cancelled %d orders that were not accepted in time", n)
-		}
-		if _, err := a.ReleaseScheduled(ctx); err != nil {
-			logf("worker: release scheduled orders: %v", err)
-		}
-		if err := a.RunJobs(ctx); err != nil {
-			logf("worker: jobs: %v", err)
-		}
-		if time.Since(lastCleanup) > 10*time.Minute {
-			if err := a.Cleanup(ctx); err != nil {
-				logf("worker: cleanup: %v", err)
-			}
-			lastCleanup = time.Now()
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-tick.C:
-		}
-	}
 }
