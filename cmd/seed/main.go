@@ -58,7 +58,7 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 		Name: name, NameEn: nameEn, Address: "123 Ayala Ave, Makati", Phone: "+63 2 8123 4567",
 		TaxRateBP: 1200, TaxInclusive: true, ServiceChargeBP: 0, PackagingFee: 1000,
 		AcceptTimeoutMinutes: 10, DeliveryEnabled: true, PickupEnabled: true,
-		OpenTime: "00:00", CloseTime: "00:00",
+		OpenTime: "00:00", CloseTime: "00:00", NotifySMS: true,
 	})
 	must(err)
 
@@ -87,29 +87,36 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 			{Name: "不辣", NameEn: "Not spicy"}, {Name: "微辣", NameEn: "Mild"},
 			{Name: "中辣", NameEn: "Medium"}, {Name: "大辣", NameEn: "Hot"}}}
 
+	station := func(name, en string, sort int) *int64 {
+		id, err := a.SaveStation(ctx, bid, 0, app.StationInput{Name: name, NameEn: en, Active: true, Sort: sort})
+		must(err)
+		return &id
+	}
+	fryer, wok, bar := station("炸台", "Fryer", 0), station("热厨", "Hot kitchen", 1), station("饮品台", "Drinks", 2)
+
 	fried := cat("炸物", "Fried", 0)
-	item(app.ItemInput{CategoryID: fried, Name: "盐酥鸡", NameEn: "Popcorn Chicken", Price: 16900, NeedsPrep: true,
+	item(app.ItemInput{CategoryID: fried, Name: "盐酥鸡", NameEn: "Popcorn Chicken", Price: 16900, NeedsPrep: true, StationID: fryer,
 		Description: "现炸台式盐酥鸡", Groups: []app.OptionGroupInput{spice,
 			{Name: "加料", NameEn: "Add-ons", MinSelect: 0, MaxSelect: 2, Options: []app.OptionInput{
 				{Name: "加九层塔", NameEn: "Extra basil", PriceDelta: 1000},
 				{Name: "加蒜", NameEn: "Extra garlic", PriceDelta: 500}}}}})
-	item(app.ItemInput{CategoryID: fried, Name: "无盐地瓜条", NameEn: "Sweet Potato Fries", Price: 9900, NeedsPrep: true})
+	item(app.ItemInput{CategoryID: fried, Name: "无盐地瓜条", NameEn: "Sweet Potato Fries", Price: 9900, NeedsPrep: true, StationID: fryer})
 	if !full {
 		return
 	}
 	item(app.ItemInput{CategoryID: fried, Name: "黄金鸡排", NameEn: "Crispy Chicken Cutlet", Price: 18900,
-		NeedsPrep: true, Groups: []app.OptionGroupInput{spice}})
+		NeedsPrep: true, StationID: fryer, Groups: []app.OptionGroupInput{spice}})
 
 	mains := cat("主食", "Mains", 1)
-	item(app.ItemInput{CategoryID: mains, Name: "卤肉饭", NameEn: "Braised Pork Rice", Price: 15900, NeedsPrep: true})
-	item(app.ItemInput{CategoryID: mains, Name: "牛肉面", NameEn: "Beef Noodle Soup", Price: 24900, NeedsPrep: true,
+	item(app.ItemInput{CategoryID: mains, Name: "卤肉饭", NameEn: "Braised Pork Rice", Price: 15900, NeedsPrep: true, StationID: wok})
+	item(app.ItemInput{CategoryID: mains, Name: "牛肉面", NameEn: "Beef Noodle Soup", Price: 24900, NeedsPrep: true, StationID: wok,
 		Groups: []app.OptionGroupInput{spice}})
 	item(app.ItemInput{CategoryID: mains, Name: "今日限量便当", NameEn: "Daily Bento (limited)", Price: 21900,
-		NeedsPrep: true, StockQty: intp(5), Description: "每日限量 5 份"})
+		NeedsPrep: true, StationID: wok, StockQty: intp(5), Description: "每日限量 5 份"})
 
 	combos := cat("套餐", "Combos", 2)
 	item(app.ItemInput{CategoryID: combos, Name: "双人炸物套餐", NameEn: "Fried Combo for Two", Price: 39900,
-		NeedsPrep: true, Description: "任选两款炸物 + 一款饮品",
+		NeedsPrep: true, StationID: fryer, Description: "任选两款炸物 + 一款饮品",
 		Groups: []app.OptionGroupInput{
 			{Name: "任选两款炸物", NameEn: "Choose two fried items", MinSelect: 2, MaxSelect: 2, Options: []app.OptionInput{
 				{Name: "盐酥鸡", NameEn: "Popcorn Chicken"}, {Name: "地瓜条", NameEn: "Sweet Potato Fries"},
@@ -118,8 +125,8 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 				{Name: "冰柠檬茶", NameEn: "Iced Lemon Tea"}, {Name: "珍珠奶茶", NameEn: "Bubble Milk Tea", PriceDelta: 3000}}}}})
 
 	drinks := cat("饮品", "Drinks", 3)
-	item(app.ItemInput{CategoryID: drinks, Name: "冰柠檬茶", NameEn: "Iced Lemon Tea", Price: 6900, NeedsPrep: true})
-	item(app.ItemInput{CategoryID: drinks, Name: "珍珠奶茶", NameEn: "Bubble Milk Tea", Price: 11900, NeedsPrep: true})
+	item(app.ItemInput{CategoryID: drinks, Name: "冰柠檬茶", NameEn: "Iced Lemon Tea", Price: 6900, NeedsPrep: true, StationID: bar})
+	item(app.ItemInput{CategoryID: drinks, Name: "珍珠奶茶", NameEn: "Bubble Milk Tea", Price: 11900, NeedsPrep: true, StationID: bar})
 	item(app.ItemInput{CategoryID: drinks, Name: "瓶装水", NameEn: "Bottled Water", Price: 3000, NeedsPrep: false})
 
 	for _, u := range []app.NewUser{

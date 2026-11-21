@@ -12,17 +12,19 @@ import (
 )
 
 type OrderItem struct {
-	ID         int64        `json:"id"`
-	ItemID     int64        `json:"item_id"`
-	Name       string       `json:"name"`
-	NameEn     string       `json:"name_en"`
-	UnitPrice  int64        `json:"unit_price"`
-	Qty        int          `json:"qty"`
-	LineTotal  int64        `json:"line_total"`
-	Options    []LineOption `json:"options"`
-	Note       string       `json:"note"`
-	NeedsPrep  bool         `json:"needs_prep"`
-	PrepStatus string       `json:"prep_status"`
+	ID          int64        `json:"id"`
+	ItemID      int64        `json:"item_id"`
+	Name        string       `json:"name"`
+	NameEn      string       `json:"name_en"`
+	UnitPrice   int64        `json:"unit_price"`
+	Qty         int          `json:"qty"`
+	LineTotal   int64        `json:"line_total"`
+	Options     []LineOption `json:"options"`
+	Note        string       `json:"note"`
+	NeedsPrep   bool         `json:"needs_prep"`
+	PrepStatus  string       `json:"prep_status"`
+	StationID   *int64       `json:"station_id"`
+	StationName string       `json:"station_name"`
 }
 
 type DeliveryTask struct {
@@ -180,7 +182,7 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 	}
 
 	rows, err = q.Query(ctx, `SELECT id, order_id, item_id, name, name_en, unit_price, qty, line_total, options,
-		note, needs_prep, prep_status FROM order_items WHERE order_id = ANY($1) ORDER BY id`, ids)
+		note, needs_prep, prep_status, station_id, station_name FROM order_items WHERE order_id = ANY($1) ORDER BY id`, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +191,7 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 		var orderID int64
 		var opts []byte
 		if err := rows.Scan(&it.ID, &orderID, &it.ItemID, &it.Name, &it.NameEn, &it.UnitPrice, &it.Qty,
-			&it.LineTotal, &opts, &it.Note, &it.NeedsPrep, &it.PrepStatus); err != nil {
+			&it.LineTotal, &opts, &it.Note, &it.NeedsPrep, &it.PrepStatus, &it.StationID, &it.StationName); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -448,7 +450,7 @@ func (a *App) OrderByToken(ctx context.Context, token string) (*Order, error) {
 
 // closeOrder is shared by reject, cancel and timeout: it releases stock, marks
 // items and the delivery task cancelled and records the reason.
-func closeOrder(ctx context.Context, tx pgx.Tx, o *lockedOrder, status, reason string, actor Actor) error {
+func (a *App) closeOrder(ctx context.Context, tx pgx.Tx, o *lockedOrder, status, reason string, actor Actor) error {
 	if err := releaseStock(ctx, tx, o.ID); err != nil {
 		return err
 	}
@@ -473,6 +475,11 @@ func closeOrder(ctx context.Context, tx pgx.Tx, o *lockedOrder, status, reason s
 		map[string]any{"reason": reason, "from": o.Acceptance}); err != nil {
 		return err
 	}
+	if actor.Type != "customer" {
+		if err := a.notifyCustomer(ctx, tx, o.ID, status); err != nil {
+			return err
+		}
+	}
 	return notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID, RiderIDs: riders})
 }
 
@@ -496,7 +503,7 @@ func (a *App) CustomerCancel(ctx context.Context, token string) (*Order, error) 
 		if o.Acceptance != "pending" {
 			return ErrInvalidState("the store already accepted this order, please contact the store")
 		}
-		return closeOrder(ctx, tx, o, "cancelled", "customer_cancelled", Actor{Type: "customer"})
+		return a.closeOrder(ctx, tx, o, "cancelled", "customer_cancelled", Actor{Type: "customer"})
 	})
 	if err != nil {
 		return nil, wrap("customer cancel", err)

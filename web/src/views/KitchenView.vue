@@ -4,10 +4,15 @@ import { ApiError, get, post } from '../api'
 import { both, minutesSince, t } from '../i18n'
 import { useLive } from '../live'
 import { session } from '../session'
-import type { Order, OrderItem } from '../types'
+import type { Order, OrderItem, Station } from '../types'
 
 const bid = session.branchId!
 const orders = ref<Order[]>([])
+const stations = ref<Station[]>([])
+// Station filter for the cooking tab: 'all', 'none' (unassigned) or a station id.
+// Remembered per device, since a screen usually sits at one station.
+const station = ref<'all' | 'none' | number>(JSON.parse(localStorage.getItem(`kds-station-${bid}`) || '"all"'))
+function setStation(v: 'all' | 'none' | number) { station.value = v; localStorage.setItem(`kds-station-${bid}`, JSON.stringify(v)) }
 const tab = ref<'cook' | 'pack'>('cook')
 const error = ref('')
 const now = ref(Date.now())
@@ -23,13 +28,28 @@ function check(o: Order) {
 }
 
 const { online, lastSync, refreshNow } = useLive(() => `/merchant/branches/${bid}/events`, async () => {
-  orders.value = (await get<{ orders: Order[] }>(`/kitchen/branches/${bid}/board`)).orders
+  const [b, s] = await Promise.all([get<{ orders: Order[] }>(`/kitchen/branches/${bid}/board`), get<{ stations: Station[] }>(`/merchant/branches/${bid}/stations`)])
+  orders.value = b.orders; stations.value = s.stations
+  if (typeof station.value === 'number' && !s.stations.some(x => x.id === station.value)) setStation('all')
 })
 
 const live = (o: Order) => o.items.filter(i => i.prep_status !== 'cancelled')
 const cancelled = computed(() => orders.value.filter(o => o.acceptance_status === 'cancelled'))
 const cooking = computed(() => orders.value.filter(o => o.acceptance_status === 'accepted' && o.packing_status === 'waiting_items'))
 const packing = computed(() => orders.value.filter(o => o.acceptance_status === 'accepted' && o.packing_status !== 'none'))
+const open = (i: OrderItem) => i.needs_prep && (i.prep_status === 'pending' || i.prep_status === 'preparing')
+const atStation = (i: OrderItem) => station.value === 'all' || (station.value === 'none' ? i.needs_prep && i.station_id === null : i.station_id === station.value)
+// Lines shown on a ticket for the chosen station; the "all" view shows every line.
+const lines = (o: Order) => live(o).filter(atStation)
+const shown = computed(() => station.value === 'all' ? cooking.value : cooking.value.filter(o => lines(o).some(open)))
+const openCount = (v: 'none' | number) => cooking.value.reduce((n, o) => n + live(o).filter(i => open(i) && (v === 'none' ? i.station_id === null : i.station_id === v)).length, 0)
+// Stations to show as tabs: active ones, plus disabled ones that still hold work.
+const tabs = computed(() => stations.value.filter(s => s.active || openCount(s.id) > 0))
+const unassigned = computed(() => stations.value.length ? openCount('none') : 0)
+function move(it: OrderItem, e: Event) {
+  const v = (e.target as HTMLSelectElement).value
+  void run(() => post(`/kitchen/items/${it.id}/station`, { station_id: v === '' ? null : Number(v), reason: 'kitchen screen' }))
+}
 const missing = (o: Order) => live(o).filter(i => i.prep_status !== 'ready')
 const waited = (o: Order) => { void now.value; return minutesSince(o.created_at) }
 
@@ -73,17 +93,31 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
 
     <!-- cooking: per-item progress, grouped by order (K01) -->
     <template v-if="tab === 'cook'">
-      <div v-if="cooking.length === 0" class="card muted">{{ t('kitchen_empty') }}</div>
+      <div class="row wrap" v-if="stations.length" style="margin-bottom:12px;gap:6px">
+        <button class="btn small" :class="{ primary: station === 'all' }" @click="setStation('all')">{{ t('all_stations') }}</button>
+        <button v-for="s in tabs" :key="s.id" class="btn small" :class="{ primary: station === s.id }" @click="setStation(s.id)">
+          {{ both(s.name, s.name_en) }} · {{ openCount(s.id) }}<span v-if="!s.active"> ({{ t('disabled') }})</span></button>
+        <button class="btn small" :class="{ primary: station === 'none', danger: unassigned > 0 && station !== 'none' }" @click="setStation('none')">{{ t('unassigned') }} · {{ unassigned }}</button>
+      </div>
+      <div v-if="unassigned > 0" class="banner warn" style="margin-bottom:12px">{{ t('unassigned_warn', { n: unassigned }) }}</div>
+      <div v-if="shown.length === 0" class="card muted">{{ t('kitchen_empty') }}</div>
       <div class="cols">
-        <div v-for="o in cooking" :key="o.id" class="card stack">
+        <div v-for="o in shown" :key="o.id" class="card stack">
           <div class="row between">
             <h2>{{ o.public_no }} <span class="tag brand">{{ t(o.service_type) }}</span></h2>
             <span class="tag" :class="waited(o) >= 20 ? 'bad' : waited(o) >= 10 ? 'warn' : ''">{{ waited(o) }} {{ t('min') }}</span>
           </div>
           <div v-if="o.note" class="banner warn small">{{ t('order_note') }}: {{ o.note }}</div>
-          <div v-for="it in live(o)" :key="it.id" class="kline" :class="it.prep_status">
+          <div v-for="it in lines(o)" :key="it.id" class="kline" :class="it.prep_status">
             <div class="grow">
               <div class="kname">{{ it.qty }} × {{ both(it.name, it.name_en) }}</div>
+              <div class="small" v-if="stations.length && it.needs_prep">
+                <span class="tag" :class="it.station_id === null ? 'warn' : 'info'">{{ it.station_name || t('unassigned') }}</span>
+                <select v-if="open(it)" class="mv" :value="it.station_id ?? ''" :title="t('move_to')" :aria-label="t('move_to')" @change="move(it, $event)">
+                  <option value="">{{ t('unassigned') }}</option>
+                  <option v-for="s in stations.filter(s => s.active || s.id === it.station_id)" :key="s.id" :value="s.id">{{ t('move_to') }} {{ s.name }}</option>
+                </select>
+              </div>
               <div class="small" v-if="it.options.length">{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</div>
               <div class="small bold" v-if="it.note" style="color:var(--warn)">{{ t('note') }}: {{ it.note }}</div>
             </div>
@@ -151,5 +185,6 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
 .kline.preparing { border-left-color: var(--warn); background: var(--warn-soft); }
 .kline.ready { border-left-color: var(--ok); background: var(--ok-soft); }
 .kname { font-size: 17px; font-weight: 700; }
+.mv { width: auto; padding: 2px 6px; font-size: 12px; margin-left: 6px; }
 .check.top { align-items: flex-start; }
 </style>

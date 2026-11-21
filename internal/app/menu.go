@@ -13,6 +13,7 @@ import (
 type AdminMenu struct {
 	Branch     *Branch    `json:"branch"`
 	Zones      []Zone     `json:"zones"`
+	Stations   []Station  `json:"stations"`
 	Categories []Category `json:"categories"`
 }
 
@@ -29,7 +30,11 @@ func (a *App) AdminMenu(ctx context.Context, branchID int64) (*AdminMenu, error)
 	if err != nil {
 		return nil, err
 	}
-	return &AdminMenu{Branch: b, Zones: zones, Categories: cats}, nil
+	stations, err := a.ListStations(ctx, branchID)
+	if err != nil {
+		return nil, err
+	}
+	return &AdminMenu{Branch: b, Zones: zones, Stations: stations, Categories: cats}, nil
 }
 
 func branchChanged(ctx context.Context, q Querier, branchID int64) error {
@@ -90,6 +95,7 @@ type ItemInput struct {
 	DeliveryAvailable bool               `json:"delivery_available"`
 	PickupAvailable   bool               `json:"pickup_available"`
 	Sort              int                `json:"sort"`
+	StationID         *int64             `json:"station_id"`
 	Groups            []OptionGroupInput `json:"groups"`
 }
 
@@ -130,20 +136,29 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 		if !ok {
 			return ErrValidation("category not found")
 		}
+		if in.StationID != nil {
+			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM kitchen_stations WHERE id=$1 AND branch_id=$2 AND active)`,
+				*in.StationID, branchID).Scan(&ok); err != nil {
+				return err
+			}
+			if !ok {
+				return ErrValidation("station not found or inactive")
+			}
+		}
 		var err error
 		if id == 0 {
 			err = tx.QueryRow(ctx, `INSERT INTO menu_items (branch_id, category_id, name, name_en, description,
-				image_url, price, published, sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+				image_url, price, published, sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort, station_id)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
 				branchID, in.CategoryID, in.Name, in.NameEn, in.Description, in.ImageURL, in.Price, in.Published,
-				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort).Scan(&id)
+				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort, in.StationID).Scan(&id)
 		} else {
 			err = tx.QueryRow(ctx, `UPDATE menu_items SET category_id=$3, name=$4, name_en=$5, description=$6,
 				image_url=$7, price=$8, published=$9, sold_out=$10, stock_qty=$11, needs_prep=$12,
-				delivery_available=$13, pickup_available=$14, sort=$15, updated_at=now()
+				delivery_available=$13, pickup_available=$14, sort=$15, station_id=$16, updated_at=now()
 				WHERE id=$1 AND branch_id=$2 AND NOT archived RETURNING id`,
 				id, branchID, in.CategoryID, in.Name, in.NameEn, in.Description, in.ImageURL, in.Price, in.Published,
-				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort).Scan(&id)
+				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort, in.StationID).Scan(&id)
 		}
 		if isNoRows(err) {
 			return ErrNotFound
@@ -246,6 +261,7 @@ type SettingsInput struct {
 	Paused               bool   `json:"paused"`
 	OpenTime             string `json:"open_time"`
 	CloseTime            string `json:"close_time"`
+	NotifySMS            bool   `json:"notify_sms"`
 }
 
 var hhmmRe = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
@@ -268,10 +284,10 @@ func (a *App) SaveSettings(ctx context.Context, branchID int64, in SettingsInput
 	}
 	tag, err := a.DB.Exec(ctx, `UPDATE branches SET name=$2, name_en=$3, address=$4, phone=$5, tax_rate_bp=$6,
 		tax_inclusive=$7, service_charge_bp=$8, packaging_fee=$9, min_order_amount=$10, accept_timeout_minutes=$11,
-		delivery_enabled=$12, pickup_enabled=$13, paused=$14, open_time=$15, close_time=$16 WHERE id=$1`,
+		delivery_enabled=$12, pickup_enabled=$13, paused=$14, open_time=$15, close_time=$16, notify_sms=$17 WHERE id=$1`,
 		branchID, in.Name, in.NameEn, in.Address, in.Phone, in.TaxRateBP, in.TaxInclusive, in.ServiceChargeBP,
 		in.PackagingFee, in.MinOrderAmount, in.AcceptTimeoutMinutes, in.DeliveryEnabled, in.PickupEnabled,
-		in.Paused, in.OpenTime, in.CloseTime)
+		in.Paused, in.OpenTime, in.CloseTime, in.NotifySMS)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +324,7 @@ func (a *App) ExpirePendingOrders(ctx context.Context) (int, error) {
 				return nil
 			}
 			n++
-			return closeOrder(ctx, tx, o, "cancelled", "accept_timeout", Actor{Type: "system"})
+			return a.closeOrder(ctx, tx, o, "cancelled", "accept_timeout", Actor{Type: "system"})
 		})
 		if err != nil {
 			return n, err
@@ -328,6 +344,7 @@ func (a *App) Cleanup(ctx context.Context) error {
 		`DELETE FROM phone_verifications WHERE created_at < now() - interval '1 day'`,
 		`DELETE FROM idempotency_records WHERE created_at < now() - interval '48 hours'`,
 		`DELETE FROM quotes WHERE used_order_id IS NULL AND expires_at < now() - interval '1 hour'`,
+		`DELETE FROM jobs WHERE status <> 'pending' AND finished_at < now() - interval '14 days'`,
 	} {
 		if _, err := a.DB.Exec(ctx, q); err != nil {
 			return err
@@ -338,7 +355,7 @@ func (a *App) Cleanup(ctx context.Context) error {
 
 // RunWorker loops until ctx is cancelled.
 func (a *App) RunWorker(ctx context.Context, logf func(string, ...any)) {
-	tick := time.NewTicker(15 * time.Second)
+	tick := time.NewTicker(5 * time.Second)
 	defer tick.Stop()
 	lastCleanup := time.Time{}
 	for {
@@ -346,6 +363,9 @@ func (a *App) RunWorker(ctx context.Context, logf func(string, ...any)) {
 			logf("worker: expire pending orders: %v", err)
 		} else if n > 0 {
 			logf("worker: cancelled %d orders that were not accepted in time", n)
+		}
+		if err := a.RunJobs(ctx); err != nil {
+			logf("worker: jobs: %v", err)
 		}
 		if time.Since(lastCleanup) > 10*time.Minute {
 			if err := a.Cleanup(ctx); err != nil {

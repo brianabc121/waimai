@@ -22,15 +22,16 @@ import (
 // NotifyChannel is the PostgreSQL NOTIFY channel used for refresh hints.
 const NotifyChannel = "waimai_events"
 
-// SMSSender delivers one-time codes. The default implementation only logs.
+// SMSSender delivers a text message. Implementations for real providers live
+// in internal/sms; the default only logs that a message was produced.
 type SMSSender interface {
-	Send(ctx context.Context, phone, code string) error
+	Send(ctx context.Context, phone, message string) error
 }
 
 type LogSMS struct{}
 
 func (LogSMS) Send(_ context.Context, phone, _ string) error {
-	log.Printf("otp: code issued for phone ending %s (no SMS provider configured)", last4(phone))
+	log.Printf("sms: message for phone ending %s not sent (no SMS provider configured)", last4(phone))
 	return nil
 }
 
@@ -46,6 +47,8 @@ type App struct {
 	Secret     []byte
 	SMS        SMSSender
 	OTPDevEcho bool
+	// PublicBaseURL is the customer-facing origin, used for order links in SMS.
+	PublicBaseURL string
 }
 
 func New(pool *pgxpool.Pool, secret string) *App {

@@ -3,15 +3,16 @@ export interface Branch {
   timezone: string; currency: string; tax_rate_bp: number; tax_inclusive: boolean; service_charge_bp: number
   packaging_fee: number; min_order_amount: number; accept_timeout_minutes: number
   delivery_enabled: boolean; pickup_enabled: boolean; paused: boolean
-  open_time: string; close_time: string; open_now: boolean
+  open_time: string; close_time: string; open_now: boolean; notify_sms: boolean
 }
+export interface Station { id: number; name: string; name_en: string; active: boolean; sort: number; item_count: number; open_tasks: number }
 export interface Zone { id: number; name: string; name_en: string; fee: number; min_order: number; active: boolean; sort: number }
 export interface Option { id: number; name: string; name_en: string; price_delta: number; sold_out: boolean }
 export interface OptionGroup { id: number; name: string; name_en: string; min_select: number; max_select: number; options: Option[] }
 export interface Item {
   id: number; category_id: number; name: string; name_en: string; description: string; image_url: string
   price: number; published: boolean; sold_out: boolean; stock_qty: number | null; needs_prep: boolean
-  delivery_available: boolean; pickup_available: boolean; sort: number; groups: OptionGroup[]
+  delivery_available: boolean; pickup_available: boolean; sort: number; station_id: number | null; groups: OptionGroup[]
 }
 export interface Category { id: number; name: string; name_en: string; sort: number; items: Item[] }
 export interface Storefront { branch: Branch; zones: Zone[]; categories: Category[] }
@@ -23,6 +24,7 @@ export interface LineOption { group: string; group_en: string; name: string; nam
 export interface OrderItem {
   id: number; item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number
   options: LineOption[]; note: string; needs_prep: boolean; prep_status: string
+  station_id: number | null; station_name: string
 }
 export interface DeliveryTask {
   id: number; rider_id: number; rider_name: string; rider_phone: string; assignment_version: number

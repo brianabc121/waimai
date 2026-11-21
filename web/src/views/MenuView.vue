@@ -3,17 +3,20 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { get, patch, post, put } from '../api'
 import { both, money, t, toMajor, toMinor } from '../i18n'
 import { currentRole, session } from '../session'
-import type { Category, Item } from '../types'
+import type { Category, Item, Station } from '../types'
 
 const bid = session.branchId!
 const cur = currentRole()?.currency ?? 'PHP'
 const manager = computed(() => ['owner', 'manager'].includes(currentRole()?.role ?? ''))
 const cats = ref<Category[]>([])
+const stations = ref<Station[]>([])
 const error = ref('')
 
 async function load() {
-  cats.value = (await get(`/merchant/branches/${bid}/menu`)).categories
+  const m = await get(`/merchant/branches/${bid}/menu`)
+  cats.value = m.categories; stations.value = m.stations
 }
+const stationName = (id: number | null) => { const x = stations.value.find(s => s.id === id); return x ? both(x.name, x.name_en) : '' }
 onMounted(load)
 
 async function run(fn: () => Promise<unknown>) {
@@ -43,20 +46,20 @@ interface OptForm { name: string; name_en: string; extra: number; sold_out: bool
 interface GroupForm { name: string; name_en: string; min_select: number; max_select: number; options: OptForm[] }
 interface Form { id: number; category_id: number; name: string; name_en: string; description: string; image_url: string
   price: number; published: boolean; sold_out: boolean; limited: boolean; stock: number; needs_prep: boolean
-  delivery_available: boolean; pickup_available: boolean; sort: number; groups: GroupForm[] }
+  delivery_available: boolean; pickup_available: boolean; sort: number; station_id: number | null; groups: GroupForm[] }
 
 const form = reactive<{ open: boolean; f: Form }>({ open: false, f: blank() })
 
 function blank(): Form {
   return { id: 0, category_id: 0, name: '', name_en: '', description: '', image_url: '', price: 0, published: false, sold_out: false,
-    limited: false, stock: 0, needs_prep: true, delivery_available: true, pickup_available: true, sort: 0, groups: [] }
+    limited: false, stock: 0, needs_prep: true, delivery_available: true, pickup_available: true, sort: 0, station_id: null, groups: [] }
 }
 
 function edit(it: Item | null, categoryId = 0) {
   form.f = it ? {
     id: it.id, category_id: it.category_id, name: it.name, name_en: it.name_en, description: it.description, image_url: it.image_url,
     price: toMajor(it.price), published: it.published, sold_out: it.sold_out, limited: it.stock_qty !== null, stock: it.stock_qty ?? 0,
-    needs_prep: it.needs_prep, delivery_available: it.delivery_available, pickup_available: it.pickup_available, sort: it.sort,
+    needs_prep: it.needs_prep, delivery_available: it.delivery_available, pickup_available: it.pickup_available, sort: it.sort, station_id: it.station_id,
     groups: it.groups.map(g => ({ name: g.name, name_en: g.name_en, min_select: g.min_select, max_select: g.max_select,
       options: g.options.map(o => ({ name: o.name, name_en: o.name_en, extra: toMajor(o.price_delta), sold_out: o.sold_out })) })),
   } : { ...blank(), category_id: categoryId || cats.value[0]?.id || 0 }
@@ -68,7 +71,7 @@ async function save() {
   const body = {
     category_id: f.category_id, name: f.name, name_en: f.name_en, description: f.description, image_url: f.image_url,
     price: toMinor(f.price), published: f.published, sold_out: f.sold_out, stock_qty: f.limited ? Math.max(0, Math.floor(f.stock)) : null,
-    needs_prep: f.needs_prep, delivery_available: f.delivery_available, pickup_available: f.pickup_available, sort: f.sort,
+    needs_prep: f.needs_prep, delivery_available: f.delivery_available, pickup_available: f.pickup_available, sort: f.sort, station_id: f.needs_prep ? f.station_id : null,
     groups: f.groups.map(g => ({ name: g.name, name_en: g.name_en, min_select: Number(g.min_select), max_select: Number(g.max_select),
       options: g.options.map(o => ({ name: o.name, name_en: o.name_en, price_delta: toMinor(o.extra), sold_out: o.sold_out })) })),
   }
@@ -101,6 +104,8 @@ async function save() {
               <span class="tag bad" v-if="it.sold_out" style="margin-left:4px">{{ t('sold_out') }}</span>
               <span class="tag info" v-if="it.stock_qty !== null" style="margin-left:4px">{{ t('stock') }} {{ it.stock_qty }}</span>
               <span class="tag" v-if="!it.needs_prep" style="margin-left:4px">{{ t('no_prep') }}</span>
+              <span class="tag info" v-else-if="it.station_id" style="margin-left:4px">{{ stationName(it.station_id) }}</span>
+              <span class="tag warn" v-else-if="stations.length" style="margin-left:4px">{{ t('unassigned') }}</span>
             </td>
             <td class="right">
               <div class="row wrap" style="justify-content:flex-end;gap:6px">
@@ -141,6 +146,12 @@ async function save() {
             <label class="check"><input type="checkbox" v-model="form.f.limited" />{{ t('stock') }}</label>
             <input v-if="form.f.limited" type="number" min="0" step="1" v-model.number="form.f.stock" />
           </div>
+
+          <label class="field" v-if="form.f.needs_prep && stations.length" style="margin-top:10px"><span>{{ t('station') }}</span>
+            <select v-model="form.f.station_id">
+              <option :value="null">{{ t('unassigned') }}</option>
+              <option v-for="x in stations.filter(x => x.active || x.id === form.f.station_id)" :key="x.id" :value="x.id">{{ both(x.name, x.name_en) }}</option>
+            </select></label>
 
           <h3 style="margin:14px 0 8px">{{ t('option_groups') }}</h3>
           <div v-for="(g, gi) in form.f.groups" :key="gi" class="card stack" style="margin-bottom:10px;background:#fafafa">

@@ -76,6 +76,18 @@ function assign(o: Order, e: Event) {
   if (id) void act(o, 'assign-rider', { rider_id: id })
 }
 
+const failed = (o: Order) => o.acceptance_status === 'accepted' && o.fulfillment_status === 'delivery_failed'
+const redeliverTo = ref(0)
+function redeliver(o: Order) {
+  const id = redeliverTo.value || o.delivery?.rider_id || 0
+  if (id) void act(o, 'redeliver', { rider_id: id })
+}
+function closeFailed(o: Order) {
+  const reason = prompt(t('reason'))
+  if (reason === null) return
+  if (!reason.trim()) { error.value = t('reason_required'); return }
+  void act(o, 'close-failed', { reason })
+}
 const canCancel = (o: Order) => o.acceptance_status === 'accepted' && ['none', 'awaiting_handoff', 'awaiting_pickup'].includes(o.fulfillment_status)
 const canAssign = (o: Order) => o.service_type === 'delivery' && o.acceptance_status === 'accepted' && ['none', 'awaiting_handoff'].includes(o.fulfillment_status)
 const waited = (o: Order) => { void now.value; return minutesSince(o.created_at) }
@@ -170,6 +182,16 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <button v-if="selected.fulfillment_status === 'awaiting_handoff' && selected.delivery" class="btn primary" @click="act(selected, 'handoff')">{{ t('handoff_rider') }}</button>
             <button v-if="selected.fulfillment_status === 'awaiting_pickup'" class="btn primary" @click="act(selected, 'handoff')">{{ t('handoff_customer') }}</button>
             <button v-if="canCancel(selected)" class="btn danger" @click="withReason(selected, 'cancel')">{{ t('cancel_order') }}</button>
+            <template v-if="failed(selected)">
+              <div class="banner warn">{{ t('failed_hint') }}</div>
+              <div class="row wrap">
+                <select :value="redeliverTo || selected.delivery?.rider_id || 0" :aria-label="t('choose_rider')" style="flex:1 1 160px" @change="redeliverTo = Number(($event.target as HTMLSelectElement).value)">
+                  <option v-for="r in riders" :key="r.id" :value="r.id">{{ r.display_name }}</option>
+                </select>
+                <button class="btn primary" @click="redeliver(selected)">{{ t('redeliver') }}</button>
+              </div>
+              <button class="btn danger" @click="closeFailed(selected)">{{ t('close_failed') }}</button>
+            </template>
           </div>
         </div>
       </div>

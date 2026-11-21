@@ -22,5 +22,9 @@ func main() {
 	}
 	defer pool.Close()
 	log.Print("worker started")
-	app.New(pool, cfg.AppSecret).RunWorker(ctx, log.Printf)
+	a, err := app.NewFromConfig(pool, cfg)
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
+	a.RunWorker(ctx, log.Printf)
 }
