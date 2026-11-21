@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="map.css">
 </head>
 <body>
-<!-- 原型：顾客下单时在地图上定位。左边在配送范围内，右边在范围外。 -->
+<!-- 原型：顾客下单时在地图上定位。左边在配送范围内，中间在两个区域的缝里，右边在范围外。 -->
 <div class="phones">
   <div><div class="phone">
     <div class="bar"><span>‹</span><span>送到哪里</span></div>
@@ -24,13 +24,27 @@
     </div></div><div class="caption">在配送范围内</div></div>
   <div><div class="phone">
     <div class="bar"><span>‹</span><span>送到哪里</span></div>
+    <div class="map"><svg class="base" id="c"></svg>
+      <div class="float search">🔍 <span style="color:#1f2328">Makati Ave cor. Paseo, Makati</span></div>
+      <div class="float locate">◎</div><div class="attrib">示意底图 · 正式版使用 Google 地图</div></div>
+    <div class="body">
+      <div class="result" style="border-color:#2a78d6;background:#f3f8ff">
+        <div class="row between"><b>可以配送 · 马卡蒂 CBD</b><span class="tag warn">边界附近</span></div>
+        <div class="small muted num" style="margin-top:4px">配送费 ₱49 · 起送 ₱200 · 约 25 分钟</div></div>
+      <p class="small muted">你的位置离“马卡蒂 CBD”配送区很近，按这个区域配送。</p>
+      <label class="field" style="margin:0"><span>楼层 / 门牌</span><input value=""></label>
+      <label class="field" style="margin:0"><span>给骑手的备注（选填）</span><input value=""></label>
+      <a class="btn primary block">确认送到这里</a>
+    </div></div><div class="caption">在两个区域之间的缝里（容差内）</div></div>
+  <div><div class="phone">
+    <div class="bar"><span>‹</span><span>送到哪里</span></div>
     <div class="map"><svg class="base" id="b"></svg>
       <div class="float search">🔍 <span style="color:#1f2328">Pio del Pilar, Makati</span></div>
       <div class="float locate">◎</div><div class="attrib">示意底图 · 正式版使用 Google 地图</div></div>
     <div class="body">
       <div class="result" style="border-color:#f3c4bf;background:#fdecea">
         <div class="row between"><b style="color:#b42318">这个位置不在配送范围</b><span class="tag">范围外</span></div>
-        <div class="small" style="margin-top:4px;color:#b42318">离最近的配送区“马卡蒂 CBD”还差约 600 米</div></div>
+        <div class="small" style="margin-top:4px;color:#b42318">离最近的配送区“马卡蒂 CBD”约 600 米，超出可配送距离</div></div>
       <p class="small muted">可以把图钉移到彩色范围里的地点，或者改成到店自取。</p>
       <a class="btn block">改为到店自取</a>
       <a class="btn primary block" style="opacity:.45">确认送到这里</a>
@@ -45,6 +59,7 @@ function phone(id, view, at, color) {
   pin(svg, at, { color: color, icon: 'dot', lift: true });
 }
 phone('a', '250 190 520 440', [540, 425], '#1d4ed8');
+phone('c', '370 215 520 440', [628, 436], '#1d4ed8');
 phone('b', '20 300 520 440', [205, 560], '#b42318');
 </script>
 </body>
