@@ -125,8 +125,11 @@ func allowed(c *gin.Context, branchID int64, roles []string) bool {
 		fail(c, app.ErrNotFound)
 		return false
 	}
+	// "kitchen" in a role list stands for anyone who works a station or the
+	// packing counter, whatever their back-office role is.
+	inStore := u.InStore(branchID)
 	for _, r := range roles {
-		if r == role {
+		if r == role || (r == "kitchen" && inStore) {
 			return true
 		}
 	}
@@ -324,6 +327,8 @@ func (s *Server) Router() *gin.Engine {
 	auth.GET("/merchant/branches/:bid/staff", s.listStaff)
 	auth.POST("/merchant/branches/:bid/staff", s.createStaff)
 	auth.PATCH("/merchant/branches/:bid/staff/:id", s.patchStaff)
+	auth.DELETE("/merchant/branches/:bid/staff/:id", s.deleteStaff)
+	auth.POST("/merchant/branches/:bid/staff/:id/password", s.resetStaffPassword)
 	auth.GET("/merchant/branches/:bid/cash-collections", s.listCash)
 	auth.POST("/merchant/cash-collections/:id/reconcile", s.reconcile)
 

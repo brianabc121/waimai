@@ -22,12 +22,14 @@ export const router = createRouter({
         { path: 'promos', component: () => import('./views/PromosView.vue') },
         { path: 'cash', component: () => import('./views/CashView.vue') },
         { path: 'delivery-map', component: () => import('./views/DeliveryMapView.vue') },
+        { path: 'staff', component: () => import('./views/StaffView.vue') },
         { path: 'settings', component: () => import('./views/SettingsView.vue') },
       ],
     },
     { path: '/kitchen', component: () => import('./views/StaffLayout.vue'), meta: { staff: true },
       children: [{ path: '', component: () => import('./views/KitchenView.vue') }] },
-    { path: '/rider', component: () => import('./views/RiderView.vue'), meta: { staff: true } },
+    { path: '/work', component: () => import('./views/WorkView.vue'), meta: { staff: true } },
+    { path: '/rider', redirect: '/work' },
     {
       path: '/admin', component: () => import('./views/admin/AdminLayout.vue'), meta: { staff: true },
       children: [

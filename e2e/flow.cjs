@@ -1,6 +1,7 @@
 // End-to-end walk through the delivery loop in a real browser:
-// customer orders -> cashier accepts and assigns -> kitchen cooks and packs
-// -> rider picks up and delivers with cash -> owner reconciles.
+// customer orders -> cashier accepts and assigns -> the kitchen screen and the
+// staff workbench cook and pack -> the same person switches to the rider
+// identity, picks up and delivers with cash -> owner reconciles.
 // Usage: BASE_URL=http://localhost:8080 node e2e/flow.cjs   (needs seed data and OTP_DEV_ECHO=true)
 const { chromium } = require('playwright')
 const { mkdirSync } = require('node:fs')
@@ -85,14 +86,17 @@ await desk.click(`.ord:has-text("${orderNo}")`)
 await shot(desk, '05-desk')
 await desk.click('.detail button:has-text("接单")')
 await desk.waitForSelector('.detail select')
-await desk.selectOption('.detail select', { label: '骑手 Juan' })
-await desk.waitForSelector('.detail :text("骑手 Juan")')
+// 小王 holds two posts: packing and rider
+await desk.selectOption('.detail select', { label: '小王' })
+await desk.waitForSelector('.detail :text("小王")')
 await expectStatus('备餐中')   // pushed to the customer page over SSE, no reload
 step('cashier accepted; customer page updated live to "preparing"')
 
 // ---- kitchen ----
 const kitchen = await open({ width: 1280, height: 800 })
 await login(kitchen, 'kitchen1')
+await kitchen.waitForURL('**/work')   // staff without back-office access land on the workbench
+await kitchen.goto(BASE + '/kitchen')
 const card = kitchen.locator(`.card:has-text("${orderNo}")`)
 await card.waitFor()
 // station tabs: the drinks station sees only the drink, the fryer only the fried item
@@ -109,45 +113,78 @@ step('kitchen stations each see only their own items')
 await kitchen.click('.seg button:has-text("打包")')
 await kitchen.locator(`.card:has-text("${orderNo}") :text("待齐菜")`).waitFor()   // cannot pack yet
 await kitchen.click('.seg button:has-text("制作")')
-for (let i = 0; i < 2; i++) await card.locator('button.ok').first().click().then(() => kitchen.waitForTimeout(250))
-await kitchen.click('.seg button:has-text("打包")')
-const pcard = kitchen.locator(`.card:has-text("${orderNo}")`)
-await pcard.locator(':text("待打包")').waitFor()
-const packBtn = pcard.locator('button.primary')
-if (!(await packBtn.isDisabled())) throw new Error('packing must need every line ticked')
-for (const box of await pcard.locator('input[type=checkbox]').all()) await box.check()
-await shot(kitchen, '07-packing')
-await packBtn.click()
-await pcard.locator(':text("已打包")').waitFor()
-await expectStatus('等待骑手取餐')
-step('kitchen cooked and packed; customer sees "waiting for rider", not "out for delivery"')
 
-// ---- rider ----
+// ---- workbench, in-store identity: 小张 works the fryer and the hot kitchen ----
+const cook = await open({ width: 390, height: 844 })
+await login(cook, 'zhang1')
+await cook.waitForURL('**/work')
+const fry = cook.locator('[data-task="盐酥鸡"]')
+await fry.waitFor()
+if (await cook.locator('[data-task="冰柠檬茶"]').count()) throw new Error('the workbench must only show the dishes of my own stations')
+if ((await cook.locator('[data-testid=identity]').innerText()).trim() !== '店内') throw new Error('a cook has the in-store identity only')
+await shot(cook, '06c-workbench-store')
+await fry.locator('[data-act=start]').click()
+await card.locator('.kline.preparing:has-text("盐酥鸡")').waitFor()   // the kitchen screen follows live
+await fry.locator('[data-act=ready]').click()
+await cook.locator('[data-testid=store-empty]').waitFor()
+await cook.click('[data-testid=tab-done]')
+await cook.locator('[data-ready="盐酥鸡"]').waitFor()
+step('workbench: the cook saw only the fryer dish, started and finished it; the kitchen screen followed')
+await card.locator('button.ok').first().click()   // the drink is finished on the kitchen screen
+
+// ---- workbench: 小王 packs in store, then switches to the rider identity ----
 const rider = await open({ width: 390, height: 844 })
-await login(rider, 'rider1')
-const task = rider.locator(`.card:has-text("${orderNo}")`)
+await login(rider, 'wang1')
+await rider.waitForURL('**/work')
+const pack = rider.locator(`[data-pack="${orderNo}"]`)
+await pack.locator(':text("待打包")').waitFor()
+await rider.locator('[data-testid=rider-busy]').waitFor()   // told about the delivery waiting under the other identity
+await pack.locator('[data-act=pack]').click()
+const packBtn = rider.locator('[data-act=confirm-pack]')
+if (!(await packBtn.isDisabled())) throw new Error('packing must need every line ticked')
+for (const box of await rider.locator('[data-testid=pack-sheet] input[type=checkbox]').all()) await box.check()
+await shot(rider, '07-packing')
+await packBtn.click()
+await pack.locator(':text("已打包")').waitFor()
+await expectStatus('等待骑手取餐')
+step('workbench: packed in store; customer sees "waiting for rider", not "out for delivery"')
+
+await rider.click('[data-testid=identity]')
+await rider.locator('[data-testid=identity-sheet] [data-id=rider]:has-text("现在有 1 个任务")').waitFor()
+await shot(rider, '07b-switch-identity')
+await rider.click('[data-testid=switch-go]')
+const task = rider.locator(`[data-delivery="${orderNo}"]`)
 await task.waitFor()
 await shot(rider, '08-rider-pickup')
-await task.locator('button:has-text("确认取餐")').click()
+await task.locator('[data-act=open]').click()
+await rider.click('[data-act=pickup]')
 await expectStatus('配送中')
 // a failed attempt: rider reports a problem, the desk sends the order out again
-await task.locator('button:has-text("配送异常")').click()
+await rider.click('[data-act=problem]')
+await rider.click('[data-testid=problem-sheet] button:has-text("联系不上顾客")')
+await rider.click('[data-act=submit-problem]')
 await expectStatus('配送异常')
 await desk.click(`.ord:has-text("${orderNo}")`)
 await desk.locator('.detail button:has-text("重新配送")').waitFor()
 await shot(desk, '09a-delivery-failed')
 await desk.click('.detail button:has-text("重新配送")')
 await expectStatus('等待骑手取餐')
-await task.locator('button:has-text("确认取餐")').click()
+await task.locator('[data-act=open]').click()
+await rider.click('[data-act=pickup]')
 await expectStatus('配送中')
 step('failed delivery was sent out again')
-await task.locator('button:has-text("已到达")').click()
+await rider.click('[data-act=arrive]')
 await expectStatus('骑手已到达')
+await rider.locator('[data-quick]').first().click()   // a round note: the page works out the change
+await rider.locator('[data-testid=change]').waitFor()
+await rider.click('.quick button:has-text("刚好")')
 await shot(rider, '09-rider-deliver')
-await task.locator('button:has-text("确认送达")').click()
+await rider.click('[data-act=deliver]')
 await expectStatus('已送达')
+await rider.click('[data-testid=tab-done]')
+await rider.locator(`[data-done="${orderNo}"]`).waitFor()
 await shot(cust, '10-delivered')
-step('rider picked up, arrived and delivered with cash')
+step('rider identity: picked up, arrived and delivered with cash')
 
 // ---- owner reconciles ----
 const owner = await open({ width: 1280, height: 800 })

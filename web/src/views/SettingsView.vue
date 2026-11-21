@@ -9,14 +9,12 @@ const bid = session.branchId!
 const branch = ref<Branch | null>(null)
 const zones = ref<Zone[]>([])
 const stations = ref<Station[]>([])
-const staff = ref<{ id: number; username: string; display_name: string; role: string; active: boolean }[]>([])
 const error = ref('')
 const saved = ref(false)
 
 const s = reactive({ name: '', name_en: '', address: '', phone: '', tax: 12, tax_inclusive: true, service: 0, packaging: 0,
   min_order: 0, accept_timeout_minutes: 10, delivery_enabled: true, pickup_enabled: true, paused: false, open_time: '00:00', close_time: '00:00', notify_sms: true, scheduling_enabled: false, prep_minutes: 30 })
 const st = reactive({ id: 0, name: '', name_en: '', active: true })
-const u = reactive({ username: '', password: '', display_name: '', phone: '', role: 'cashier' })
 
 async function load() {
   const m = await get(`/merchant/branches/${bid}/menu`)
@@ -27,7 +25,6 @@ async function load() {
     accept_timeout_minutes: b.accept_timeout_minutes, delivery_enabled: b.delivery_enabled, pickup_enabled: b.pickup_enabled,
     paused: b.paused, open_time: b.open_time, close_time: b.close_time, notify_sms: b.notify_sms,
     scheduling_enabled: b.scheduling_enabled, prep_minutes: b.prep_minutes })
-  staff.value = (await get(`/merchant/branches/${bid}/staff`)).staff
 }
 onMounted(load)
 
@@ -51,10 +48,6 @@ async function saveStation() {
   if (await run(() => st.id ? put(`/merchant/branches/${bid}/stations/${st.id}`, body) : post(`/merchant/branches/${bid}/stations`, body))) editStation(null)
 }
 
-async function addStaff() {
-  if (await run(() => post(`/merchant/branches/${bid}/staff`, { ...u }))) Object.assign(u, { username: '', password: '', display_name: '', phone: '' })
-}
-const toggleStaff = (m: { id: number; active: boolean }) => run(() => patch(`/merchant/branches/${bid}/staff/${m.id}`, { active: !m.active }))
 const link = () => `${location.origin}/s/${branch.value?.slug}`
 </script>
 
@@ -120,26 +113,9 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
       </form>
     </div>
 
-    <div class="card stack">
-      <h2>{{ t('staff') }}</h2>
-      <table class="data">
-        <thead><tr><th>{{ t('username') }}</th><th>{{ t('display_name') }}</th><th>{{ t('role') }}</th><th></th></tr></thead>
-        <tbody><tr v-for="m in staff" :key="m.id">
-          <td>{{ m.username }}</td><td>{{ m.display_name }}</td><td>{{ t('role.' + m.role) }}</td>
-          <td class="right"><span v-if="!m.active" class="tag bad" style="margin-right:6px">{{ t('disabled') }}</span>
-            <button v-if="m.id !== session.user?.id" class="btn small" @click="toggleStaff(m)">{{ m.active ? t('disable') : t('enable') }}</button></td>
-        </tr></tbody>
-      </table>
-      <form class="row wrap" @submit.prevent="addStaff">
-        <input v-model="u.username" :placeholder="t('username')" required autocapitalize="none" style="flex:1 1 120px" />
-        <input v-model="u.display_name" :placeholder="t('display_name')" required style="flex:1 1 120px" />
-        <input v-model="u.password" type="password" :placeholder="t('password') + ' (8+)'" required minlength="8" autocomplete="new-password" style="flex:1 1 120px" />
-        <input v-model="u.phone" :placeholder="t('phone')" style="flex:1 1 120px" />
-        <select v-model="u.role" style="flex:0 1 150px">
-          <option v-for="r in ['manager', 'cashier', 'kitchen', 'rider']" :key="r" :value="r">{{ t('role.' + r) }}</option>
-        </select>
-        <button class="btn primary">{{ t('add_staff') }}</button>
-      </form>
+    <div class="card row between">
+      <span><b>{{ t('staff') }}</b> <span class="muted small">{{ t('staff_moved') }}</span></span>
+      <router-link class="btn" to="/merchant/staff">{{ t('staff') }}</router-link>
     </div>
   </div>
 </template>

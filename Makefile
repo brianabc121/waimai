@@ -28,3 +28,4 @@ e2e:
 	node e2e/templates.cjs
 	node e2e/admin.cjs
 	node e2e/mapzones.cjs
+	node e2e/staff.cjs

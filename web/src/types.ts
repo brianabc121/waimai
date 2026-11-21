@@ -77,5 +77,9 @@ export interface MenuImport {
   total_rows: number; valid_rows: number; error_rows: number; created_count: number; updated_count: number
   created_at: string; rows: ImportRow[]
 }
-export interface BranchRole { branch_id: number; branch_name: string; slug: string; currency: string; role: string }
+// A post is one job in a branch: a kitchen station, the packing counter, or rider.
+export interface Post { kind: 'station' | 'packing' | 'rider'; station_id: number | null; station_name?: string; station_name_en?: string; station_active?: boolean }
+// role is back-office access (owner, manager, cashier, staff); posts say what the person works on.
+export interface BranchRole { branch_id: number; branch_name: string; slug: string; currency: string; role: string; posts: Post[] }
+export interface StaffMember { id: number; username: string; display_name: string; phone: string; role: string; active: boolean; posts: Post[]; open_tasks: number; active_deliveries: number }
 export interface User { id: number; username: string; display_name: string; is_platform_admin: boolean; roles: BranchRole[] }

@@ -47,6 +47,7 @@ func TestMain(m *testing.M) {
 
 type store struct {
 	slug                         string
+	ownerName                    string
 	branchID                     int64
 	zoneID                       int64
 	chicken, tea, water, limited int64
@@ -88,9 +89,9 @@ func newStore(t *testing.T, taxInclusive bool) *store {
 	t.Helper()
 	a := need(t)
 	ctx := context.Background()
-	s := &store{slug: uniq("s")}
+	s := &store{slug: uniq("s"), ownerName: uniq("owner")}
 	m, err := a.CreateMerchant(ctx, app.NewMerchant{MerchantName: "T", BranchName: "T", Slug: s.slug,
-		Owner: app.NewUser{Username: uniq("owner"), Password: "password1", DisplayName: "Owner"}})
+		Owner: app.NewUser{Username: s.ownerName, Password: "password1", DisplayName: "Owner"}})
 	noErr(t, err)
 	s.branchID = m.BranchID
 	_, err = a.SaveSettings(ctx, s.branchID, app.SettingsInput{Name: "T", TaxRateBP: 1200, TaxInclusive: taxInclusive,
