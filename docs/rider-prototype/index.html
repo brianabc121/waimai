@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>骑手端 · 原型</title>
+<link rel="stylesheet" href="../map-prototype/map.css">
+<link rel="stylesheet" href="rider.css">
+</head>
+<body>
+<!-- 原型：骑手端在安卓 App、iPhone App、浏览器三种外壳里的样子。数据都是示意。正式方案见 ../RIDER_APP_DESIGN.md -->
+
+<!-- ============ 01 任务和新单提醒 ============ -->
+<section class="phones" id="tasks">
+  <div><div class="phone">
+    <div class="status"><span>9:41</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="rbar"><div><b>我的任务</b><div class="sub">Jun Reyes · 马卡蒂小馆</div></div>
+      <div class="duty on"><i></i>上班中</div></div>
+    <div class="gps ok">● 定位正常 · 每 15 秒上报一次 · 下班后停止</div>
+    <div class="body">
+      <div class="card new">
+        <div class="row between"><b class="no">A-0127</b><span class="tag brand">新任务 · 待取餐</span></div>
+        <div class="line"><span class="dot s"></span>马卡蒂小馆 · <span class="ok-t">已打包 2 袋</span></div>
+        <div class="line"><span class="dot c"></span>马卡蒂 CBD · 88 Ayala Ave 12 楼 1203</div>
+        <div class="row between meta"><span>约 1.4 公里</span><span>货到付款 <b class="price">₱486</b></span></div>
+        <a class="btn primary block">去取餐</a>
+      </div>
+      <div class="card">
+        <div class="row between"><b class="no">A-0125</b><span class="tag info">配送中</span></div>
+        <div class="line"><span class="dot c"></span>波布拉西翁 · 5021 P. Burgos St 3 楼</div>
+        <div class="row between meta"><span>还有 600 米</span><span class="ok-t">已线上支付</span></div>
+        <a class="btn block">继续配送</a>
+      </div>
+      <div class="today">今日已完成 6 单 · 代收现金 ₱1,930 待交店</div>
+    </div>
+    <div class="tabs"><span class="on">任务<em>2</em></span><span>已完成</span><span>我的</span></div>
+  </div><div class="caption">任务首页：上班开关、定位状态、任务卡片</div></div>
+
+  <div><div class="phone dark">
+    <div class="status light"><span>9:41</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="alert">
+      <div class="ring"><div class="bell"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7 2.5 7h-17S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></div></div>
+      <div class="a-title">新任务</div>
+      <div class="a-no">A-0127</div>
+      <div class="a-card">
+        <div class="line"><span class="dot s"></span>马卡蒂小馆取餐 · 2 袋</div>
+        <div class="line"><span class="dot c"></span>送到 马卡蒂 CBD · 88 Ayala Ave</div>
+        <div class="row between meta"><span>约 1.4 公里</span><span>货到付款 <b>₱486</b></span></div>
+      </div>
+      <a class="btn primary block big">知道了，去取餐</a>
+      <div class="a-foot">响铃和震动持续到你点按钮为止</div>
+    </div>
+  </div><div class="caption">App 开着时：全屏提醒，持续响铃和震动</div></div>
+
+  <div><div class="phone lock">
+    <div class="status light"><span></span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="clock"><div class="d">11月21日 星期六</div><div class="t">9:41</div></div>
+    <div class="push">
+      <div class="row between"><span class="app"><i></i>外卖骑手</span><span class="when">现在</span></div>
+      <b>新任务 A-0127 · 货到付款 ₱486</b>
+      <div>马卡蒂小馆取餐，送到 88 Ayala Ave（马卡蒂 CBD），约 1.4 公里</div>
+    </div>
+    <div class="push dim">
+      <div class="row between"><span class="app"><i></i>外卖骑手</span><span class="when">12 分钟前</span></div>
+      <b>A-0119 已取消</b>
+      <div>门店取消了这一单，不用去取餐了</div>
+    </div>
+    <div class="lockfoot">点通知直接打开这一单</div>
+  </div><div class="caption">锁屏或 App 在后台时：系统推送通知</div></div>
+</section>
+
+<!-- ============ 02 取餐、配送、送达 ============ -->
+<section class="phones" id="flow">
+  <div><div class="phone">
+    <div class="status"><span>9:44</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="rbar"><div><b>‹ A-0127 取餐</b></div><span class="tag brand">待取餐</span></div>
+    <div class="body">
+      <div class="banner ok">已打包，共 <b>2</b> 袋。请和柜台核对袋数</div>
+      <div class="card flat">
+        <div class="k">取餐点</div><b>马卡蒂小馆</b><div class="muted">Ayala Ave 6750 号 G 层</div>
+      </div>
+      <div class="card flat">
+        <div class="k">餐品</div>
+        <div class="it"><span>2 × 海南鸡饭</span></div>
+        <div class="it"><span>1 × 蒜蓉空心菜</span></div>
+        <div class="it"><span>2 × 冻柠茶（少冰）</span></div>
+      </div>
+      <div class="card flat">
+        <div class="k">收款</div>
+        <div class="row between"><span>货到付款，向顾客收</span><b class="price big">₱486</b></div>
+      </div>
+      <div class="grow"></div>
+      <a class="btn primary block big">确认取餐（2 袋）</a>
+      <a class="btn link center">餐还没好 / 有问题</a>
+    </div>
+  </div><div class="caption">取餐：核对袋数，一键确认</div></div>
+
+  <div><div class="phone">
+    <div class="status"><span>9:52</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="rbar"><div><b>‹ A-0127 配送中</b></div><span class="tag info">配送中</span></div>
+    <div class="map" style="height:300px"><svg class="base" id="m1"></svg>
+      <div class="float eta"><b>约 6 分钟</b> · 1.1 公里</div>
+      <div class="attrib">示意底图 · 正式版使用 Google 地图</div></div>
+    <div class="body tight">
+      <div><b style="font-size:16px">Maria Santos</b>
+        <div>马卡蒂 CBD · 88 Ayala Ave <b>12 楼 1203</b></div>
+        <div class="banner warn small">顾客备注：到了打电话，前台要登记</div></div>
+      <div class="row"><a class="btn grow">导航</a><a class="btn grow">打电话</a></div>
+      <div class="row between"><span class="muted">袋数 2 · 货到付款</span><b class="price big">₱486</b></div>
+      <a class="btn primary block big">我已到达</a>
+      <a class="btn link center danger-t">送不了 / 有问题</a>
+    </div>
+  </div><div class="caption">配送中：地图、导航、打电话。锁屏后继续上报位置</div></div>
+
+  <div><div class="phone">
+    <div class="status"><span>9:59</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="rbar"><div><b>‹ A-0127 送达</b></div><span class="tag ok">已到达</span></div>
+    <div class="body">
+      <div class="card flat">
+        <div class="k">应收</div>
+        <div class="row between"><span>货到付款</span><b class="price huge">₱486</b></div>
+      </div>
+      <div class="card flat">
+        <div class="k">实收金额</div>
+        <div class="amount">₱ <b>486</b></div>
+        <div class="row quick"><span class="chip on">刚好 ₱486</span><span class="chip">₱500</span><span class="chip">₱1,000</span></div>
+        <div class="muted small">收 ₱500 找零 ₱14。实收和应收不一样时会记下差额。</div>
+      </div>
+      <div class="card flat">
+        <div class="k">送达凭证（选填）</div>
+        <div class="row"><div class="photo">＋ 拍照</div><div class="muted small">放门口或前台代收时拍一张，有争议时能查。</div></div>
+      </div>
+      <div class="grow"></div>
+      <a class="btn primary block big">确认送达并收款 ₱486</a>
+    </div>
+  </div><div class="caption">送达：代收现金、快捷金额、拍照留证</div></div>
+</section>
+
+<!-- ============ 03 定位、离线 ============ -->
+<section class="phones" id="location">
+  <div><div class="phone">
+    <div class="status"><span>8:58</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="body perm">
+      <div class="pin-ill"><svg viewBox="0 0 80 80" width="96" height="96"><circle cx="40" cy="40" r="38" fill="#fff1e8"/><path d="M40 62C34 48 22 42 22 30a18 18 0 1 1 36 0c0 12-12 18-18 32z" fill="#d9480f"/><circle cx="40" cy="30" r="7" fill="#fff"/></svg></div>
+      <h1>上班时需要你的位置</h1>
+      <p class="muted">门店靠它把单派给离得近的骑手，顾客也能看到餐送到哪了。</p>
+      <div class="plist">
+        <div><i class="y"></i><span><b>只在上班时采集</b>点“下班”就完全停止</span></div>
+        <div><i class="y"></i><span><b>锁屏也要能上报</b>所以下一步请选“始终允许”</span></div>
+        <div><i class="y"></i><span><b>只给门店和当前这单的顾客看</b>不做别的用途</span></div>
+      </div>
+      <div class="grow"></div>
+      <a class="btn primary block big">继续，去授权</a>
+      <a class="btn link center">先不开（只能手动刷新任务）</a>
+    </div>
+  </div><div class="caption">第一次上班前：先说明用途，再弹系统授权</div></div>
+
+  <div><div class="phone">
+    <div class="status"><span>14:05</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="rbar"><div><b>我的</b><div class="sub">Jun Reyes · 马卡蒂小馆</div></div><div class="duty"><i></i>已下班</div></div>
+    <div class="gps off">○ 已下班，没有采集位置，也不会收到新任务</div>
+    <div class="body">
+      <div class="card flat"><div class="k">今天</div>
+        <div class="stats"><div><b>9</b><span>送达</span></div><div><b>1</b><span>异常</span></div><div><b>₱2,416</b><span>代收现金</span></div></div>
+        <div class="banner warn small">代收现金 ₱2,416 还没交给门店</div></div>
+      <div class="card flat list">
+        <div class="row between"><span>新任务提醒</span><span class="ok-t">已开启</span></div>
+        <div class="row between"><span>后台定位</span><span class="ok-t">始终允许</span></div>
+        <div class="row between"><span>省电白名单</span><span class="warn-t">去设置 ›</span></div>
+        <div class="row between"><span>语言</span><span class="muted">中文 / EN</span></div>
+        <div class="row between"><span>版本</span><span class="muted">1.0.0</span></div>
+      </div>
+      <div class="grow"></div>
+      <a class="btn primary block big">开始上班</a>
+    </div>
+    <div class="tabs"><span>任务</span><span>已完成</span><span class="on">我的</span></div>
+  </div><div class="caption">“我的”：上下班、当日统计、提醒和定位自检</div></div>
+
+  <div><div class="phone">
+    <div class="status"><span>10:21</span><span class="sig bad">× 无信号</span></div>
+    <div class="rbar"><div><b>‹ A-0125 送达</b></div><span class="tag ok">已到达</span></div>
+    <div class="gps warn">▲ 现在没有网络。你的操作会先存在手机里，联网后自动提交</div>
+    <div class="body">
+      <div class="card flat"><div class="k">收款</div><div class="row between"><span>已线上支付</span><b class="ok-t">不用收钱</b></div></div>
+      <div class="card flat queue">
+        <div class="k">等待提交（1）</div>
+        <div class="row between"><span>A-0125 确认送达</span><span class="warn-t">10:21 · 待联网</span></div>
+      </div>
+      <div class="muted small">楼里、电梯里没信号很常见。送达时间按你点按钮的时间算，不按联网时间算。</div>
+      <div class="grow"></div>
+      <a class="btn block big" style="opacity:.5">已确认送达，等待联网</a>
+    </div>
+  </div><div class="caption">没信号：操作先存本机，联网后自动补交</div></div>
+</section>
+
+<!-- ============ 04 三种外壳 ============ -->
+<section class="phones" id="platforms">
+  <div><div class="phone android">
+    <div class="status"><span>9:41</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="rbar"><div><b>我的任务</b><div class="sub">Jun Reyes</div></div><div class="duty on"><i></i>上班中</div></div>
+    <div class="gps ok">● 定位正常 · 锁屏后继续上报</div>
+    <div class="body mini">
+      <div class="card new"><div class="row between"><b class="no">A-0127</b><span class="tag brand">待取餐</span></div>
+        <div class="line"><span class="dot c"></span>马卡蒂 CBD · 88 Ayala Ave</div><a class="btn primary block">去取餐</a></div>
+      <div class="caps"><div class="y">新单推送：有，锁屏也响</div><div class="y">后台定位：有</div><div class="y">安装：应用商店或直接装安装包</div></div>
+    </div>
+    <div class="navbar"><i>◁</i><i>○</i><i>□</i></div>
+  </div><div class="caption"><b>安卓 App</b>（Capacitor 套壳）</div></div>
+
+  <div><div class="phone ios">
+    <div class="status"><span>9:41</span><span class="island"></span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="rbar"><div><b>我的任务</b><div class="sub">Jun Reyes</div></div><div class="duty on"><i></i>上班中</div></div>
+    <div class="gps ok">● 定位正常 · 锁屏后继续上报</div>
+    <div class="body mini">
+      <div class="card new"><div class="row between"><b class="no">A-0127</b><span class="tag brand">待取餐</span></div>
+        <div class="line"><span class="dot c"></span>马卡蒂 CBD · 88 Ayala Ave</div><a class="btn primary block">去取餐</a></div>
+      <div class="caps"><div class="y">新单推送：有，锁屏也响</div><div class="y">后台定位：有</div><div class="y">安装：App Store 或 TestFlight</div></div>
+    </div>
+    <div class="homebar"></div>
+  </div><div class="caption"><b>iPhone App</b>（Capacitor 套壳）</div></div>
+
+  <div><div class="phone web">
+    <div class="status"><span>9:41</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="url"><span>🔒</span> rider.example.com</div>
+    <div class="rbar"><div><b>我的任务</b><div class="sub">Jun Reyes</div></div><div class="duty on"><i></i>上班中</div></div>
+    <div class="gps warn">▲ 网页版：屏幕关掉后不能上报位置</div>
+    <div class="body mini">
+      <div class="card new"><div class="row between"><b class="no">A-0127</b><span class="tag brand">待取餐</span></div>
+        <div class="line"><span class="dot c"></span>马卡蒂 CBD · 88 Ayala Ave</div><a class="btn primary block">去取餐</a></div>
+      <div class="caps"><div class="h">新单推送：安卓有；iPhone 要先“添加到主屏幕”</div><div class="n">后台定位：没有，只有页面开着时有</div><div class="y">安装：不用装，打开网址就能用</div></div>
+    </div>
+  </div><div class="caption"><b>浏览器 H5</b>（同一套页面，兜底用）</div></div>
+</section>
+
+<!-- ============ 05 门店和顾客看到的 ============ -->
+<section class="wide" id="tracking">
+  <div class="desk">
+    <div class="desk-h"><b>订单工作台 · 骑手位置</b><span class="muted">马卡蒂小馆 · 3 位骑手上班中</span></div>
+    <div class="desk-b">
+      <div class="map"><svg class="base" id="m2"></svg><div class="attrib">示意底图 · 正式版使用 Google 地图</div></div>
+      <div class="side">
+        <div class="rr"><i style="background:#1d4ed8"></i><div><b>Jun Reyes</b><div class="muted small">配送中 A-0127 · 约 6 分钟到</div></div><span class="tag info">1 单</span></div>
+        <div class="rr"><i style="background:#18794e"></i><div><b>Carlo Dizon</b><div class="muted small">空闲 · 离店 200 米</div></div><a class="btn small primary">派单</a></div>
+        <div class="rr"><i style="background:#7c3aed"></i><div><b>Ana Cruz</b><div class="muted small">配送中 A-0124、A-0126</div></div><span class="tag info">2 单</span></div>
+        <div class="rr off"><i style="background:#9ca3af"></i><div><b>Ben Lim</b><div class="muted small">位置 8 分钟没更新</div></div><span class="tag warn">失联</span></div>
+        <div class="muted small" style="padding:10px 2px">派单时按“空闲优先、离店近优先”排好顺序，还是由店员点人。</div>
+      </div>
+    </div>
+    <div class="caption">门店：地图上看骑手在哪、手上几单，派单时离店近的排前面</div>
+  </div>
+  <div><div class="phone">
+    <div class="status"><span>9:53</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="bar"><span>‹</span><span>订单 A-0127</span></div>
+    <div class="map" style="height:330px"><svg class="base" id="m3"></svg>
+      <div class="attrib">示意底图 · 正式版使用 Google 地图</div></div>
+    <div class="body">
+      <div><b style="font-size:17px">骑手正在送来 · 约 6 分钟</b><div class="muted">Jun 已取餐，距离你 1.1 公里</div></div>
+      <div class="steps"><span class="done">已接单</span><span class="done">已打包</span><span class="cur">配送中</span><span>已送达</span></div>
+      <div class="row"><a class="btn grow">打电话给骑手</a></div>
+      <div class="row between"><span class="muted">货到付款</span><b class="price big">₱486</b></div>
+    </div>
+  </div><div class="caption">顾客：订单页看到骑手位置和预计到达</div></div>
+</section>
+
+<script src="../map-prototype/map.js"></script>
+<script>
+// 街区是绕 (500,360) 逆时针转 20 度画的，路线按街区坐标给，再转到画面坐标。
+function R(p) { var a = -20 * Math.PI / 180, x = p[0] - 500, y = p[1] - 360; return [500 + x * Math.cos(a) - y * Math.sin(a), 360 + x * Math.sin(a) + y * Math.cos(a)]; }
+var ROUTE = [[496, 372], [496, 434], [372, 434]].map(R), RIDER = R([440, 434]), DEST = ROUTE[2];
+function route(svg, done) {
+  svg.appendChild(el('polyline', { points: ROUTE.join(' '), fill: 'none', stroke: '#1d4ed8', 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: .85 }));
+  if (done) svg.appendChild(el('polyline', { points: [ROUTE[0], ROUTE[1], RIDER].join(' '), fill: 'none', stroke: '#9db7f5', 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+}
+function rider(svg, p, color, name) {
+  svg.appendChild(el('circle', { cx: p[0], cy: p[1], r: 20, fill: color, opacity: .18 }));
+  svg.appendChild(el('circle', { cx: p[0], cy: p[1], r: 10, fill: color, stroke: '#fff', 'stroke-width': 3 }));
+  if (name) svg.appendChild(el('text', { x: p[0], y: p[1] - 16, 'text-anchor': 'middle', 'font-size': 12.5, 'font-weight': 700, fill: color, stroke: '#fff', 'stroke-width': 3.5, 'paint-order': 'stroke' }, name));
+}
+['m1', 'm3'].forEach(function (id) {
+  var svg = document.getElementById(id); baseMap(svg, '230 270 440 340');
+  route(svg, true); pin(svg, ROUTE[0], { text: '马卡蒂小馆' }); pin(svg, DEST, { color: '#1d4ed8', icon: 'dot' }); rider(svg, RIDER, '#1d4ed8', id === 'm3' ? 'Jun' : '');
+});
+(function () {
+  var svg = document.getElementById('m2'); baseMap(svg, '180 120 720 520');
+  ZONES.slice().reverse().forEach(function (z) { drawZone(svg, z, { label: false, dim: true }); });
+  route(svg, true); pin(svg, ROUTE[0], { text: '马卡蒂小馆' }); pin(svg, DEST, { color: '#1d4ed8', icon: 'dot' });
+  rider(svg, RIDER, '#1d4ed8', 'Jun'); rider(svg, R([570, 320]), '#18794e', 'Carlo'); rider(svg, R([700, 470]), '#7c3aed', 'Ana'); rider(svg, R([330, 520]), '#9ca3af', 'Ben');
+})();
+</script>
+</body>
+</html>
