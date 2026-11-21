@@ -8,6 +8,8 @@ const router = useRouter()
 const role = computed(() => currentRole()?.role ?? '')
 const desk = computed(() => ['owner', 'manager', 'cashier'].includes(role.value))
 const manager = computed(() => ['owner', 'manager'].includes(role.value))
+const posts = computed(() => currentRole()?.posts ?? [])
+const inStore = computed(() => posts.value.some(p => p.kind !== 'rider'))
 
 async function out() { await logout(); session.loaded = true; router.replace('/login') }
 const viewing = computed(() => !!session.user?.is_platform_admin)
@@ -24,13 +26,15 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
       <b v-else>{{ currentRole()?.branch_name }}</b>
       <router-link v-if="desk" to="/merchant/orders">{{ t('orders') }}</router-link>
       <router-link v-if="desk" to="/merchant/tables">{{ t('tables') }}</router-link>
-      <router-link v-if="role !== 'rider'" to="/kitchen">{{ t('kitchen') }}</router-link>
-      <router-link v-if="role !== 'rider'" to="/merchant/menu">{{ t('menu_admin') }}</router-link>
+      <router-link v-if="desk || inStore" to="/kitchen">{{ t('kitchen') }}</router-link>
+      <router-link v-if="desk || inStore" to="/merchant/menu">{{ t('menu_admin') }}</router-link>
       <router-link v-if="manager" to="/merchant/templates">{{ t('templates') }}</router-link>
       <router-link v-if="manager" to="/merchant/promos">{{ t('promos') }}</router-link>
       <router-link v-if="manager" to="/merchant/cash">{{ t('cash') }}</router-link>
       <router-link v-if="manager" to="/merchant/delivery-map">{{ t('delivery_map') }}</router-link>
+      <router-link v-if="manager" to="/merchant/staff">{{ t('staff') }}</router-link>
       <router-link v-if="manager" to="/merchant/settings">{{ t('settings') }}</router-link>
+      <router-link v-if="posts.length" to="/work">{{ t('my_workbench') }}</router-link>
       <span class="grow"></span>
       <span class="small">{{ session.user?.display_name }}</span>
       <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>

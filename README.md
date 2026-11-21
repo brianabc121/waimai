@@ -47,8 +47,9 @@ docker compose run --rm seed    # 可选：载入演示数据
 | 桌台（开台、账单、收款） | `/merchant/tables` | `cashier1` 或 `owner1` |
 | 堂食扫码点菜 | 桌台页每张桌的“桌码”里有链接和二维码 | 不需要账号，要先开台 |
 | 堂食平板点菜 | `/ipad` | 在桌台页生成配对码后输入 |
-| 后厨、打包和上菜 | `/login` | `kitchen1` |
-| 骑手 | `/login` | `rider1`、`rider2` |
+| 后厨大屏、打包和上菜 | `/kitchen` | `kitchen1`（登录后先进员工工作台，再打开 `/kitchen`） |
+| 员工工作台（店内任务和配送，见 docs/RIDER_APP_DESIGN.md） | `/work` | `zhang1`（炸台、热厨）、`wang1`（打包台加骑手，可切换身份）、`rider1`、`rider2`（只有骑手） |
+| 员工和岗位 | `/merchant/staff` | `owner1` |
 | 平台管理后台（总览、API 监控、Worker 和任务队列、商户、商品、操作记录，见 docs/ADMIN_DESIGN.md） | `/login` | `admin` |
 | 第二个商户（验证隔离） | `/login` | `owner2`，门店 `/s/bgc` |
 

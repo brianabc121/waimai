@@ -183,6 +183,11 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 		{Username: "kitchen1", DisplayName: "后厨 阿明", Role: "kitchen"},
 		{Username: "rider1", DisplayName: "骑手 Juan", Role: "rider", Phone: "+639171234567"},
 		{Username: "rider2", DisplayName: "骑手 Maria", Role: "rider", Phone: "+639181234567"},
+		// Two people with more than one post, to try the workbench's identity switch.
+		{Username: "zhang1", DisplayName: "小张", Role: "staff", Posts: []app.PostInput{
+			{Kind: app.PostStation, StationID: fryer}, {Kind: app.PostStation, StationID: wok}}},
+		{Username: "wang1", DisplayName: "小王", Role: "staff", Phone: "+639191234567", Posts: []app.PostInput{
+			{Kind: app.PostPacking}, {Kind: app.PostRider}}},
 	} {
 		u.Password = demoPassword
 		_, err := a.CreateStaff(ctx, bid, u)

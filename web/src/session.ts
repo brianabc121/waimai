@@ -12,7 +12,7 @@ export function adminView(): BranchRole | null {
 
 export function setAdminView(b: { id: number; name: string; slug: string; currency: string } | null) {
   if (!b) { localStorage.removeItem(VIEW_KEY); return }
-  const role: BranchRole = { branch_id: b.id, branch_name: b.name, slug: b.slug, currency: b.currency, role: 'owner' }
+  const role: BranchRole = { branch_id: b.id, branch_name: b.name, slug: b.slug, currency: b.currency, role: 'owner', posts: [] }
   localStorage.setItem(VIEW_KEY, JSON.stringify(role))
   localStorage.setItem('branch_id', String(b.id))
   session.loaded = false
@@ -68,7 +68,22 @@ export async function logout() {
 export function homeFor(u: User): string {
   if (u.is_platform_admin) return '/admin'
   const role = u.roles.find(r => r.branch_id === session.branchId)?.role ?? u.roles[0]?.role
-  if (role === 'rider') return '/rider'
-  if (role === 'kitchen') return '/kitchen'
-  return '/merchant/orders'
+  return role === 'staff' ? '/work' : '/merchant/orders'
+}
+
+// The identities a person can work under in the current branch, from their posts:
+// "store" for a station or the packing counter, "rider" for deliveries.
+export type Identity = 'store' | 'rider'
+export function identities(): Identity[] {
+  const posts = currentRole()?.posts ?? []
+  const out: Identity[] = []
+  if (posts.some(p => p.kind !== 'rider')) out.push('store')
+  if (posts.some(p => p.kind === 'rider')) out.push('rider')
+  return out
+}
+
+// Re-read the signed-in user, e.g. after a manager changed their posts.
+export async function reloadUser() {
+  if (session.user?.is_platform_admin) return
+  try { session.user = await get<User>('/auth/me'); pickBranch() } catch { /* keep what we have */ }
 }

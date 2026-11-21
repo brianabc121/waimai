@@ -29,7 +29,10 @@ type BranchRole struct {
 	BranchName string `json:"branch_name"`
 	Slug       string `json:"slug"`
 	Currency   string `json:"currency"`
-	Role       string `json:"role"`
+	// Role is back-office access: owner, manager, cashier or staff (none).
+	// What the person works on is in Posts.
+	Role  string `json:"role"`
+	Posts []Post `json:"posts"`
 }
 
 type User struct {
@@ -51,6 +54,26 @@ func (u *User) RoleIn(branchID int64) string {
 	return ""
 }
 
+// HasPost reports whether the user holds a post of this kind in the branch.
+func (u *User) HasPost(branchID int64, kind string) bool {
+	for _, r := range u.Roles {
+		if r.BranchID != branchID {
+			continue
+		}
+		for _, p := range r.Posts {
+			if p.Kind == kind {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// InStore reports whether the user works a station or the packing counter.
+func (u *User) InStore(branchID int64) bool {
+	return u.HasPost(branchID, PostStation) || u.HasPost(branchID, PostPacking)
+}
+
 func (a *App) loadUser(ctx context.Context, id int64) (*User, error) {
 	u := &User{Roles: []BranchRole{}}
 	err := a.DB.QueryRow(ctx, `SELECT id, username, display_name, phone, is_platform_admin FROM users
@@ -68,13 +91,25 @@ func (a *App) loadUser(ctx context.Context, id int64) (*User, error) {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var r BranchRole
+		r := BranchRole{Posts: []Post{}}
 		if err := rows.Scan(&r.BranchID, &r.BranchName, &r.Slug, &r.Currency, &r.Role); err != nil {
 			return nil, err
 		}
 		u.Roles = append(u.Roles, r)
 	}
-	return u, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	posts, err := loadPosts(ctx, a.DB, `p.user_id=$1`, id)
+	if err != nil {
+		return nil, err
+	}
+	for i := range u.Roles {
+		if ps := posts[postKey{id, u.Roles[i].BranchID}]; ps != nil {
+			u.Roles[i].Posts = ps
+		}
+	}
+	return u, nil
 }
 
 var errBadLogin = Err(http.StatusUnauthorized, "BAD_CREDENTIALS", "wrong username or password")
@@ -143,7 +178,10 @@ type NewUser struct {
 	Password    string `json:"password"`
 	DisplayName string `json:"display_name"`
 	Phone       string `json:"phone"`
-	Role        string `json:"role"`
+	// Role is owner, manager, cashier or staff. The former "kitchen" and
+	// "rider" roles are still accepted and become staff with matching posts.
+	Role  string      `json:"role"`
+	Posts []PostInput `json:"posts"`
 }
 
 func createUser(ctx context.Context, tx pgx.Tx, in NewUser, branchID int64) (int64, error) {
@@ -154,8 +192,11 @@ func createUser(ctx context.Context, tx pgx.Tx, in NewUser, branchID int64) (int
 	if strings.TrimSpace(in.DisplayName) == "" {
 		return 0, ErrValidation("display_name is required")
 	}
+	legacy := in.Role
 	switch in.Role {
-	case "owner", "manager", "cashier", "kitchen", "rider":
+	case "owner", "manager", "cashier", "staff":
+	case "kitchen", "rider":
+		in.Role = "staff"
 	default:
 		return 0, ErrValidation("unknown role")
 	}
@@ -172,65 +213,22 @@ func createUser(ctx context.Context, tx pgx.Tx, in NewUser, branchID int64) (int
 	} else if err != nil {
 		return 0, err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO user_branch_roles (user_id, branch_id, role) VALUES ($1,$2,$3)`, id, branchID, in.Role)
-	return id, err
-}
-
-type StaffMember struct {
-	ID          int64  `json:"id"`
-	Username    string `json:"username"`
-	DisplayName string `json:"display_name"`
-	Phone       string `json:"phone"`
-	Role        string `json:"role"`
-	Active      bool   `json:"active"`
-}
-
-func (a *App) ListStaff(ctx context.Context, branchID int64, role string) ([]StaffMember, error) {
-	rows, err := a.DB.Query(ctx, `SELECT u.id, u.username, u.display_name, u.phone, r.role, u.active
-		FROM user_branch_roles r JOIN users u ON u.id = r.user_id
-		WHERE r.branch_id=$1 AND ($2 = '' OR (r.role = $2 AND u.active)) ORDER BY u.id`, branchID, role)
-	if err != nil {
-		return nil, err
+	if _, err = tx.Exec(ctx, `INSERT INTO user_branch_roles (user_id, branch_id, role) VALUES ($1,$2,$3)`, id, branchID, in.Role); err != nil {
+		return 0, err
 	}
-	defer rows.Close()
-	out := []StaffMember{}
-	for rows.Next() {
-		var s StaffMember
-		if err := rows.Scan(&s.ID, &s.Username, &s.DisplayName, &s.Phone, &s.Role, &s.Active); err != nil {
-			return nil, err
+	switch legacy {
+	case "kitchen":
+		if _, err = tx.Exec(ctx, `INSERT INTO staff_posts (user_id, branch_id, kind, station_id)
+			SELECT $1, $2, 'station', id FROM kitchen_stations WHERE branch_id=$2 AND active`, id, branchID); err != nil {
+			return 0, err
 		}
-		out = append(out, s)
+		_, err = tx.Exec(ctx, `INSERT INTO staff_posts (user_id, branch_id, kind) VALUES ($1,$2,'packing')`, id, branchID)
+	case "rider":
+		_, err = tx.Exec(ctx, `INSERT INTO staff_posts (user_id, branch_id, kind) VALUES ($1,$2,'rider')`, id, branchID)
+	default:
+		err = setPosts(ctx, tx, id, branchID, in.Posts)
 	}
-	return out, rows.Err()
-}
-
-func (a *App) CreateStaff(ctx context.Context, branchID int64, in NewUser) (int64, error) {
-	var id int64
-	err := a.inTx(ctx, func(tx pgx.Tx) error {
-		var err error
-		id, err = createUser(ctx, tx, in, branchID)
-		return err
-	})
 	return id, err
-}
-
-// SetStaffActive enables or disables an account that has a role in this branch.
-// Disabling also drops the user's sessions.
-func (a *App) SetStaffActive(ctx context.Context, branchID, userID int64, active bool) error {
-	return a.inTx(ctx, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `UPDATE users SET active=$3 WHERE id=$2 AND EXISTS (
-			SELECT 1 FROM user_branch_roles WHERE user_id=$2 AND branch_id=$1)`, branchID, userID, active)
-		if err != nil {
-			return err
-		}
-		if tag.RowsAffected() == 0 {
-			return ErrNotFound
-		}
-		if !active {
-			_, err = tx.Exec(ctx, `DELETE FROM sessions WHERE user_id=$1`, userID)
-		}
-		return err
-	})
 }
 
 var slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,40}$`)

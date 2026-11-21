@@ -181,8 +181,8 @@ func (a *App) AssignRider(ctx context.Context, orderID, riderID int64, actor Act
 			return ErrInvalidState("a rider can only be assigned before handoff")
 		}
 		var ok bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM user_branch_roles r JOIN users u ON u.id = r.user_id
-			WHERE r.user_id=$1 AND r.branch_id=$2 AND r.role='rider' AND u.active)`, riderID, o.BranchID).Scan(&ok); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM staff_posts p JOIN users u ON u.id = p.user_id
+			WHERE p.user_id=$1 AND p.branch_id=$2 AND p.kind='rider' AND u.active)`, riderID, o.BranchID).Scan(&ok); err != nil {
 			return err
 		}
 		if !ok {
@@ -454,6 +454,15 @@ func (a *App) riderCommand(ctx context.Context, taskID, riderID int64, fn func(t
 		if owner != riderID || status == "cancelled" {
 			return Err(http.StatusNotFound, "NOT_ASSIGNED", "this delivery is not assigned to you")
 		}
+		// Only someone who holds the rider post may deliver.
+		var rider bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM staff_posts WHERE user_id=$1 AND branch_id=$2 AND kind='rider')`,
+			riderID, o.BranchID).Scan(&rider); err != nil {
+			return err
+		}
+		if !rider {
+			return Err(http.StatusForbidden, "NOT_RIDER", "only a rider can deliver")
+		}
 		return fn(tx, o, status)
 	})
 }
@@ -640,8 +649,8 @@ func (a *App) Redeliver(ctx context.Context, orderID, riderID int64, actor Actor
 			return ErrInvalidState("only a failed delivery can be sent out again")
 		}
 		var ok bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM user_branch_roles r JOIN users u ON u.id = r.user_id
-			WHERE r.user_id=$1 AND r.branch_id=$2 AND r.role='rider' AND u.active)`, riderID, o.BranchID).Scan(&ok); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM staff_posts p JOIN users u ON u.id = p.user_id
+			WHERE p.user_id=$1 AND p.branch_id=$2 AND p.kind='rider' AND u.active)`, riderID, o.BranchID).Scan(&ok); err != nil {
 			return err
 		}
 		if !ok {

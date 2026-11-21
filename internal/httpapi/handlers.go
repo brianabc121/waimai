@@ -195,7 +195,7 @@ func (s *Server) listRiders(c *gin.Context) {
 	if !ok {
 		return
 	}
-	riders, err := s.App.ListStaff(c, bid, "rider")
+	riders, err := s.App.ListRiders(c, bid)
 	if err != nil {
 		fail(c, err)
 		return
@@ -496,7 +496,7 @@ func (s *Server) listStaff(c *gin.Context) {
 	if !ok {
 		return
 	}
-	staff, err := s.App.ListStaff(c, bid, "")
+	staff, err := s.App.ListStaff(c, bid)
 	if err != nil {
 		fail(c, err)
 		return
@@ -513,12 +513,7 @@ func (s *Server) createStaff(c *gin.Context) {
 	if !bind(c, &in) {
 		return
 	}
-	// Only an owner can create another owner.
-	if in.Role == "owner" && currentUser(c).RoleIn(bid) != "owner" {
-		fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "only an owner can add an owner"))
-		return
-	}
-	id, err := s.App.CreateStaff(c, bid, in)
+	id, err := s.App.CreateStaffBy(c, bid, in, currentUser(c))
 	if err != nil {
 		fail(c, err)
 		return
@@ -526,26 +521,55 @@ func (s *Server) createStaff(c *gin.Context) {
 	c.JSON(200, gin.H{"id": id})
 }
 
+// staffScope resolves the branch (managers only) and the staff member's id.
+func staffScope(c *gin.Context) (bid, id int64, ok bool) {
+	if bid, ok = branchScope(c, managerRoles); !ok {
+		return
+	}
+	id, ok = idParam(c, "id")
+	return
+}
+
 func (s *Server) patchStaff(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, id, ok := staffScope(c)
 	if !ok {
 		return
 	}
-	id, ok := idParam(c, "id")
+	var in app.StaffPatch
+	if !bind(c, &in) {
+		return
+	}
+	if err := s.App.UpdateStaff(c, bid, id, in, currentUser(c)); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (s *Server) deleteStaff(c *gin.Context) {
+	bid, id, ok := staffScope(c)
+	if !ok {
+		return
+	}
+	if err := s.App.DeleteStaff(c, bid, id, currentUser(c)); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (s *Server) resetStaffPassword(c *gin.Context) {
+	bid, id, ok := staffScope(c)
 	if !ok {
 		return
 	}
 	var in struct {
-		Active bool `json:"active"`
+		Password string `json:"password"`
 	}
 	if !bind(c, &in) {
 		return
 	}
-	if id == currentUser(c).ID {
-		fail(c, app.ErrValidation("you cannot disable your own account"))
-		return
-	}
-	if err := s.App.SetStaffActive(c, bid, id, in.Active); err != nil {
+	if err := s.App.ResetStaffPassword(c, bid, id, in.Password, currentUser(c)); err != nil {
 		fail(c, err)
 		return
 	}
