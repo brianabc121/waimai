@@ -13,7 +13,7 @@ mkdirSync(SHOTS, { recursive: true })
 const browser = await chromium.launch()
 const errors = []
 async function open(viewport) {
-  const ctx = await browser.newContext({ viewport, locale: 'zh-CN' })
+  const ctx = await browser.newContext({ viewport, locale: 'zh-CN', ignoreHTTPSErrors: process.env.E2E_INSECURE_TLS === '1' })
   const page = await ctx.newPage()
   page.on('pageerror', e => errors.push(`pageerror: ${e.message}`))
   page.on('console', m => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) errors.push(`console: ${m.text()}`) })
