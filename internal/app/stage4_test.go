@@ -42,8 +42,11 @@ func TestScheduledOrders(t *testing.T) {
 	sf, err = a.Storefront(ctx, s.slug)
 	noErr(t, err)
 	now := time.Now()
-	if len(sf.Slots) < 96 {
-		t.Fatalf("an all-day store should offer at least a day of slots, got %d", len(sf.Slots))
+	// Slots run to the end of tomorrow, store time. Just before local midnight
+	// the 30 minute lead time reaches into tomorrow and takes its first two
+	// quarter hours, so the fewest an all-day store ever offers is 94.
+	if len(sf.Slots) < 94 {
+		t.Fatalf("an all-day store should offer about a day of slots or more, got %d", len(sf.Slots))
 	}
 	first, last := sf.Slots[0], sf.Slots[len(sf.Slots)-1]
 	if first.Before(now.Add(30*time.Minute)) || first.After(now.Add(46*time.Minute)) || first.Minute()%15 != 0 {
