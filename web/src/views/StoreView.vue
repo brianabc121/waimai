@@ -33,7 +33,9 @@ onMounted(load)
 
 const cur = computed(() => store.value?.branch.currency ?? 'PHP')
 const items = computed(() => new Map((store.value?.categories ?? []).flatMap(c => c.items).map(i => [i.id, i])))
-const canOrder = computed(() => !!store.value && store.value.branch.open_now && !store.value.branch.paused)
+// A closed store can still take orders for later when it offers time slots.
+const canOrder = computed(() => !!store.value && !store.value.branch.paused && (store.value.branch.open_now || store.value.slots.length > 0))
+const ahead = computed(() => canOrder.value && !store.value!.branch.open_now)
 
 function orderable(it: Item) {
   return !it.sold_out && (cart.service === 'delivery' ? it.delivery_available : it.pickup_available)
@@ -149,6 +151,7 @@ function scrollTo(id: number) {
       <div class="section" v-if="!canOrder">
         <div class="banner warn">{{ store.branch.paused ? t('paused') : t('closed') }}</div>
       </div>
+      <div class="section" v-else-if="ahead"><div class="banner info">{{ t('closed_can_schedule') }}</div></div>
 
       <div class="section promos" v-if="tab === 'menu' && promos.length">
         <span v-for="p in promos" :key="p.id" class="tag brand" :title="pick(p.name, p.name_en)">{{ promoLabel(p, cur) }}</span>

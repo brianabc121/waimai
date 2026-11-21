@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ApiError, get, post } from '../api'
-import { both, minutesSince, money, reasonText, t } from '../i18n'
+import { both, minutesSince, money, reasonText, t, whenText } from '../i18n'
 import { useLive } from '../live'
 import { session } from '../session'
 import type { Order } from '../types'
@@ -116,6 +116,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <span class="muted" v-if="scope === 'active'">{{ t('waiting') }} {{ waited(o) }} {{ t('min') }}</span>
           </div>
           <div class="row wrap" style="margin-top:8px;gap:6px">
+            <span class="tag brand" v-if="o.scheduled_for">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span>
             <span class="tag" :class="accTag(o.acceptance_status)">{{ t('a.' + o.acceptance_status) }}</span>
             <span class="tag" v-if="o.acceptance_status === 'accepted'">{{ t('p.' + o.packing_status) }}</span>
             <span class="tag" v-if="o.acceptance_status === 'accepted'">{{ t('f.' + o.fulfillment_status) }}</span>
@@ -137,6 +138,8 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <span class="tag" :class="selected.payment_status === 'paid' ? 'ok' : 'warn'">{{ t(selected.payment_method) }} · {{ t(selected.payment_status) }}</span>
           </div>
           <div v-if="selected.close_reason" class="banner bad">{{ t('reason') }}: {{ reasonText(selected.close_reason) }}</div>
+          <div v-if="selected.scheduled_for" class="banner info">{{ t(selected.service_type === 'delivery' ? 'deliver_at' : 'pickup_at') }} <b>{{ whenText(selected.scheduled_for, selected.timezone) }}</b>
+            <span v-if="selected.release_at"> · {{ t('kitchen_from') }} {{ whenText(selected.release_at, selected.timezone) }}</span></div>
 
           <div>
             <div class="muted small">{{ t('customer') }}</div>

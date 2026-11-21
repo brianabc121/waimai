@@ -262,6 +262,8 @@ type SettingsInput struct {
 	OpenTime             string `json:"open_time"`
 	CloseTime            string `json:"close_time"`
 	NotifySMS            bool   `json:"notify_sms"`
+	SchedulingEnabled    bool   `json:"scheduling_enabled"`
+	PrepMinutes          int    `json:"prep_minutes"` // 0 = keep the default of 30
 }
 
 var hhmmRe = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
@@ -282,12 +284,19 @@ func (a *App) SaveSettings(ctx context.Context, branchID int64, in SettingsInput
 	if !hhmmRe.MatchString(in.OpenTime) || !hhmmRe.MatchString(in.CloseTime) {
 		return nil, ErrValidation("opening hours must be HH:MM")
 	}
+	if in.PrepMinutes == 0 {
+		in.PrepMinutes = 30
+	}
+	if in.PrepMinutes < 5 || in.PrepMinutes > 240 {
+		return nil, ErrValidation("preparation time must be 5 to 240 minutes")
+	}
 	tag, err := a.DB.Exec(ctx, `UPDATE branches SET name=$2, name_en=$3, address=$4, phone=$5, tax_rate_bp=$6,
 		tax_inclusive=$7, service_charge_bp=$8, packaging_fee=$9, min_order_amount=$10, accept_timeout_minutes=$11,
-		delivery_enabled=$12, pickup_enabled=$13, paused=$14, open_time=$15, close_time=$16, notify_sms=$17 WHERE id=$1`,
+		delivery_enabled=$12, pickup_enabled=$13, paused=$14, open_time=$15, close_time=$16, notify_sms=$17,
+		scheduling_enabled=$18, prep_minutes=$19 WHERE id=$1`,
 		branchID, in.Name, in.NameEn, in.Address, in.Phone, in.TaxRateBP, in.TaxInclusive, in.ServiceChargeBP,
 		in.PackagingFee, in.MinOrderAmount, in.AcceptTimeoutMinutes, in.DeliveryEnabled, in.PickupEnabled,
-		in.Paused, in.OpenTime, in.CloseTime, in.NotifySMS)
+		in.Paused, in.OpenTime, in.CloseTime, in.NotifySMS, in.SchedulingEnabled, in.PrepMinutes)
 	if err != nil {
 		return nil, err
 	}
@@ -298,6 +307,42 @@ func (a *App) SaveSettings(ctx context.Context, branchID int64, in SettingsInput
 }
 
 // ---- background jobs (run by cmd/worker) ----
+
+// ReleaseScheduled tells kitchen screens that a scheduled order has reached
+// its preparation time. The kitchen board itself filters by time, so a missed
+// run only delays the push, never the order.
+func (a *App) ReleaseScheduled(ctx context.Context) (int, error) {
+	n := 0
+	err := a.inTx(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `UPDATE orders SET release_notified = true
+			WHERE release_at <= now() AND NOT release_notified AND acceptance_status='accepted'
+			RETURNING id, branch_id`)
+		if err != nil {
+			return err
+		}
+		var evs []Event
+		for rows.Next() {
+			var e Event
+			if err := rows.Scan(&e.OrderID, &e.BranchID); err != nil {
+				rows.Close()
+				return err
+			}
+			evs = append(evs, e)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		for _, e := range evs {
+			if err := notify(ctx, tx, e); err != nil {
+				return err
+			}
+		}
+		n = len(evs)
+		return nil
+	})
+	return n, err
+}
 
 // ExpirePendingOrders cancels orders the store did not accept in time and
 // returns how many were cancelled. SKIP LOCKED keeps it from waiting behind a
@@ -363,6 +408,9 @@ func (a *App) RunWorker(ctx context.Context, logf func(string, ...any)) {
 			logf("worker: expire pending orders: %v", err)
 		} else if n > 0 {
 			logf("worker: cancelled %d orders that were not accepted in time", n)
+		}
+		if _, err := a.ReleaseScheduled(ctx); err != nil {
+			logf("worker: release scheduled orders: %v", err)
 		}
 		if err := a.RunJobs(ctx); err != nil {
 			logf("worker: jobs: %v", err)

@@ -31,6 +31,23 @@ export const post = <T = any>(path: string, body: unknown = {}, headers?: Record
 export const put = <T = any>(path: string, body: unknown) => api<T>('PUT', path, body)
 export const patch = <T = any>(path: string, body: unknown) => api<T>('PATCH', path, body)
 
+// upload sends a file as the raw request body (the API reads it with a size cap).
+export async function upload<T = any>(path: string, file: File): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch('/api/v1' + path, { method: 'POST', credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'waimai-web', 'Content-Type': 'application/octet-stream' }, body: file })
+  } catch {
+    throw new ApiError(0, 'NETWORK', 'network error')
+  }
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    const e = data?.error ?? {}
+    throw new ApiError(res.status, e.code ?? 'UNKNOWN', e.message ?? res.statusText, e.details)
+  }
+  return data as T
+}
+
 export function newKey(): string {
   return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)
 }

@@ -3,8 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError, get, newKey, post } from '../api'
 import { clearLines, useCart } from '../cart'
-import { money, pick, t } from '../i18n'
-import type { Quote } from '../types'
+import { money, pick, t, whenText } from '../i18n'
+import type { Quote, Storefront } from '../types'
 import TotalsTable from './TotalsTable.vue'
 
 const props = defineProps<{ slug: string }>()
@@ -15,6 +15,18 @@ const quote = ref<Quote | null>(null)
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
+
+// Scheduling: '' means as soon as possible. When the store is closed right
+// now, a time must be chosen.
+const store = ref<Storefront | null>(null)
+const scheduled = ref('')
+const tz = computed(() => store.value?.branch.timezone)
+const slots = computed(() => store.value?.slots ?? [])
+const mustSchedule = computed(() => !!store.value && !store.value.branch.open_now)
+async function loadStore() {
+  store.value = await get<Storefront>(`/stores/${props.slug}`).catch(() => null)
+  if (scheduled.value && !slots.value.includes(scheduled.value)) scheduled.value = ''
+}
 
 // phone verification
 const verified = ref(false)
@@ -42,6 +54,7 @@ function describe(e: unknown): string {
     case 'ITEM_UNAVAILABLE': return t('unavailable')
     case 'OUT_OF_ZONE': return t('choose_zone')
     case 'STORE_CLOSED': return t('closed')
+    case 'SCHEDULE_INVALID': return t('schedule_invalid')
     case 'BELOW_MINIMUM': return t('below_min', { amt: money((e.details?.minimum ?? 0) - (e.details?.subtotal ?? 0), quote.value?.currency) })
     default: return e.message
   }
@@ -50,16 +63,20 @@ function describe(e: unknown): string {
 async function requote() {
   error.value = ''
   if (cart.lines.length === 0) { router.replace(`/s/${props.slug}`); return }
+  if (mustSchedule.value && !scheduled.value) { quote.value = null; error.value = slots.value.length ? t('pick_time') : t('closed'); return }
   try {
     quote.value = await post<Quote>(`/stores/${props.slug}/quotes`, {
       service_type: cart.service,
       zone_id: cart.service === 'delivery' ? cart.zoneId : null,
       items: cart.lines.map(l => ({ item_id: l.item_id, qty: l.qty, option_ids: l.option_ids, note: l.note })),
+      scheduled_for: scheduled.value || null,
     })
     idemKey = keyFor(quote.value.id)
   } catch (e) {
     quote.value = null
     error.value = describe(e)
+    // The offered times move on; fetch fresh ones when the chosen one is gone.
+    if (e instanceof ApiError && (e.code === 'SCHEDULE_INVALID' || e.code === 'STORE_CLOSED')) await loadStore()
   }
 }
 
@@ -67,6 +84,7 @@ onMounted(async () => {
   const s = await get('/customer/session').catch(() => ({ verified: false }))
   verified.value = s.verified
   if (s.phone) phone.value = s.phone
+  await loadStore()
   await requote()
 })
 
@@ -136,6 +154,14 @@ async function submit() {
           <label class="field"><span>{{ t('address_note') }}</span><input v-model="cart.addressNote" maxlength="300" /></label>
         </template>
         <label class="field" style="margin:0"><span>{{ t('order_note') }}</span><input v-model="cart.note" maxlength="300" /></label>
+      </div>
+
+      <div class="card stack" v-if="slots.length || mustSchedule">
+        <h2>{{ t(cart.service === 'delivery' ? 'deliver_at' : 'pickup_at') }}</h2>
+        <select v-model="scheduled" data-testid="slot" :aria-label="t('when')" @change="requote">
+          <option value="" :disabled="mustSchedule">{{ mustSchedule ? t('pick_time') : t('asap') }}</option>
+          <option v-for="s in slots" :key="s" :value="s">{{ whenText(s, tz) }}</option>
+        </select>
       </div>
 
       <div class="card stack">

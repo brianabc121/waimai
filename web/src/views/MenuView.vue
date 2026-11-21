@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { get, patch, post, put } from '../api'
-import { both, money, t, toMajor, toMinor } from '../i18n'
+import { get, patch, post, put, upload } from '../api'
+import { both, importError, money, t, toMajor, toMinor } from '../i18n'
 import { currentRole, session } from '../session'
-import type { Category, Item, Station } from '../types'
+import type { Category, Item, MenuImport, Station } from '../types'
 
 const bid = session.branchId!
 const cur = currentRole()?.currency ?? 'PHP'
@@ -39,6 +39,38 @@ async function newCategory() {
   if (!name?.trim()) return
   const en = prompt(t('name_en')) ?? ''
   await run(() => post(`/merchant/branches/${bid}/categories`, { name, name_en: en, sort: cats.value.length }))
+}
+
+// ---- Excel import: upload, wait for the background parse, review, confirm ----
+const imp = reactive<{ open: boolean; busy: boolean; error: string; data: MenuImport | null; done: string }>({ open: false, busy: false, error: '', data: null, done: '' })
+function openImport() { Object.assign(imp, { open: true, busy: false, error: '', data: null, done: '' }) }
+async function pickFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  Object.assign(imp, { busy: true, error: '', data: null, done: '' })
+  try {
+    const { id } = await upload<{ id: number }>(`/merchant/branches/${bid}/menu-imports?filename=${encodeURIComponent(file.name)}`, file)
+    for (let i = 0; i < 60 && imp.open; i++) {
+      const m = await get<MenuImport>(`/merchant/branches/${bid}/menu-imports/${id}`)
+      if (m.status !== 'pending') { imp.data = m; break }
+      await new Promise(r => setTimeout(r, 1000))
+    }
+    if (!imp.data) imp.error = t('import_parsing')
+  } catch (err) { imp.error = (err as Error).message }
+  imp.busy = false
+}
+async function applyImport() {
+  if (!imp.data) return
+  imp.busy = true; imp.error = ''
+  try {
+    const m = await post<MenuImport>(`/merchant/branches/${bid}/menu-imports/${imp.data.id}/apply`)
+    imp.data = m
+    imp.done = t('import_done', { c: m.created_count, u: m.updated_count })
+    await load()
+  } catch (err) { imp.error = (err as Error).message }
+  imp.busy = false
 }
 
 // ---- item editor ----
@@ -85,6 +117,7 @@ async function save() {
     <div class="row between">
       <h1>{{ t('menu_admin') }}</h1>
       <div class="row" v-if="manager">
+        <button class="btn" @click="openImport">{{ t('import_excel') }}</button>
         <button class="btn" @click="newCategory">{{ t('new_category') }}</button>
         <button class="btn primary" :disabled="cats.length === 0" @click="edit(null)">{{ t('new_item') }}</button>
       </div>
@@ -122,6 +155,46 @@ async function save() {
           <tr v-if="c.items.length === 0"><td class="muted">—</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="sheet-mask" v-if="imp.open" @click.self="imp.open = false">
+      <div class="sheet center wide">
+        <div class="sheet-head"><h2>{{ t('import_excel') }}</h2></div>
+        <div class="sheet-body stack">
+          <p class="muted small">{{ t('import_hint') }}</p>
+          <div class="row wrap">
+            <a class="btn" :href="`/api/v1/merchant/branches/${bid}/menu-imports/template`" download>{{ t('download_template') }}</a>
+            <label class="btn primary" :class="{ disabled: imp.busy }">{{ t('upload') }} .xlsx
+              <input type="file" accept=".xlsx" hidden :disabled="imp.busy" data-testid="import-file" @change="pickFile" /></label>
+            <span v-if="imp.busy" class="muted">{{ t('import_parsing') }}</span>
+          </div>
+          <div v-if="imp.error" class="banner bad">{{ imp.error }}</div>
+          <div v-if="imp.done" class="banner ok">{{ imp.done }}</div>
+          <template v-if="imp.data">
+            <div v-if="imp.data.status === 'failed'" class="banner bad">{{ t('import_failed') }}: {{ imp.data.error }}</div>
+            <template v-else>
+              <div class="banner" :class="imp.data.error_rows ? 'warn' : 'info'" data-testid="import-summary">
+                {{ t('import_summary', { total: imp.data.total_rows, valid: imp.data.valid_rows, bad: imp.data.error_rows }) }}</div>
+              <div style="max-height:46vh;overflow:auto">
+                <table class="data">
+                  <thead><tr><th>{{ t('import_line') }}</th><th>{{ t('category') }}</th><th>{{ t('name_zh') }}</th><th>{{ t('price') }}</th><th>{{ t('import_result') }}</th></tr></thead>
+                  <tbody><tr v-for="r in imp.data.rows" :key="r.line" :class="{ badrow: r.errors.length }">
+                    <td>{{ r.line }}</td><td>{{ r.category }}</td><td>{{ r.name }}<div class="muted small">{{ r.name_en }}</div></td>
+                    <td class="price"><span v-if="r.action === 'update' && r.old_price !== r.price" class="muted strike">{{ money(r.old_price ?? 0, cur) }} </span>{{ r.errors.includes('price_invalid') || r.errors.includes('price_required') ? '—' : money(r.price, cur) }}</td>
+                    <td><span v-if="r.errors.length" class="small" style="color:var(--bad)">{{ r.errors.map(importError).join('；') }}</span>
+                      <span v-else class="tag" :class="r.action === 'create' ? 'ok' : 'info'">{{ t('act.' + r.action) }}</span></td>
+                  </tr></tbody>
+                </table>
+              </div>
+            </template>
+          </template>
+        </div>
+        <div class="sheet-foot row">
+          <button type="button" class="btn grow" @click="imp.open = false">{{ imp.done ? t('back') : t('cancel') }}</button>
+          <button v-if="imp.data?.status === 'parsed'" class="btn primary grow" :disabled="imp.busy || imp.data.valid_rows === 0" data-testid="import-apply" @click="applyImport">
+            {{ t('import_apply', { n: imp.data.valid_rows }) }}</button>
+        </div>
+      </div>
     </div>
 
     <div class="sheet-mask" v-if="form.open" @click.self="form.open = false">
@@ -185,4 +258,7 @@ async function save() {
 
 <style scoped>
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: center; }
+.sheet.wide { max-width: 860px; width: 100%; }
+.badrow td { background: var(--bad-soft); }
+label.btn.disabled { opacity: .5; pointer-events: none; }
 </style>

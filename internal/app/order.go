@@ -59,43 +59,49 @@ type CashCollection struct {
 // Order is the full staff-facing view. Customer and rider views are trimmed
 // from it in views.go.
 type Order struct {
-	ID                int64           `json:"id"`
-	MerchantID        int64           `json:"-"`
-	BranchID          int64           `json:"branch_id"`
-	PublicNo          string          `json:"public_no"`
-	PickupCode        string          `json:"pickup_code"`
-	Channel           string          `json:"channel"`
-	ServiceType       string          `json:"service_type"`
-	CustomerName      string          `json:"customer_name"`
-	CustomerPhone     string          `json:"customer_phone"`
-	ZoneName          string          `json:"zone_name"`
-	AddressLine       string          `json:"address_line"`
-	AddressUnit       string          `json:"address_unit"`
-	AddressNote       string          `json:"address_note"`
-	Note              string          `json:"note"`
-	Currency          string          `json:"currency"`
-	Totals            Totals          `json:"totals"`
-	PaymentMethod     string          `json:"payment_method"`
-	AcceptanceStatus  string          `json:"acceptance_status"`
-	PackingStatus     string          `json:"packing_status"`
-	FulfillmentStatus string          `json:"fulfillment_status"`
-	PaymentStatus     string          `json:"payment_status"`
-	DisplayStatus     string          `json:"display_status"`
-	CloseReason       string          `json:"close_reason"`
-	Bags              *int            `json:"bags"`
-	Version           int             `json:"version"`
-	ManifestVersion   int             `json:"manifest_version"`
-	AcceptDeadline    time.Time       `json:"accept_deadline"`
-	CreatedAt         time.Time       `json:"created_at"`
-	AcceptedAt        *time.Time      `json:"accepted_at"`
-	PackedAt          *time.Time      `json:"packed_at"`
-	HandedOffAt       *time.Time      `json:"handed_off_at"`
-	CompletedAt       *time.Time      `json:"completed_at"`
-	ClosedAt          *time.Time      `json:"closed_at"`
-	Items             []OrderItem     `json:"items"`
-	Delivery          *DeliveryTask   `json:"delivery"`
-	Cash              *CashCollection `json:"cash"`
-	tokenNonce        []byte
+	ID                int64     `json:"id"`
+	MerchantID        int64     `json:"-"`
+	BranchID          int64     `json:"branch_id"`
+	PublicNo          string    `json:"public_no"`
+	PickupCode        string    `json:"pickup_code"`
+	Channel           string    `json:"channel"`
+	ServiceType       string    `json:"service_type"`
+	CustomerName      string    `json:"customer_name"`
+	CustomerPhone     string    `json:"customer_phone"`
+	ZoneName          string    `json:"zone_name"`
+	AddressLine       string    `json:"address_line"`
+	AddressUnit       string    `json:"address_unit"`
+	AddressNote       string    `json:"address_note"`
+	Note              string    `json:"note"`
+	Currency          string    `json:"currency"`
+	Totals            Totals    `json:"totals"`
+	PaymentMethod     string    `json:"payment_method"`
+	AcceptanceStatus  string    `json:"acceptance_status"`
+	PackingStatus     string    `json:"packing_status"`
+	FulfillmentStatus string    `json:"fulfillment_status"`
+	PaymentStatus     string    `json:"payment_status"`
+	DisplayStatus     string    `json:"display_status"`
+	CloseReason       string    `json:"close_reason"`
+	Bags              *int      `json:"bags"`
+	Version           int       `json:"version"`
+	ManifestVersion   int       `json:"manifest_version"`
+	AcceptDeadline    time.Time `json:"accept_deadline"`
+	// ScheduledFor is the time the customer asked for (nil = as soon as
+	// possible); ReleaseAt is when the kitchen should start on it.
+	ScheduledFor *time.Time `json:"scheduled_for"`
+	ReleaseAt    *time.Time `json:"release_at"`
+	// Timezone is the store\'s, so every screen shows times on the store\'s clock.
+	Timezone    string          `json:"timezone"`
+	CreatedAt   time.Time       `json:"created_at"`
+	AcceptedAt  *time.Time      `json:"accepted_at"`
+	PackedAt    *time.Time      `json:"packed_at"`
+	HandedOffAt *time.Time      `json:"handed_off_at"`
+	CompletedAt *time.Time      `json:"completed_at"`
+	ClosedAt    *time.Time      `json:"closed_at"`
+	Items       []OrderItem     `json:"items"`
+	Delivery    *DeliveryTask   `json:"delivery"`
+	Cash        *CashCollection `json:"cash"`
+	tokenNonce  []byte
 }
 
 // DisplayStatus derives the single customer-facing status from the four
@@ -134,7 +140,8 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	o.tax_rate_bp, o.discount, o.total, o.payment_method, o.acceptance_status, o.packing_status,
 	o.fulfillment_status, o.payment_status, o.close_reason, o.bags, o.version, o.manifest_version,
 	o.accept_deadline, o.created_at, o.accepted_at, o.packed_at, o.handed_off_at, o.completed_at, o.closed_at,
-	o.token_nonce, COALESCE(o.promotion_id, 0), o.promotion_name, o.promotion_name_en`
+	o.token_nonce, COALESCE(o.promotion_id, 0), o.promotion_name, o.promotion_name_en, o.scheduled_for, o.release_at,
+	(SELECT b.timezone FROM branches b WHERE b.id = o.branch_id)`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}}
@@ -145,11 +152,16 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&t.TaxRateBP, &t.Discount, &t.Total, &o.PaymentMethod, &o.AcceptanceStatus, &o.PackingStatus,
 		&o.FulfillmentStatus, &o.PaymentStatus, &o.CloseReason, &o.Bags, &o.Version, &o.ManifestVersion,
 		&o.AcceptDeadline, &o.CreatedAt, &o.AcceptedAt, &o.PackedAt, &o.HandedOffAt, &o.CompletedAt, &o.ClosedAt,
-		&o.tokenNonce, &t.PromotionID, &t.PromotionName, &t.PromotionNameEn)
+		&o.tokenNonce, &t.PromotionID, &t.PromotionName, &t.PromotionNameEn, &o.ScheduledFor, &o.ReleaseAt,
+		&o.Timezone)
 	if err != nil {
 		return nil, err
 	}
 	o.DisplayStatus = DisplayStatus(o.AcceptanceStatus, o.FulfillmentStatus)
+	// An accepted scheduled order that the kitchen has not started on yet.
+	if o.DisplayStatus == "preparing" && o.ReleaseAt != nil && o.ReleaseAt.After(time.Now()) {
+		o.DisplayStatus = "scheduled"
+	}
 	return o, nil
 }
 
@@ -393,15 +405,16 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			access_token_hash, token_nonce, service_type, customer_name, customer_phone, zone_id, zone_name,
 			address_line, address_unit, address_note, note, currency, subtotal, packaging_fee, delivery_fee,
 			service_charge, tax_amount, tax_inclusive, tax_rate_bp, discount, total, payment_method, accept_deadline,
-			promotion_id, promotion_name, promotion_name_en)
+			promotion_id, promotion_name, promotion_name_en, scheduled_for, release_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-				now() + make_interval(mins => $27), NULLIF($28, 0), $29, $30)
+				now() + make_interval(mins => $27), NULLIF($28, 0), $29, $30,
+				$31::timestamptz, $31::timestamptz - make_interval(mins => $32))
 			RETURNING id`,
 			b.MerchantID, b.ID, publicNo, pickupCode, hashToken(token), nonce, cur.ServiceType, in.CustomerName,
 			phone, cur.ZoneID, cur.ZoneName, in.AddressLine, in.AddressUnit, in.AddressNote, in.Note, b.Currency,
 			t.Subtotal, t.PackagingFee, t.DeliveryFee, t.ServiceCharge, t.TaxAmount, t.TaxInclusive, t.TaxRateBP,
 			t.Discount, t.Total, payMethod, b.AcceptTimeoutMinutes, t.PromotionID, t.PromotionName,
-			t.PromotionNameEn).Scan(&orderID)
+			t.PromotionNameEn, cur.ScheduledFor, b.PrepMinutes).Scan(&orderID)
 		if err != nil {
 			return wrap("insert order", err)
 		}

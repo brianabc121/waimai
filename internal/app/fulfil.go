@@ -258,8 +258,10 @@ func (a *App) StaffHandoff(ctx context.Context, orderID int64, actor Actor) (*Or
 // sees a "cancelled" notice instead of a ticket silently disappearing.
 func (a *App) KitchenBoard(ctx context.Context, branchID int64) ([]*Order, error) {
 	return queryOrders(ctx, a.DB, `o.branch_id=$1 AND (
-		(o.acceptance_status='accepted' AND o.fulfillment_status IN ('none','awaiting_handoff','awaiting_pickup'))
-		OR (o.acceptance_status='cancelled' AND o.accepted_at IS NOT NULL AND o.closed_at > now() - interval '10 minutes'))
+		(o.acceptance_status='accepted' AND o.fulfillment_status IN ('none','awaiting_handoff','awaiting_pickup')
+			AND (o.release_at IS NULL OR o.release_at <= now()))
+		OR (o.acceptance_status='cancelled' AND o.accepted_at IS NOT NULL AND o.closed_at > now() - interval '10 minutes'
+			AND (o.release_at IS NULL OR o.release_at <= o.closed_at)))
 		ORDER BY o.accepted_at`, branchID)
 }
 

@@ -525,3 +525,100 @@ func TestPromotionsOverHTTP(t *testing.T) {
 		t.Fatalf("used_count after reject: %v", list)
 	}
 }
+
+func TestImportAndScheduleOverHTTP(t *testing.T) {
+	f1, f2 := newFixture(t), newFixture(t)
+	b1 := fmt.Sprint(f1.branchID)
+	owner, owner2, cashier := login(t, f1.owner), login(t, f2.owner), login(t, f1.cashier)
+
+	raw := func(c *client, path string, body []byte) (int, map[string]any) {
+		req, _ := http.NewRequest("POST", server.URL+"/api/v1"+path, bytes.NewReader(body))
+		req.Header.Set("X-Requested-With", "test")
+		req.Header.Set("X-Forwarded-For", c.ip)
+		for k, v := range c.cookies {
+			req.AddCookie(&http.Cookie{Name: k, Value: v})
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(res.Body).Decode(&out)
+		return res.StatusCode, out
+	}
+	tpl, err := app.MenuImportTemplate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "/merchant/branches/" + b1 + "/menu-imports"
+	if code, _ := raw(cashier, path+"?filename=m.xlsx", tpl); code != 403 {
+		t.Fatalf("cashier upload: %d", code)
+	}
+	if code, _ := raw(owner2, path+"?filename=m.xlsx", tpl); code != 404 {
+		t.Fatalf("other merchant upload: %d", code)
+	}
+	if code, _ := raw(owner, path+"?filename=m.xlsx", make([]byte, 2<<20+10)); code != 413 {
+		t.Fatalf("oversize upload: %d", code)
+	}
+	if code, out := raw(owner, path+"?filename=m.txt", tpl); code != 422 {
+		t.Fatalf("wrong extension: %d %v", code, out)
+	}
+	code, out := raw(owner, path+"?filename=m.xlsx", tpl)
+	if code != 200 {
+		t.Fatalf("upload: %d %v", code, out)
+	}
+	id := fmt.Sprint(int64(out["id"].(float64)))
+	owner2.want(404, "NOT_FOUND", "GET", path+"/"+id, nil)
+	owner2.want(404, "NOT_FOUND", "POST", "/merchant/branches/"+fmt.Sprint(f2.branchID)+"/menu-imports/"+id+"/apply", nil)
+	cashier.want(403, "FORBIDDEN", "POST", path+"/"+id+"/apply", nil)
+	if err := a.RunJobs(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	m := owner.want(200, "", "GET", path+"/"+id, nil)
+	if m["status"] != "parsed" || m["valid_rows"].(float64) != 3 {
+		t.Fatalf("import: %v", m)
+	}
+	m = owner.want(200, "", "POST", path+"/"+id+"/apply", nil)
+	if m["status"] != "applied" || m["created_count"].(float64) != 3 {
+		t.Fatalf("apply: %v", m)
+	}
+	owner.want(409, "INVALID_STATE", "POST", path+"/"+id+"/apply", nil)
+	// drafts are not on the storefront
+	anon := newClient(t)
+	if sf := anon.want(200, "", "GET", "/stores/"+f1.slug, nil); len(sf["categories"].([]any)) != 1 {
+		t.Fatalf("imported drafts leaked: %v", sf["categories"])
+	}
+
+	// scheduling over HTTP: off -> refused; on -> slots offered and an order carries the time
+	later := time.Now().Add(3 * time.Hour).UTC().Format(time.RFC3339)
+	quote := map[string]any{"service_type": "delivery", "zone_id": f1.zoneID, "scheduled_for": later,
+		"items": []map[string]any{{"item_id": f1.itemID, "qty": 1}}}
+	anon.want(422, "SCHEDULE_INVALID", "POST", "/stores/"+f1.slug+"/quotes", quote)
+	owner.want(200, "", "PUT", "/merchant/branches/"+b1+"/settings", map[string]any{"name": "H", "accept_timeout_minutes": 10,
+		"delivery_enabled": true, "pickup_enabled": true, "open_time": "00:00", "close_time": "00:00",
+		"scheduling_enabled": true, "prep_minutes": 45})
+	sf := anon.want(200, "", "GET", "/stores/"+f1.slug, nil)
+	slots := sf["slots"].([]any)
+	if len(slots) == 0 {
+		t.Fatal("no slots offered")
+	}
+	quote["scheduled_for"] = slots[3]
+	cust := verifiedCustomer(t)
+	q := cust.want(200, "", "POST", "/stores/"+f1.slug+"/quotes", quote)
+	placed := cust.want(200, "", "POST", "/stores/"+f1.slug+"/orders", map[string]any{"quote_id": q["id"],
+		"customer_name": "Ann", "address_line": "1 Main"}, "Idempotency-Key", uniq("key"))
+	o := anon.want(200, "", "GET", "/customer/orders/"+placed["access_token"].(string), nil)
+	if o["scheduled_for"] == nil {
+		t.Fatalf("order lost its time: %v", o)
+	}
+	oid := fmt.Sprint(int64(placed["order_id"].(float64)))
+	o = cashier.want(200, "", "POST", "/merchant/orders/"+oid+"/accept", map[string]any{})
+	if o["display_status"] != "scheduled" {
+		t.Fatalf("display status: %v", o["display_status"])
+	}
+	board := login(t, f1.kitchen).want(200, "", "GET", "/kitchen/branches/"+b1+"/board", nil)
+	if len(board["orders"].([]any)) != 0 {
+		t.Fatal("scheduled order reached the kitchen early")
+	}
+}

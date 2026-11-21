@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ApiError, get, post } from '../api'
-import { locale, money, pick, reasonText, setLocale, t } from '../i18n'
+import { locale, money, pick, reasonText, setLocale, t, whenText } from '../i18n'
 import { useLive } from '../live'
 import type { Order } from '../types'
 import TotalsTable from './TotalsTable.vue'
@@ -27,7 +27,7 @@ const steps = computed(() => order.value?.service_type === 'pickup'
   : ['pending_acceptance', 'preparing', 'awaiting_rider', 'out_for_delivery', 'delivered'])
 const stepIndex = computed(() => {
   const s = order.value?.display_status ?? ''
-  return steps.value.indexOf(s === 'rider_arrived' ? 'out_for_delivery' : s)
+  return steps.value.indexOf(s === 'rider_arrived' ? 'out_for_delivery' : s === 'scheduled' ? 'preparing' : s)
 })
 const closed = computed(() => ['rejected', 'cancelled', 'delivery_failed'].includes(order.value?.display_status ?? ''))
 
@@ -55,6 +55,7 @@ async function cancel() {
         <div class="card stack">
           <h2 :style="{ color: closed ? 'var(--bad)' : 'var(--brand-dark)' }" data-testid="status">{{ t('s.' + order.display_status) }}</h2>
           <p v-if="closed && order.close_reason" class="muted">{{ t('reason') }}: {{ reasonText(order.close_reason) }}</p>
+          <p v-if="order.scheduled_for" class="bold" data-testid="scheduled">{{ t(order.service_type === 'delivery' ? 'deliver_at' : 'pickup_at') }} {{ whenText(order.scheduled_for, order.timezone) }}</p>
           <div v-if="!closed" class="steps">
             <div v-for="(s, i) in steps" :key="s" class="step" :class="{ done: i <= stepIndex, cur: i === stepIndex }">
               <span class="dot"></span><span class="small">{{ t('s.' + s) }}</span>

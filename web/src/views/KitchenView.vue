@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ApiError, get, post } from '../api'
-import { both, minutesSince, t } from '../i18n'
+import { both, minutesSince, t, whenText } from '../i18n'
 import { useLive } from '../live'
 import { session } from '../session'
 import type { Order, OrderItem, Station } from '../types'
@@ -51,7 +51,7 @@ function move(it: OrderItem, e: Event) {
   void run(() => post(`/kitchen/items/${it.id}/station`, { station_id: v === '' ? null : Number(v), reason: 'kitchen screen' }))
 }
 const missing = (o: Order) => live(o).filter(i => i.prep_status !== 'ready')
-const waited = (o: Order) => { void now.value; return minutesSince(o.created_at) }
+const waited = (o: Order) => { void now.value; return minutesSince(o.release_at ?? o.created_at) }
 
 async function run(fn: () => Promise<unknown>) {
   error.value = ''
@@ -104,7 +104,8 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
       <div class="cols">
         <div v-for="o in shown" :key="o.id" class="card stack">
           <div class="row between">
-            <h2>{{ o.public_no }} <span class="tag brand">{{ t(o.service_type) }}</span></h2>
+            <h2>{{ o.public_no }} <span class="tag brand">{{ t(o.service_type) }}</span>
+              <span class="tag info" v-if="o.scheduled_for" style="margin-left:4px">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span></h2>
             <span class="tag" :class="waited(o) >= 20 ? 'bad' : waited(o) >= 10 ? 'warn' : ''">{{ waited(o) }} {{ t('min') }}</span>
           </div>
           <div v-if="o.note" class="banner warn small">{{ t('order_note') }}: {{ o.note }}</div>
@@ -138,7 +139,8 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
       <div class="cols">
         <div v-for="o in packing" :key="o.id" class="card stack">
           <div class="row between">
-            <h2>{{ o.public_no }} <span class="tag brand">{{ t(o.service_type) }}</span></h2>
+            <h2>{{ o.public_no }} <span class="tag brand">{{ t(o.service_type) }}</span>
+              <span class="tag info" v-if="o.scheduled_for" style="margin-left:4px">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span></h2>
             <span class="tag" :class="{ ok: o.packing_status === 'packed', warn: o.packing_status === 'ready_to_pack' }">{{ t('p.' + o.packing_status) }}</span>
           </div>
           <div v-if="o.note" class="banner warn small">{{ t('order_note') }}: {{ o.note }}</div>

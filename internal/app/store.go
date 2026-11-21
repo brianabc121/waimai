@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net/http"
 	"time"
 )
 
@@ -27,6 +28,8 @@ type Branch struct {
 	OpenTime             string `json:"open_time"`
 	CloseTime            string `json:"close_time"`
 	NotifySMS            bool   `json:"notify_sms"`
+	SchedulingEnabled    bool   `json:"scheduling_enabled"`
+	PrepMinutes          int    `json:"prep_minutes"`
 	OpenNow              bool   `json:"open_now"`
 }
 
@@ -56,15 +59,60 @@ func (b *Branch) isOpen(now time.Time) bool {
 	return cur >= b.OpenTime || cur < b.CloseTime
 }
 
+const slotStep = 15 * time.Minute
+
+// scheduleLimit is the last moment an order can be scheduled for: the end of
+// tomorrow in the branch's local time.
+func (b *Branch) scheduleLimit(now time.Time) time.Time {
+	l := now.In(b.location())
+	return time.Date(l.Year(), l.Month(), l.Day()+2, 0, 0, 0, 0, l.Location())
+}
+
+// Slots lists the times a customer can schedule an order for: every 15
+// minutes from "now plus preparation time" to the end of tomorrow, inside
+// opening hours.
+func (b *Branch) Slots(now time.Time) []time.Time {
+	out := []time.Time{}
+	if !b.SchedulingEnabled || b.Paused {
+		return out
+	}
+	t := now.Add(time.Duration(b.PrepMinutes) * time.Minute).Truncate(slotStep).Add(slotStep)
+	for limit := b.scheduleLimit(now); t.Before(limit); t = t.Add(slotStep) {
+		if b.isOpen(t) {
+			out = append(out, t.UTC())
+		}
+	}
+	return out
+}
+
+// checkSchedule validates a requested time. The lead time is relaxed by the
+// quote's lifetime so that a slot offered a few minutes ago is still accepted
+// when the customer confirms.
+func (b *Branch) checkSchedule(now, at time.Time) error {
+	bad := func(msg string) error { return Err(http.StatusUnprocessableEntity, "SCHEDULE_INVALID", msg) }
+	switch {
+	case !b.SchedulingEnabled:
+		return bad("this store does not take scheduled orders")
+	case at.Before(now.Add(time.Duration(b.PrepMinutes)*time.Minute - quoteTTL)):
+		return bad("that time is too soon, please pick a later one")
+	case !at.Before(b.scheduleLimit(now)):
+		return bad("orders can be scheduled up to the end of tomorrow")
+	case !b.isOpen(at):
+		return bad("the store is closed at that time")
+	}
+	return nil
+}
+
 const branchCols = `id, merchant_id, slug, name, name_en, address, phone, timezone, currency, tax_rate_bp,
 	tax_inclusive, service_charge_bp, packaging_fee, min_order_amount, accept_timeout_minutes,
-	delivery_enabled, pickup_enabled, paused, open_time, close_time, notify_sms`
+	delivery_enabled, pickup_enabled, paused, open_time, close_time, notify_sms, scheduling_enabled, prep_minutes`
 
 func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 	var b Branch
 	err := row.Scan(&b.ID, &b.MerchantID, &b.Slug, &b.Name, &b.NameEn, &b.Address, &b.Phone, &b.Timezone,
 		&b.Currency, &b.TaxRateBP, &b.TaxInclusive, &b.ServiceChargeBP, &b.PackagingFee, &b.MinOrderAmount,
-		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime, &b.NotifySMS)
+		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime, &b.NotifySMS,
+		&b.SchedulingEnabled, &b.PrepMinutes)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, ErrNotFound
@@ -284,6 +332,9 @@ type Storefront struct {
 	Zones      []Zone      `json:"zones"`
 	Categories []Category  `json:"categories"`
 	Promotions []Promotion `json:"promotions"`
+	// Slots are the times an order can be scheduled for (empty when the store
+	// does not take scheduled orders).
+	Slots []time.Time `json:"slots"`
 }
 
 func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) {
@@ -299,6 +350,14 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	if err != nil {
 		return nil, err
 	}
+	// Categories with nothing published (for example only drafts) are not shown.
+	shown := cats[:0]
+	for _, c := range cats {
+		if len(c.Items) > 0 {
+			shown = append(shown, c)
+		}
+	}
+	cats = shown
 	// Customers see whether a limited item is gone, not the exact stock.
 	for i := range cats {
 		for j := range cats[i].Items {
@@ -314,5 +373,5 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &Storefront{Branch: b, Zones: zones, Categories: cats, Promotions: promos}, nil
+	return &Storefront{Branch: b, Zones: zones, Categories: cats, Promotions: promos, Slots: b.Slots(time.Now())}, nil
 }

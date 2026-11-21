@@ -59,6 +59,7 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 		TaxRateBP: 1200, TaxInclusive: true, ServiceChargeBP: 0, PackagingFee: 1000,
 		AcceptTimeoutMinutes: 10, DeliveryEnabled: true, PickupEnabled: true,
 		OpenTime: "00:00", CloseTime: "00:00", NotifySMS: true,
+		SchedulingEnabled: true, PrepMinutes: 30,
 	})
 	must(err)
 

@@ -58,6 +58,8 @@ func fail(c *gin.Context, err error) {
 }
 
 func bind(c *gin.Context, v any) bool {
+	// No JSON command needs more than this; larger bodies are refused unread.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
 	if err := c.ShouldBindJSON(v); err != nil {
 		fail(c, app.Err(http.StatusUnprocessableEntity, "VALIDATION", "invalid JSON body"))
 		return false
@@ -262,6 +264,11 @@ func (s *Server) Router() *gin.Engine {
 	auth.POST("/merchant/branches/:bid/stations", s.saveStation)
 	auth.PUT("/merchant/branches/:bid/stations/:id", s.saveStation)
 	auth.POST("/merchant/branches/:bid/station-assignments", s.assignStation)
+	auth.GET("/merchant/branches/:bid/menu-imports", s.listMenuImports)
+	auth.POST("/merchant/branches/:bid/menu-imports", s.uploadMenuImport)
+	auth.GET("/merchant/branches/:bid/menu-imports/template", s.menuImportTemplate)
+	auth.GET("/merchant/branches/:bid/menu-imports/:id", s.getMenuImport)
+	auth.POST("/merchant/branches/:bid/menu-imports/:id/apply", s.applyMenuImport)
 	auth.GET("/merchant/branches/:bid/promotions", s.listPromotions)
 	auth.POST("/merchant/branches/:bid/promotions", s.savePromotion)
 	auth.PUT("/merchant/branches/:bid/promotions/:id", s.savePromotion)
