@@ -25,6 +25,11 @@ type OrderItem struct {
 	PrepStatus  string       `json:"prep_status"`
 	StationID   *int64       `json:"station_id"`
 	StationName string       `json:"station_name"`
+	// Dine-in: which batch the line came in, who sent it, and when it reached the table.
+	BatchSeq    int        `json:"batch_seq"`
+	BatchSource string     `json:"batch_source"`
+	ServedAt    *time.Time `json:"served_at"`
+	VoidReason  string     `json:"void_reason,omitempty"`
 }
 
 type DeliveryTask struct {
@@ -90,18 +95,23 @@ type Order struct {
 	// possible); ReleaseAt is when the kitchen should start on it.
 	ScheduledFor *time.Time `json:"scheduled_for"`
 	ReleaseAt    *time.Time `json:"release_at"`
-	// Timezone is the store\'s, so every screen shows times on the store\'s clock.
-	Timezone    string          `json:"timezone"`
-	CreatedAt   time.Time       `json:"created_at"`
-	AcceptedAt  *time.Time      `json:"accepted_at"`
-	PackedAt    *time.Time      `json:"packed_at"`
-	HandedOffAt *time.Time      `json:"handed_off_at"`
-	CompletedAt *time.Time      `json:"completed_at"`
-	ClosedAt    *time.Time      `json:"closed_at"`
-	Items       []OrderItem     `json:"items"`
-	Delivery    *DeliveryTask   `json:"delivery"`
-	Cash        *CashCollection `json:"cash"`
-	tokenNonce  []byte
+	// Timezone is the store's, so every screen shows times on the store's clock.
+	Timezone string `json:"timezone"`
+	// Dine-in only.
+	SessionID      *int64          `json:"session_id"`
+	TableName      string          `json:"table_name"`
+	AmountReceived *int64          `json:"amount_received"`
+	PaymentNote    string          `json:"payment_note"`
+	CreatedAt      time.Time       `json:"created_at"`
+	AcceptedAt     *time.Time      `json:"accepted_at"`
+	PackedAt       *time.Time      `json:"packed_at"`
+	HandedOffAt    *time.Time      `json:"handed_off_at"`
+	CompletedAt    *time.Time      `json:"completed_at"`
+	ClosedAt       *time.Time      `json:"closed_at"`
+	Items          []OrderItem     `json:"items"`
+	Delivery       *DeliveryTask   `json:"delivery"`
+	Cash           *CashCollection `json:"cash"`
+	tokenNonce     []byte
 }
 
 // DisplayStatus derives the single customer-facing status from the four
@@ -120,6 +130,8 @@ func DisplayStatus(acceptance, fulfillment string) string {
 		return "delivered"
 	case "picked_up":
 		return "picked_up"
+	case "dined":
+		return "completed"
 	case "delivery_failed":
 		return "delivery_failed"
 	case "arrived":
@@ -141,7 +153,8 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	o.fulfillment_status, o.payment_status, o.close_reason, o.bags, o.version, o.manifest_version,
 	o.accept_deadline, o.created_at, o.accepted_at, o.packed_at, o.handed_off_at, o.completed_at, o.closed_at,
 	o.token_nonce, COALESCE(o.promotion_id, 0), o.promotion_name, o.promotion_name_en, o.scheduled_for, o.release_at,
-	(SELECT b.timezone FROM branches b WHERE b.id = o.branch_id)`
+	(SELECT b.timezone FROM branches b WHERE b.id = o.branch_id), o.session_id, o.table_name, o.amount_received,
+	o.payment_note`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}}
@@ -153,7 +166,7 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.FulfillmentStatus, &o.PaymentStatus, &o.CloseReason, &o.Bags, &o.Version, &o.ManifestVersion,
 		&o.AcceptDeadline, &o.CreatedAt, &o.AcceptedAt, &o.PackedAt, &o.HandedOffAt, &o.CompletedAt, &o.ClosedAt,
 		&o.tokenNonce, &t.PromotionID, &t.PromotionName, &t.PromotionNameEn, &o.ScheduledFor, &o.ReleaseAt,
-		&o.Timezone)
+		&o.Timezone, &o.SessionID, &o.TableName, &o.AmountReceived, &o.PaymentNote)
 	if err != nil {
 		return nil, err
 	}
@@ -193,8 +206,10 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 		return orders, nil
 	}
 
-	rows, err = q.Query(ctx, `SELECT id, order_id, item_id, name, name_en, unit_price, qty, line_total, options,
-		note, needs_prep, prep_status, station_id, station_name FROM order_items WHERE order_id = ANY($1) ORDER BY id`, ids)
+	rows, err = q.Query(ctx, `SELECT i.id, i.order_id, i.item_id, i.name, i.name_en, i.unit_price, i.qty, i.line_total,
+		i.options, i.note, i.needs_prep, i.prep_status, i.station_id, i.station_name, b.seq, b.source, i.served_at,
+		i.void_reason FROM order_items i JOIN order_batches b ON b.id = i.batch_id
+		WHERE i.order_id = ANY($1) ORDER BY i.id`, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +218,8 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 		var orderID int64
 		var opts []byte
 		if err := rows.Scan(&it.ID, &orderID, &it.ItemID, &it.Name, &it.NameEn, &it.UnitPrice, &it.Qty,
-			&it.LineTotal, &opts, &it.Note, &it.NeedsPrep, &it.PrepStatus, &it.StationID, &it.StationName); err != nil {
+			&it.LineTotal, &opts, &it.Note, &it.NeedsPrep, &it.PrepStatus, &it.StationID, &it.StationName,
+			&it.BatchSeq, &it.BatchSource, &it.ServedAt, &it.VoidReason); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -284,6 +300,21 @@ func lockOrder(ctx context.Context, tx pgx.Tx, id int64) (*lockedOrder, error) {
 func bump(ctx context.Context, tx pgx.Tx, id int64) error {
 	_, err := tx.Exec(ctx, `UPDATE orders SET version = version + 1, updated_at = now() WHERE id=$1`, id)
 	return err
+}
+
+// nextOrderNo takes the next number of the branch's daily sequence (in branch
+// local time) and returns the public order number and its short code.
+func nextOrderNo(ctx context.Context, tx pgx.Tx, b *Branch, prefix string) (publicNo, code string, err error) {
+	today := time.Now().In(b.location())
+	var seq int
+	err = tx.QueryRow(ctx, `UPDATE branches SET
+		order_seq = CASE WHEN order_seq_date = $2::date THEN order_seq + 1 ELSE 1 END,
+		order_seq_date = $2::date WHERE id=$1 RETURNING order_seq`, b.ID, today.Format("2006-01-02")).Scan(&seq)
+	if err != nil {
+		return "", "", err
+	}
+	code = fmt.Sprintf("%03d", seq)
+	return fmt.Sprintf("%s%s-%s", prefix, today.Format("0102"), code), code, nil
 }
 
 // ---- placing an order ----
@@ -382,17 +413,10 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			return err
 		}
 
-		// Per-branch daily sequence in branch local time.
-		today := time.Now().In(b.location())
-		var seq int
-		err = tx.QueryRow(ctx, `UPDATE branches SET
-			order_seq = CASE WHEN order_seq_date = $2::date THEN order_seq + 1 ELSE 1 END,
-			order_seq_date = $2::date WHERE id=$1 RETURNING order_seq`, b.ID, today.Format("2006-01-02")).Scan(&seq)
+		publicNo, pickupCode, err := nextOrderNo(ctx, tx, b, "W")
 		if err != nil {
 			return err
 		}
-		pickupCode := fmt.Sprintf("%03d", seq)
-		publicNo := fmt.Sprintf("W%s-%s", today.Format("0102"), pickupCode)
 		nonce := randomBytes(16)
 		token := a.orderToken(nonce)
 		payMethod := "cod"

@@ -208,8 +208,13 @@ func hashToken(token string) []byte {
 // and the server secret, so it can be re-issued on an idempotent replay while
 // the database only stores its hash.
 func (a *App) orderToken(nonce []byte) string {
+	return a.derive("order-access:", nonce)
+}
+
+// derive computes a purpose-bound token from a stored nonce and the server secret.
+func (a *App) derive(purpose string, nonce []byte) string {
 	m := hmac.New(sha256.New, a.Secret)
-	m.Write([]byte("order-access:"))
+	m.Write([]byte(purpose))
 	m.Write(nonce)
 	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
 }

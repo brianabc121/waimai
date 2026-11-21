@@ -185,8 +185,11 @@ func (it *Item) available(serviceType string) bool {
 	if it.StockQty != nil && *it.StockQty <= 0 {
 		return false
 	}
-	if serviceType == "delivery" {
+	switch serviceType {
+	case "delivery":
 		return it.DeliveryAvailable
+	case "dine_in":
+		return true // everything on the published menu can be ordered at the table
 	}
 	return it.PickupAvailable
 }

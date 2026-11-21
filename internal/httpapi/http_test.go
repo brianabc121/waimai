@@ -622,3 +622,135 @@ func TestImportAndScheduleOverHTTP(t *testing.T) {
 		t.Fatal("scheduled order reached the kitchen early")
 	}
 }
+
+func TestDineInOverHTTP(t *testing.T) {
+	f1, f2 := newFixture(t), newFixture(t)
+	b1 := fmt.Sprint(f1.branchID)
+	owner, cashier, kitchen, rider, other := login(t, f1.owner), login(t, f1.cashier), login(t, f1.kitchen), login(t, f1.rider), login(t, f2.owner)
+
+	// tables are a manager's job; another merchant sees nothing
+	cashier.want(403, "FORBIDDEN", "POST", "/merchant/branches/"+b1+"/tables", map[string]any{"name": "08", "active": true})
+	tid := fmt.Sprint(int64(owner.want(200, "", "POST", "/merchant/branches/"+b1+"/tables", map[string]any{"name": "08", "active": true})["id"].(float64)))
+	owner.want(422, "VALIDATION", "POST", "/merchant/branches/"+b1+"/tables", map[string]any{"name": "08", "active": true})
+	other.want(404, "NOT_FOUND", "GET", "/merchant/branches/"+b1+"/tables", nil)
+	other.want(404, "NOT_FOUND", "POST", "/merchant/tables/"+tid+"/open", map[string]any{"guests": 2})
+	kitchen.want(403, "FORBIDDEN", "POST", "/merchant/tables/"+tid+"/open", map[string]any{"guests": 2})
+	rider.want(403, "FORBIDDEN", "GET", "/merchant/branches/"+b1+"/tables", nil)
+
+	list := cashier.want(200, "", "GET", "/merchant/branches/"+b1+"/tables", nil)
+	qr := list["tables"].([]any)[0].(map[string]any)["qr_token"].(string)
+
+	// a guest cannot get in before the table is open, or with a made-up code
+	phone := newClient(t)
+	phone.want(409, "TABLE_NOT_OPEN", "POST", "/table-sessions/exchange", map[string]any{"code": qr})
+	phone.want(404, "NOT_FOUND", "POST", "/table-sessions/exchange", map[string]any{"code": "nope"})
+	phone.want(409, "TABLE_SESSION_CLOSED", "GET", "/table-sessions/current", nil)
+
+	bill := cashier.want(200, "", "POST", "/merchant/tables/"+tid+"/open", map[string]any{"guests": 2})
+	sid := fmt.Sprint(int64(bill["session_id"].(float64)))
+	cashier.want(409, "TABLE_OCCUPIED", "POST", "/merchant/tables/"+tid+"/open", map[string]any{"guests": 2})
+	other.want(404, "NOT_FOUND", "GET", "/merchant/table-sessions/"+sid, nil)
+	other.want(404, "NOT_FOUND", "POST", "/merchant/table-sessions/"+sid+"/close", map[string]any{})
+
+	// phone: scan, then one batch; the same key again adds nothing
+	phone.want(200, "", "POST", "/table-sessions/exchange", map[string]any{"code": qr})
+	cur := phone.want(200, "", "GET", "/table-sessions/current", nil)
+	if acc := cur["access"].(map[string]any); acc["table_name"] != "08" || acc["mode"] != "qr" || acc["slug"] != f1.slug {
+		t.Fatalf("access: %v", acc)
+	}
+	batch := map[string]any{"items": []map[string]any{{"item_id": f1.itemID, "qty": 2}}, "expected_total": 13800}
+	phone.want(422, "VALIDATION", "POST", "/table-sessions/current/batches", batch)
+	phone.want(409, "QUOTE_CHANGED", "POST", "/table-sessions/current/batches",
+		map[string]any{"items": batch["items"], "expected_total": 1}, "Idempotency-Key", uniq("k"))
+	key := uniq("k")
+	phone.want(200, "", "POST", "/table-sessions/current/batches", batch, "Idempotency-Key", key)
+	got := phone.want(200, "", "POST", "/table-sessions/current/batches", batch, "Idempotency-Key", key)
+	order := got["order"].(map[string]any)
+	if items := order["items"].([]any); len(items) != 1 || order["totals"].(map[string]any)["subtotal"].(float64) != 13800 {
+		t.Fatalf("bill after replay: %v", order)
+	}
+	if order["customer_phone"] != "" || order["cash"] != nil {
+		t.Fatalf("guest bill leaks: %v", order)
+	}
+
+	// tablet: pair with a single-use code, then add a second batch to the same bill
+	kitchen.want(403, "FORBIDDEN", "POST", "/merchant/tables/"+tid+"/devices", map[string]any{})
+	code := cashier.want(200, "", "POST", "/merchant/tables/"+tid+"/devices", map[string]any{"name": "pad"})["code"].(string)
+	pad := newClient(t)
+	pad.want(401, "DEVICE_NOT_PAIRED", "GET", "/table-sessions/current?via=device", nil)
+	pad.want(422, "PAIR_CODE_INVALID", "POST", "/table-devices/pair", map[string]any{"code": "WRONG123"})
+	pad.want(200, "", "POST", "/table-devices/pair", map[string]any{"code": code})
+	newClient(t).want(422, "PAIR_CODE_INVALID", "POST", "/table-devices/pair", map[string]any{"code": code})
+	got = pad.want(200, "", "POST", "/table-sessions/current/batches?via=device",
+		map[string]any{"items": []map[string]any{{"item_id": f1.itemID, "qty": 1}}}, "Idempotency-Key", uniq("k"))
+	items := got["order"].(map[string]any)["items"].([]any)
+	if len(items) != 2 || items[1].(map[string]any)["batch_seq"].(float64) != 2 || items[1].(map[string]any)["batch_source"] != "ipad" {
+		t.Fatalf("second batch: %v", items)
+	}
+	i1 := fmt.Sprint(int64(items[0].(map[string]any)["id"].(float64)))
+	i2 := fmt.Sprint(int64(items[1].(map[string]any)["id"].(float64)))
+
+	// kitchen sees the table on its board; serve needs a ready dish; void is the desk's
+	board := kitchen.want(200, "", "GET", "/kitchen/branches/"+b1+"/board", nil)["orders"].([]any)
+	if len(board) != 1 || board[0].(map[string]any)["table_name"] != "08" {
+		t.Fatalf("board: %v", board)
+	}
+	kitchen.want(409, "INVALID_STATE", "POST", "/merchant/bill-items/"+i1+"/serve", map[string]any{})
+	kitchen.want(200, "", "POST", "/kitchen/items/"+i1+"/ready", map[string]any{})
+	other.want(404, "NOT_FOUND", "POST", "/merchant/bill-items/"+i1+"/serve", map[string]any{})
+	rider.want(403, "FORBIDDEN", "POST", "/merchant/bill-items/"+i1+"/serve", map[string]any{})
+	kitchen.want(200, "", "POST", "/merchant/bill-items/"+i1+"/serve", map[string]any{})
+	kitchen.want(403, "FORBIDDEN", "POST", "/merchant/bill-items/"+i2+"/void", map[string]any{"reason": "x"})
+
+	// closing: stale list is refused, so is a dish still cooking; then void and pay
+	b := cashier.want(200, "", "GET", "/merchant/table-sessions/"+sid, nil)
+	mv := b["order"].(map[string]any)["manifest_version"].(float64)
+	cashier.want(409, "VERSION_CONFLICT", "POST", "/merchant/table-sessions/"+sid+"/close",
+		map[string]any{"expected_manifest_version": mv - 1, "amount_received": 99999})
+	cashier.want(409, "ITEMS_IN_PROGRESS", "POST", "/merchant/table-sessions/"+sid+"/close",
+		map[string]any{"expected_manifest_version": mv, "amount_received": 99999})
+	b = cashier.want(200, "", "POST", "/merchant/bill-items/"+i2+"/void", map[string]any{"reason": "guest changed mind"})
+	mv = b["order"].(map[string]any)["manifest_version"].(float64)
+	total := b["order"].(map[string]any)["totals"].(map[string]any)["total"].(float64)
+	cashier.want(422, "VALIDATION", "POST", "/merchant/table-sessions/"+sid+"/close",
+		map[string]any{"expected_manifest_version": mv, "amount_received": total - 1})
+	kitchen.want(403, "FORBIDDEN", "POST", "/merchant/table-sessions/"+sid+"/close",
+		map[string]any{"expected_manifest_version": mv, "amount_received": total})
+	b = cashier.want(200, "", "POST", "/merchant/table-sessions/"+sid+"/close",
+		map[string]any{"expected_manifest_version": mv, "amount_received": total + 200})
+	if b["status"] != "closed" || b["order"].(map[string]any)["payment_status"] != "paid" {
+		t.Fatalf("closed bill: %v", b)
+	}
+
+	// after closing: the phone's cookie is dead, the tablet waits for the next sitting,
+	// and a lost answer can still be recovered with the original key
+	phone.want(409, "TABLE_SESSION_CLOSED", "GET", "/table-sessions/current", nil)
+	phone.want(409, "TABLE_SESSION_CLOSED", "POST", "/table-sessions/current/batches", batch, "Idempotency-Key", uniq("k"))
+	phone.want(409, "TABLE_NOT_OPEN", "POST", "/table-sessions/exchange", map[string]any{"code": qr})
+	idle := pad.want(200, "", "GET", "/table-sessions/current?via=device", nil)
+	if idle["bill"] != nil {
+		t.Fatalf("tablet should be idle: %v", idle)
+	}
+	pad.want(409, "TABLE_SESSION_CLOSED", "POST", "/table-sessions/current/batches?via=device", batch, "Idempotency-Key", uniq("k"))
+
+	// next guests: a new session, an empty bill; the old phone has to scan again
+	b = cashier.want(200, "", "POST", "/merchant/tables/"+tid+"/open", map[string]any{"guests": 4})
+	if fmt.Sprint(int64(b["session_id"].(float64))) == sid || len(b["order"].(map[string]any)["items"].([]any)) != 0 {
+		t.Fatalf("new sitting: %v", b)
+	}
+	next := pad.want(200, "", "GET", "/table-sessions/current?via=device", nil)
+	if next["bill"].(map[string]any)["session_id"] != b["session_id"] {
+		t.Fatalf("tablet did not follow the new sitting: %v", next)
+	}
+
+	// unpairing cuts the tablet off at once
+	dev := cashier.want(200, "", "GET", "/merchant/branches/"+b1+"/tables", nil)["tables"].([]any)[0].(map[string]any)["devices"].([]any)[0].(map[string]any)
+	other.want(404, "NOT_FOUND", "POST", "/merchant/branches/"+fmt.Sprint(f2.branchID)+"/table-devices/"+fmt.Sprint(int64(dev["id"].(float64)))+"/revoke", map[string]any{})
+	cashier.want(200, "", "POST", "/merchant/branches/"+b1+"/table-devices/"+fmt.Sprint(int64(dev["id"].(float64)))+"/revoke", map[string]any{})
+	pad.want(401, "DEVICE_NOT_PAIRED", "GET", "/table-sessions/current?via=device", nil)
+
+	// dine-in bills never show up in the delivery order list or its commands
+	if l := cashier.want(200, "", "GET", "/merchant/branches/"+b1+"/orders", nil)["orders"].([]any); len(l) != 0 {
+		t.Fatalf("dine-in order in delivery list: %v", l)
+	}
+}

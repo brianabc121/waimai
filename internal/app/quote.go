@@ -93,12 +93,6 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 	default:
 		return nil, ErrValidation("service_type must be delivery or pickup")
 	}
-	if len(in.Items) == 0 {
-		return nil, ErrValidation("cart is empty")
-	}
-	if len(in.Items) > 100 {
-		return nil, ErrValidation("too many lines")
-	}
 
 	quote := &Quote{BranchID: b.ID, Currency: b.Currency, ServiceType: in.ServiceType, Input: in, Lines: []QuoteLine{},
 		ScheduledFor: in.ScheduledFor}
@@ -120,9 +114,40 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		minOrder = max(b.MinOrderAmount, z.MinOrder)
 	}
 
-	items, err := loadItems(ctx, q, b.ID, true)
+	lines, subtotal, err := priceLines(ctx, q, b.ID, in.ServiceType, in.Items)
 	if err != nil {
 		return nil, err
+	}
+	quote.Lines = lines
+	if subtotal < minOrder {
+		return nil, ErrD(http.StatusUnprocessableEntity, "BELOW_MINIMUM", "order is below the minimum amount",
+			map[string]any{"minimum": minOrder, "subtotal": subtotal})
+	}
+	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active'", phone)
+	if err != nil {
+		return nil, err
+	}
+	promo, d := bestPromotion(promos, time.Now(), b.location(), in.ServiceType, subtotal, deliveryFee)
+	quote.Totals = ComputeTotals(subtotal, deliveryFee, b.taxConfig(), d)
+	if promo != nil {
+		quote.Totals.PromotionID, quote.Totals.PromotionName, quote.Totals.PromotionNameEn = promo.ID, promo.Name, promo.NameEn
+	}
+	return quote, nil
+}
+
+// priceLines validates cart lines against the live menu and prices them. It is
+// shared by delivery/pickup quotes and dine-in batches.
+func priceLines(ctx context.Context, q Querier, branchID int64, service string, in []QuoteLineInput) ([]QuoteLine, int64, error) {
+	if len(in) == 0 {
+		return nil, 0, ErrValidation("cart is empty")
+	}
+	if len(in) > 100 {
+		return nil, 0, ErrValidation("too many lines")
+	}
+	lines := []QuoteLine{}
+	items, err := loadItems(ctx, q, branchID, true)
+	if err != nil {
+		return nil, 0, err
 	}
 	byID := map[int64]*Item{}
 	for _, it := range items {
@@ -132,15 +157,15 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 	var unavailable []int64
 	wanted := map[int64]int{}
 	var subtotal int64
-	for _, line := range in.Items {
+	for _, line := range in {
 		if line.Qty < 1 || line.Qty > 99 {
-			return nil, ErrValidation("qty must be between 1 and 99")
+			return nil, 0, ErrValidation("qty must be between 1 and 99")
 		}
 		if len(line.Note) > 200 {
-			return nil, ErrValidation("note too long")
+			return nil, 0, ErrValidation("note too long")
 		}
 		it, ok := byID[line.ItemID]
-		if !ok || !it.available(in.ServiceType) {
+		if !ok || !it.available(service) {
 			unavailable = append(unavailable, line.ItemID)
 			continue
 		}
@@ -155,7 +180,7 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		chosen := map[int64]bool{}
 		for _, id := range line.OptionIDs {
 			if chosen[id] {
-				return nil, ErrValidation("duplicate option")
+				return nil, 0, ErrValidation("duplicate option")
 			}
 			chosen[id] = true
 		}
@@ -177,13 +202,13 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 					NameEn: o.NameEn, PriceDelta: o.PriceDelta})
 			}
 			if n < g.MinSelect || n > g.MaxSelect {
-				return nil, ErrD(http.StatusUnprocessableEntity, "OPTIONS_INVALID",
+				return nil, 0, ErrD(http.StatusUnprocessableEntity, "OPTIONS_INVALID",
 					"required options are missing or too many were chosen",
 					map[string]any{"item_id": it.ID, "group_id": g.ID})
 			}
 		}
 		if matched != len(chosen) {
-			return nil, ErrD(http.StatusUnprocessableEntity, "OPTIONS_INVALID", "option does not belong to this item",
+			return nil, 0, ErrD(http.StatusUnprocessableEntity, "OPTIONS_INVALID", "option does not belong to this item",
 				map[string]any{"item_id": it.ID})
 		}
 		if optionGone {
@@ -193,26 +218,13 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		ql.UnitPrice = unit
 		ql.LineTotal = unit * int64(line.Qty)
 		subtotal += ql.LineTotal
-		quote.Lines = append(quote.Lines, ql)
+		lines = append(lines, ql)
 	}
 	if len(unavailable) > 0 {
-		return nil, ErrD(http.StatusConflict, "ITEM_UNAVAILABLE", "some items are no longer available",
+		return nil, 0, ErrD(http.StatusConflict, "ITEM_UNAVAILABLE", "some items are no longer available",
 			map[string]any{"item_ids": unavailable})
 	}
-	if subtotal < minOrder {
-		return nil, ErrD(http.StatusUnprocessableEntity, "BELOW_MINIMUM", "order is below the minimum amount",
-			map[string]any{"minimum": minOrder, "subtotal": subtotal})
-	}
-	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active'", phone)
-	if err != nil {
-		return nil, err
-	}
-	promo, d := bestPromotion(promos, time.Now(), b.location(), in.ServiceType, subtotal, deliveryFee)
-	quote.Totals = ComputeTotals(subtotal, deliveryFee, b.taxConfig(), d)
-	if promo != nil {
-		quote.Totals.PromotionID, quote.Totals.PromotionName, quote.Totals.PromotionNameEn = promo.ID, promo.Name, promo.NameEn
-	}
-	return quote, nil
+	return lines, subtotal, nil
 }
 
 // CreateQuote prices a cart and stores the result for confirmation.

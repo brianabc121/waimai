@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/brianabc121/waimai/internal/app"
@@ -141,6 +142,12 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 		id, err := a.SavePromotion(ctx, bid, 0, p, app.Actor{Type: "system"})
 		must(err)
 		must(a.SetPromotionStatus(ctx, bid, id, "active", app.Actor{Type: "system"}))
+	}
+
+	// Dine-in tables 01 to 08. Their QR links are shown on the Tables screen.
+	for i := 1; i <= 8; i++ {
+		_, err := a.SaveTable(ctx, bid, 0, app.TableInput{Name: fmt.Sprintf("%02d", i), Active: true, Sort: i})
+		must(err)
 	}
 
 	for _, u := range []app.NewUser{
