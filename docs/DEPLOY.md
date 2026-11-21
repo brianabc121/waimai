@@ -2,7 +2,7 @@
 
 这份教程把系统部署到一台 Linux 服务器上，用 Docker Compose 运行，前面用 Caddy 提供 HTTPS。适合一家或几家门店的试点。
 
-> 实测情况（2026-11-21）：这份教程在一台装了 Docker 29 和 Compose v5 的 Linux 机器上从头走过一遍。镜像构建、迁移、Compose 启动、创建管理员、Caddy 的 HTTPS 和 HTTP/2、Nginx 转发和实时推送、短信 webhook、重启恢复、备份和恢复、托管数据库的 override 写法都验证过，外卖、堂食、模板三条浏览器流程也在这套环境上全部通过。没有验证的部分：真实域名的证书签发（测试用的是 Caddy 给 `localhost` 签的本地证书）、Twilio 真实账号、真实的托管数据库。
+> 实测情况（2026-11-21）：这份教程在一台装了 Docker 29 和 Compose v5 的 Linux 机器上从头走过一遍。镜像构建、迁移、Compose 启动、创建管理员、Caddy 的 HTTPS 和 HTTP/2、Nginx 转发和实时推送、短信 webhook、重启恢复、备份和恢复、托管数据库的接法（TLS 加事务级连接池，见第 10 节）都验证过，外卖、堂食、模板三条浏览器流程也在这套环境上全部通过。没有验证的部分：真实域名的证书签发（测试用的是 Caddy 给 `localhost` 签的本地证书）、Twilio 真实账号、具体某家云厂商的托管数据库。
 
 ## 1. 整体结构
 
@@ -167,11 +167,37 @@ docker compose ps
 
 ## 10. 使用托管数据库
 
-正式营业建议用云厂商的托管 PostgreSQL 16，自带备份和时间点恢复。
+正式营业建议用云厂商的托管 PostgreSQL 16，自带备份和时间点恢复。下面的做法在模拟环境里实测过：一个只接受 TLS 连接的独立 PostgreSQL，前面加一层事务模式的 PgBouncer，应用通过连接池访问。
 
-1. 把 `.env` 里的 `DATABASE_URL` 换成托管库的地址，通常要带 `sslmode=require`。
-2. 如果这个地址经过事务级连接池（PgBouncer 的 transaction 模式，或云厂商标着 pooled 的地址），再设置 `LISTEN_DATABASE_URL` 为直连地址。否则实时推送收不到通知，页面只能靠每 30 秒的轮询刷新。
-3. 停用本地数据库容器：新建 `docker-compose.override.yml`，内容如下，然后 `docker compose up -d`。
+### 10.1 两种地址
+
+云厂商通常给两个地址：
+
+- **直连地址**：直接连到数据库，一般是 5432 端口。
+- **连接池地址**：经过事务级连接池（PgBouncer 的 transaction 模式，或标着 pooled 的地址），一般是 6432 或 6543 端口。
+
+只有直连地址时，把它填进 `DATABASE_URL` 就行，其他不用设。
+
+用连接池地址时，**必须同时提供直连地址**：
+
+```
+DATABASE_URL=postgres://用户:密码@连接池地址:6432/waimai?sslmode=require
+DIRECT_DATABASE_URL=postgres://用户:密码@直连地址:5432/waimai?sslmode=require
+```
+
+原因有三个，系统在设置了 `DIRECT_DATABASE_URL` 后会自动处理：
+
+1. 实时推送靠数据库的 LISTEN，它需要一条固定的连接，经过事务级连接池收不到通知。接口进程会用直连地址监听。
+2. 数据库迁移要持有会话级的锁，也走直连地址。
+3. 经过事务级连接池时不能用缓存的预编译语句。系统会自动把普通查询切换到对连接池安全的模式，不需要手工改连接串。
+
+如果只填了连接池地址而没填 `DIRECT_DATABASE_URL`，现象是接口大量返回 500，日志里有 `prepared statement ... already exists` 或 `does not exist`，并且页面不会自动刷新。
+
+`sslmode=require` 会加密连接但不校验证书。云厂商使用公共 CA 签发证书时可以改成 `verify-full`，这一点没有实测。
+
+### 10.2 停用本地数据库容器
+
+新建 `docker-compose.override.yml`，内容如下，然后 `docker compose up -d`：
 
 ```yaml
 services:
@@ -181,7 +207,29 @@ services:
     depends_on: !reset []
 ```
 
-`!reset` 需要较新的 Compose（2.24 及以上）。
+`!reset` 需要较新的 Compose（2.24 及以上）。启动后 `docker compose ps -a` 里应该只有 `api`、`worker`、`web` 在运行，`migrate` 是 exited (0)。
+
+### 10.3 备份和恢复
+
+托管数据库优先用云厂商自带的备份和时间点恢复。需要手工导出时，用直连地址：
+
+```bash
+docker run --rm postgres:16-alpine pg_dump '直连地址' -Fc > backup-$(date +%F).dump
+
+docker compose stop api worker
+docker run --rm -i postgres:16-alpine pg_restore -d '直连地址' --clean --if-exists --no-owner < backup-2026-11-21.dump
+docker compose start api worker
+```
+
+### 10.4 实测结果（2026-11-21）
+
+- 迁移、启动、演示数据都能通过 TLS 和连接池完成。
+- 数据库端看到的连接全部是加密的。只有接口进程的监听连接是直连，其余都经过连接池。
+- 业务测试（包括并发下单、名额、关台和加菜并发）经过连接池全部通过。外卖、堂食、模板三条浏览器流程也全部通过。
+- 备份后删掉数据再恢复，数据回来了。
+- 重启数据库模拟故障切换：接口几秒内恢复，实时推送自动重连。
+
+没有验证的是具体某家云厂商的产品，各家连接池的行为可能有细微差别。
 
 ## 11. 常见问题
 
@@ -190,8 +238,9 @@ services:
 | `migrate` 退出码不是 0 | `docker compose logs migrate`。多半是 `DATABASE_URL` 里的密码和 `POSTGRES_PASSWORD` 不一致。数据库卷已创建后再改 `POSTGRES_PASSWORD` 不会生效 |
 | 登录后马上又掉回登录页 | 用 http 访问但 `COOKIE_SECURE=true`。请用 https 地址 |
 | 顾客收不到验证码 | `SMS_PROVIDER` 是不是还是 `log`，再看 `docker compose logs worker api` |
-| 页面不自动刷新，要等半分钟 | 实时推送被代理缓冲或被连接池挡住。检查 Caddy 的 `flush_interval -1` 和第 10 节的 `LISTEN_DATABASE_URL` |
+| 页面不自动刷新，要等半分钟 | 实时推送被代理缓冲或被连接池挡住。检查 Caddy 的 `flush_interval -1` 和第 10 节的 `DIRECT_DATABASE_URL` |
 | 升级或改配置后短暂出现 502 | 接口容器重启需要几秒，页面会自动重连。如果持续超过半分钟，看 `docker compose logs api` |
+| 接口大量 500，日志有 `prepared statement ... already exists` | `DATABASE_URL` 经过了事务级连接池，但没设置 `DIRECT_DATABASE_URL`，见第 10 节 |
 | 很多顾客同时被提示请求太频繁 | 代理没有传真实地址，所有人被当成同一个来源。检查代理是否带 `X-Forwarded-For` |
 | 开很多页面后卡住 | 没有走 HTTP/2。确认是通过 Caddy 的 https 地址访问 |
 | 短信里没有订单链接 | 没设置 `PUBLIC_BASE_URL` |
