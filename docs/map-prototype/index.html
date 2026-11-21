@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>配送地图 · 原型</title>
+<link rel="stylesheet" href="map.css">
+</head>
+<body>
+<!-- 原型：用 ?s=overview｜draw｜form｜location 切换四个状态。底图是示意图，正式版换成 Google 地图。 -->
+<nav class="staffbar">
+  <b>马卡蒂小馆</b>
+  <a>订单</a><a>桌台</a><a>后厨</a><a>菜单</a><a>模板</a><a>活动</a><a>核款</a><a class="on">配送地图</a><a>设置</a>
+  <span class="grow"></span><span class="small">店主 老王</span><button class="lang">EN</button><span class="small" style="color:#c9ced6">退出</span>
+</nav>
+<div class="mapwrap">
+  <div class="map" id="map">
+    <svg class="base" id="svg"></svg>
+    <div class="float search" id="search">🔍 <span>搜索地址或地点</span></div>
+    <div class="float suggest" id="suggest" hidden>
+      <div class="on"><b>123 Ayala Ave</b> <span class="muted">Makati, Metro Manila</span></div>
+      <div><b>123 Ayala Ave Ext</b> <span class="muted">Makati, Metro Manila</span></div>
+      <div><b>Ayala Triangle Gardens</b> <span class="muted">Makati Ave, Makati</span></div>
+    </div>
+    <div class="float tools">
+      <span data-t="overview">✋ 浏览</span><span data-t="draw">✏️ 画新区域</span><span data-t="circle">◯ 按半径生成</span><span data-t="location">📍 店铺位置</span>
+    </div>
+    <div class="float mtype"><span>地图</span><span>卫星</span></div>
+    <div class="float zoom"><span>+</span><span>−</span></div>
+    <div class="float hint" id="hint" hidden></div>
+    <div class="attrib">示意底图 · 正式版使用 Google 地图</div>
+  </div>
+  <aside class="panel" id="panel"></aside>
+</div>
+<script src="map.js"></script>
+<script>
+var s = new URLSearchParams(location.search).get('s') || 'overview';
+var svg = document.getElementById('svg'), panel = document.getElementById('panel'), hint = document.getElementById('hint');
+document.querySelectorAll('.tools span').forEach(function (e) {
+  if (e.dataset.t === (s === 'form' ? 'draw' : s)) e.className = 'on';
+  e.onclick = function () { location.search = '?s=' + (e.dataset.t === 'circle' ? 'overview' : e.dataset.t); };
+});
+baseMap(svg);
+
+function zoneRow(z, extra) {
+  return '<div class="zone ' + (extra || '') + '"><span class="grip">⋮⋮</span><span class="sw" style="background:' + z.color + '"></span>' +
+    '<div><div class="bold">' + z.name + ' <span class="tag ok" style="margin-left:4px">启用</span></div><div class="small muted">配送费 ₱' + z.fee + ' · 起送 ₱' + z.min + ' · 约 ' + z.eta + ' 分钟</div></div>' +
+    '<a class="btn small">编辑</a></div>';
+}
+var storeCard = '<section><div class="row between"><h2>店铺位置</h2><a class="btn small" href="?s=location">修改位置</a></div>' +
+  '<div class="kv"><span>地址</span><span>123 Ayala Ave, Makati</span><span>经纬度</span><span class="num">14.55472, 121.02445</span></div></section>';
+
+if (s === 'overview') {
+  ZONES.slice().reverse().forEach(function (z) { drawZone(svg, z); });
+  pin(svg, STORE, { text: '马卡蒂小馆' });
+  panel.innerHTML = storeCard +
+    '<section><div class="row between"><h2>配送区 · 3</h2><a class="btn small primary" href="?s=draw">＋ 画新区域</a></div>' +
+    ZONES.map(function (z) { return zoneRow(z); }).join('') +
+    '<p class="small muted">拖动 ⋮⋮ 调整顺序。两个区域重叠的地方，按排在前面的区域计费。</p></section>' +
+    '<section><h2>顾客怎么选配送区</h2><div class="seg"><span class="on">地图定位</span><span>列表选择</span></div>' +
+    '<p class="small muted" style="margin-top:8px">顾客下单时在地图上定位送餐地址，系统自动判断属于哪个区域，范围外不能下外卖单。</p></section>' +
+    '<section><div class="banner ok">3 个区域都已画好范围，覆盖面积约 6.8 km²</div></section>';
+}
+
+if (s === 'draw') {
+  document.getElementById('map').classList.add('drawing');
+  ZONES.slice().reverse().forEach(function (z) { drawZone(svg, z, { dim: true }); });
+  pin(svg, STORE, { text: '马卡蒂小馆' });
+  var pts = NEWZ.pts.slice(0, 5), cur = [585, 628];
+  svg.appendChild(el('polygon', { points: pts.concat([cur]).join(' '), fill: NEWZ.color, 'fill-opacity': .1 }));
+  svg.appendChild(el('polyline', { points: pts.join(' '), fill: 'none', stroke: NEWZ.color, 'stroke-width': 3, 'stroke-linejoin': 'round' }));
+  svg.appendChild(el('polyline', { points: [pts[4], cur, pts[0]].join(' '), fill: 'none', stroke: NEWZ.color, 'stroke-width': 2, 'stroke-dasharray': '7 6' }));
+  pts.forEach(function (p, i) {
+    svg.appendChild(el('circle', { cx: p[0], cy: p[1], r: i ? 6 : 9, fill: i ? '#fff' : NEWZ.color, stroke: i ? NEWZ.color : '#fff', 'stroke-width': 2.5 }));
+    svg.appendChild(el('text', { x: p[0] + (i ? 10 : -14), y: p[1] - 10, 'font-size': 11.5, 'font-weight': 700, fill: NEWZ.color, stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke', 'text-anchor': i ? 'start' : 'end' }, i + 1));
+  });
+  svg.appendChild(el('rect', { x: 204, y: 512, width: 110, height: 24, rx: 6, fill: '#1f2328' }));
+  svg.appendChild(el('text', { x: 259, y: 528.5, 'text-anchor': 'middle', 'font-size': 12, fill: '#fff' }, '点回这里完成'));
+  // 十字光标
+  svg.appendChild(el('path', { d: 'M' + (cur[0] - 13) + ' ' + cur[1] + 'h26M' + cur[0] + ' ' + (cur[1] - 13) + 'v26', stroke: '#1f2328', 'stroke-width': 2 }));
+  svg.appendChild(el('circle', { cx: cur[0], cy: cur[1], r: 4, fill: '#fff', stroke: '#1f2328', 'stroke-width': 1.5 }));
+  hint.hidden = false;
+  hint.innerHTML = '在地图上依次点击，圈出这个区域 · 点回第 1 个点或双击完成 · <kbd>Backspace</kbd> 撤销上一个点 · <kbd>Esc</kbd> 取消';
+  panel.innerHTML = '<section><h2>正在画新区域</h2><div class="kv"><span>已点</span><span class="num">5 个点</span><span>面积</span><span class="num">约 1.4 km²</span><span>离店最远</span><span class="num">1.9 km</span></div></section>' +
+    '<section><p class="muted small" style="margin-bottom:8px">画法</p><ol style="margin:0;padding-left:18px;display:grid;gap:6px"><li>沿着想送的范围，在地图上一个点一个点地点过去。</li><li>点回第 1 个点（或双击），区域就闭合了。</li><li>闭合后填名称、配送费和起送金额。</li></ol></section>' +
+    '<section><p class="muted small" style="margin-bottom:8px">已有区域（画的时候变淡，方便对齐边界）</p>' +
+    ZONES.map(function (z) { return '<div class="row" style="margin-bottom:6px"><span class="sw" style="background:' + z.color + '"></span><span class="grow">' + z.name + '</span><span class="small muted num">₱' + z.fee + '</span></div>'; }).join('') + '</section>' +
+    '<div class="foot"><a class="btn">↶ 撤销上一个点</a><a class="btn" href="?s=overview">取消</a><a class="btn primary grow" href="?s=form">完成</a></div>';
+}
+
+if (s === 'form') {
+  ZONES.slice().reverse().forEach(function (z) { drawZone(svg, z, { dim: true, label: z.id !== 'cbd' }); });
+  drawZone(svg, ZONES[0], { dim: true, at: [455, 292] });
+  drawZone(svg, NEWZ, { sel: true, handles: true, at: [478, 570] });
+  pin(svg, STORE, { text: '马卡蒂小馆' });
+  hint.hidden = false;
+  hint.innerHTML = '拖动圆点调整边界 · 拖动边中间的小圆点加一个点 · 右键圆点删除';
+  var colors = ['#2a78d6', '#18794e', '#7c3aed', '#c2255c', '#e0a100', '#0b7285'];
+  panel.innerHTML = '<section><div class="row between"><h2>新区域</h2><span class="tag warn">未保存</span></div>' +
+    '<div class="two"><label class="field"><span>名称</span><input value="圣洛伦索"></label><label class="field"><span>英文名</span><input value="San Lorenzo"></label></div>' +
+    '<div class="two"><label class="field"><span>配送费（₱）</span><input value="59"></label><label class="field"><span>起送金额（₱）</span><input value="250"></label></div>' +
+    '<div class="two"><label class="field"><span>预计送达（分钟）</span><input value="30"></label><label class="field"><span>颜色</span><div class="swatches" style="padding-top:3px">' +
+    colors.map(function (c) { return '<span class="sw' + (c === NEWZ.color ? ' on' : '') + '" style="background:' + c + '"></span>'; }).join('') + '</div></label></div>' +
+    '<div class="row between"><span>启用这个区域</span><span class="switch"></span></div></section>' +
+    '<section><div class="kv"><span>顶点</span><span class="num">7 个</span><span>面积</span><span class="num">约 1.6 km²</span><span>离店最远</span><span class="num">2.1 km</span></div></section>' +
+    '<section><div class="banner warn">和“马卡蒂 CBD”有一小块重叠。重叠的地方按排在前面的“马卡蒂 CBD”计费（₱49）。可以拖动圆点把边界对齐，也可以不管。</div></section>' +
+    '<div class="foot"><a class="btn danger">删除</a><a class="btn" href="?s=draw">重画</a><a class="btn primary grow" href="?s=overview">保存区域</a></div>';
+}
+
+if (s === 'location') {
+  ZONES.slice().reverse().forEach(function (z) { drawZone(svg, z, { dim: true, label: false }); });
+  var np = [468, 402];
+  svg.appendChild(el('circle', { cx: STORE[0], cy: STORE[1], r: 6, fill: '#fff', stroke: '#9aa0a6', 'stroke-width': 2, 'stroke-dasharray': '3 2' }));
+  svg.appendChild(el('line', { x1: STORE[0], y1: STORE[1], x2: np[0], y2: np[1], stroke: '#9aa0a6', 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }));
+  pin(svg, np, { lift: true });
+  svg.appendChild(el('rect', { x: np[0] - 70, y: np[1] - 86, width: 140, height: 24, rx: 6, fill: '#1f2328' }));
+  svg.appendChild(el('text', { x: np[0], y: np[1] - 69.5, 'text-anchor': 'middle', 'font-size': 12, fill: '#fff' }, '拖动图钉到店门口'));
+  var sb = document.getElementById('search'); sb.classList.add('active'); sb.querySelector('span').textContent = '123 Ayala';
+  document.getElementById('suggest').hidden = false;
+  panel.innerHTML = '<section><h2>设置店铺位置</h2><p class="small muted" style="margin-bottom:10px">先搜地址把地图移过去，再把图钉拖到店门口。骑手从这里出发，顾客也在地图上看到这个位置。</p>' +
+    '<label class="field"><span>地址（顾客看到的文字）</span><input value="123 Ayala Ave, Makati"></label>' +
+    '<div class="two"><label class="field"><span>纬度</span><input class="num" value="14.55461"></label><label class="field"><span>经度</span><input class="num" value="121.02433"></label></div>' +
+    '<div class="banner info">图钉比原位置移动了 18 米</div></section>' +
+    '<section><div class="banner warn">店铺位置只影响地图上的图钉和骑手导航起点，不会移动已画好的配送区。</div></section>' +
+    '<div class="foot"><a class="btn" href="?s=overview">取消</a><a class="btn primary grow" href="?s=overview">保存位置</a></div>';
+}
+</script>
+</body>
+</html>
