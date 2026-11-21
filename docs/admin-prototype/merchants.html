@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商户 · 平台管理后台（原型）</title><link rel="stylesheet" href="admin.css"></head>
+<body data-page="merchants.html" data-title="商户">
+<div class="shell"><nav class="side"></nav><div class="main"><div class="top"></div><div class="page">
+<div class="row"><input placeholder="搜索商户名、门店名、链接、电话" style="width:300px"><div class="seg"><span class="on">全部 9</span><span>营业中 7</span><span>已暂停 2</span><span>已删除 1</span></div><span class="grow"></span><a class="btn primary">＋ 新建商户</a></div>
+<div class="card flush"><table class="data"><thead><tr><th>商户</th><th>联系人</th><th class="right">门店</th><th>状态</th><th class="right">今日订单</th><th class="right">近 7 天</th><th>入驻时间</th><th></th></tr></thead><tbody>
+  <tr><td><a href="merchant.html" class="bold">老陈粥铺</a><div class="small muted mono">/s/laochen-makati 等 3 个链接</div></td><td>陈国强<div class="small muted">+63 917 555 0142</div></td><td class="right num">3</td><td><span class="tag ok">营业中</span></td><td class="right num">86</td><td class="right num">540</td><td class="num">2026-11-03</td><td class="right"><a class="btn small">编辑</a> <a class="btn small">暂停</a></td></tr>
+  <tr><td><a class="bold">阿美烧腊</a><div class="small muted mono">/s/amei-bgc 等 2 个链接</div></td><td>林美玲<div class="small muted">+63 905 555 0177</div></td><td class="right num">2</td><td><span class="tag ok">营业中</span></td><td class="right num">71</td><td class="right num">463</td><td class="num">2026-11-05</td><td class="right"><a class="btn small">编辑</a> <a class="btn small">暂停</a></td></tr>
+  <tr><td><a class="bold">川味小馆</a><div class="small muted mono">/s/chuanwei</div></td><td>王建军<div class="small muted">+63 998 555 0108</div></td><td class="right num">1</td><td><span class="tag ok">营业中</span></td><td class="right num">58</td><td class="right num">391</td><td class="num">2026-11-08</td><td class="right"><a class="btn small">编辑</a> <a class="btn small">暂停</a></td></tr>
+  <tr><td><a class="bold">Lola's Kitchen</a><div class="small muted mono">/s/lolas-qc 等 2 个链接</div></td><td>Maria Santos<div class="small muted">+63 917 555 0199</div></td><td class="right num">2</td><td><span class="tag ok">营业中</span></td><td class="right num">49</td><td class="right num">312</td><td class="num">2026-11-10</td><td class="right"><a class="btn small">编辑</a> <a class="btn small">暂停</a></td></tr>
+  <tr><td><a class="bold">一品面馆</a><div class="small muted mono">/s/yipin-noodle</div></td><td>赵一品<div class="small muted">+63 906 555 0121</div></td><td class="right num">1</td><td><span class="tag ok">营业中</span></td><td class="right num">33</td><td class="right num">207</td><td class="num">2026-11-12</td><td class="right"><a class="btn small">编辑</a> <a class="btn small">暂停</a></td></tr>
+  <tr><td><a class="bold">阿福茶餐厅</a><div class="small muted mono">/s/afu-cafe</div></td><td>黄阿福<div class="small muted">+63 915 555 0163</div></td><td class="right num">1</td><td><span class="tag warn">已暂停</span><div class="small muted">11-18 资料待补</div></td><td class="right num">0</td><td class="right num">64</td><td class="num">2026-11-14</td><td class="right"><a class="btn small">编辑</a> <a class="btn small">恢复</a> <a class="btn small danger">删除</a></td></tr>
+  <tr><td><a class="bold">新记饺子</a><div class="small muted mono">/s/xinji</div></td><td>刘新<div class="small muted">+63 927 555 0135</div></td><td class="right num">1</td><td><span class="tag ok">营业中</span></td><td class="right num">30</td><td class="right num">30</td><td class="num">2026-11-21</td><td class="right"><a class="btn small">编辑</a> <a class="btn small">暂停</a></td></tr>
+</tbody></table></div>
+<div class="row small muted"><span>共 9 家，第 1 / 2 页</span><span class="grow"></span><a class="btn small">上一页</a><a class="btn small">下一页</a></div>
+<div id="new" hidden><div class="mask"></div><div class="drawer"><div class="dh"><h2>新建商户</h2><div class="small muted">同时创建首家门店和店主账号</div></div><div class="db">
+  <label class="field"><span>商户名称</span><input value="新记饺子"></label>
+  <div class="f2"><label class="field"><span>联系人</span><input value="刘新"></label><label class="field"><span>联系电话</span><input value="+63 927 555 0135"></label></div>
+  <label class="field"><span>备注（只有平台可见）</span><input value="朋友介绍，先试用一个月"></label>
+  <h2 style="margin:14px 0 8px">首家门店</h2>
+  <div class="f2"><label class="field"><span>门店名称</span><input value="新记饺子（马卡蒂店）"></label><label class="field"><span>英文名</span><input value="Xinji Dumplings"></label></div>
+  <label class="field"><span>店铺链接（a-z、0-9、-）</span><input value="xinji"><div class="small muted" style="margin-top:3px">顾客点菜地址：https://你的域名/s/xinji</div></label>
+  <div class="f2"><label class="field"><span>时区</span><select><option>Asia/Manila</option></select></label><label class="field"><span>货币</span><select><option>PHP</option></select></label></div>
+  <h2 style="margin:14px 0 8px">店主账号</h2>
+  <div class="f2"><label class="field"><span>用户名</span><input value="xinji-owner"></label><label class="field"><span>显示名</span><input value="刘新"></label></div>
+  <label class="field"><span>初始密码（8 位以上）</span><input type="password" value="12345678901"></label>
+</div><div class="df"><a class="btn">取消</a><a class="btn primary">创建</a></div></div></div>
+<script>if (location.search.indexOf('new') > 0) document.getElementById('new').hidden = false;</script>
+</div></div></div>
+<script src="shell.js"></script>
+</body></html>

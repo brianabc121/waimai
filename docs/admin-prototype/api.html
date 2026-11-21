@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API 监控 · 平台管理后台（原型）</title><link rel="stylesheet" href="admin.css"></head>
+<body data-page="api.html" data-title="API 监控">
+<div class="shell"><nav class="side"></nav><div class="main"><div class="top"></div><div class="page">
+<div class="row"><div class="seg"><span class="on">1 小时</span><span>6 小时</span><span>24 小时</span><span>7 天</span></div><span class="grow"></span>
+  <span class="small muted">当前 SSE 连接 37（顾客 21 · 门店 12 · 骑手 4）</span><span class="small muted">限流命中 14 次</span></div>
+<div class="grid3">
+  <div class="card"><div class="head"><h2>每分钟请求数</h2><div class="legend"><span><i style="background:var(--s1)"></i>2xx</span><span><i style="background:var(--c4)"></i>4xx</span><span><i style="background:var(--c5)"></i>5xx</span></div></div><svg class="chart" data-w="430" id="c1"></svg></div>
+  <div class="card"><div class="head"><h2>错误率（5xx）</h2><span class="small muted">15:30 前后有一次抖动</span></div><svg class="chart" data-w="430" id="c3"></svg></div>
+  <div class="card"><div class="head"><h2>耗时</h2></div><svg class="chart" data-w="430" id="c2"></svg></div>
+</div>
+<div class="card flush"><div class="head"><h2>接口排行</h2><input placeholder="筛选路由" style="width:220px"></div>
+  <table class="data"><thead><tr><th>方法</th><th>路由</th><th class="right">请求数 ▾</th><th class="right">4xx</th><th class="right">5xx</th><th class="right">P50</th><th class="right">P95</th><th class="right">最慢</th></tr></thead><tbody>
+    <tr><td><span class="tag info">GET</span></td><td class="mono">/api/v1/stores/:slug</td><td class="right num">1,204</td><td class="right num">3</td><td class="right num">0</td><td class="right num">18 ms</td><td class="right num">64 ms</td><td class="right num">210 ms</td></tr>
+    <tr><td><span class="tag info">GET</span></td><td class="mono">/api/v1/merchant/branches/:bid/orders</td><td class="right num">862</td><td class="right num">0</td><td class="right num">0</td><td class="right num">24 ms</td><td class="right num">88 ms</td><td class="right num">304 ms</td></tr>
+    <tr><td><span class="tag info">GET</span></td><td class="mono">/api/v1/kitchen/branches/:bid/board</td><td class="right num">655</td><td class="right num">0</td><td class="right num">0</td><td class="right num">29 ms</td><td class="right num">97 ms</td><td class="right num">188 ms</td></tr>
+    <tr><td><span class="tag">POST</span></td><td class="mono">/api/v1/stores/:slug/quotes</td><td class="right num">341</td><td class="right num">22</td><td class="right num">1</td><td class="right num">41 ms</td><td class="right num">156 ms</td><td class="right num">1.9 s</td></tr>
+    <tr><td><span class="tag">POST</span></td><td class="mono">/api/v1/stores/:slug/orders</td><td class="right num">118</td><td class="right num">9</td><td class="right num"><b style="color:var(--bad)">2</b></td><td class="right num">96 ms</td><td class="right num">412 ms</td><td class="right num">2.4 s</td></tr>
+    <tr><td><span class="tag">POST</span></td><td class="mono">/api/v1/otp/request</td><td class="right num">97</td><td class="right num">14</td><td class="right num">0</td><td class="right num">12 ms</td><td class="right num">38 ms</td><td class="right num">71 ms</td></tr>
+    <tr><td><span class="tag">POST</span></td><td class="mono">/api/v1/kitchen/items/:id/:action</td><td class="right num">84</td><td class="right num">1</td><td class="right num">0</td><td class="right num">22 ms</td><td class="right num">61 ms</td><td class="right num">140 ms</td></tr>
+  </tbody></table></div>
+<div class="card flush"><div class="head"><h2>最近错误</h2><div class="row"><select><option>全部状态</option></select><select><option>全部接口</option></select></div></div>
+  <table class="data"><thead><tr><th>时间</th><th>接口</th><th>状态</th><th class="right">耗时</th><th>request_id</th><th>内部错误</th></tr></thead><tbody>
+    <tr><td class="num">15:31:07</td><td class="mono">POST /api/v1/stores/:slug/orders</td><td><span class="tag bad">500 INTERNAL</span></td><td class="right num">2.4 s</td><td class="mono">9f2c41a07be3d510</td><td class="small muted">context deadline exceeded</td></tr>
+    <tr><td class="num">15:30:58</td><td class="mono">POST /api/v1/stores/:slug/orders</td><td><span class="tag bad">500 INTERNAL</span></td><td class="right num">2.1 s</td><td class="mono">41d0e7c2a9b86f33</td><td class="small muted">context deadline exceeded</td></tr>
+    <tr><td class="num">15:30:41</td><td class="mono">POST /api/v1/stores/:slug/quotes</td><td><span class="tag bad">500 INTERNAL</span></td><td class="right num">1.9 s</td><td class="mono">c07a1be4492d8e16</td><td class="small muted">conn busy</td></tr>
+    <tr><td class="num">14:12:20</td><td class="mono">POST /api/v1/otp/request</td><td><span class="tag warn">429 RATE_LIMITED</span></td><td class="right num">1 ms</td><td class="mono">7b3e90fd12c4a865</td><td class="small muted">—</td></tr>
+  </tbody></table></div>
+</div></div></div>
+<script src="shell.js"></script>
+<script>
+var ok = demo.series(60, 34, 12, 7), c4 = demo.series(60, 2, 1.5, 3), c5 = demo.series(60, 0, 0, 5, [44, 48, 3]);
+stackChart('c1', [{ data: ok, color: 'var(--s1)' }, { data: c4, color: 'var(--c4)' }, { data: c5, color: 'var(--c5)' }], 60, 210);
+lineChart('c3', [{ data: c5.map(function (v, i) { return v / (ok[i] + c4[i] + v) * 100; }), color: 'var(--c5)', label: '5xx' }], 9, function (v) { return v.toFixed(0) + '%'; }, 210);
+lineChart('c2', [{ data: demo.series(60, 150, 40, 11, [44, 48, 260]), color: 'var(--s2)', label: 'P95' }, { data: demo.series(60, 30, 6, 2), color: 'var(--s1)', label: 'P50' }], 600, function (v) { return Math.round(v) + ' ms'; }, 210);
+</script></body></html>
