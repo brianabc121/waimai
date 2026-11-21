@@ -4,7 +4,7 @@
 // step: pick up, arrived, delivered (with the cash collected).
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ApiError, get, post } from '../../api'
+import { ApiError, get, post, upload } from '../../api'
 import { both, money, t, toMajor, toMinor, whenText } from '../../i18n'
 import { useLive } from '../../live'
 import { currentRole, reloadUser, session } from '../../session'
@@ -101,6 +101,38 @@ async function deliver(o: Order) {
   if (await act(o, 'deliver', { collected_amount: due(o) ? got.value : 0 })) void back()
 }
 
+// ---- photo at the door (optional) ----
+// The photo is shrunk on the phone to about 1280 px before it is sent.
+const photo = reactive({ busy: false, error: '' })
+function shrink(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image(), url = URL.createObjectURL(file)
+    img.onload = () => {
+      const k = Math.min(1, 1280 / Math.max(img.width, img.height))
+      const c = document.createElement('canvas')
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
+      c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+      URL.revokeObjectURL(url)
+      c.toBlob(b => b ? resolve(b) : reject(new Error('photo')), 'image/jpeg', 0.7)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('photo')) }
+    img.src = url
+  })
+}
+async function addPhoto(o: Order, e: Event) {
+  const input = e.target as HTMLInputElement, file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  photo.busy = true; photo.error = ''
+  try {
+    await upload(`/rider/tasks/${o.delivery!.id}/proof`, new File([await shrink(file)], 'proof.jpg', { type: 'image/jpeg' }))
+    await refreshNow()
+  } catch (err) {
+    photo.error = err instanceof ApiError && err.code === 'NETWORK' ? t('wk.photo_offline') : t('wk.photo_failed')
+  }
+  photo.busy = false
+}
+
 // ---- problem sheet ----
 const prob = reactive({ open: false, reason: '' })
 const reasons = ['wk.r.unreachable', 'wk.r.address', 'wk.r.refused', 'wk.r.vehicle']
@@ -193,6 +225,15 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
               <div v-else-if="diff < 0" class="small" style="color:var(--warn)">{{ t('wk.short', { amt: money(-diff, cur.currency) }) }}</div>
             </div>
             <div v-else class="banner ok">{{ t('wk.prepaid') }} · {{ t('wk.no_cash') }}</div>
+            <div class="card stack" data-testid="proof">
+              <div class="row between">
+                <span>{{ t('wk.photo') }} <span v-if="cur.delivery?.proof_at" class="tag ok" data-testid="proof-done">{{ t('wk.photo_done') }}</span></span>
+                <label class="btn small" :class="{ disabled: photo.busy }">{{ cur.delivery?.proof_at ? t('wk.photo_again') : t('wk.photo_take') }}
+                  <input type="file" accept="image/*" capture="environment" name="proof" hidden :disabled="photo.busy" @change="addPhoto(cur, $event)" /></label>
+              </div>
+              <div class="small muted">{{ t('wk.photo_hint') }}</div>
+              <div v-if="photo.error" class="banner bad small">{{ photo.error }}</div>
+            </div>
             <button class="btn primary block big" :disabled="busy" data-act="deliver" @click="deliver(cur)">
               {{ due(cur) ? t('wk.confirm_deliver_cash', { amt: money(cur.totals.total, cur.currency) }) : t('wk.confirm_deliver') }}</button>
           </template>

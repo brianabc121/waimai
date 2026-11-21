@@ -479,3 +479,55 @@ func (a *App) OrderTracking(ctx context.Context, token string) (*Tracking, error
 	}
 	return t, nil
 }
+
+// ---- photo at the door ----
+
+// ProofMaxBytes caps the photo; the app shrinks it well below this.
+const ProofMaxBytes = 600 << 10
+
+// SaveProof stores the rider's photo for a delivery they are carrying or have
+// just delivered. A second photo replaces the first.
+func (a *App) SaveProof(ctx context.Context, taskID, riderID int64, image []byte) (*Order, error) {
+	if len(image) < 4 || len(image) > ProofMaxBytes || image[0] != 0xFF || image[1] != 0xD8 || image[2] != 0xFF {
+		return nil, ErrValidation("the photo must be a JPEG of at most 600 KB")
+	}
+	return a.riderCommand(ctx, taskID, riderID, func(tx pgx.Tx, o *lockedOrder, status string) error {
+		if status != "picked_up" && status != "arrived" && status != "delivered" {
+			return ErrInvalidState("a photo can be added once the order is picked up")
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO delivery_proofs (task_id, branch_id, rider_id, image) VALUES ($1,$2,$3,$4)
+			ON CONFLICT (task_id) DO UPDATE SET image=$4, rider_id=$3, created_at=now()`, taskID, o.BranchID, riderID, image); err != nil {
+			return err
+		}
+		if err := bump(ctx, tx, o.ID); err != nil {
+			return err
+		}
+		if err := audit(ctx, tx, o.BranchID, o.ID, Actor{Type: "rider", ID: riderID}, "delivery.proof",
+			map[string]any{"bytes": len(image)}); err != nil {
+			return err
+		}
+		return notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID, RiderIDs: []int64{riderID}})
+	})
+}
+
+// OrderProof returns the photo taken for an order's delivery.
+func (a *App) OrderProof(ctx context.Context, orderID int64) ([]byte, error) {
+	var image []byte
+	err := a.DB.QueryRow(ctx, `SELECT p.image FROM delivery_proofs p JOIN delivery_tasks t ON t.id = p.task_id
+		WHERE t.order_id=$1`, orderID).Scan(&image)
+	if isNoRows(err) {
+		return nil, ErrNotFound
+	}
+	return image, err
+}
+
+// RiderProof returns the photo of a delivery to the rider who took it.
+func (a *App) RiderProof(ctx context.Context, taskID, riderID int64) ([]byte, error) {
+	var image []byte
+	err := a.DB.QueryRow(ctx, `SELECT p.image FROM delivery_proofs p JOIN delivery_tasks t ON t.id = p.task_id
+		WHERE p.task_id=$1 AND t.rider_id=$2`, taskID, riderID).Scan(&image)
+	if isNoRows(err) {
+		return nil, ErrNotFound
+	}
+	return image, err
+}

@@ -184,6 +184,8 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
           </div>
           <div v-if="selected.delivery && unread(selected)" class="banner warn small">{{ t('rd.unread_hint', { name: selected.delivery.rider_name }) }}
             <a v-if="selected.delivery.rider_phone" :href="'tel:' + selected.delivery.rider_phone">{{ selected.delivery.rider_phone }}</a></div>
+          <div v-if="selected.delivery?.proof_at" class="row between" data-testid="proof-row"><span class="muted">{{ t('rd.proof') }}</span>
+            <a :href="`/api/v1/merchant/orders/${selected.id}/proof`" target="_blank" rel="noopener">{{ t('rd.proof_view') }} · {{ whenText(selected.delivery.proof_at, selected.timezone) }}</a></div>
           <div v-if="selected.delivery?.fail_reason" class="banner bad">{{ selected.delivery.fail_reason }}</div>
           <div v-if="selected.bags" class="row between"><span class="muted">{{ t('bags') }}</span><b>{{ selected.bags }}</b></div>
           <div v-if="selected.cash" class="row between"><span class="muted">{{ t('collected') }}</span>

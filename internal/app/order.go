@@ -42,7 +42,9 @@ type DeliveryTask struct {
 	FailReason        string    `json:"fail_reason"`
 	AssignedAt        time.Time `json:"assigned_at"`
 	// SeenAt is when the rider first had this assignment on screen.
-	SeenAt      *time.Time `json:"seen_at"`
+	SeenAt *time.Time `json:"seen_at"`
+	// ProofAt is when the rider took a photo at the door, nil when there is none.
+	ProofAt     *time.Time `json:"proof_at"`
 	PickedUpAt  *time.Time `json:"picked_up_at"`
 	ArrivedAt   *time.Time `json:"arrived_at"`
 	DeliveredAt *time.Time `json:"delivered_at"`
@@ -241,7 +243,8 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 	}
 
 	rows, err = q.Query(ctx, `SELECT t.id, t.order_id, t.rider_id, u.display_name, u.phone, t.assignment_version,
-		t.status, t.fail_reason, t.assigned_at, t.picked_up_at, t.arrived_at, t.delivered_at, t.seen_at
+		t.status, t.fail_reason, t.assigned_at, t.picked_up_at, t.arrived_at, t.delivered_at, t.seen_at,
+		(SELECT p.created_at FROM delivery_proofs p WHERE p.task_id = t.id)
 		FROM delivery_tasks t JOIN users u ON u.id = t.rider_id WHERE t.order_id = ANY($1)`, ids)
 	if err != nil {
 		return nil, err
@@ -250,7 +253,7 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 		var t DeliveryTask
 		var orderID int64
 		if err := rows.Scan(&t.ID, &orderID, &t.RiderID, &t.RiderName, &t.RiderPhone, &t.AssignmentVersion,
-			&t.Status, &t.FailReason, &t.AssignedAt, &t.PickedUpAt, &t.ArrivedAt, &t.DeliveredAt, &t.SeenAt); err != nil {
+			&t.Status, &t.FailReason, &t.AssignedAt, &t.PickedUpAt, &t.ArrivedAt, &t.DeliveredAt, &t.SeenAt, &t.ProofAt); err != nil {
 			rows.Close()
 			return nil, err
 		}
