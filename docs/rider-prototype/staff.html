@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>员工工作台和员工管理 · 原型</title>
+<link rel="stylesheet" href="../map-prototype/map.css">
+<link rel="stylesheet" href="rider.css">
+</head>
+<body>
+<!-- 原型 v0.2：员工工作台的身份切换，商家端的员工页。数据都是示意。方案见 ../RIDER_APP_DESIGN.md 第 9 节 -->
+
+<section class="phones" id="workbench">
+  <div><div class="phone">
+    <div class="status"><span>11:52</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="rbar"><div><b>员工工作台</b><div class="sub">小张 · 马卡蒂小馆</div></div><div class="idsw">店内</div></div>
+    <div class="seg"><span class="on">全部<em>5</em></span><span>油炸炉<em>2</em></span><span>炒菜<em>3</em></span></div>
+    <div class="body">
+      <div class="card task doing">
+        <div><span class="q">2 × 炸鸡翅</span> <span class="tag info">制作中</span></div>
+        <a class="btn ok">做好了</a>
+        <div class="src">油炸炉 · A-0131 外卖 · <span class="late">已等 9 分钟</span></div>
+      </div>
+      <div class="card task">
+        <div><span class="q">1 × 炸春卷</span></div>
+        <a class="btn">开始做</a>
+        <div class="src">油炸炉 · 6 号桌 堂食 · 已等 2 分钟</div>
+      </div>
+      <div class="card task">
+        <div><span class="q">1 × 蒜蓉空心菜</span><div class="note">备注：少油，不要辣</div></div>
+        <a class="btn">开始做</a>
+        <div class="src">炒菜 · A-0131 外卖 · 已等 4 分钟</div>
+      </div>
+      <div class="card task">
+        <div><span class="q">2 × 扬州炒饭</span></div>
+        <a class="btn">开始做</a>
+        <div class="src">炒菜 · A-0132 自取 · 已等 1 分钟</div>
+      </div>
+      <div class="card task">
+        <div><span class="q">1 × 干炒牛河</span></div>
+        <a class="btn">开始做</a>
+        <div class="src">炒菜 · A-0132 自取 · 已等 1 分钟</div>
+      </div>
+    </div>
+    <div class="tabs"><span class="on">任务<em>5</em></span><span>已完成</span><span>我的</span></div>
+  </div><div class="caption">店内身份：只看分给自己岗位的菜（小张负责油炸炉和炒菜）</div></div>
+
+  <div><div class="phone">
+    <div class="status"><span>11:53</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="rbar"><div><b>员工工作台</b><div class="sub">小王 · 马卡蒂小馆</div></div><div class="idsw">店内</div></div>
+    <div class="seg"><span class="on">打包台<em>2</em></span></div>
+    <div class="body"><div class="card task"><div><span class="q">A-0131 待打包</span></div><a class="btn">去打包</a><div class="src">5 样已齐 · 外卖</div></div>
+      <div class="card task"><div><span class="q">A-0129 待打包</span></div><a class="btn">去打包</a><div class="src">还差 1 样 · 自取</div></div></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <h2>切换身份</h2>
+      <div class="idopt on"><div class="row"><b>店内员工</b><span class="tag ok">当前</span></div><div class="muted">岗位：打包台 · 现在有 2 个任务</div></div>
+      <div class="idopt"><div class="row"><b>骑手</b><span class="tag brand">1 单待取餐</span></div><div class="muted">切过去后开始上报位置，可以接配送任务</div></div>
+      <div class="muted small">身份由店长在“员工”页分配。小王有两个身份：打包台、骑手。</div>
+      <a class="btn primary block big">切到骑手身份</a>
+    </div>
+  </div><div class="caption">一个员工多个身份：点右上角切换</div></div>
+
+  <div><div class="phone">
+    <div class="status"><span>11:54</span><span class="sig">▂▄▆ 4G ▮</span></div>
+    <div class="rbar"><div><b>员工工作台</b><div class="sub">小王 · 马卡蒂小馆</div></div><div class="idsw">骑手</div></div>
+    <div class="gps ok">● 定位正常 · 每 15 秒上报一次 · 切回店内后停止</div>
+    <div class="body">
+      <div class="card new">
+        <div class="row between"><b class="no">A-0127</b><span class="tag brand">新任务 · 待取餐</span></div>
+        <div class="line"><span class="dot s"></span>马卡蒂小馆 · <span class="ok-t">已打包 2 袋</span></div>
+        <div class="line"><span class="dot c"></span>马卡蒂 CBD · 88 Ayala Ave 12 楼 1203</div>
+        <div class="row between meta"><span>约 1.4 公里</span><span>货到付款 <b class="price">₱486</b></span></div>
+        <a class="btn primary block">去取餐</a>
+      </div>
+      <div class="today">只有骑手身份能取餐和送达。店内身份下看不到配送任务的操作按钮。</div>
+    </div>
+    <div class="tabs"><span class="on">任务<em>1</em></span><span>已完成</span><span>我的</span></div>
+  </div><div class="caption">骑手身份：配送任务，和之前的骑手端一样</div></div>
+</section>
+
+<section id="staff-list" style="padding-bottom:28px">
+  <div class="pc">
+    <div class="pc-nav"><b>马卡蒂小馆</b><span>订单</span><span>桌台</span><span>后厨</span><span>菜单</span><span>模板</span><span>优惠</span><span>核款</span><span>配送地图</span><span class="on">员工</span><span>设置</span><span class="me">陈店长 ▾</span></div>
+    <div class="pc-body">
+      <div class="pc-head"><h1>员工 <span class="muted" style="font-size:14px;font-weight:400">7 人在职 · 1 人已停用</span></h1><input value="" placeholder="搜姓名、账号、手机"><a class="btn primary">＋ 新增员工</a></div>
+      <div class="filters"><span class="on">全部 8</span><span>油炸炉 2</span><span>炒菜 2</span><span>饮品 1</span><span>打包台 2</span><span>骑手 3</span><span>后台权限 2</span><span>已停用 1</span></div>
+      <table class="staff">
+        <tr><th style="width:24%">员工</th><th style="width:14%">手机</th><th>岗位</th><th style="width:11%">后台权限</th><th style="width:15%">现在</th><th style="width:13%"></th></tr>
+        <tr><td><span class="av" style="background:#d9480f">陈</span><b>陈店长</b> <span class="muted small">chen</span></td><td>0917 555 0101</td><td><span class="post no">没有岗位</span></td><td><span class="tag brand">店主</span></td><td class="live"><i></i>在后台</td><td class="right"><a class="btn small">编辑</a></td></tr>
+        <tr class="sel"><td><span class="av" style="background:#1d4ed8">张</span><b>小张</b> <span class="muted small">zhang</span></td><td>0917 555 0102</td><td><span class="post st">油炸炉</span><span class="post st">炒菜</span></td><td><span class="muted">无</span></td><td class="live"><i></i>店内 · 5 个任务</td><td class="right"><a class="btn small">编辑</a></td></tr>
+        <tr><td><span class="av" style="background:#18794e">李</span><b>小李</b> <span class="muted small">li</span></td><td>0917 555 0103</td><td><span class="post rd">骑手</span></td><td><span class="muted">无</span></td><td class="live"><i></i>骑手 · 配送中 2 单</td><td class="right"><a class="btn small">编辑</a></td></tr>
+        <tr><td><span class="av" style="background:#7c3aed">王</span><b>小王</b> <span class="muted small">wang</span></td><td>0917 555 0104</td><td><span class="post pk">打包台</span><span class="post rd">骑手</span></td><td><span class="muted">无</span></td><td class="live"><i></i>店内 · 2 个任务</td><td class="right"><a class="btn small">编辑</a></td></tr>
+        <tr><td><span class="av" style="background:#b45309">赵</span><b>赵姐</b> <span class="muted small">zhao</span></td><td>0917 555 0105</td><td><span class="post pk">打包台</span><span class="post st">饮品</span></td><td><span class="tag">收银</span></td><td class="live"><i></i>在后台</td><td class="right"><a class="btn small">编辑</a></td></tr>
+        <tr><td><span class="av" style="background:#0e7490">刘</span><b>阿刘</b> <span class="muted small">liu</span></td><td>0917 555 0106</td><td><span class="post st">油炸炉</span><span class="post st">炒菜</span></td><td><span class="muted">无</span></td><td class="live off"><i></i>没上班</td><td class="right"><a class="btn small">编辑</a></td></tr>
+        <tr><td><span class="av" style="background:#be185d">周</span><b>小周</b> <span class="muted small">zhou</span></td><td>0917 555 0107</td><td><span class="post rd">骑手</span></td><td><span class="muted">无</span></td><td class="live off"><i></i>没上班</td><td class="right"><a class="btn small">编辑</a></td></tr>
+        <tr class="offr"><td><span class="av" style="background:#9ca3af">吴</span><b>老吴</b> <span class="small">wu</span></td><td>0917 555 0108</td><td><span class="post no">骑手（已停用）</span></td><td>无</td><td class="live off"><i></i>已停用</td><td class="right"><a class="btn small">恢复</a></td></tr>
+      </table>
+      <p class="muted small" style="margin-top:12px">岗位决定员工在“员工工作台”里能看到什么任务。没有分人的工作台：<b style="color:var(--warn)">凉菜</b>，这个工作台的菜现在只有后厨大屏能看到。</p>
+    </div>
+  </div>
+  <div class="caption">商家端新增“员工”页：谁负责什么岗位、现在在做什么，一眼看清</div>
+</section>
+
+<section id="staff-edit" style="padding-bottom:28px">
+  <div class="pc">
+    <div class="pc-nav"><b>马卡蒂小馆</b><span>订单</span><span>桌台</span><span>后厨</span><span>菜单</span><span>模板</span><span>优惠</span><span>核款</span><span>配送地图</span><span class="on">员工</span><span>设置</span><span class="me">陈店长 ▾</span></div>
+    <div class="pc-body" style="min-height:700px;opacity:.55">
+      <div class="pc-head"><h1>员工</h1><a class="btn primary">＋ 新增员工</a></div>
+      <table class="staff" style="width:760px">
+        <tr><th>员工</th><th>岗位</th><th>后台权限</th></tr>
+        <tr><td><span class="av" style="background:#d9480f">陈</span><b>陈店长</b></td><td><span class="post no">没有岗位</span></td><td><span class="tag brand">店主</span></td></tr>
+        <tr class="sel"><td><span class="av" style="background:#1d4ed8">张</span><b>小张</b></td><td><span class="post st">油炸炉</span><span class="post st">炒菜</span></td><td>无</td></tr>
+        <tr><td><span class="av" style="background:#18794e">李</span><b>小李</b></td><td><span class="post rd">骑手</span></td><td>无</td></tr>
+        <tr><td><span class="av" style="background:#7c3aed">王</span><b>小王</b></td><td><span class="post pk">打包台</span><span class="post rd">骑手</span></td><td>无</td></tr>
+        <tr><td><span class="av" style="background:#b45309">赵</span><b>赵姐</b></td><td><span class="post pk">打包台</span><span class="post st">饮品</span></td><td><span class="tag">收银</span></td></tr>
+      </table>
+    </div>
+    <div class="drawer">
+      <div class="row between"><h2>编辑员工 · 小张</h2><span class="muted">✕</span></div>
+      <div class="two"><label class="f"><span>姓名</span><input value="小张"></label><label class="f"><span>手机</span><input value="0917 555 0102"></label></div>
+      <div class="two"><label class="f"><span>登录账号</span><input value="zhang"></label><label class="f"><span>密码</span><a class="btn" style="width:100%">重置密码</a></label></div>
+      <div class="grp">
+        <div class="lab"><b>店内岗位</b>　可多选。选了哪些，他在工作台的“店内”身份里就看到哪些任务</div>
+        <div class="sub">工作台（在“设置”里增减）</div>
+        <div class="opts"><span class="opt on"><i></i>油炸炉</span><span class="opt on"><i></i>炒菜</span><span class="opt"><i></i>凉菜</span><span class="opt"><i></i>饮品</span></div>
+        <div class="sub">其他</div>
+        <div class="opts"><span class="opt"><i></i>打包台</span></div>
+      </div>
+      <div class="grp">
+        <div class="lab"><b>骑手</b>　勾上才能被指派配送、才能取餐和送达</div>
+        <div class="opts"><span class="opt"><i></i>骑手</span></div>
+      </div>
+      <div class="grp">
+        <div class="lab"><b>后台权限</b>　能不能进商家后台，和岗位分开管</div>
+        <div class="opts"><span class="opt r on"><i></i>无</span><span class="opt r"><i></i>收银</span><span class="opt r"><i></i>店长</span></div>
+      </div>
+      <div class="foot"><a class="btn danger">停用</a><a class="btn link danger-t">删除</a><span class="sp"></span><a class="btn">取消</a><a class="btn primary">保存</a></div>
+    </div>
+  </div>
+  <div class="caption">新增和编辑：基本信息、岗位（多选）、后台权限</div>
+</section>
+</body>
+</html>
