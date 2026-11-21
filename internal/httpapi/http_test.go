@@ -840,3 +840,106 @@ func TestTemplatesOverHTTP(t *testing.T) {
 		t.Fatalf("template crossed merchants: %v", l)
 	}
 }
+
+// TestMapZonesOverHTTP covers who may change the delivery map and what the
+// customer side gets to see.
+func TestMapZonesOverHTTP(t *testing.T) {
+	f, other := newFixture(t), newFixture(t)
+	b := "/merchant/branches/" + fmt.Sprint(f.branchID)
+	owner, cashier, stranger := login(t, f.owner), login(t, f.cashier), login(t, other.owner)
+	anon := newClient(t)
+
+	if cfg := anon.want(200, "", "GET", "/config", nil); cfg["maps_key"] != "" {
+		t.Fatalf("config without a key: %v", cfg)
+	}
+
+	loc := map[string]any{"lat": 14.55, "lng": 121.02, "address": "1 Map St"}
+	cashier.want(403, "FORBIDDEN", "PUT", b+"/location", loc)
+	stranger.want(404, "NOT_FOUND", "PUT", b+"/location", loc)
+	anon.want(401, "UNAUTHENTICATED", "PUT", b+"/location", loc)
+	if br := owner.want(200, "", "PUT", b+"/location", loc); br["lat"] != 14.55 || br["address"] != "1 Map St" {
+		t.Fatalf("location: %v", br)
+	}
+
+	// about 1.1 km square with the store in a corner
+	square := [][]float64{{14.55, 121.02}, {14.55, 121.03}, {14.56, 121.03}, {14.56, 121.02}}
+	zone := map[string]any{"name": "Near", "fee": 4900, "min_order": 0, "active": true, "polygon": square,
+		"color": "#2a78d6", "eta_minutes": 25}
+	cashier.want(403, "FORBIDDEN", "POST", b+"/zones", zone)
+	stranger.want(404, "NOT_FOUND", "POST", b+"/zones", zone)
+	bow := map[string]any{"name": "Bow", "fee": 1, "active": true,
+		"polygon": [][]float64{{14.55, 121.02}, {14.56, 121.03}, {14.55, 121.03}, {14.56, 121.02}}}
+	owner.want(422, "ZONE_SELF_INTERSECTS", "POST", b+"/zones", bow)
+	zid := fmt.Sprint(int64(owner.want(200, "", "POST", b+"/zones", zone)["id"].(float64)))
+
+	order := map[string]any{"ids": []any{f.zoneID}}
+	owner.want(422, "VALIDATION", "PUT", b+"/zone-order", order)
+	order["ids"] = []any{json.Number(zid), f.zoneID}
+	cashier.want(403, "FORBIDDEN", "PUT", b+"/zone-order", order)
+	owner.want(200, "", "PUT", b+"/zone-order", order)
+
+	mode := map[string]any{"zone_mode": "map", "zone_tolerance_m": 200}
+	cashier.want(403, "FORBIDDEN", "PUT", b+"/zone-mode", mode)
+	if br := owner.want(200, "", "PUT", b+"/zone-mode", mode); br["zone_mode"] != "map" {
+		t.Fatalf("zone mode: %v", br)
+	}
+
+	// The platform admin may look but not touch.
+	if err := a.EnsurePlatformAdmin(context.Background(), "admin-map", "password1"); err != nil {
+		t.Fatal(err)
+	}
+	admin := login(t, "admin-map")
+	if zs := admin.want(200, "", "GET", b+"/menu", nil)["zones"].([]any); len(zs) != 2 ||
+		len(zs[0].(map[string]any)["polygon"].([]any)) != 4 {
+		t.Fatalf("admin view of zones: %v", zs)
+	}
+	admin.want(403, "READ_ONLY", "PUT", b+"/location", loc)
+	admin.want(403, "READ_ONLY", "DELETE", b+"/zones/"+zid, nil)
+
+	// The storefront carries what the customer's map needs.
+	sf := anon.want(200, "", "GET", "/stores/"+f.slug, nil)
+	br := sf["branch"].(map[string]any)
+	if br["zone_mode"] != "map" || br["lat"] != 14.55 || len(sf["zones"].([]any)[0].(map[string]any)["polygon"].([]any)) != 4 {
+		t.Fatalf("storefront: %v %v", br, sf["zones"])
+	}
+
+	at := func(lat, lng float64) map[string]any { return map[string]any{"lat": lat, "lng": lng} }
+	in := anon.want(200, "", "POST", "/stores/"+f.slug+"/locate", at(14.555, 121.025))
+	if z, _ := in["zone"].(map[string]any); z == nil || z["name"] != "Near" || z["eta_minutes"] != float64(25) || in["distance_m"] != float64(0) {
+		t.Fatalf("locate inside: %v", in)
+	}
+	out := anon.want(200, "", "POST", "/stores/"+f.slug+"/locate", at(14.60, 121.025))
+	if out["zone"] != nil || out["nearest"].(map[string]any)["name"] != "Near" {
+		t.Fatalf("locate outside: %v", out)
+	}
+	anon.want(422, "VALIDATION", "POST", "/stores/"+f.slug+"/locate", map[string]any{"lat": 14.5})
+	anon.want(422, "VALIDATION", "POST", "/stores/"+f.slug+"/locate", at(100, 0))
+	anon.want(404, "NOT_FOUND", "POST", "/stores/no-such-store/locate", at(14.5, 121))
+
+	// Quotes follow the pin, not the zone id the browser sends.
+	items := []map[string]any{{"item_id": f.itemID, "qty": 1}}
+	anon.want(422, "OUT_OF_ZONE", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+		"zone_id": f.zoneID, "items": items})
+	anon.want(422, "OUT_OF_ZONE", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+		"zone_id": f.zoneID, "lat": 14.60, "lng": 121.025, "items": items})
+	q := anon.want(200, "", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+		"zone_id": f.zoneID, "lat": 14.555, "lng": 121.025, "items": items})
+	if q["zone_name"] != "Near" || q["totals"].(map[string]any)["delivery_fee"] != float64(4900) {
+		t.Fatalf("quote: %v", q)
+	}
+	cust := verifiedCustomer(t)
+	placed := cust.want(200, "", "POST", "/stores/"+f.slug+"/orders", map[string]any{"quote_id": q["id"],
+		"customer_name": "Ann", "address_line": "1 Main"}, "Idempotency-Key", uniq("key"))
+	o := owner.want(200, "", "GET", "/merchant/orders/"+fmt.Sprint(int64(placed["order_id"].(float64))), nil)
+	if o["dest_lat"] != 14.555 || o["dest_lng"] != 121.025 || o["zone_distance_m"] != nil {
+		t.Fatalf("order location: %v", o)
+	}
+
+	// Removing the only drawn zone is allowed; customers are then out of range everywhere.
+	stranger.want(404, "NOT_FOUND", "DELETE", b+"/zones/"+zid, nil)
+	cashier.want(403, "FORBIDDEN", "DELETE", b+"/zones/"+zid, nil)
+	owner.want(200, "", "DELETE", b+"/zones/"+zid, nil)
+	owner.want(404, "NOT_FOUND", "DELETE", b+"/zones/"+zid, nil)
+	anon.want(422, "OUT_OF_ZONE", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+		"lat": 14.555, "lng": 121.025, "items": items})
+}

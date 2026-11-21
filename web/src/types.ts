@@ -5,9 +5,13 @@ export interface Branch {
   delivery_enabled: boolean; pickup_enabled: boolean; paused: boolean
   open_time: string; close_time: string; open_now: boolean; notify_sms: boolean
   scheduling_enabled: boolean; prep_minutes: number
+  lat: number | null; lng: number | null; zone_mode: 'list' | 'map'; zone_tolerance_m: number
 }
 export interface Station { id: number; name: string; name_en: string; active: boolean; sort: number; item_count: number; open_tasks: number }
-export interface Zone { id: number; name: string; name_en: string; fee: number; min_order: number; active: boolean; sort: number }
+export type LatLngPair = [number, number]
+export interface Zone { id: number; name: string; name_en: string; fee: number; min_order: number; active: boolean; sort: number
+  polygon: LatLngPair[]; color: string; eta_minutes: number | null }
+export interface Located { zone: Zone | null; distance_m: number; nearest: { name: string; name_en: string; distance_m: number } | null }
 export interface Option { id: number; name: string; name_en: string; price_delta: number; sold_out: boolean }
 export interface OptionGroup { id: number; name: string; name_en: string; min_select: number; max_select: number; options: Option[] }
 export interface Item {
@@ -52,6 +56,7 @@ export interface Order {
   address_note: string; note: string; currency: string; totals: Totals; payment_method: string
   acceptance_status: string; packing_status: string; fulfillment_status: string; payment_status: string
   display_status: string; close_reason: string; bags: number | null; version: number; manifest_version: number
+  dest_lat: number | null; dest_lng: number | null; zone_distance_m: number | null
   accept_deadline: string; scheduled_for: string | null; release_at: string | null; timezone: string; created_at: string; items: OrderItem[]; delivery: DeliveryTask | null; cash: Cash | null
   session_id: number | null; table_name: string; amount_received: number | null; payment_note: string
 }
@@ -61,7 +66,7 @@ export interface DiningTable { id: number; name: string; qr_token: string; activ
 export interface Bill { session_id: number; table_id: number; table_name: string; status: 'open' | 'closed'; guests: number; opened_at: string; closed_at: string | null; order: Order }
 export interface TableAccess { slug: string; store_name: string; table_name: string; mode: 'qr' | 'ipad' }
 export interface BatchLine { item_id: number; qty: number; option_ids: number[]; note: string }
-export interface Quote { id: string; currency: string; service_type: string; zone_name: string; scheduled_for: string | null; totals: Totals; expires_at: string
+export interface Quote { id: string; currency: string; service_type: string; zone_name: string; zone_distance_m: number | null; scheduled_for: string | null; totals: Totals; expires_at: string
   lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string }[] }
 export interface ImportRow {
   line: number; category: string; name: string; name_en: string; description: string; price: number; station: string

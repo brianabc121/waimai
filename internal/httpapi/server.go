@@ -239,7 +239,9 @@ func (s *Server) Router() *gin.Engine {
 	})
 
 	// customer
+	api.GET("/config", s.publicConfig)
 	api.GET("/stores/:slug", s.storefront)
+	api.POST("/stores/:slug/locate", s.limit(s.publicWrites), s.locate)
 	api.POST("/otp/request", s.limit(s.otpLimit), s.otpRequest)
 	api.POST("/otp/verify", s.limit(s.otpLimit), s.otpVerify)
 	api.GET("/customer/session", s.customerSession)
@@ -297,6 +299,10 @@ func (s *Server) Router() *gin.Engine {
 	auth.PATCH("/merchant/branches/:bid/items/:id", s.patchItem)
 	auth.POST("/merchant/branches/:bid/zones", s.saveZone)
 	auth.PUT("/merchant/branches/:bid/zones/:id", s.saveZone)
+	auth.DELETE("/merchant/branches/:bid/zones/:id", s.deleteZone)
+	auth.PUT("/merchant/branches/:bid/zone-order", s.reorderZones)
+	auth.PUT("/merchant/branches/:bid/location", s.saveLocation)
+	auth.PUT("/merchant/branches/:bid/zone-mode", s.saveZoneMode)
 	auth.PUT("/merchant/branches/:bid/settings", s.saveSettings)
 	auth.GET("/merchant/branches/:bid/templates", s.listTemplates)
 	auth.PUT("/merchant/branches/:bid/templates/:channel", s.saveTemplateDraft)

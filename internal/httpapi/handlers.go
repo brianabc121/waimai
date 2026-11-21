@@ -381,6 +381,99 @@ func (s *Server) saveZone(c *gin.Context) {
 	c.JSON(200, gin.H{"id": id})
 }
 
+func (s *Server) deleteZone(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	if err := s.App.DeleteZone(c, bid, id); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (s *Server) reorderZones(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	var in struct {
+		IDs []int64 `json:"ids"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	if err := s.App.ReorderZones(c, bid, in.IDs); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (s *Server) saveLocation(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	var in app.LocationInput
+	if !bind(c, &in) {
+		return
+	}
+	b, err := s.App.SaveLocation(c, bid, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, b)
+}
+
+func (s *Server) saveZoneMode(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	var in app.ZoneModeInput
+	if !bind(c, &in) {
+		return
+	}
+	b, err := s.App.SaveZoneMode(c, bid, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, b)
+}
+
+// publicConfig is what every page may know before anyone signs in.
+func (s *Server) publicConfig(c *gin.Context) {
+	c.JSON(200, gin.H{"maps_key": s.Cfg.GoogleMapsKey})
+}
+
+func (s *Server) locate(c *gin.Context) {
+	var in struct {
+		Lat *float64 `json:"lat"`
+		Lng *float64 `json:"lng"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	if in.Lat == nil || in.Lng == nil {
+		fail(c, app.ErrValidation("lat and lng are required"))
+		return
+	}
+	loc, err := s.App.Locate(c, c.Param("slug"), *in.Lat, *in.Lng)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, loc)
+}
+
 func (s *Server) saveSettings(c *gin.Context) {
 	bid, ok := branchScope(c, managerRoles)
 	if !ok {

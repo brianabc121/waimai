@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -222,26 +224,161 @@ type ZoneInput struct {
 	MinOrder int64  `json:"min_order"`
 	Active   bool   `json:"active"`
 	Sort     int    `json:"sort"`
+	// Polygon nil keeps a zone without an outline (list mode only).
+	Polygon    Polygon `json:"polygon"`
+	Color      string  `json:"color"`
+	EtaMinutes *int    `json:"eta_minutes"`
 }
 
+var zoneColorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+// SaveZone creates (id 0) or replaces a delivery zone. A new zone goes to the
+// end of the priority order unless Sort says otherwise; ReorderZones moves it.
 func (a *App) SaveZone(ctx context.Context, branchID, id int64, in ZoneInput) (int64, error) {
 	if strings.TrimSpace(in.Name) == "" || in.Fee < 0 || in.MinOrder < 0 {
 		return 0, ErrValidation("zone needs a name and non-negative amounts")
 	}
+	if in.Color != "" && !zoneColorRe.MatchString(in.Color) {
+		return 0, ErrValidation("color must look like #2a78d6")
+	}
+	if in.EtaMinutes != nil && (*in.EtaMinutes < 1 || *in.EtaMinutes > 600) {
+		return 0, ErrValidation("estimated minutes must be 1 to 600")
+	}
+	var poly any // SQL NULL when the zone has no outline
+	if len(in.Polygon) > 0 {
+		b, err := a.BranchByID(ctx, branchID)
+		if err != nil {
+			return 0, err
+		}
+		if err := checkPolygon(in.Polygon, b.latLng()); err != nil {
+			return 0, err
+		}
+		raw, _ := json.Marshal(in.Polygon)
+		poly = string(raw)
+	}
 	var err error
 	if id == 0 {
-		err = a.DB.QueryRow(ctx, `INSERT INTO delivery_zones (branch_id, name, name_en, fee, min_order, active, sort)
-			VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`, branchID, in.Name, in.NameEn, in.Fee, in.MinOrder,
-			in.Active, in.Sort).Scan(&id)
+		err = a.DB.QueryRow(ctx, `INSERT INTO delivery_zones (branch_id, name, name_en, fee, min_order, active, sort,
+			polygon, color, eta_minutes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10) RETURNING id`,
+			branchID, in.Name, in.NameEn, in.Fee, in.MinOrder, in.Active, in.Sort, poly, in.Color,
+			in.EtaMinutes).Scan(&id)
 	} else {
-		err = a.DB.QueryRow(ctx, `UPDATE delivery_zones SET name=$3, name_en=$4, fee=$5, min_order=$6, active=$7, sort=$8
-			WHERE id=$1 AND branch_id=$2 RETURNING id`, id, branchID, in.Name, in.NameEn, in.Fee, in.MinOrder,
-			in.Active, in.Sort).Scan(&id)
+		err = a.DB.QueryRow(ctx, `UPDATE delivery_zones SET name=$3, name_en=$4, fee=$5, min_order=$6, active=$7, sort=$8,
+			polygon=$9::jsonb, color=$10, eta_minutes=$11 WHERE id=$1 AND branch_id=$2 RETURNING id`,
+			id, branchID, in.Name, in.NameEn, in.Fee, in.MinOrder, in.Active, in.Sort, poly, in.Color,
+			in.EtaMinutes).Scan(&id)
 	}
 	if isNoRows(err) {
 		return 0, ErrNotFound
 	}
 	return id, err
+}
+
+// DeleteZone removes a zone. Orders keep the zone's name and fee as they were
+// when placed, so history is unaffected.
+func (a *App) DeleteZone(ctx context.Context, branchID, id int64) error {
+	tag, err := a.DB.Exec(ctx, `DELETE FROM delivery_zones WHERE id=$1 AND branch_id=$2`, id, branchID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ReorderZones sets the priority order: where outlines overlap, the earlier
+// zone wins. ids must be exactly the branch's zones.
+func (a *App) ReorderZones(ctx context.Context, branchID int64, ids []int64) error {
+	return a.inTx(ctx, func(tx pgx.Tx) error {
+		var n int
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM delivery_zones WHERE branch_id=$1`, branchID).Scan(&n); err != nil {
+			return err
+		}
+		seen := map[int64]bool{}
+		for _, id := range ids {
+			seen[id] = true
+		}
+		if len(ids) != n || len(seen) != n {
+			return ErrValidation("ids must list every zone of the store exactly once")
+		}
+		for i, id := range ids {
+			tag, err := tx.Exec(ctx, `UPDATE delivery_zones SET sort=$3 WHERE id=$1 AND branch_id=$2`, id, branchID, i)
+			if err != nil {
+				return err
+			}
+			if tag.RowsAffected() == 0 {
+				return ErrValidation("ids must list every zone of the store exactly once")
+			}
+		}
+		return nil
+	})
+}
+
+type LocationInput struct {
+	Lat     float64 `json:"lat"`
+	Lng     float64 `json:"lng"`
+	Address string  `json:"address"`
+}
+
+// SaveLocation sets where the store is. Zone outlines do not move with it.
+func (a *App) SaveLocation(ctx context.Context, branchID int64, in LocationInput) (*Branch, error) {
+	if !validLatLng(LatLng{in.Lat, in.Lng}) {
+		return nil, ErrValidation("invalid coordinates")
+	}
+	in.Address = strings.TrimSpace(in.Address)
+	if len(in.Address) > 300 {
+		return nil, ErrValidation("address is too long")
+	}
+	tag, err := a.DB.Exec(ctx, `UPDATE branches SET lat=$2, lng=$3, address=CASE WHEN $4 = '' THEN address ELSE $4 END
+		WHERE id=$1`, branchID, in.Lat, in.Lng, in.Address)
+	if err != nil {
+		return nil, err
+	}
+	if tag.RowsAffected() == 0 {
+		return nil, ErrNotFound
+	}
+	return a.BranchByID(ctx, branchID)
+}
+
+type ZoneModeInput struct {
+	ZoneMode       string `json:"zone_mode"`
+	ZoneToleranceM int    `json:"zone_tolerance_m"`
+}
+
+// SaveZoneMode switches between picking a zone from a list and locating on
+// the map, and sets the tolerance outside the outlines.
+func (a *App) SaveZoneMode(ctx context.Context, branchID int64, in ZoneModeInput) (*Branch, error) {
+	if in.ZoneMode != "list" && in.ZoneMode != "map" {
+		return nil, ErrValidation("zone_mode must be list or map")
+	}
+	if in.ZoneToleranceM < 0 || in.ZoneToleranceM > 500 {
+		return nil, ErrValidation("tolerance must be 0 to 500 metres")
+	}
+	if in.ZoneMode == "map" {
+		b, err := a.BranchByID(ctx, branchID)
+		if err != nil {
+			return nil, err
+		}
+		var drawn int
+		if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM delivery_zones WHERE branch_id=$1 AND active
+			AND polygon IS NOT NULL`, branchID).Scan(&drawn); err != nil {
+			return nil, err
+		}
+		if b.latLng() == nil || drawn == 0 {
+			return nil, Err(http.StatusConflict, "MAP_NOT_READY",
+				"set the store location and draw at least one active zone first")
+		}
+	}
+	tag, err := a.DB.Exec(ctx, `UPDATE branches SET zone_mode=$2, zone_tolerance_m=$3 WHERE id=$1`,
+		branchID, in.ZoneMode, in.ZoneToleranceM)
+	if err != nil {
+		return nil, err
+	}
+	if tag.RowsAffected() == 0 {
+		return nil, ErrNotFound
+	}
+	return a.BranchByID(ctx, branchID)
 }
 
 type SettingsInput struct {
