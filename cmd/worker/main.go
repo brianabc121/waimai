@@ -26,5 +26,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
-	a.RunWorker(ctx, log.Printf)
+	a.RunWorker(ctx, log.Printf, false)
 }

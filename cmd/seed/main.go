@@ -29,8 +29,26 @@ func main() {
 	must(a.EnsurePlatformAdmin(ctx, "admin", demoPassword))
 	seedStore(ctx, a, "makati", "马卡蒂小馆", "Makati Kitchen", "owner1", true)
 	seedStore(ctx, a, "bgc", "BGC 面馆", "BGC Noodle House", "owner2", false)
+	seedFailedJobs(ctx, a)
 	log.Printf("seed done. Demo password for every account: %s", demoPassword)
 	log.Print("accounts: admin · owner1 cashier1 kitchen1 rider1 rider2 (store makati) · owner2 (store bgc)")
+}
+
+// seedFailedJobs leaves two text messages that ran out of attempts, so that
+// the job queue page of the back office has something to retry and discard.
+// They come back when seed runs again after they were dealt with.
+func seedFailedJobs(ctx context.Context, a *app.App) {
+	var n int
+	must(a.DB.QueryRow(ctx, `SELECT count(*) FROM jobs WHERE status='failed' AND payload->>'phone' LIKE '+63900000%'`).Scan(&n))
+	if n > 0 {
+		return
+	}
+	for i, reason := range []string{"twilio: 21211 invalid 'To' phone number", "post: context deadline exceeded"} {
+		_, err := a.DB.Exec(ctx, `INSERT INTO jobs (kind, payload, status, attempts, last_error, finished_at)
+			VALUES ('sms', jsonb_build_object('phone', $1::text, 'message', $2::text), 'failed', 5, $3, now())`,
+			fmt.Sprintf("+6390000001%02d", i), "【马卡蒂小馆】A00"+fmt.Sprint(i+1)+" 商家已接单，正在备餐。The store accepted your order and is preparing it.", reason)
+		must(err)
+	}
 }
 
 func must(err error) {

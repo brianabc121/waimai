@@ -184,6 +184,44 @@ if ((await admin.content()).includes(newPassword)) throw new Error('the generate
 await shot(admin, 'a6-audit')
 step('every change is in the audit trail, without the password')
 
+// ---- worker and job queue ----
+await admin.click('.adm-side a[href="/admin/worker"]')
+await admin.waitForSelector('tr[data-instance=online]')
+for (const task of ['expire_pending', 'release_scheduled', 'jobs', 'cleanup']) {
+  await admin.waitForSelector(`tr[data-task=${task}] .tag.ok`)
+}
+step('the worker page shows a live worker and its four periodic tasks')
+
+const failed = Number(await admin.textContent('[data-testid=q-failed]'))
+if (failed < 2) throw new Error(`expected the two failed demo jobs, found ${failed}: run the seed again`)
+expect(await admin.textContent('[data-testid=failed-badge]'), String(failed), 'failed badge in the sidebar')
+await admin.click('[data-tab=failed]')
+await admin.waitForFunction(() => { const r = document.querySelectorAll('tr[data-job]'); return r.length > 0 && [...r].every(x => x.dataset.status === 'failed') })
+await shot(admin, 'a7-worker')
+const first = admin.locator('tr[data-job]').first()
+const jobId = await first.getAttribute('data-job')
+if (!/^\+63900•+\d\d$/.test((await first.locator('td').nth(2).textContent()).trim())) throw new Error('the phone number of a job is not masked')
+await first.locator('[data-act=details]').click()
+await admin.waitForSelector('[data-testid=job-message]')
+await shot(admin, 'a8-job-detail')
+await admin.click('[data-testid=job-detail] .df button:has-text("关闭")')
+step('failed jobs are listed with a masked phone number; the message is in the details')
+
+answer(admin, '')
+await first.locator('[data-act=discard]').click()
+await admin.waitForFunction((id) => !document.querySelector(`tr[data-job="${id}"]`), jobId)
+await admin.click('[data-tab=discarded]')
+await admin.waitForSelector(`tr[data-job="${jobId}"][data-status=discarded]`)
+answer(admin, '')
+await admin.click('[data-testid=retry-all]')
+await admin.waitForSelector('[data-testid=notice]')
+await admin.waitForFunction(() => document.querySelector('[data-testid=q-failed]').textContent === '0')
+await admin.waitForFunction(() => !document.querySelector('[data-testid=failed-badge]'))
+await admin.click(`tr[data-job="${jobId}"] [data-act=retry]`)
+await admin.click('[data-tab=done]')
+await admin.waitForSelector(`tr[data-job="${jobId}"][data-status=done]`, { timeout: 30000 })
+step('a job can be discarded, brought back and retried; retry-all clears the failed ones')
+
 // ---- a merchant account has no way in ----
 const other = await open({ width: 1280, height: 900 })
 await signIn(other, 'owner1', 'demo1234')

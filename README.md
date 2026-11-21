@@ -49,7 +49,7 @@ docker compose run --rm seed    # 可选：载入演示数据
 | 堂食平板点菜 | `/ipad` | 在桌台页生成配对码后输入 |
 | 后厨、打包和上菜 | `/login` | `kitchen1` |
 | 骑手 | `/login` | `rider1`、`rider2` |
-| 平台管理后台（商户、商品、操作记录，见 docs/ADMIN_DESIGN.md） | `/login` | `admin` |
+| 平台管理后台（商户、商品、Worker 和任务队列、操作记录，见 docs/ADMIN_DESIGN.md） | `/login` | `admin` |
 | 第二个商户（验证隔离） | `/login` | `owner2`，门店 `/s/bgc` |
 
 开发时设置 `OTP_DEV_ECHO=true`，验证码会直接显示在结账页。生产环境必须关闭，并用 `SMS_PROVIDER` 选择短信服务商（`twilio`，或用 `webhook` 接本地短信网关，见 `.env.example`）。

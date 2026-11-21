@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import './strings'
 import { useRoute, useRouter } from 'vue-router'
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { locale, setLocale, t } from '../../i18n'
 import { logout, session } from '../../session'
+import { loadWorkerStatus, monitor, poll } from './monitor'
 
 const router = useRouter()
 const route = useRoute()
 const title = computed(() => t(String(route.meta.title ?? 'ad.title')))
+// the failed-job badge stays current on every page; errors here are shown by the page itself
+let stop = () => {}
+onMounted(() => { if (session.user?.is_platform_admin) stop = poll(() => loadWorkerStatus().catch(() => {}), 60) })
+onUnmounted(() => stop())
 async function out() { await logout(); session.loaded = true; router.replace('/login') }
 </script>
 
@@ -15,6 +20,8 @@ async function out() { await logout(); session.loaded = true; router.replace('/l
   <div class="adm">
     <nav class="adm-side">
       <div class="brand">{{ t('ad.product') }}<small>{{ t('ad.title') }}</small></div>
+      <div class="grp">{{ t('ad.g_monitor') }}</div>
+      <router-link to="/admin/worker">{{ t('ad.worker') }}<span v-if="monitor.failedJobs" class="badge" data-testid="failed-badge">{{ monitor.failedJobs }}</span></router-link>
       <div class="grp">{{ t('ad.g_merchants') }}</div>
       <router-link to="/admin/merchants">{{ t('ad.merchants') }}</router-link>
       <router-link to="/admin/items">{{ t('ad.items') }}</router-link>

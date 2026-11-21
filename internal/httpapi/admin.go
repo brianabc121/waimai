@@ -74,6 +74,12 @@ func (s *Server) adminRoutes(admin *gin.RouterGroup) {
 	admin.PUT("/branches/:bid/items/:id", s.adminSaveItem)
 	admin.PATCH("/branches/:bid/items/:id", s.adminPatchItem)
 
+	admin.GET("/worker", s.adminWorker)
+	admin.GET("/jobs", s.adminListJobs)
+	admin.POST("/jobs/retry-failed", s.adminRetryFailedJobs)
+	admin.GET("/jobs/:id", s.adminGetJob)
+	admin.POST("/jobs/:id/:action", s.adminJobAction) // retry, discard
+
 	admin.GET("/audit", s.adminAudit)
 }
 
@@ -401,4 +407,67 @@ func (s *Server) adminAudit(c *gin.Context) {
 		return
 	}
 	c.JSON(200, l)
+}
+
+// ---- worker and job queue ----
+
+func (s *Server) adminWorker(c *gin.Context) {
+	w, err := s.App.WorkerStatus(c)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, w)
+}
+
+func (s *Server) adminListJobs(c *gin.Context) {
+	l, err := s.App.ListJobs(c, app.JobFilter{Status: c.Query("status"), Kind: c.Query("kind"), Page: queryPage(c)})
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, l)
+}
+
+func (s *Server) adminGetJob(c *gin.Context) {
+	id, found := idParam(c, "id")
+	if !found {
+		return
+	}
+	j, err := s.App.GetJob(c, id)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, j)
+}
+
+func (s *Server) adminJobAction(c *gin.Context) {
+	id, found := idParam(c, "id")
+	if !found {
+		return
+	}
+	switch c.Param("action") {
+	case "retry":
+		ok(c, s.App.RetryJob(c, adminActor(c), id))
+	case "discard":
+		ok(c, s.App.DiscardJob(c, adminActor(c), id))
+	default:
+		fail(c, app.ErrNotFound)
+	}
+}
+
+func (s *Server) adminRetryFailedJobs(c *gin.Context) {
+	var in struct {
+		Kind string `json:"kind"`
+	}
+	if c.Request.ContentLength != 0 && !bind(c, &in) {
+		return
+	}
+	n, err := s.App.RetryFailedJobs(c, adminActor(c), in.Kind)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"retried": n})
 }

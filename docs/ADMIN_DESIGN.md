@@ -5,8 +5,8 @@
 | 批次 | 状态 |
 |---|---|
 | 第一批：商户、门店、账号、商品、操作记录、只读进入门店 | 已实现 |
-| 第二批：Worker 和任务队列 | 进行中 |
-| 第三批：API 监控和总览 | 待做 |
+| 第二批：Worker 和任务队列 | 已实现 |
+| 第三批：API 监控和总览 | 进行中 |
 
 本稿是 [DESIGN.md](DESIGN.md) 的补充，只讲平台管理员（`platform_admin`）这一端。现在的 `/admin` 页面只有“商户列表 + 新建商户”一张表单（`web/src/views/AdminView.vue`，接口 `GET｜POST /api/v1/admin/merchants`）。本稿把它扩成一个完整后台。
 
@@ -176,7 +176,7 @@ CREATE TABLE worker_tasks (
     last_started_at  TIMESTAMPTZ,
     last_ok_at       TIMESTAMPTZ,
     last_duration_ms INT NOT NULL DEFAULT 0,
-    last_result      TEXT NOT NULL DEFAULT '', -- 如“取消 2 单”
+    last_count       INT NOT NULL DEFAULT 0,   -- 这一轮处理了几条，文字由页面按语言拼
     last_error       TEXT NOT NULL DEFAULT '',
     last_error_at    TIMESTAMPTZ,
     runs             BIGINT NOT NULL DEFAULT 0,
@@ -221,6 +221,16 @@ CREATE INDEX admin_audit_logs_created_idx ON admin_audit_logs (created_at DESC);
 - **新增门店时**，该商户现有的店主自动成为新门店的店主。
 - **只读进入门店** 时，平台管理员的写请求返回 `403 READ_ONLY`。
 
+### 3.6 实现时的调整（第二批）
+
+- **周期任务存数量不存文字。** `worker_tasks.last_count` 记这一轮处理了几条，“取消 2 单”这样的文字由页面按中英文拼。
+- **正常退出的 Worker 会删掉自己的心跳行**，所以重启或发版之后不会留下一条“失联”。只有崩溃或被强杀的实例才显示失联，1 天后清理。
+- **一个 Worker 都不在线时**，页面顶部有红色提示。
+- **任务详情里的短信内容会隐去订单链接**（`/o/…`），因为拿到链接就能看到顾客的订单。列表里只有打码的手机号。
+- **重试** 适用于失败和已丢弃的任务，次数从 0 重新算。**丢弃** 适用于失败和等待中的任务，执行中的不能丢弃。“全部重试”可以按类型筛选。三个动作都写操作记录。
+- **侧栏的失败数** 每分钟刷新一次，Worker 页面本身每 10 秒刷新，浏览器标签页不在前台时暂停。
+- **演示数据** 里带两条失败的短信任务，方便试重试和丢弃。正式环境不跑 seed，不会有。
+
 ## 4. 接口
 
 都在 `/api/v1/admin` 下，沿用现有的 `requireUser` 加 `requireAdmin` 中间件和统一错误格式。列表接口统一 `?q=&status=&page=&page_size=`，返回 `{items, total}`。
@@ -229,7 +239,7 @@ CREATE INDEX admin_audit_logs_created_idx ON admin_audit_logs (created_at DESC);
 |---|---|
 | 总览 | `GET /admin/overview` |
 | API 监控 | `GET /admin/metrics/api?range=1h｜6h｜24h｜7d`（时间序列加接口排行） · `GET /admin/metrics/errors?route=&status=` |
-| Worker | `GET /admin/worker`（实例、周期任务、队列统计） · `GET /admin/jobs?status=&kind=` · `GET /admin/jobs/{id}` · `POST /admin/jobs/{id}/retry` · `POST /admin/jobs/{id}/discard` |
+| Worker | `GET /admin/worker`（实例、周期任务、队列统计） · `GET /admin/jobs?status=&kind=` · `GET /admin/jobs/{id}` · `POST /admin/jobs/{id}/retry` · `POST /admin/jobs/{id}/discard` · `POST /admin/jobs/retry-failed` |
 | 商户 | `GET /admin/merchants` · `POST /admin/merchants` · `GET /admin/merchants/{id}` · `PUT /admin/merchants/{id}` · `POST /admin/merchants/{id}/suspend｜resume｜restore` · `DELETE /admin/merchants/{id}` |
 | 门店 | `GET /admin/branches`（全部门店，给选择框用） · `GET /admin/branches/{bid}` · `POST /admin/merchants/{id}/branches` · `PUT /admin/branches/{bid}` · `DELETE /admin/branches/{bid}` |
 | 账号 | 账号列表在 `GET /admin/merchants/{id}` 里 · `POST /admin/branches/{bid}/users` · `PATCH /admin/users/{id}`（启用、停用） · `POST /admin/users/{id}/reset-password` |
