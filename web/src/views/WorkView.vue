@@ -10,6 +10,8 @@ import type { Post } from '../types'
 import WorkRider from './work/WorkRider.vue'
 import WorkStore from './work/WorkStore.vue'
 import { disablePush, enablePush, forgetPush, push, setupWorkbench } from './work/push'
+import { native, platform } from './work/native'
+import { openAppSettings } from './work/duty'
 import './work/strings'
 
 const router = useRouter()
@@ -43,7 +45,7 @@ async function togglePush() {
   pushError.value = ''
   try { await (push.on ? disablePush() : enablePush()) } catch (e) { pushError.value = (e as Error).message }
 }
-const standalone = window.matchMedia('(display-mode: standalone)').matches
+const standalone = native || window.matchMedia('(display-mode: standalone)').matches
 </script>
 
 <template>
@@ -84,9 +86,14 @@ const standalone = window.matchMedia('(display-mode: standalone)').matches
         </div>
         <div v-if="ids.includes('rider') && push.supported" class="card stack" data-testid="push-card">
           <div class="row between"><span>{{ t('wk.push') }} <span v-if="push.on" class="tag ok">{{ t('wk.push.on') }}</span></span>
-            <button class="btn small" :disabled="push.busy || push.denied" data-act="push" @click="togglePush">{{ push.on ? t('wk.push.disable') : t('wk.push.enable') }}</button></div>
-          <div class="small muted">{{ push.denied ? t('wk.push.denied') : t('wk.push.hint') }}</div>
+            <button class="btn small" :disabled="push.busy || (push.denied && !native)" data-act="push" @click="togglePush">{{ push.on ? t('wk.push.disable') : t('wk.push.enable') }}</button></div>
+          <div class="small muted">{{ push.denied ? t(native ? 'wk.push.denied_app' : 'wk.push.denied') : t('wk.push.hint') }}</div>
           <div v-if="pushError" class="banner bad small">{{ pushError }}</div>
+        </div>
+        <div v-if="native && platform === 'android' && ids.includes('rider')" class="card stack" data-testid="battery-card">
+          <b>{{ t('wk.battery') }}</b>
+          <div class="small muted">{{ t('wk.battery_hint') }}</div>
+          <button class="btn small" @click="openAppSettings">{{ t('wk.app_settings') }}</button>
         </div>
         <p v-if="!standalone" class="muted small" style="text-align:center">{{ t('wk.install') }}</p>
         <button class="btn block" data-testid="sign-out" @click="out">{{ t('sign_out') }}</button>

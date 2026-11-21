@@ -26,6 +26,9 @@ type Config struct {
 	VAPIDPublicKey  string
 	VAPIDPrivateKey string
 	VAPIDSubject    string // mailto: or https: contact for the push services
+	// FCMServiceAccount is the Firebase service account for push to the
+	// Android and iPhone apps: the JSON itself or the path of its file.
+	FCMServiceAccount string
 
 	SMSProvider        string // log (default), webhook, twilio
 	SMSWebhookURL      string
@@ -64,9 +67,10 @@ func Load() Config {
 		StaticDir:     env("STATIC_DIR", ""),
 		GoogleMapsKey: env("GOOGLE_MAPS_API_KEY", ""),
 
-		VAPIDPublicKey:  env("VAPID_PUBLIC_KEY", ""),
-		VAPIDPrivateKey: env("VAPID_PRIVATE_KEY", ""),
-		VAPIDSubject:    env("VAPID_SUBJECT", ""),
+		VAPIDPublicKey:    env("VAPID_PUBLIC_KEY", ""),
+		VAPIDPrivateKey:   env("VAPID_PRIVATE_KEY", ""),
+		VAPIDSubject:      env("VAPID_SUBJECT", ""),
+		FCMServiceAccount: env("FCM_SERVICE_ACCOUNT", ""),
 
 		PublicBaseURL:      env("PUBLIC_BASE_URL", ""),
 		SMSProvider:        env("SMS_PROVIDER", "log"),

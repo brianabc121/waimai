@@ -20,12 +20,20 @@ func NewFromConfig(pool *pgxpool.Pool, cfg config.Config) (*App, error) {
 	if sender != nil {
 		a.SMS = sender
 	}
+	a.Push = map[string]PushSender{}
 	if cfg.VAPIDPublicKey != "" && cfg.VAPIDPrivateKey != "" {
 		subject := cfg.VAPIDSubject
 		if subject == "" {
 			subject = cfg.PublicBaseURL
 		}
-		a.Push = map[string]PushSender{"web": WebPush{PublicKey: cfg.VAPIDPublicKey, PrivateKey: cfg.VAPIDPrivateKey, Subject: subject}}
+		a.Push["web"] = WebPush{PublicKey: cfg.VAPIDPublicKey, PrivateKey: cfg.VAPIDPrivateKey, Subject: subject}
+	}
+	if cfg.FCMServiceAccount != "" {
+		fcm, err := NewFCM(cfg.FCMServiceAccount)
+		if err != nil {
+			return nil, err
+		}
+		a.Push["android"], a.Push["ios"] = fcm, fcm
 	}
 	return a, nil
 }

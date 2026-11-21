@@ -1,0 +1,19 @@
+{
+  "name": "waimai-workbench-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Android shell of the staff workbench (Capacitor). It opens the workbench of one deployment and adds push and background location.",
+  "scripts": {
+    "sync": "cap sync android",
+    "apk": "cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor-community/background-geolocation": "^1.3.1",
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/push-notifications": "^8.1.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2"
+  }
+}

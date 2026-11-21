@@ -4,8 +4,11 @@ import (
 	"context"
 	"crypto/ecdh"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -311,5 +314,76 @@ func TestWebPushSender(t *testing.T) {
 	}
 	if err := w.Send(context.Background(), app.Device{Token: "{}"}, app.PushMessage{}); !errors.Is(err, app.ErrPushGone) {
 		t.Fatalf("an unusable subscription: %v", err)
+	}
+}
+
+// The app sender signs in to Google with the service account, reuses the
+// access token, and reads a removed app as gone.
+func TestFCMSender(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	noErr(t, err)
+	pemKey := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	var signIns, sends int
+	var lastAuth string
+	var lastMsg map[string]any
+	status := http.StatusOK
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/token" {
+			signIns++
+			_ = r.ParseForm()
+			if r.Form.Get("grant_type") != "urn:ietf:params:oauth:grant-type:jwt-bearer" || len(r.Form.Get("assertion")) < 100 {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			_, _ = w.Write([]byte(`{"access_token":"at-1","expires_in":3600}`))
+			return
+		}
+		sends++
+		lastAuth = r.Header.Get("Authorization")
+		_ = json.NewDecoder(r.Body).Decode(&lastMsg)
+		w.WriteHeader(status)
+		if status == http.StatusNotFound {
+			_, _ = w.Write([]byte(`{"error":{"status":"NOT_FOUND","details":[{"errorCode":"UNREGISTERED"}]}}`))
+		}
+	}))
+	defer srv.Close()
+	account, _ := json.Marshal(map[string]string{"project_id": "demo", "client_email": "push@demo.iam.gserviceaccount.com",
+		"private_key": string(pemKey), "token_uri": srv.URL + "/token"})
+	f, err := app.NewFCM(string(account))
+	noErr(t, err)
+	f.SetSendURL(srv.URL + "/send")
+
+	ctx := context.Background()
+	d := app.Device{Platform: "android", Token: "device-token"}
+	noErr(t, f.Send(ctx, d, app.PushMessage{Title: "新配送单", Body: "A012", Tag: "order-1", URL: "/work"}))
+	noErr(t, f.Send(ctx, d, app.PushMessage{Title: "x"}))
+	if signIns != 1 || sends != 2 || lastAuth != "Bearer at-1" {
+		t.Fatalf("%d sign-ins, %d sends, auth %q", signIns, sends, lastAuth)
+	}
+	msg := lastMsg["message"].(map[string]any)
+	if msg["token"] != "device-token" || msg["android"].(map[string]any)["priority"] != "HIGH" {
+		t.Fatalf("message: %v", msg)
+	}
+	status = http.StatusNotFound
+	if err := f.Send(ctx, d, app.PushMessage{Title: "x"}); !errors.Is(err, app.ErrPushGone) {
+		t.Fatalf("a removed app: %v", err)
+	}
+	status = http.StatusServiceUnavailable
+	if err := f.Send(ctx, d, app.PushMessage{Title: "x"}); err == nil || errors.Is(err, app.ErrPushGone) {
+		t.Fatalf("FCM down: %v", err)
+	}
+	// A rejected access token is dropped so the next send signs in again.
+	status = http.StatusUnauthorized
+	_ = f.Send(ctx, d, app.PushMessage{Title: "x"})
+	status = http.StatusOK
+	noErr(t, f.Send(ctx, d, app.PushMessage{Title: "x"}))
+	if signIns != 2 {
+		t.Fatalf("%d sign-ins after a rejected token", signIns)
+	}
+	if _, err := app.NewFCM(`{"project_id":"demo"}`); err == nil {
+		t.Fatal("an incomplete service account must be refused")
+	}
+	if _, err := app.NewFCM("/no/such/file.json"); err == nil {
+		t.Fatal("a missing file must be refused")
 	}
 }

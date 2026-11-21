@@ -3,6 +3,7 @@
 // and kept on the phone while there is no signal.
 import { reactive } from 'vue'
 import { ApiError, get, post } from '../../api'
+import { native, nativePost, plugin } from './native'
 
 export interface Point { lat: number; lng: number; accuracy?: number; battery?: number; at: string }
 type Geo = 'idle' | 'ok' | 'denied' | 'unsupported' | 'searching'
@@ -32,7 +33,7 @@ export async function flush() {
   if (sending || !points.length || !duty.on) return
   sending = true
   try {
-    await post('/rider/locations', { points })
+    if (!(await nativePost('/rider/locations', { points }))) await post('/rider/locations', { points })
     duty.sentAt = points[points.length - 1].at
     // Fixes taken while the request was in flight stay queued.
     write(read().filter(p => !points.some(q => q.at === p.at)))
@@ -55,10 +56,10 @@ let last: Point | null = null
 let battery: number | undefined
 let busy: () => boolean = () => false
 
-function onFix(pos: GeolocationPosition) {
+function onFix(c: { latitude: number; longitude: number; accuracy: number }, time: number) {
   duty.geo = 'ok'
-  const p: Point = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy),
-    battery, at: new Date(Math.min(pos.timestamp, Date.now())).toISOString() }
+  const p: Point = { lat: c.latitude, lng: c.longitude, accuracy: Math.round(c.accuracy),
+    battery, at: new Date(Math.min(time || Date.now(), Date.now())).toISOString() }
   // Every 15 s with a delivery in hand, every minute otherwise; a rider who
   // stands still is reported once in five minutes.
   const gap = last ? Date.parse(p.at) - Date.parse(last.at) : Infinity
@@ -69,9 +70,35 @@ function onFix(pos: GeolocationPosition) {
   void flush()
 }
 
+// In the app the phone itself keeps reading the position, with a notice in
+// the status bar, also while the screen is off.
+let nativeWatch: Promise<string> | null = null
+async function trackNative(on: boolean) {
+  const geo = await plugin('BackgroundGeolocation')
+  if (!on) {
+    const id = nativeWatch; nativeWatch = null
+    if (id) await geo.removeWatcher({ id: await id }).catch(() => {})
+    return
+  }
+  if (nativeWatch) return
+  nativeWatch = geo.addWatcher({ backgroundTitle: '员工工作台 · 上班中', backgroundMessage: '正在上报位置，下班后停止 Sharing your position while on duty',
+    requestPermissions: true, stale: false, distanceFilter: 15 }, (loc: any, err: any) => {
+    if (err) { duty.geo = err.code === 'NOT_AUTHORIZED' ? 'denied' : 'searching'; return }
+    if (loc) onFix(loc, loc.time)
+  })
+}
+// Opens the phone's settings page of the app (location permission, battery).
+export async function openAppSettings() { if (native) await (await plugin('BackgroundGeolocation')).openSettings().catch(() => {}) }
+
 // track starts or stops reading the position. hasDeliveries tells how often.
 export function track(on: boolean, hasDeliveries: () => boolean = () => false) {
   busy = hasDeliveries
+  if (native) {
+    if (on && !nativeWatch) duty.geo = 'searching'
+    if (!on) { last = null; if (duty.geo === 'ok' || duty.geo === 'searching') duty.geo = 'idle' }
+    void trackNative(on).catch(() => { duty.geo = 'unsupported' })
+    return
+  }
   if (!on) {
     if (watch !== null) navigator.geolocation.clearWatch(watch)
     watch = null; last = null
@@ -84,7 +111,8 @@ export function track(on: boolean, hasDeliveries: () => boolean = () => false) {
   ;(navigator as any).getBattery?.().then((b: any) => {
     const set = () => (battery = Math.round(b.level * 100)); set(); b.addEventListener('levelchange', set)
   }).catch(() => {})
-  watch = navigator.geolocation.watchPosition(onFix, err => { duty.geo = err.code === err.PERMISSION_DENIED ? 'denied' : 'searching' },
+  watch = navigator.geolocation.watchPosition(pos => onFix(pos.coords, pos.timestamp),
+    err => { duty.geo = err.code === err.PERMISSION_DENIED ? 'denied' : 'searching' },
     { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 })
 }
 

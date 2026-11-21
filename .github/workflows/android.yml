@@ -1,0 +1,65 @@
+name: Android app
+
+# Builds the staff workbench app. Run it by hand from the Actions tab after
+# setting the repository variable and secrets listed in docs/DEPLOY.md
+# ("安卓 App"). It also runs when the app shell itself changes.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["mobile/**", ".github/workflows/android.yml"]
+  pull_request:
+    paths: ["mobile/**", ".github/workflows/android.yml"]
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      WORKBENCH_URL: ${{ vars.WORKBENCH_URL }}
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci --no-audit --no-fund
+        working-directory: mobile
+      - name: Firebase file (push)
+        if: env.GOOGLE_SERVICES_JSON != ''
+        run: printf '%s' "$GOOGLE_SERVICES_JSON" > mobile/android/app/google-services.json
+      - name: Signing key
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/workbench.jks"
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/workbench.jks" >> "$GITHUB_ENV"
+      - run: npx cap sync android
+        working-directory: mobile
+      # With a signing key: a release build that staff can install and update.
+      # Without one: a debug build, good for a first look only.
+      - name: Build
+        working-directory: mobile/android
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_FILE" ]; then ./gradlew assembleRelease --console=plain; else ./gradlew assembleDebug --console=plain; fi
+          mkdir -p "$RUNNER_TEMP/out"
+          cp app/build/outputs/apk/*/*.apk "$RUNNER_TEMP/out/"
+          {
+            echo "### 员工工作台 Android"
+            echo "- 服务器地址 WORKBENCH_URL: ${WORKBENCH_URL:-（没有设置，装上后打不开工作台）}"
+            echo "- 推送 google-services.json: $([ -f app/google-services.json ] && echo 有 || echo 没有，App 收不到推送)"
+            echo "- 签名: $([ -n "$ANDROID_KEYSTORE_FILE" ] && echo 正式签名 || echo 调试签名，不能覆盖安装到以后的正式版上)"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: workbench-android-${{ github.run_number }}
+          path: ${{ runner.temp }}/out/*.apk
+          retention-days: 30
