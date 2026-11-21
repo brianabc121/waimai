@@ -96,3 +96,50 @@
 .rr { display: flex; gap: 10px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--line); } .rr > div { flex: 1; } .rr i { width: 12px; height: 12px; border-radius: 50%; flex: none; } .rr.off b { color: var(--muted); }
 .steps { display: flex; gap: 4px; } .steps span { flex: 1; text-align: center; font-size: 12px; padding: 6px 0; border-radius: 6px; background: #eef0f2; color: var(--muted); }
 .steps .done { background: var(--ok-soft); color: var(--ok); } .steps .cur { background: var(--brand); color: #fff; font-weight: 700; }
+
+/* v0.2 员工工作台：身份切换、店内任务 */
+.idsw { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.2); border-radius: 999px; padding: 5px 10px 5px 12px; font-size: 13px; font-weight: 700; }
+.idsw::after { content: "▾"; font-size: 11px; opacity: .85; }
+.seg { display: flex; gap: 6px; padding: 10px 16px 0; flex: none; }
+.seg span { padding: 6px 12px; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.seg .on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
+.seg em { font-style: normal; margin-left: 4px; opacity: .85; }
+.task { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
+.task .q { font-size: 17px; font-weight: 700; } .task .note { color: var(--warn); font-size: 13px; }
+.task .src { font-size: 12.5px; color: var(--muted); } .task .btn { grid-row: span 2; padding: 10px 16px; }
+.task.doing { border-left: 4px solid var(--info); } .btn.ok { background: var(--ok); border-color: var(--ok); color: #fff; }
+.late { color: var(--bad); font-weight: 600; }
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 20px 20px 0 0; padding: 18px 16px 22px; display: grid; gap: 10px; }
+.sheet h2 { font-size: 17px; } .idopt { border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 3px; }
+.idopt.on { border-color: var(--brand); background: var(--brand-soft); } .idopt b { font-size: 16px; } .idopt .row { justify-content: space-between; }
+.mini-banner { background: var(--info-soft); color: var(--info); font-size: 12.5px; padding: 6px 16px; flex: none; }
+
+/* 商家端员工页 */
+.pc { width: 1280px; margin: 28px auto 0; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; position: relative; }
+.pc-nav { background: var(--brand); color: #fff; display: flex; align-items: center; gap: 4px; padding: 0 18px; height: 50px; font-size: 14px; }
+.pc-nav b { margin-right: 18px; font-size: 16px; } .pc-nav span { padding: 6px 11px; border-radius: 8px; opacity: .88; } .pc-nav .on { background: rgba(255,255,255,.22); opacity: 1; font-weight: 700; }
+.pc-nav .me { margin-left: auto; }
+.pc-body { padding: 20px 24px 26px; background: var(--bg); min-height: 640px; }
+.pc-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; } .pc-head h1 { font-size: 20px; margin-right: auto; }
+.pc-head input { width: 220px; } .filters { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.filters span { padding: 5px 12px; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: 13px; } .filters .on { background: var(--ink); color: #fff; border-color: var(--ink); }
+table.staff { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+table.staff th { text-align: left; font-size: 12px; color: var(--muted); background: #fafafa; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+table.staff td { padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; } table.staff tr:last-child td { border: 0; }
+table.staff tr.sel td { background: var(--brand-soft); } table.staff tr.offr td { color: var(--muted); }
+.av { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; margin-right: 10px; vertical-align: middle; }
+.post { display: inline-block; padding: 2px 9px; border-radius: 6px; font-size: 12.5px; font-weight: 600; margin: 1px 4px 1px 0; }
+.post.st { background: var(--info-soft); color: var(--info); } .post.pk { background: #f1e9ff; color: #6d28d9; } .post.rd { background: var(--brand-soft); color: var(--brand-dark); } .post.no { background: #eef0f2; color: var(--muted); font-weight: 500; }
+.live { font-size: 12.5px; } .live i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 5px; } .live.off i { background: #c4c9d0; }
+.drawer { position: absolute; top: 50px; right: 0; bottom: 0; width: 460px; background: #fff; border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.12); padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+.drawer h2 { font-size: 18px; } .drawer .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.drawer label.f span, .drawer .lab { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+.drawer .lab b { color: var(--ink); font-size: 14px; }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; } .opt { border: 1.5px solid var(--line); border-radius: 10px; padding: 7px 12px; display: flex; gap: 7px; align-items: center; font-size: 14px; }
+.opt i { width: 16px; height: 16px; border: 1.5px solid #9ca3af; border-radius: 4px; flex: none; position: relative; } .opt.r i { border-radius: 50%; }
+.opt.on { border-color: var(--brand); background: var(--brand-soft); font-weight: 600; } .opt.on i { background: var(--brand); border-color: var(--brand); }
+.opt.on i::after { content: ""; position: absolute; left: 4.5px; top: 1.5px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.grp { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 9px; } .grp .sub { font-size: 12.5px; color: var(--muted); }
+.drawer .foot { margin-top: auto; display: flex; gap: 8px; align-items: center; } .drawer .foot .sp { margin-left: auto; }
+.pc + .caption { margin: 10px 0 0; }
