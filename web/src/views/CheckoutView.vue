@@ -22,6 +22,7 @@ const store = ref<Storefront | null>(null)
 const scheduled = ref('')
 const tz = computed(() => store.value?.branch.timezone)
 const slots = computed(() => store.value?.slots ?? [])
+const mapMode = computed(() => store.value?.branch.zone_mode === 'map')
 const mustSchedule = computed(() => !!store.value && !store.value.branch.open_now)
 async function loadStore() {
   store.value = await get<Storefront>(`/stores/${props.slug}`).catch(() => null)
@@ -52,7 +53,7 @@ function describe(e: unknown): string {
   switch (e.code) {
     case 'NETWORK': return t('offline')
     case 'ITEM_UNAVAILABLE': return t('unavailable')
-    case 'OUT_OF_ZONE': return t('choose_zone')
+    case 'OUT_OF_ZONE': return t(mapMode.value ? 'pin_needed' : 'choose_zone')
     case 'STORE_CLOSED': return t('closed')
     case 'SCHEDULE_INVALID': return t('schedule_invalid')
     case 'BELOW_MINIMUM': return t('below_min', { amt: money((e.details?.minimum ?? 0) - (e.details?.subtotal ?? 0), quote.value?.currency) })
@@ -68,6 +69,8 @@ async function requote() {
     quote.value = await post<Quote>(`/stores/${props.slug}/quotes`, {
       service_type: cart.service,
       zone_id: cart.service === 'delivery' ? cart.zoneId : null,
+      // Stores that locate customers on a map decide the area from the pin.
+      ...(cart.service === 'delivery' && mapMode.value ? { lat: cart.lat, lng: cart.lng } : {}),
       items: cart.lines.map(l => ({ item_id: l.item_id, qty: l.qty, option_ids: l.option_ids, note: l.note })),
       scheduled_for: scheduled.value || null,
     })
@@ -147,6 +150,7 @@ async function submit() {
 
       <div class="card stack">
         <div class="row between"><h2>{{ t(cart.service) }}</h2><span class="tag brand" v-if="quote?.zone_name">{{ quote.zone_name }}</span></div>
+        <p v-if="quote?.zone_distance_m" class="small muted" style="margin:0" data-testid="near-zone">{{ t('near_zone', { name: quote.zone_name }) }}</p>
         <label class="field"><span>{{ t('your_name') }}</span><input v-model="cart.name" maxlength="80" autocomplete="name" /></label>
         <template v-if="cart.service === 'delivery'">
           <label class="field"><span>{{ t('street') }}</span><input v-model="cart.addressLine" maxlength="300" autocomplete="street-address" /></label>

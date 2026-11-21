@@ -4,9 +4,11 @@ import type { Item } from './types'
 export interface CartLine { key: string; item_id: number; qty: number; option_ids: number[]; note: string }
 
 interface CartState { slug: string; service: 'delivery' | 'pickup'; zoneId: number | null; lines: CartLine[]
+  // The delivery pin of stores that locate customers on a map.
+  lat: number | null; lng: number | null; placeLabel: string
   name: string; addressLine: string; addressUnit: string; addressNote: string; note: string }
 
-const empty = (slug: string): CartState => ({ slug, service: 'delivery', zoneId: null, lines: [], name: '', addressLine: '', addressUnit: '', addressNote: '', note: '' })
+const empty = (slug: string): CartState => ({ slug, service: 'delivery', zoneId: null, lines: [], lat: null, lng: null, placeLabel: '', name: '', addressLine: '', addressUnit: '', addressNote: '', note: '' })
 
 export const cart = reactive<CartState>(empty(''))
 

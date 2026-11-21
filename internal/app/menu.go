@@ -360,6 +360,9 @@ func (a *App) SaveZoneMode(ctx context.Context, branchID int64, in ZoneModeInput
 		if err != nil {
 			return nil, err
 		}
+		if a.MapsOff && b.ZoneMode != "map" {
+			return nil, Err(http.StatusConflict, "MAPS_DISABLED", "this platform has no map key configured")
+		}
 		var drawn int
 		if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM delivery_zones WHERE branch_id=$1 AND active
 			AND polygon IS NOT NULL`, branchID).Scan(&drawn); err != nil {

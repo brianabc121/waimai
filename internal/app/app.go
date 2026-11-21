@@ -49,6 +49,17 @@ type App struct {
 	OTPDevEcho bool
 	// PublicBaseURL is the customer-facing origin, used for order links in SMS.
 	PublicBaseURL string
+	// MapsOff is set when the platform has no map key. Customers cannot pin
+	// an address then, so every store behaves as "pick a zone from a list".
+	MapsOff bool
+}
+
+// forCustomer applies platform-wide limits to a store as customers use it.
+func (a *App) forCustomer(b *Branch) *Branch {
+	if a.MapsOff {
+		b.ZoneMode = "list"
+	}
+	return b
 }
 
 func New(pool *pgxpool.Pool, secret string) *App {
