@@ -1,0 +1,211 @@
+# 部署教程
+
+这份教程把系统部署到一台 Linux 服务器上，用 Docker Compose 运行，前面用 Caddy 提供 HTTPS。适合一家或几家门店的试点。
+
+> 说明：写这份教程的环境里没有 Docker 守护进程，所以 Compose 的整套启动没有实际跑过，只做过 `docker compose config` 的配置校验。应用本身（迁移、接口、后台任务、前端）是用同样的程序在本机 PostgreSQL 上完整测试过的。第一次部署请按第 9 节的检查项逐条确认。
+
+## 1. 整体结构
+
+```
+浏览器 ──HTTPS──> Caddy（宿主机，自动证书，HTTP/2）
+                    └─> web 容器（Nginx：前端静态文件，/api 转发）
+                          └─> api 容器（Gin 接口和 SSE）
+                    worker 容器（后台任务：接单超时、短信、菜单导入、预约单放行）
+                    postgres 容器（或托管 PostgreSQL）
+```
+
+`api`、`worker`、`migrate`、`seed`、`admin` 是同一个镜像的不同命令。每次启动时 `migrate` 先执行数据库迁移，成功后 `api` 和 `worker` 才启动。
+
+## 2. 准备
+
+- 一台 Linux 服务器。试点规模 2 核 CPU、2 GB 内存、20 GB 硬盘够用。
+- 一个域名（下面用 `order.example.com` 举例），A 记录指向服务器。
+- 防火墙放行 80 和 443，其他端口不对外。
+- 服务器上装好 Git、Docker Engine 和 Compose 插件（`docker compose version` 能输出版本）。
+- 顾客下单要验证手机号，所以正式营业前需要一个短信渠道，见第 6 节。
+
+## 3. 获取代码并配置
+
+```bash
+git clone https://github.com/brianabc121/waimai.git
+cd waimai
+cp deploy/env.production.example .env
+chmod 600 .env
+```
+
+编辑 `.env`，把标了 `CHANGE` 的值都换掉：
+
+| 变量 | 填什么 |
+|---|---|
+| `POSTGRES_PASSWORD` | `openssl rand -hex 24` 生成。只在数据库第一次创建时生效 |
+| `DATABASE_URL` | 把里面的 `CHANGE` 换成同一个数据库密码 |
+| `APP_SECRET` | `openssl rand -hex 32` 生成。上线后不要再改，改了会让已发出的订单链接失效 |
+| `PUBLIC_BASE_URL` | 你的地址，例如 `https://order.example.com`，结尾不带斜杠 |
+| `COOKIE_SECURE` | 保持 `true` |
+| `OTP_DEV_ECHO` | 保持 `false`。设成 `true` 会把验证码直接显示在页面上，只能用于演示 |
+| `HTTP_PORT` | 保持 `127.0.0.1:8000`，只让本机的 Caddy 访问 |
+
+注意：不要把仓库根目录的 `.env.example` 直接用于 Compose。它是给本机开发用的，里面的数据库地址是 `localhost`，在容器里连不上。
+
+## 4. 启动
+
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+正常情况下 `postgres`、`api`、`worker`、`web` 是 running，`migrate` 是 exited (0)。确认接口和数据库都通：
+
+```bash
+docker compose exec api wget -qO- http://localhost:8080/readyz   # 应返回 {"ok":true}
+curl -I http://127.0.0.1:8000/                                    # 应返回 200
+```
+
+创建平台管理员（用来创建商户）。密码至少 10 位，再次执行同一条命令可以重置密码：
+
+```bash
+docker compose run --rm -e ADMIN_PASSWORD='换成你的强密码' admin
+```
+
+默认用户名是 `admin`，要换的话加 `-e ADMIN_USERNAME=名字`。
+
+想先看演示数据，可以执行 `docker compose run --rm seed`。它会创建密码都是 `demo1234` 的演示账号，其中包括把 `admin` 的密码也设成 `demo1234`。**正式环境不要执行**。如果已经执行过，请重新运行上面的 `admin` 命令改密码，并在后台停用演示账号。
+
+## 5. 配置 HTTPS
+
+在宿主机安装 Caddy（见 Caddy 官方安装文档），把 `/etc/caddy/Caddyfile` 写成：
+
+```
+order.example.com {
+    reverse_proxy 127.0.0.1:8000 {
+        flush_interval -1
+    }
+}
+```
+
+```bash
+sudo systemctl reload caddy
+```
+
+Caddy 会自动申请和续期证书，并启用 HTTP/2。HTTP/2 是必要的：每个打开的页面会保持一条实时推送连接，HTTP/1.1 下浏览器对同一域名最多 6 条连接，多开几个页面就会卡住。`flush_interval -1` 让推送不被缓冲。
+
+容器里的 Nginx 已配置为信任来自本机和内网代理的 `X-Forwarded-For`，所以限流看到的是顾客的真实地址。如果你用的是别的代理或云负载均衡，要确认它会带上这个请求头。
+
+打开 `https://order.example.com/login`，用平台管理员登录。
+
+## 6. 短信
+
+`SMS_PROVIDER` 有三个选项，改完 `.env` 后执行 `docker compose up -d` 生效：
+
+- `twilio`：填 `TWILIO_ACCOUNT_SID`、`TWILIO_AUTH_TOKEN`，再填 `TWILIO_FROM`（发信号码）或 `TWILIO_MESSAGING_SERVICE_SID`。
+- `webhook`：系统把 `{"to":"号码","message":"内容"}` 以 JSON POST 到 `SMS_WEBHOOK_URL`，可以接本地短信服务商的网关。`SMS_WEBHOOK_AUTH` 会放进 `Authorization` 请求头。
+- `log`：只写日志，不发短信。这时顾客收不到验证码，无法下单。
+
+这两种真实渠道目前只用模拟服务测过。配置好后请用真实手机号完整下一单，并查看 `docker compose logs worker` 里有没有发送失败。
+
+## 7. 开通门店
+
+1. 平台管理员登录后进入管理页，创建商户：填商户名、门店名、门店链接标识（例如 `makati`，顾客地址就是 `/s/makati`）、时区、币种和店长账号。
+2. 店长登录，在“设置”里填营业时间、税率、服务费、包装费、起送金额、配送区、后厨工作台和员工账号（收银、后厨、骑手）。
+3. 在“菜单”里建分类和菜品，或用 Excel 导入，给菜品选工作台，然后发布。
+4. 堂食：在“桌台”里新增桌台，点每张桌的“桌码”打印二维码贴在桌上。平板在浏览器打开 `/ipad`，输入桌台页生成的配对码。
+5. 在“模板”里给外卖、扫码、平板各选一个布局并发布。
+6. 把顾客链接 `https://order.example.com/s/门店标识` 发给顾客或做成二维码。
+
+设备建议：后厨屏和平板用较新的 Chrome 或 Safari，关闭自动休眠，把页面添加到主屏幕。
+
+## 8. 日常运维
+
+**看日志**
+
+```bash
+docker compose logs -f --tail=100 api worker
+```
+
+**备份**（建议每天定时执行，并把文件传到另一台机器或对象存储）
+
+```bash
+docker compose exec -T postgres pg_dump -U waimai -Fc waimai > backup-$(date +%F).dump
+```
+
+**恢复**（会覆盖现有数据，先停掉接口和后台任务）
+
+```bash
+docker compose stop api worker
+docker compose exec -T postgres pg_restore -U waimai -d waimai --clean --if-exists < backup-2026-11-21.dump
+docker compose start api worker
+```
+
+上线前请实际做一次恢复演练，确认备份文件可用。
+
+**升级**
+
+```bash
+docker compose exec -T postgres pg_dump -U waimai -Fc waimai > before-upgrade.dump
+git pull
+docker compose up -d --build
+docker compose ps
+```
+
+迁移会自动执行。升级时接口会重启几秒钟，打开的页面会自动重连并刷新。尽量在非营业时间升级。
+
+**回滚**：数据库迁移只向前，不自动回退。如果新版本有问题，先 `git checkout` 回上一个版本并重新 `docker compose up -d --build`。如果新版本的迁移和旧代码不兼容，用升级前的备份恢复。
+
+**磁盘**：旧镜像会占空间，可以定期执行 `docker image prune -f`。
+
+## 9. 上线前检查
+
+- [ ] `https://你的域名/` 能打开，证书有效，浏览器开发者工具里协议显示为 h2。
+- [ ] `.env` 里 `OTP_DEV_ECHO=false`、`COOKIE_SECURE=true`，`APP_SECRET` 和数据库密码是随机值。
+- [ ] 没有执行过 `seed`，或者演示账号已停用、`admin` 密码已重置。
+- [ ] 用真实手机号收到验证码，完成一单外卖：下单、接单、后厨备好、打包、骑手送达、核款。
+- [ ] 订单工作台和后厨屏在新订单进来时会自动刷新（说明实时推送穿过了代理）。
+- [ ] 堂食走一遍：开台、扫码点菜、平板加菜、上桌、收款关台。
+- [ ] 重启一次 `docker compose restart api worker`，页面能自动恢复，订单都在。
+- [ ] 做过一次备份和恢复演练，并设置了每天自动备份。
+- [ ] 防火墙只开放 80 和 443，8000 端口从外网访问不到。
+
+## 10. 使用托管数据库
+
+正式营业建议用云厂商的托管 PostgreSQL 16，自带备份和时间点恢复。
+
+1. 把 `.env` 里的 `DATABASE_URL` 换成托管库的地址，通常要带 `sslmode=require`。
+2. 如果这个地址经过事务级连接池（PgBouncer 的 transaction 模式，或云厂商标着 pooled 的地址），再设置 `LISTEN_DATABASE_URL` 为直连地址。否则实时推送收不到通知，页面只能靠每 30 秒的轮询刷新。
+3. 停用本地数据库容器：新建 `docker-compose.override.yml`，内容如下，然后 `docker compose up -d`。
+
+```yaml
+services:
+  postgres:
+    profiles: ["local-db"]
+  migrate:
+    depends_on: !reset []
+```
+
+`!reset` 需要较新的 Compose（2.24 及以上）。
+
+## 11. 常见问题
+
+| 现象 | 排查 |
+|---|---|
+| `migrate` 退出码不是 0 | `docker compose logs migrate`。多半是 `DATABASE_URL` 里的密码和 `POSTGRES_PASSWORD` 不一致。数据库卷已创建后再改 `POSTGRES_PASSWORD` 不会生效 |
+| 登录后马上又掉回登录页 | 用 http 访问但 `COOKIE_SECURE=true`。请用 https 地址 |
+| 顾客收不到验证码 | `SMS_PROVIDER` 是不是还是 `log`，再看 `docker compose logs worker api` |
+| 页面不自动刷新，要等半分钟 | 实时推送被代理缓冲或被连接池挡住。检查 Caddy 的 `flush_interval -1` 和第 10 节的 `LISTEN_DATABASE_URL` |
+| 很多顾客同时被提示请求太频繁 | 代理没有传真实地址，所有人被当成同一个来源。检查代理是否带 `X-Forwarded-For` |
+| 开很多页面后卡住 | 没有走 HTTP/2。确认是通过 Caddy 的 https 地址访问 |
+| 短信里没有订单链接 | 没设置 `PUBLIC_BASE_URL` |
+
+## 12. 不用 Docker 的单机运行
+
+只想在一台机器上快速跑起来（例如内部演示），可以直接用二进制，需要 Go 1.24、Node 22 和 PostgreSQL 16：
+
+```bash
+export DATABASE_URL='postgres://USER:PASS@localhost:5432/waimai?sslmode=disable'
+export APP_SECRET=$(openssl rand -hex 32)
+make web build
+./bin/migrate
+ADMIN_PASSWORD='换成你的强密码' ./bin/admin
+STATIC_DIR=web/dist EMBED_WORKER=true ./bin/api      # 接口、后台任务和前端都在 :8080
+```
+
+对外提供服务时同样要在前面放一个 HTTPS 代理，并设置 `COOKIE_SECURE=true` 和 `PUBLIC_BASE_URL`。

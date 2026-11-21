@@ -2,7 +2,7 @@
 
 面向海外华人餐厅的点餐系统，覆盖自营外卖、自取和堂食。外卖闭环：顾客点餐下单，商家接单，后厨制作和打包，骑手配送和代收现金，门店核款。堂食闭环：店员开台，顾客扫桌码或用桌上平板点菜和加菜，后厨按工作台制作，上桌，柜台收款关台。
 
-设计依据是 [docs/DESIGN.md](docs/DESIGN.md)。
+设计依据是 [docs/DESIGN.md](docs/DESIGN.md)。部署到服务器见 [docs/DEPLOY.md](docs/DEPLOY.md)。
 
 ## 技术栈
 
@@ -29,6 +29,7 @@ make run                        # 单进程启动：接口、后台任务和前�
 用 Docker Compose 启动全部服务：
 
 ```bash
+# 注意：根目录有 .env 时 Compose 会读取它，里面的 DATABASE_URL 不能是 localhost
 docker compose up --build -d
 docker compose run --rm seed    # 可选：载入演示数据
 # 打开 http://localhost:8000
@@ -73,7 +74,7 @@ BASE_URL=http://localhost:8080 make e2e
 ## 目录
 
 ```
-cmd/api  cmd/worker  cmd/migrate  cmd/seed
+cmd/api  cmd/worker  cmd/migrate  cmd/seed  cmd/admin
 internal/app        业务用例和规则
 internal/httpapi    路由、权限、SSE、限流
 internal/db         连接池和迁移 SQL
