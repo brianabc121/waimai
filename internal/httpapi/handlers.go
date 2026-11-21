@@ -1,0 +1,643 @@
+package httpapi
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/brianabc121/waimai/internal/app"
+)
+
+// ---- customer ----
+
+func (s *Server) storefront(c *gin.Context) {
+	sf, err := s.App.Storefront(c, c.Param("slug"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, sf)
+}
+
+func (s *Server) otpRequest(c *gin.Context) {
+	var in struct {
+		Phone string `json:"phone"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	code, err := s.App.RequestOTP(c, in.Phone)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	out := gin.H{"sent": true}
+	if code != "" {
+		out["dev_code"] = code // only when OTP_DEV_ECHO=true
+	}
+	c.JSON(200, out)
+}
+
+func (s *Server) otpVerify(c *gin.Context) {
+	var in struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	token, phone, err := s.App.VerifyOTP(c, in.Phone, in.Code)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	s.setCookie(c, customerCookie, token, int(app.CustomerSessionTTL.Seconds()))
+	c.JSON(200, gin.H{"verified": true, "phone": phone})
+}
+
+func (s *Server) customerPhone(c *gin.Context) (string, error) {
+	token, err := c.Cookie(customerCookie)
+	if err != nil || token == "" {
+		return "", app.Err(http.StatusForbidden, "PHONE_NOT_VERIFIED", "verify your phone number first")
+	}
+	return s.App.CustomerPhone(c, token)
+}
+
+func (s *Server) customerSession(c *gin.Context) {
+	phone, err := s.customerPhone(c)
+	if err != nil {
+		c.JSON(200, gin.H{"verified": false})
+		return
+	}
+	c.JSON(200, gin.H{"verified": true, "phone": phone})
+}
+
+func (s *Server) createQuote(c *gin.Context) {
+	var in app.QuoteInput
+	if !bind(c, &in) {
+		return
+	}
+	q, err := s.App.CreateQuote(c, c.Param("slug"), in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, q)
+}
+
+func (s *Server) placeOrder(c *gin.Context) {
+	phone, err := s.customerPhone(c)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	var in app.PlaceOrderInput
+	if !bind(c, &in) {
+		return
+	}
+	out, err := s.App.PlaceOrder(c, c.Param("slug"), phone, c.GetHeader("Idempotency-Key"), in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+// customerView removes store-internal data from an order.
+func customerView(o *app.Order) *app.Order {
+	o.Cash = nil
+	return o
+}
+
+func (s *Server) customerOrder(c *gin.Context) {
+	o, err := s.App.OrderByToken(c, c.Param("token"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, customerView(o))
+}
+
+func (s *Server) customerCancel(c *gin.Context) {
+	o, err := s.App.CustomerCancel(c, c.Param("token"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, customerView(o))
+}
+
+func (s *Server) customerEvents(c *gin.Context) {
+	o, err := s.App.OrderByToken(c, c.Param("token"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	s.Hub.serve(c, &subscription{order: o.ID})
+}
+
+// ---- auth ----
+
+func (s *Server) login(c *gin.Context) {
+	var in struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	token, u, err := s.App.Login(c, in.Username, in.Password)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	s.setCookie(c, staffCookie, token, int(app.SessionTTL.Seconds()))
+	c.JSON(200, u)
+}
+
+func (s *Server) logout(c *gin.Context) {
+	if token, err := c.Cookie(staffCookie); err == nil && token != "" {
+		_ = s.App.Logout(c, token)
+	}
+	s.setCookie(c, staffCookie, "", -1)
+	c.JSON(200, gin.H{"ok": true})
+}
+
+// ---- merchant order desk ----
+
+func (s *Server) listOrders(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	orders, err := s.App.ListOrders(c, bid, c.Query("scope"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"orders": orders})
+}
+
+func (s *Server) branchEvents(c *gin.Context) {
+	bid, ok := branchScope(c, allStaff)
+	if !ok {
+		return
+	}
+	s.Hub.serve(c, &subscription{branch: bid})
+}
+
+func (s *Server) listRiders(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	riders, err := s.App.ListStaff(c, bid, "rider")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"riders": riders})
+}
+
+func (s *Server) getOrder(c *gin.Context) {
+	id, ok := s.orderScope(c, allStaff)
+	if !ok {
+		return
+	}
+	o, err := s.App.GetOrder(c, id)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, o)
+}
+
+type orderCommand struct {
+	ExpectedVersion int    `json:"expected_version"`
+	Reason          string `json:"reason"`
+	RiderID         int64  `json:"rider_id"`
+}
+
+func (s *Server) orderCmd(c *gin.Context, roles []string, fn func(id int64, in orderCommand) (*app.Order, error)) {
+	id, ok := s.orderScope(c, roles)
+	if !ok {
+		return
+	}
+	var in orderCommand
+	if c.Request.ContentLength != 0 && !bind(c, &in) {
+		return
+	}
+	o, err := fn(id, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, o)
+}
+
+func (s *Server) acceptOrder(c *gin.Context) {
+	s.orderCmd(c, deskRoles, func(id int64, in orderCommand) (*app.Order, error) {
+		return s.App.Accept(c, id, in.ExpectedVersion, staffActor(c))
+	})
+}
+
+func (s *Server) rejectOrder(c *gin.Context) {
+	s.orderCmd(c, deskRoles, func(id int64, in orderCommand) (*app.Order, error) {
+		return s.App.Reject(c, id, in.ExpectedVersion, in.Reason, staffActor(c))
+	})
+}
+
+func (s *Server) cancelOrder(c *gin.Context) {
+	s.orderCmd(c, deskRoles, func(id int64, in orderCommand) (*app.Order, error) {
+		return s.App.StaffCancel(c, id, in.ExpectedVersion, in.Reason, staffActor(c))
+	})
+}
+
+func (s *Server) assignRider(c *gin.Context) {
+	s.orderCmd(c, deskRoles, func(id int64, in orderCommand) (*app.Order, error) {
+		return s.App.AssignRider(c, id, in.RiderID, staffActor(c))
+	})
+}
+
+func (s *Server) handoffOrder(c *gin.Context) {
+	s.orderCmd(c, kitchenRoles, func(id int64, _ orderCommand) (*app.Order, error) {
+		return s.App.StaffHandoff(c, id, staffActor(c))
+	})
+}
+
+// ---- merchant configuration ----
+
+func (s *Server) adminMenu(c *gin.Context) {
+	bid, ok := branchScope(c, allStaff)
+	if !ok {
+		return
+	}
+	m, err := s.App.AdminMenu(c, bid)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, m)
+}
+
+// optionalID reads :id when the route has one (PUT) and returns 0 otherwise (POST).
+func optionalID(c *gin.Context) (int64, bool) {
+	if c.Param("id") == "" {
+		return 0, true
+	}
+	return idParam(c, "id")
+}
+
+func (s *Server) saveCategory(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	id, ok := optionalID(c)
+	if !ok {
+		return
+	}
+	var in app.CategoryInput
+	if !bind(c, &in) {
+		return
+	}
+	id, err := s.App.SaveCategory(c, bid, id, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"id": id})
+}
+
+func (s *Server) saveItem(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	id, ok := optionalID(c)
+	if !ok {
+		return
+	}
+	var in app.ItemInput
+	if !bind(c, &in) {
+		return
+	}
+	id, err := s.App.SaveItem(c, bid, id, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"id": id})
+}
+
+// patchItem covers the quick sold-out toggle, which kitchen staff may also use.
+func (s *Server) patchItem(c *gin.Context) {
+	bid, ok := branchScope(c, allStaff)
+	if !ok {
+		return
+	}
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	var in app.ItemPatch
+	if !bind(c, &in) {
+		return
+	}
+	role := currentUser(c).RoleIn(bid)
+	if (in.Published != nil || in.Archived != nil) && role != "owner" && role != "manager" {
+		fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "only managers can publish or remove items"))
+		return
+	}
+	if err := s.App.PatchItem(c, bid, id, in); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (s *Server) saveZone(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	id, ok := optionalID(c)
+	if !ok {
+		return
+	}
+	var in app.ZoneInput
+	if !bind(c, &in) {
+		return
+	}
+	id, err := s.App.SaveZone(c, bid, id, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"id": id})
+}
+
+func (s *Server) saveSettings(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	var in app.SettingsInput
+	if !bind(c, &in) {
+		return
+	}
+	b, err := s.App.SaveSettings(c, bid, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, b)
+}
+
+func (s *Server) listStaff(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	staff, err := s.App.ListStaff(c, bid, "")
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"staff": staff})
+}
+
+func (s *Server) createStaff(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	var in app.NewUser
+	if !bind(c, &in) {
+		return
+	}
+	// Only an owner can create another owner.
+	if in.Role == "owner" && currentUser(c).RoleIn(bid) != "owner" {
+		fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "only an owner can add an owner"))
+		return
+	}
+	id, err := s.App.CreateStaff(c, bid, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"id": id})
+}
+
+func (s *Server) patchStaff(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		Active bool `json:"active"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	if id == currentUser(c).ID {
+		fail(c, app.ErrValidation("you cannot disable your own account"))
+		return
+	}
+	if err := s.App.SetStaffActive(c, bid, id, in.Active); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (s *Server) listCash(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	cash, err := s.App.ListCash(c, bid)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"collections": cash})
+}
+
+func (s *Server) reconcile(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	bid, err := s.App.CashBranch(c, id)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	if !allowed(c, bid, managerRoles) {
+		return
+	}
+	var in struct {
+		AmountReturned int64  `json:"amount_returned"`
+		Note           string `json:"note"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	out, err := s.App.Reconcile(c, id, in.AmountReturned, in.Note, staffActor(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+// ---- kitchen ----
+
+func (s *Server) kitchenBoard(c *gin.Context) {
+	bid, ok := branchScope(c, kitchenRoles)
+	if !ok {
+		return
+	}
+	orders, err := s.App.KitchenBoard(c, bid)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	// The kitchen needs dishes and notes, not the customer's contact details.
+	for _, o := range orders {
+		o.CustomerPhone, o.AddressLine, o.AddressUnit, o.AddressNote, o.Cash = "", "", "", "", nil
+	}
+	c.JSON(200, gin.H{"orders": orders})
+}
+
+func (s *Server) itemAction(c *gin.Context) {
+	itemID, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	orderID, bid, err := s.App.ItemOrder(c, itemID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	if !allowed(c, bid, kitchenRoles) {
+		return
+	}
+	o, err := s.App.SetItemStatus(c, orderID, itemID, c.Param("action"), staffActor(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, o)
+}
+
+func (s *Server) packOrder(c *gin.Context) {
+	id, ok := s.orderScope(c, kitchenRoles)
+	if !ok {
+		return
+	}
+	var in struct {
+		Bags            int `json:"bags"`
+		ManifestVersion int `json:"manifest_version"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	o, err := s.App.Pack(c, id, in.Bags, in.ManifestVersion, staffActor(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, o)
+}
+
+// ---- rider ----
+
+// riderView gives the rider what the delivery needs and hides the customer's
+// contact details once the task is over.
+func riderView(o *app.Order) *app.Order {
+	o.Cash = nil
+	if o.Delivery != nil && (o.Delivery.Status == "delivered" || o.Delivery.Status == "failed") {
+		o.CustomerPhone, o.AddressUnit, o.AddressNote = "", "", ""
+	}
+	return o
+}
+
+func (s *Server) riderTasks(c *gin.Context) {
+	orders, err := s.App.RiderTasks(c, currentUser(c).ID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	for _, o := range orders {
+		riderView(o)
+	}
+	c.JSON(200, gin.H{"tasks": orders})
+}
+
+func (s *Server) riderEvents(c *gin.Context) {
+	s.Hub.serve(c, &subscription{rider: currentUser(c).ID})
+}
+
+func (s *Server) riderAction(c *gin.Context) {
+	taskID, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		CollectedAmount int64  `json:"collected_amount"`
+		Reason          string `json:"reason"`
+	}
+	if c.Request.ContentLength != 0 && !bind(c, &in) {
+		return
+	}
+	riderID := currentUser(c).ID
+	var o *app.Order
+	var err error
+	switch c.Param("action") {
+	case "pickup":
+		o, err = s.App.RiderPickup(c, taskID, riderID)
+	case "arrive":
+		o, err = s.App.RiderArrive(c, taskID, riderID)
+	case "deliver":
+		o, err = s.App.RiderDeliver(c, taskID, riderID, in.CollectedAmount)
+	case "fail":
+		o, err = s.App.RiderFail(c, taskID, riderID, in.Reason)
+	default:
+		err = app.ErrNotFound
+	}
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, riderView(o))
+}
+
+// ---- platform admin ----
+
+func (s *Server) listMerchants(c *gin.Context) {
+	m, err := s.App.ListMerchants(c)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"merchants": m})
+}
+
+func (s *Server) createMerchant(c *gin.Context) {
+	var in app.NewMerchant
+	if !bind(c, &in) {
+		return
+	}
+	m, err := s.App.CreateMerchant(c, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, m)
+}
