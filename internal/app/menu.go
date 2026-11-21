@@ -390,6 +390,9 @@ func (a *App) Cleanup(ctx context.Context) error {
 		`DELETE FROM quotes WHERE used_order_id IS NULL AND expires_at < now() - interval '1 hour'`,
 		`DELETE FROM jobs WHERE status <> 'pending' AND finished_at < now() - interval '14 days'`,
 		`DELETE FROM worker_instances WHERE last_beat_at < now() - interval '1 day'`,
+		`DELETE FROM api_instances WHERE last_seen_at < now() - interval '1 day'`,
+		`DELETE FROM api_metrics WHERE bucket < now() - interval '7 days'`,
+		`DELETE FROM api_errors WHERE at < now() - interval '7 days'`,
 	} {
 		if _, err := a.DB.Exec(ctx, q); err != nil {
 			return err

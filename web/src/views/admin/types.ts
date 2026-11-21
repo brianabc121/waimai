@@ -42,3 +42,22 @@ export interface JobRow {
   id: number; kind: string; status: JobStatus; attempts: number; max_attempts: number; subject: string
   run_at: string; created_at: string; finished_at: string | null; last_error: string; message?: string
 }
+export interface ApiPoint { t: string; ok: number; c4: number; c5: number; p50: number; p95: number }
+export interface ApiTotals { requests: number; c4: number; c5: number; limited: number; p50: number; p95: number; max_ms: number }
+export interface ApiRoute { method: string; route: string; count: number; c4: number; c5: number; p50: number; p95: number; max_ms: number }
+export interface ApiStreams { instances: number; customer: number; table: number; store: number; rider: number }
+export interface ApiMetrics { range: string; step_seconds: number; series: ApiPoint[]; totals: ApiTotals; routes: ApiRoute[]; streams: ApiStreams }
+export interface ApiError {
+  id: number; at: string; request_id: string; method: string; route: string; status: number; code: string
+  duration_ms: number; user_id: number | null; message: string
+}
+export type Health = 'ok' | 'warn' | 'bad'
+export interface Overview {
+  now: string
+  api: { state: Health; requests: number; error_rate: number; p95: number; instances: number }
+  worker: { state: Health; online: number; failing_tasks: string[] }
+  db: { state: Health; ping_ms: number; in_use: number; max: number }
+  queue: { state: Health; pending: number; failed: number; oldest_wait_seconds: number }
+  day: ApiTotals; orders_today: number; stores_open: number; stores_total: number
+  hour: ApiPoint[]; errors: ApiError[]
+}

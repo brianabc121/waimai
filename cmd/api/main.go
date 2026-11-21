@@ -50,8 +50,15 @@ func main() {
 		close(workerDone)
 	}
 
-	srv := &http.Server{Addr: cfg.Addr, Handler: httpapi.NewServer(a, cfg, hub).Router(),
-		ReadHeaderTimeout: 10 * time.Second}
+	server := httpapi.NewServer(a, cfg, hub)
+	server.Metrics = a.NewMetrics(log.Printf)
+	metricsDone := make(chan struct{})
+	go func() {
+		defer close(metricsDone)
+		server.Metrics.Run(ctx)
+	}()
+
+	srv := &http.Server{Addr: cfg.Addr, Handler: server.Router(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		// Stop taking requests; open SSE streams end and clients reconnect.
@@ -63,5 +70,7 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
-	<-workerDone // lets the embedded worker sign off before the pool closes
+	// let the embedded worker sign off and the last counts be written before the pool closes
+	<-workerDone
+	<-metricsDone
 }

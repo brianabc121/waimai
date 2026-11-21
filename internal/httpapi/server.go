@@ -28,6 +28,8 @@ type Server struct {
 	App *app.App
 	Cfg config.Config
 	Hub *Hub
+	// Metrics, when set, counts every API request for the back office.
+	Metrics *app.Metrics
 
 	publicWrites *limiter // quotes, orders
 	otpLimit     *limiter
@@ -52,11 +54,14 @@ func fail(c *gin.Context, err error) {
 	rid := c.GetString("request_id")
 	var ae *app.Error
 	if errors.As(err, &ae) {
+		c.Set(errorCodeKey, ae.Code)
 		c.AbortWithStatusJSON(ae.Status, gin.H{"error": gin.H{
 			"code": ae.Code, "message": ae.Message, "details": ae.Details, "request_id": rid}})
 		return
 	}
 	log.Printf("request %s %s %s failed: %v", rid, c.Request.Method, c.FullPath(), err)
+	c.Set(errorCodeKey, "INTERNAL")
+	c.Set(errorMessageKey, err.Error())
 	c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": gin.H{
 		"code": "INTERNAL", "message": "internal error", "request_id": rid}})
 }
@@ -216,7 +221,7 @@ func (s *Server) Router() *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.ContextWithFallback = true // lets handlers pass *gin.Context as the request context
-	r.Use(gin.Recovery(), requestID)
+	r.Use(gin.Recovery(), requestID, s.metrics)
 	_ = r.SetTrustedProxies([]string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"})
 
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })

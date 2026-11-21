@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,9 +20,10 @@ import (
 )
 
 var (
-	a      *app.App
-	server *httptest.Server
-	dbURL  string
+	a       *app.App
+	server  *httptest.Server
+	metrics *app.Metrics
+	dbURL   string
 )
 
 func TestMain(m *testing.M) {
@@ -42,7 +44,10 @@ func TestMain(m *testing.M) {
 	a.OTPDevEcho = true
 	hub := httpapi.NewHub()
 	go hub.Listen(ctx, dbURL)
-	server = httptest.NewServer(httpapi.NewServer(a, config.Config{}, hub).Router())
+	srv := httpapi.NewServer(a, config.Config{}, hub)
+	metrics = a.NewMetrics(log.Printf)
+	srv.Metrics = metrics
+	server = httptest.NewServer(srv.Router())
 	code := m.Run()
 	server.CloseClientConnections()
 	server.Close()
@@ -384,6 +389,22 @@ func TestSSE(t *testing.T) {
 	}
 	if !wait(s1, "ready", 3*time.Second) || !wait(s2, "ready", 3*time.Second) {
 		t.Fatal("stream did not open")
+	}
+	// open streams are counted as connections, not as requests
+	if err := metrics.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	stats, err := a.APIMetrics(context.Background(), "1h")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.Streams.Store < 2 {
+		t.Fatalf("two store streams are open, counted %d", stats.Streams.Store)
+	}
+	for _, r := range stats.Routes {
+		if strings.HasSuffix(r.Route, "/events") {
+			t.Fatalf("an event stream was counted as a request: %+v", r)
+		}
 	}
 	time.Sleep(300 * time.Millisecond) // let the listener settle; drain stray refreshes
 	for len(s1) > 0 {
