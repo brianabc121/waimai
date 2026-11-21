@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import { get, post } from './api'
+import { ApiError, get, post } from './api'
 import type { BranchRole, User } from './types'
 
 // A platform administrator can open one store's back office read-only. The
@@ -27,9 +27,18 @@ export const session = reactive<{ user: User | null; loaded: boolean; branchId: 
   user: null, loaded: false, branchId: Number(localStorage.getItem('branch_id')) || null,
 })
 
+const USER_KEY = 'session_user'
+function remember() { if (session.user) localStorage.setItem(USER_KEY, JSON.stringify(session.user)) }
+function remembered(): User | null { try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null') } catch { return null } }
+
 export async function loadSession(): Promise<User | null> {
   if (!session.loaded) {
-    try { session.user = await get<User>('/auth/me') } catch { session.user = null }
+    try { session.user = await get<User>('/auth/me'); remember() } catch (e) {
+      // Without signal the workbench still opens as the person who last used
+      // this phone; the server checks who they are on every request anyway.
+      session.user = e instanceof ApiError && e.code === 'NETWORK' ? remembered() : null
+      if (!session.user) localStorage.removeItem(USER_KEY)
+    }
     session.loaded = true
     applyAdminView()
     pickBranch()
@@ -54,6 +63,7 @@ export function currentRole() {
 export async function login(username: string, password: string) {
   localStorage.removeItem(VIEW_KEY)
   session.user = await post<User>('/auth/login', { username, password })
+  remember()
   session.loaded = true
   pickBranch()
 }
@@ -61,6 +71,7 @@ export async function login(username: string, password: string) {
 export async function logout() {
   await post('/auth/logout').catch(() => {})
   localStorage.removeItem(VIEW_KEY)
+  localStorage.removeItem(USER_KEY)
   session.user = null
 }
 
@@ -85,5 +96,5 @@ export function identities(): Identity[] {
 // Re-read the signed-in user, e.g. after a manager changed their posts.
 export async function reloadUser() {
   if (session.user?.is_platform_admin) return
-  try { session.user = await get<User>('/auth/me'); pickBranch() } catch { /* keep what we have */ }
+  try { session.user = await get<User>('/auth/me'); pickBranch(); remember() } catch { /* keep what we have */ }
 }

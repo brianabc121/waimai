@@ -159,8 +159,26 @@ func (s *Server) login(c *gin.Context) {
 	c.JSON(200, u)
 }
 
+// tokenLogin is the app's sign-in: the session token comes back in the body
+// and no cookie is set.
+func (s *Server) tokenLogin(c *gin.Context) {
+	var in struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	token, u, expires, err := s.App.TokenLogin(c, in.Username, in.Password)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"token": token, "expires_at": expires, "user": u})
+}
+
 func (s *Server) logout(c *gin.Context) {
-	if token, err := c.Cookie(staffCookie); err == nil && token != "" {
+	if token := sessionToken(c); token != "" {
 		_ = s.App.Logout(c, token)
 	}
 	s.setCookie(c, staffCookie, "", -1)
@@ -451,7 +469,7 @@ func (s *Server) saveZoneMode(c *gin.Context) {
 
 // publicConfig is what every page may know before anyone signs in.
 func (s *Server) publicConfig(c *gin.Context) {
-	c.JSON(200, gin.H{"maps_key": s.Cfg.GoogleMapsKey})
+	c.JSON(200, gin.H{"maps_key": s.Cfg.GoogleMapsKey, "push_key": s.Cfg.VAPIDPublicKey})
 }
 
 func (s *Server) locate(c *gin.Context) {
@@ -977,4 +995,78 @@ func (s *Server) applyMenuImport(c *gin.Context) {
 		return
 	}
 	c.JSON(200, m)
+}
+
+// ---- rider duty, position and devices ----
+
+func (s *Server) riderDuty(c *gin.Context) {
+	st, err := s.App.RiderStatus(c, currentUser(c).ID)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, st)
+}
+
+func (s *Server) setRiderDuty(c *gin.Context) {
+	var in struct {
+		OnDuty *bool `json:"on_duty"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	if in.OnDuty == nil {
+		fail(c, app.ErrValidation("on_duty is required"))
+		return
+	}
+	st, err := s.App.SetDuty(c, currentUser(c).ID, *in.OnDuty, sessionToken(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, st)
+}
+
+func (s *Server) riderLocations(c *gin.Context) {
+	var in struct {
+		Points []app.LocationPoint `json:"points"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	n, err := s.App.ReportLocations(c, currentUser(c).ID, in.Points)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"accepted": n})
+}
+
+func (s *Server) registerDevice(c *gin.Context) {
+	var in struct {
+		Platform   string `json:"platform"`
+		Token      string `json:"token"`
+		AppVersion string `json:"app_version"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	d, err := s.App.RegisterDevice(c, currentUser(c).ID, in.Platform, in.Token, in.AppVersion, sessionToken(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, d)
+}
+
+func (s *Server) removeDevice(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	if err := s.App.RemoveDevice(c, currentUser(c).ID, id); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
 }

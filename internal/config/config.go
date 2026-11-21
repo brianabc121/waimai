@@ -21,6 +21,12 @@ type Config struct {
 	StaticDir     string
 	PublicBaseURL string // customer-facing origin, for order links in SMS
 
+	// Web push for the staff workbench in a browser. Empty keys turn it off.
+	// Make a pair with: admin vapid
+	VAPIDPublicKey  string
+	VAPIDPrivateKey string
+	VAPIDSubject    string // mailto: or https: contact for the push services
+
 	SMSProvider        string // log (default), webhook, twilio
 	SMSWebhookURL      string
 	SMSWebhookAuth     string
@@ -57,6 +63,10 @@ func Load() Config {
 		EmbedWorker:   envBool("EMBED_WORKER", false),
 		StaticDir:     env("STATIC_DIR", ""),
 		GoogleMapsKey: env("GOOGLE_MAPS_API_KEY", ""),
+
+		VAPIDPublicKey:  env("VAPID_PUBLIC_KEY", ""),
+		VAPIDPrivateKey: env("VAPID_PRIVATE_KEY", ""),
+		VAPIDSubject:    env("VAPID_SUBJECT", ""),
 
 		PublicBaseURL:      env("PUBLIC_BASE_URL", ""),
 		SMSProvider:        env("SMS_PROVIDER", "log"),

@@ -47,6 +47,9 @@ type App struct {
 	Secret     []byte
 	SMS        SMSSender
 	OTPDevEcho bool
+	// Push delivers reminders to riders, by device platform (android, ios,
+	// web). A platform with no sender is skipped.
+	Push map[string]PushSender
 	// PublicBaseURL is the customer-facing origin, used for order links in SMS.
 	PublicBaseURL string
 	// MapsOff is set when the platform has no map key. Customers cannot pin

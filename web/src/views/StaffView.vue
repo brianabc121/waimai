@@ -52,7 +52,8 @@ const nowText = (m: StaffMember) => {
   const parts = []
   if (m.open_tasks) parts.push(t('st.now.tasks', { n: m.open_tasks }))
   if (m.active_deliveries) parts.push(t('st.now.deliveries', { n: m.active_deliveries }))
-  return parts.join(' / ') || t('st.now.idle')
+  const rider = m.posts.some(p => p.kind === 'rider')
+  return (rider ? t(m.on_duty ? 'st.now.on_duty' : 'st.now.off_duty') + ' · ' : '') + (parts.join(' / ') || t('st.now.idle'))
 }
 const colors = ['#d9480f', '#1d4ed8', '#18794e', '#7c3aed', '#b45309', '#0e7490', '#be185d']
 // Owners are managed by owners only.
@@ -129,7 +130,7 @@ const resetPw = () => act(() => post(`/merchant/branches/${bid}/staff/${f.id}/pa
               <span v-for="p in m.posts" :key="p.kind + (p.station_id ?? '')" class="post" :class="p.kind">{{ postName(p) }}</span>
               <span v-if="!m.posts.length" class="post none">{{ t('st.no_posts') }}</span></td>
             <td><span v-if="m.role !== 'staff'" class="tag" :class="{ brand: m.role === 'owner' }">{{ t('role.' + m.role) }}</span><span v-else class="muted">{{ t('st.role.none') }}</span></td>
-            <td class="small"><i class="dot" :class="{ on: m.active && (m.open_tasks > 0 || m.active_deliveries > 0) }"></i>{{ nowText(m) }}</td>
+            <td class="small"><i class="dot" :class="{ on: m.active && (m.open_tasks > 0 || m.active_deliveries > 0 || m.on_duty) }"></i>{{ nowText(m) }}</td>
             <td class="right">
               <button v-if="!m.active && editable(m)" class="btn small" @click="restore(m)">{{ t('st.restore') }}</button>
               <button v-if="editable(m)" class="btn small" style="margin-left:6px" @click="edit(m)">{{ t('edit') }}</button></td>

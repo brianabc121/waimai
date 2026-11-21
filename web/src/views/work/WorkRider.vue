@@ -2,28 +2,43 @@
 // Rider identity: the deliveries assigned to this person. A list of task
 // cards, and one page per delivery with a single main button for the next
 // step: pick up, arrived, delivered (with the cash collected).
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError, get, post } from '../../api'
 import { both, money, t, toMajor, toMinor, whenText } from '../../i18n'
 import { useLive } from '../../live'
-import { currentRole, reloadUser } from '../../session'
+import { currentRole, reloadUser, session } from '../../session'
 import type { Order } from '../../types'
+import { duty, flush, loadDuty, setDuty, track } from './duty'
+import { enqueue, overlay, queue, send } from './offline'
 
 const props = defineProps<{ tab: 'tasks' | 'done'; active: boolean }>()
 const emit = defineEmits<{ count: [n: number] }>()
 const route = useRoute()
 const router = useRouter()
 
-const tasks = ref<Order[]>([])
+// The last list the server gave, kept on the phone so that it is still there
+// when the app is opened without signal.
+const CACHE = `work-tasks-${session.user?.id}`
+const cached = (): Order[] => { try { return JSON.parse(localStorage.getItem(CACHE) || '[]') } catch { return [] } }
+const fetched = ref<Order[]>(cached())
+// Steps taken offline are shown as done while they wait to be sent.
+const tasks = computed(() => overlay(fetched.value))
 const error = ref('')
 const notice = ref('')
 const busy = ref(false)
 
 const { online, refreshNow } = useLive(() => '/rider/events', async () => {
+  for (const r of await send()) {
+    notice.value = t(r.code === 'NOT_ASSIGNED' ? 'wk.op_reassigned' : 'wk.op_refused', { no: r.no, why: r.message })
+  }
   await reloadUser() // posts may have been changed by a manager
-  tasks.value = (await get<{ tasks: Order[] }>('/rider/tasks')).tasks
+  fetched.value = (await get<{ tasks: Order[] }>('/rider/tasks')).tasks
+  localStorage.setItem(CACHE, JSON.stringify(fetched.value))
+  void loadDuty(); void flush()
 })
+window.addEventListener('online', refreshNow)
+onBeforeUnmount(() => { window.removeEventListener('online', refreshNow); track(false) })
 
 const st = (o: Order) => o.delivery?.status ?? ''
 const current = computed(() => tasks.value.filter(o => ['assigned', 'picked_up', 'arrived'].includes(st(o))))
@@ -37,7 +52,7 @@ const open = (o: Order) => router.push({ query: { o: o.id } })
 const back = () => router.replace({ query: {} })
 // The delivery was reassigned, cancelled or finished while its page was open.
 const loaded = ref(false)
-watch(tasks, () => (loaded.value = true))
+watch(fetched, () => (loaded.value = true))
 watch([openId, tasks], () => {
   if (openId.value && loaded.value && !cur.value && !busy.value) {
     if (!done.value.some(o => o.id === openId.value)) notice.value = t('wk.reassigned')
@@ -54,9 +69,15 @@ const mapUrl = (o: Order) => 'https://www.google.com/maps/dir/?api=1&destination
 async function act(o: Order, action: string, body: Record<string, unknown> = {}) {
   error.value = ''; notice.value = ''; busy.value = true
   let ok = true
-  try { await post(`/rider/tasks/${o.delivery!.id}/${action}`, body) } catch (e) {
-    ok = false
+  try {
+    if (queue.ops.length) throw new ApiError(0, 'NETWORK', '') // keep the order of steps already waiting
+    await post(`/rider/tasks/${o.delivery!.id}/${action}`, body)
+  } catch (e) {
     const code = e instanceof ApiError ? e.code : ''
+    // No signal: keep the step on the phone and move on. A pickup needs the
+    // store to have packed the order, which only the server knows for sure.
+    if (code === 'NETWORK') { enqueue(o, action, body); busy.value = false; void refreshNow(); return true }
+    ok = false
     error.value = code === 'NOT_ASSIGNED' ? t('wk.reassigned') : code === 'NOT_RIDER' ? t('wk.only_rider') : (e as Error).message
   }
   await refreshNow()
@@ -86,6 +107,19 @@ async function fail(o: Order) {
   if (await act(o, 'fail', { reason: prob.reason.trim() })) { prob.open = false; prob.reason = ''; void back() }
 }
 const branchName = computed(() => currentRole()?.branch_name ?? '')
+
+// ---- shift and position ----
+// The position is read only on duty and only while the rider identity is in front.
+watch([() => props.active, () => duty.on], ([active, on]) => track(active && on, () => current.value.length > 0), { immediate: true })
+const dutyBusy = ref(false)
+async function toggleDuty() {
+  dutyBusy.value = true; error.value = ''
+  try { await setDuty(!duty.on) } catch (e) { error.value = (e as Error).message }
+  dutyBusy.value = false
+}
+const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active ? t('wk.geo.paused')
+  : duty.geo === 'ok' ? t('wk.geo.ok') : duty.geo === 'denied' ? t('wk.geo.denied')
+  : duty.geo === 'unsupported' ? t('wk.geo.unsupported') : t('wk.geo.searching'))
 </script>
 
 <template>
@@ -98,6 +132,7 @@ const branchName = computed(() => currentRole()?.branch_name ?? '')
       </div>
       <div class="section stack">
         <div v-if="!online" class="banner warn">{{ t('offline') }}</div>
+        <div v-if="queue.ops.length" class="banner warn" data-testid="ops-waiting">{{ t('wk.ops_waiting', { n: queue.ops.length }) }}</div>
         <div v-if="error" class="banner bad" data-testid="task-error">{{ error }}</div>
 
         <!-- pick up at the store -->
@@ -165,8 +200,18 @@ const branchName = computed(() => currentRole()?.branch_name ?? '')
     <!-- the list -->
     <div v-else class="section stack">
       <div v-if="!online" class="banner warn">{{ t('offline') }}</div>
+      <div v-if="queue.ops.length" class="banner warn" data-testid="ops-waiting">{{ t('wk.ops_waiting', { n: queue.ops.length }) }}</div>
       <div v-if="notice" class="banner warn" data-testid="rider-notice">{{ notice }}</div>
       <div v-if="error" class="banner bad">{{ error }}</div>
+
+      <div v-if="tab === 'tasks' && duty.loaded" class="card duty" :class="{ on: duty.on }" data-testid="duty" :data-on="duty.on" :data-geo="duty.geo">
+        <div class="row between">
+          <div><b>{{ duty.on ? t('wk.duty.on') : t('wk.duty.off') }}</b>
+            <div class="small muted" data-testid="geo-text">{{ geoText }}</div></div>
+          <button class="btn" :class="{ primary: !duty.on }" :disabled="dutyBusy" data-act="duty" @click="toggleDuty">{{ duty.on ? t('wk.duty.end') : t('wk.duty.start') }}</button>
+        </div>
+        <div v-if="duty.on && active && duty.geo !== 'denied' && duty.geo !== 'unsupported'" class="small muted">{{ t('wk.geo.screen') }}</div>
+      </div>
 
       <template v-if="tab === 'tasks'">
         <div v-if="!current.length" class="card muted" data-testid="rider-empty">{{ t('no_tasks') }}</div>
