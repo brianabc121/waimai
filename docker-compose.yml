@@ -1,0 +1,70 @@
+# Local development and single-host pilot. In production point DATABASE_URL
+# at a managed PostgreSQL and drop the postgres service.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: waimai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-waimai}
+      POSTGRES_DB: waimai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waimai"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # One-off: applies migrations, then exits. api and worker wait for it.
+  migrate:
+    build: .
+    command: ["migrate"]
+    environment: &env
+      DATABASE_URL: ${DATABASE_URL:-postgres://waimai:waimai@postgres:5432/waimai?sslmode=disable}
+      APP_SECRET: ${APP_SECRET:-dev-secret-change-me}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      OTP_DEV_ECHO: ${OTP_DEV_ECHO:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    command: ["api"]
+    environment: *env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["worker"]
+    environment: *env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+    ports:
+      - "${HTTP_PORT:-8000}:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # Optional demo data: docker compose run --rm seed
+  seed:
+    build: .
+    command: ["seed"]
+    environment: *env
+    profiles: ["tools"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

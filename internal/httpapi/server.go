@@ -1,0 +1,301 @@
+// Package httpapi is the HTTP layer: authentication, binding, error mapping
+// and SSE. Business rules live in internal/app.
+package httpapi
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/brianabc121/waimai/internal/app"
+	"github.com/brianabc121/waimai/internal/config"
+)
+
+const (
+	staffCookie    = "sid"
+	customerCookie = "cs"
+)
+
+type Server struct {
+	App *app.App
+	Cfg config.Config
+	Hub *Hub
+
+	publicWrites *limiter // quotes, orders
+	otpLimit     *limiter
+	loginLimit   *limiter
+}
+
+func NewServer(a *app.App, cfg config.Config, hub *Hub) *Server {
+	return &Server{App: a, Cfg: cfg, Hub: hub,
+		publicWrites: newLimiter(60, 30),
+		otpLimit:     newLimiter(6, 6),
+		loginLimit:   newLimiter(10, 10),
+	}
+}
+
+// ---- helpers ----
+
+func fail(c *gin.Context, err error) {
+	rid := c.GetString("request_id")
+	var ae *app.Error
+	if errors.As(err, &ae) {
+		c.AbortWithStatusJSON(ae.Status, gin.H{"error": gin.H{
+			"code": ae.Code, "message": ae.Message, "details": ae.Details, "request_id": rid}})
+		return
+	}
+	log.Printf("request %s %s %s failed: %v", rid, c.Request.Method, c.FullPath(), err)
+	c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": gin.H{
+		"code": "INTERNAL", "message": "internal error", "request_id": rid}})
+}
+
+func bind(c *gin.Context, v any) bool {
+	if err := c.ShouldBindJSON(v); err != nil {
+		fail(c, app.Err(http.StatusUnprocessableEntity, "VALIDATION", "invalid JSON body"))
+		return false
+	}
+	return true
+}
+
+func idParam(c *gin.Context, name string) (int64, bool) {
+	id, err := strconv.ParseInt(c.Param(name), 10, 64)
+	if err != nil || id <= 0 {
+		fail(c, app.ErrNotFound)
+		return 0, false
+	}
+	return id, true
+}
+
+func (s *Server) setCookie(c *gin.Context, name, value string, maxAge int) {
+	http.SetCookie(c.Writer, &http.Cookie{Name: name, Value: value, Path: "/", MaxAge: maxAge,
+		HttpOnly: true, Secure: s.Cfg.CookieSecure, SameSite: http.SameSiteLaxMode})
+}
+
+func currentUser(c *gin.Context) *app.User {
+	u, _ := c.Get("user")
+	user, _ := u.(*app.User)
+	return user
+}
+
+func staffActor(c *gin.Context) app.Actor {
+	return app.Actor{Type: "staff", ID: currentUser(c).ID}
+}
+
+var (
+	deskRoles    = []string{"owner", "manager", "cashier"}
+	managerRoles = []string{"owner", "manager"}
+	kitchenRoles = []string{"owner", "manager", "cashier", "kitchen"}
+	allStaff     = []string{"owner", "manager", "cashier", "kitchen"}
+)
+
+// allowed checks the user's role in a branch. A branch the user has no role
+// in is reported as not found, so that ids of other merchants leak nothing.
+func allowed(c *gin.Context, branchID int64, roles []string) bool {
+	role := currentUser(c).RoleIn(branchID)
+	if role == "" {
+		fail(c, app.ErrNotFound)
+		return false
+	}
+	for _, r := range roles {
+		if r == role {
+			return true
+		}
+	}
+	fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "your role cannot do this"))
+	return false
+}
+
+// branchScope reads :bid and checks the role.
+func branchScope(c *gin.Context, roles []string) (int64, bool) {
+	bid, ok := idParam(c, "bid")
+	if !ok {
+		return 0, false
+	}
+	return bid, allowed(c, bid, roles)
+}
+
+// orderScope reads :id, resolves the order's branch and checks the role.
+func (s *Server) orderScope(c *gin.Context, roles []string) (int64, bool) {
+	id, ok := idParam(c, "id")
+	if !ok {
+		return 0, false
+	}
+	bid, err := s.App.OrderBranch(c, id)
+	if err != nil {
+		fail(c, err)
+		return 0, false
+	}
+	return id, allowed(c, bid, roles)
+}
+
+// ---- middleware ----
+
+func requestID(c *gin.Context) {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	id := hex.EncodeToString(b)
+	c.Set("request_id", id)
+	c.Header("X-Request-Id", id)
+	c.Next()
+}
+
+// csrf requires a custom header on every state-changing API call. Browsers do
+// not let cross-site forms set it, and the API serves no CORS headers.
+func csrf(c *gin.Context) {
+	switch c.Request.Method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+	default:
+		if c.GetHeader("X-Requested-With") == "" {
+			fail(c, app.Err(http.StatusForbidden, "CSRF", "missing X-Requested-With header"))
+			return
+		}
+	}
+	c.Next()
+}
+
+func (s *Server) limit(l *limiter) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !l.allow(c.ClientIP()) {
+			fail(c, app.Err(http.StatusTooManyRequests, "RATE_LIMITED", "too many requests, slow down"))
+			return
+		}
+		c.Next()
+	}
+}
+
+func (s *Server) requireUser(c *gin.Context) {
+	token, err := c.Cookie(staffCookie)
+	if err != nil || token == "" {
+		fail(c, app.Err(http.StatusUnauthorized, "UNAUTHENTICATED", "please sign in"))
+		return
+	}
+	u, err := s.App.UserBySession(c, token)
+	if err != nil {
+		fail(c, app.Err(http.StatusUnauthorized, "UNAUTHENTICATED", "please sign in"))
+		return
+	}
+	c.Set("user", u)
+	c.Next()
+}
+
+func requireAdmin(c *gin.Context) {
+	if !currentUser(c).IsPlatformAdmin {
+		fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "platform admin only"))
+		return
+	}
+	c.Next()
+}
+
+// ---- routes ----
+
+func (s *Server) Router() *gin.Engine {
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+	r.ContextWithFallback = true // lets handlers pass *gin.Context as the request context
+	r.Use(gin.Recovery(), requestID)
+	_ = r.SetTrustedProxies([]string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"})
+
+	r.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
+	r.GET("/readyz", func(c *gin.Context) {
+		if err := s.App.DB.Ping(c); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"ok": false})
+			return
+		}
+		c.JSON(200, gin.H{"ok": true})
+	})
+
+	api := r.Group("/api/v1", csrf, func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		c.Next()
+	})
+
+	// customer
+	api.GET("/stores/:slug", s.storefront)
+	api.POST("/otp/request", s.limit(s.otpLimit), s.otpRequest)
+	api.POST("/otp/verify", s.limit(s.otpLimit), s.otpVerify)
+	api.GET("/customer/session", s.customerSession)
+	api.POST("/stores/:slug/quotes", s.limit(s.publicWrites), s.createQuote)
+	api.POST("/stores/:slug/orders", s.limit(s.publicWrites), s.placeOrder)
+	api.GET("/customer/orders/:token", s.customerOrder)
+	api.POST("/customer/orders/:token/cancel", s.limit(s.publicWrites), s.customerCancel)
+	api.GET("/customer/orders/:token/events", s.customerEvents)
+
+	// auth
+	api.POST("/auth/login", s.limit(s.loginLimit), s.login)
+	api.POST("/auth/logout", s.logout)
+
+	auth := api.Group("", s.requireUser)
+	auth.GET("/auth/me", func(c *gin.Context) { c.JSON(200, currentUser(c)) })
+
+	// merchant order desk
+	auth.GET("/merchant/branches/:bid/orders", s.listOrders)
+	auth.GET("/merchant/branches/:bid/events", s.branchEvents)
+	auth.GET("/merchant/branches/:bid/riders", s.listRiders)
+	auth.GET("/merchant/orders/:id", s.getOrder)
+	auth.POST("/merchant/orders/:id/accept", s.acceptOrder)
+	auth.POST("/merchant/orders/:id/reject", s.rejectOrder)
+	auth.POST("/merchant/orders/:id/cancel", s.cancelOrder)
+	auth.POST("/merchant/orders/:id/assign-rider", s.assignRider)
+	auth.POST("/merchant/orders/:id/handoff", s.handoffOrder)
+
+	// merchant configuration
+	auth.GET("/merchant/branches/:bid/menu", s.adminMenu)
+	auth.POST("/merchant/branches/:bid/categories", s.saveCategory)
+	auth.PUT("/merchant/branches/:bid/categories/:id", s.saveCategory)
+	auth.POST("/merchant/branches/:bid/items", s.saveItem)
+	auth.PUT("/merchant/branches/:bid/items/:id", s.saveItem)
+	auth.PATCH("/merchant/branches/:bid/items/:id", s.patchItem)
+	auth.POST("/merchant/branches/:bid/zones", s.saveZone)
+	auth.PUT("/merchant/branches/:bid/zones/:id", s.saveZone)
+	auth.PUT("/merchant/branches/:bid/settings", s.saveSettings)
+	auth.GET("/merchant/branches/:bid/staff", s.listStaff)
+	auth.POST("/merchant/branches/:bid/staff", s.createStaff)
+	auth.PATCH("/merchant/branches/:bid/staff/:id", s.patchStaff)
+	auth.GET("/merchant/branches/:bid/cash-collections", s.listCash)
+	auth.POST("/merchant/cash-collections/:id/reconcile", s.reconcile)
+
+	// kitchen and packing
+	auth.GET("/kitchen/branches/:bid/board", s.kitchenBoard)
+	auth.POST("/kitchen/items/:id/:action", s.itemAction)
+	auth.POST("/kitchen/orders/:id/pack", s.packOrder)
+
+	// rider
+	auth.GET("/rider/tasks", s.riderTasks)
+	auth.GET("/rider/events", s.riderEvents)
+	auth.POST("/rider/tasks/:id/:action", s.riderAction)
+
+	// platform admin
+	admin := auth.Group("/admin", requireAdmin)
+	admin.GET("/merchants", s.listMerchants)
+	admin.POST("/merchants", s.createMerchant)
+
+	s.static(r)
+	return r
+}
+
+// static serves the built Vue app with history-mode fallback when STATIC_DIR
+// is set (single-binary demos). In production Nginx serves the files.
+func (s *Server) static(r *gin.Engine) {
+	dir := s.Cfg.StaticDir
+	r.NoRoute(func(c *gin.Context) {
+		if dir == "" || strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			fail(c, app.ErrNotFound)
+			return
+		}
+		clean := filepath.Join(dir, filepath.Clean("/"+c.Request.URL.Path))
+		if st, err := os.Stat(clean); err == nil && !st.IsDir() {
+			c.File(clean)
+			return
+		}
+		c.Header("Cache-Control", "no-cache")
+		c.File(filepath.Join(dir, "index.html"))
+	})
+}

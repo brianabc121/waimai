@@ -1,2 +1,87 @@
-# waimai
-外卖系统
+# waimai · 外卖点餐系统
+
+面向海外华人餐厅的自营外卖和自取系统。首版覆盖一条完整闭环：顾客点餐下单，商家接单，后厨制作和打包，骑手配送和代收现金，门店核款。
+
+设计依据是 [docs/DESIGN.md](docs/DESIGN.md)。
+
+## 技术栈
+
+- 后端：Go、Gin、PostgreSQL（pgx）、Goose 迁移。`cmd/api` 提供接口和 SSE，`cmd/worker` 跑后台任务。
+- 前端：Vue 3、TypeScript、Vite，中英双语。
+- 部署：Docker Compose 加 Nginx。
+
+## 本地运行
+
+需要 Go 1.24、Node 22 和一个 PostgreSQL 16。
+
+```bash
+cp .env.example .env            # 按需修改
+export DATABASE_URL='postgres://USER:PASS@localhost:5432/waimai?sslmode=disable'
+
+make migrate                    # 执行数据库迁移
+make seed                       # 载入演示数据，可重复执行
+make web                        # 构建前端
+make run                        # 单进程启动：接口、后台任务和前端都在 :8080
+```
+
+前端开发时可以另开一个终端运行 `cd web && npm run dev`，Vite 会把 `/api` 代理到 `:8080`。
+
+用 Docker Compose 启动全部服务：
+
+```bash
+docker compose up --build -d
+docker compose run --rm seed    # 可选：载入演示数据
+# 打开 http://localhost:8000
+```
+
+## 演示账号
+
+`make seed` 之后所有账号的密码都是 `demo1234`。
+
+| 入口 | 地址 | 账号 |
+|---|---|---|
+| 顾客点餐 | `/s/makati` | 不需要账号，下单前验证手机号 |
+| 商家订单台 | `/login` | `cashier1` 或 `owner1` |
+| 后厨和打包 | `/login` | `kitchen1` |
+| 骑手 | `/login` | `rider1`、`rider2` |
+| 平台管理（创建商户） | `/login` | `admin` |
+| 第二个商户（验证隔离） | `/login` | `owner2`，门店 `/s/bgc` |
+
+开发时设置 `OTP_DEV_ECHO=true`，验证码会直接显示在结账页。生产环境必须关闭，并接入短信服务商（实现 `app.SMSSender` 接口）。
+
+## 测试
+
+后端测试需要一个真实的空 PostgreSQL 数据库，不设置时数据库相关测试会跳过。
+
+```bash
+export TEST_DATABASE_URL='postgres://USER:PASS@localhost:5432/waimai_test?sslmode=disable'
+make test
+```
+
+浏览器端到端流程（需要已启动服务、已载入演示数据、开启 `OTP_DEV_ECHO`，并安装 Playwright）：
+
+```bash
+BASE_URL=http://localhost:8080 make e2e
+```
+
+## 目录
+
+```
+cmd/api  cmd/worker  cmd/migrate  cmd/seed
+internal/app        业务用例和规则
+internal/httpapi    路由、权限、SSE、限流
+internal/db         连接池和迁移 SQL
+web/                Vue 前端
+deploy/             Nginx 配置和前端镜像
+docs/DESIGN.md      设计稿
+docs/reference/     Codex 原始资料
+e2e/                浏览器端到端脚本
+```
+
+## 上线前必须处理
+
+- 把 `APP_SECRET` 换成随机值，`COOKIE_SECURE=true`，`OTP_DEV_ECHO=false`。
+- 接入真实的短信服务商。目前验证码只写日志。
+- 在 Nginx 上配置 HTTPS 并启用 HTTP/2。
+- 数据库开启自动备份和时间点恢复，并做一次恢复演练。
+- 如果数据库地址经过事务级连接池，单独设置 `LISTEN_DATABASE_URL` 为直连地址。
