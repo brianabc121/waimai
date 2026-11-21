@@ -534,6 +534,7 @@ func (a *App) Cleanup(ctx context.Context) error {
 		`DELETE FROM api_metrics WHERE bucket < now() - interval '7 days'`,
 		`DELETE FROM api_errors WHERE at < now() - interval '7 days'`,
 		`DELETE FROM rider_tracks WHERE at < now() - interval '7 days'`,
+		`DELETE FROM delivery_proofs WHERE created_at < now() - interval '30 days'`,
 	} {
 		if _, err := a.DB.Exec(ctx, q); err != nil {
 			return err

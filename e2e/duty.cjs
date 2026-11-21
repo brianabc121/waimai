@@ -146,22 +146,33 @@ await cust.locator('[data-testid=tracking-map] [data-testid=rider-pin]').waitFor
 await shot(cust, 'd03c-customer-tracking')
 step('the customer sees the rider on a map once the order is on its way')
 
-await rider.waitForSelector('[data-act=arrive]')
-await rider.context().setOffline(true)
+// ---- at the door: an optional photo, shrunk on the phone, shown to the desk ----
 await rider.click('[data-act=arrive]')
-await rider.locator('[data-testid=ops-waiting]:has-text("1 个操作")').waitFor()
+await expectStatus('骑手已到达')
+const picture = await cust.screenshot()   // any picture will do
+await rider.setInputFiles('[data-testid=proof] input[type=file]', { name: 'door.png', mimeType: 'image/png', buffer: picture })
+await rider.locator('[data-testid=proof-done]').waitFor()
+await shot(rider, 'd03d-proof')
+await desk.click(`.ord:has-text("${orderNo}")`)
+const proofHref = await desk.locator('[data-testid=proof-row] a').getAttribute('href')
+const proof = await desk.evaluate(async (u) => { const r = await fetch(u); return { type: r.headers.get('content-type'), size: (await r.blob()).size } }, proofHref)
+if (proof.type !== 'image/jpeg' || proof.size < 1000 || proof.size > 600 * 1024) throw new Error('proof photo: ' + JSON.stringify(proof))
+step(`the photo at the door reached the desk as a ${Math.round(proof.size / 1024)} KB JPEG`)
+
+await rider.waitForSelector('[data-act=deliver]')
+await rider.context().setOffline(true)
 await rider.click('.quick button:has-text("刚好")')
 await shot(rider, 'd04-offline-steps')
 await rider.click('[data-act=deliver]')
-await rider.locator('[data-testid=ops-waiting]:has-text("2 个操作")').waitFor()
+await rider.locator('[data-testid=ops-waiting]:has-text("1 个操作")').waitFor()
 await rider.click('[data-testid=tab-done]')
 await rider.locator(`[data-done="${orderNo}"]`).waitFor()   // shown as delivered while it waits
-if (!(await cust.locator('[data-testid=status]').innerText()).includes('配送中')) throw new Error('nothing may reach the server while offline')
+if (!(await cust.locator('[data-testid=status]').innerText()).includes('骑手已到达')) throw new Error('nothing may reach the server while offline')
 // The page opens again without signal, with the tasks and the waiting steps.
 await rider.reload()
-await rider.locator('[data-testid=ops-waiting]:has-text("2 个操作")').waitFor()
+await rider.locator('[data-testid=ops-waiting]:has-text("1 个操作")').waitFor()
 await shot(rider, 'd05-offline-reopened')
-step('offline: two steps saved on the phone; the page reopened without signal')
+step('offline: the delivery was saved on the phone; the page reopened without signal')
 
 await rider.context().setOffline(false)
 await rider.locator('[data-testid=ops-waiting]').waitFor({ state: 'detached', timeout: 15000 })
@@ -170,7 +181,7 @@ await cust.locator('[data-testid=tracking]').waitFor({ state: 'detached' })   //
 const cash = (await api(owner, 'GET', '/merchant/branches/1/cash')).body
 const mine = (cash?.collections ?? cash?.items ?? []).filter(c => c.public_no === orderNo)
 if (mine.length > 1) throw new Error('the cash was recorded more than once')
-step('back online: the steps were sent in order and the order is delivered')
+step('back online: the saved step was sent and the order is delivered')
 
 // ---- a step for a delivery that was reassigned meanwhile does not count ----
 await rider.evaluate(() => localStorage.setItem('work-ops', JSON.stringify([

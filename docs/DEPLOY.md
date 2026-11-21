@@ -438,3 +438,9 @@ base64 -w0 workbench.jks > workbench.jks.txt
 - 国内不能访问 Google 服务的手机收不到 Firebase 推送。在这类手机上，App 开着时任务仍然实时出现，只是锁屏时没有提醒。
 - iPhone 版在后面的批次做。
 
+## 16. 隐私政策和上架材料
+
+- 隐私政策草稿在 `web/public/privacy.html`，部署后网址是 `https://你的域名/privacy.html`（中英文在同一页）。
+- 上线前把页面里所有黄色标出的地方（`class="todo"`）换成你的公司名称、联系方式、短信服务商和托管商，
+  并请熟悉当地法律的人看一遍。改完重新构建前端即可。
+- 应用商店要填的名称、介绍、权限说明、数据安全表、审核账号和截图清单见 `docs/APP_STORE_LISTING.md`。

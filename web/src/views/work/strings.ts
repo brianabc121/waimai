@@ -59,6 +59,11 @@ extend({
   'wk.app_settings': ['打开应用设置', 'Open app settings'],
   'wk.battery': ['锁屏后收不到新单或位置断了？', 'Missing reminders or position with the screen off?'],
   'wk.battery_hint': ['有些手机会为了省电把后台应用停掉。请在应用设置的“电池”里选“无限制”或“不优化”，并允许自启动。', 'Some phones stop background apps to save power. In the app settings, set Battery to "Unrestricted" and allow auto-start.'],
+  'wk.photo': ['拍照留证（选填）', 'Photo at the door (optional)'], 'wk.photo_take': ['拍照', 'Take photo'], 'wk.photo_again': ['重拍', 'Retake'], 'wk.photo_done': ['已拍', 'Taken'],
+  'wk.photo_hint': ['放门口或前台代收时建议拍一张，门店能看到，保存 30 天', 'Worth taking when you leave the order at the door or front desk. The store can see it; kept for 30 days'],
+  'wk.photo_offline': ['没有信号，照片传不上去。可以先送达，照片不是必须的', 'No signal, so the photo could not be sent. You can still confirm delivery; the photo is optional'],
+  'wk.photo_failed': ['照片没有传上去，请再试一次', 'The photo was not sent. Try again'],
+  'rd.proof': ['送达照片', 'Delivery photo'], 'rd.proof_view': ['查看', 'View'],
   'wk.install': ['添加到主屏幕后，可以像 App 一样打开', 'Add this page to your home screen to open it like an app'],
 
   'rd.title': ['骑手', 'Riders'], 'rd.count': ['{on} 人上班 · 共 {all} 人', '{on} on duty · {all} in all'],

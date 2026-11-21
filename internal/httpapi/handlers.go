@@ -741,6 +741,10 @@ func (s *Server) riderAction(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if c.Param("action") == "proof" {
+		s.riderProof(c, taskID)
+		return
+	}
 	var in struct {
 		CollectedAmount int64  `json:"collected_amount"`
 		Reason          string `json:"reason"`
@@ -1093,4 +1097,47 @@ func (s *Server) customerTracking(c *gin.Context) {
 		return
 	}
 	c.JSON(200, t)
+}
+
+// riderProof takes the photo as the raw request body, capped before it is read.
+func (s *Server) riderProof(c *gin.Context, taskID int64) {
+	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, app.ProofMaxBytes+1))
+	if err != nil || len(body) > app.ProofMaxBytes {
+		fail(c, app.Err(http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", "the photo is larger than 600 KB"))
+		return
+	}
+	o, err := s.App.SaveProof(c, taskID, currentUser(c).ID, body)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, riderView(o))
+}
+
+func sendPhoto(c *gin.Context, image []byte, err error) {
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.Header("Cache-Control", "private, no-store")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Data(200, "image/jpeg", image)
+}
+
+func (s *Server) riderProofPhoto(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	image, err := s.App.RiderProof(c, id, currentUser(c).ID)
+	sendPhoto(c, image, err)
+}
+
+func (s *Server) orderProofPhoto(c *gin.Context) {
+	id, ok := s.orderScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	image, err := s.App.OrderProof(c, id)
+	sendPhoto(c, image, err)
 }
