@@ -69,6 +69,8 @@ make test
 BASE_URL=http://localhost:8080 make e2e
 ```
 
+对着自签名证书的 https 地址跑时加上 `E2E_INSECURE_TLS=1`。
+
 `make e2e` 先跑外卖流程，再跑堂食演示（08 桌：手机点炸物，平板加饮料，炸台和饮品台各自备好，上桌，模拟回应丢失后重试，收款关台，下一桌从空账单开始），最后验证模板的草稿、预览和分入口发布。
 
 ## 目录
@@ -88,7 +90,7 @@ e2e/                浏览器端到端脚本
 ## 上线前必须处理
 
 - 把 `APP_SECRET` 换成随机值，`COOKIE_SECURE=true`，`OTP_DEV_ECHO=false`。
-- 设置 `SMS_PROVIDER` 和对应凭证，并用真实手机号实测一次。默认的 `log` 只写日志，不会真的发短信。Twilio 和 webhook 两种实现目前只经过本地模拟服务测试，没有用真实账号发过短信。
+- 设置 `SMS_PROVIDER` 和对应凭证，并用真实手机号实测一次。默认的 `log` 只写日志，不会真的发短信。Twilio 和 webhook 两种实现目前只对着模拟服务测试过，没有用真实账号发过短信。
 - 设置 `PUBLIC_BASE_URL`，否则状态短信里没有订单链接。
 - 在 Nginx 上配置 HTTPS 并启用 HTTP/2。
 - 数据库开启自动备份和时间点恢复，并做一次恢复演练。
