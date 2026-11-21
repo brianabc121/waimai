@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>总览 · 平台管理后台（原型）</title><link rel="stylesheet" href="admin.css"></head>
+<body data-page="index.html" data-title="总览">
+<div class="shell"><nav class="side"></nav><div class="main"><div class="top"></div><div class="page">
+<div class="grid4 health">
+  <div class="card"><div class="muted small">API</div><div class="state"><span class="dot ok">✓</span>正常</div><div class="small muted">近 5 分钟 5xx 0.2% · P95 182 ms</div></div>
+  <div class="card"><div class="muted small">Worker</div><div class="state"><span class="dot ok">✓</span>正常</div><div class="small muted">1 个实例在线 · 3 秒前心跳</div></div>
+  <div class="card"><div class="muted small">数据库</div><div class="state"><span class="dot ok">✓</span>正常</div><div class="small muted">连接池 4 / 10 · Ping 2 ms</div></div>
+  <div class="card"><div class="muted small">任务队列</div><div class="state"><span class="dot warn">!</span>注意</div><div class="small muted">3 条任务重试后仍失败 · <a href="worker.html">查看</a></div></div>
+</div>
+<div class="grid5 stat">
+  <div class="card"><div class="muted small">今日请求</div><div class="v">48,213</div><div class="small muted">较昨日同时段 +6%</div></div>
+  <div class="card"><div class="muted small">今日错误率（5xx）</div><div class="v">0.12%</div><div class="small muted">58 次</div></div>
+  <div class="card"><div class="muted small">P95 耗时</div><div class="v">176 ms</div><div class="small muted">P50 31 ms</div></div>
+  <div class="card"><div class="muted small">今日订单</div><div class="v">327</div><div class="small muted">外卖 214 · 自取 61 · 堂食 52</div></div>
+  <div class="card"><div class="muted small">营业中的门店</div><div class="v">11 <span class="small muted" style="font-weight:400">/ 14</span></div><div class="small muted">2 家暂停 · 1 家未到营业时间</div></div>
+</div>
+<div class="grid2">
+  <div class="card"><div class="head"><h2>每分钟请求数 · 最近 1 小时</h2><div class="legend"><span><i style="background:var(--s1)"></i>2xx</span><span><i style="background:var(--c4)"></i>4xx</span><span><i style="background:var(--c5)"></i>5xx</span></div></div><svg class="chart" id="c1"></svg></div>
+  <div class="card"><div class="head"><h2>耗时 · 最近 1 小时</h2><a href="api.html" class="small">API 监控 ›</a></div><svg class="chart" id="c2"></svg></div>
+</div>
+<div class="grid2">
+  <div class="card flush"><div class="head"><h2>最近的服务端错误</h2><a href="api.html" class="small">全部 ›</a></div>
+    <table class="data"><thead><tr><th>时间</th><th>接口</th><th>状态</th><th>request_id</th></tr></thead><tbody>
+      <tr><td class="num">15:31:07</td><td class="mono">POST /stores/:slug/orders</td><td><span class="tag bad">500 INTERNAL</span></td><td class="mono">9f2c41a07be3d510</td></tr>
+      <tr><td class="num">15:30:58</td><td class="mono">POST /stores/:slug/orders</td><td><span class="tag bad">500 INTERNAL</span></td><td class="mono">41d0e7c2a9b86f33</td></tr>
+      <tr><td class="num">15:30:41</td><td class="mono">POST /stores/:slug/quotes</td><td><span class="tag bad">500 INTERNAL</span></td><td class="mono">c07a1be4492d8e16</td></tr>
+      <tr><td class="num">14:12:20</td><td class="mono">POST /otp/request</td><td><span class="tag warn">429 RATE_LIMITED</span></td><td class="mono">7b3e90fd12c4a865</td></tr>
+    </tbody></table></div>
+  <div class="card flush"><div class="head"><h2>周期任务</h2><a href="worker.html" class="small">Worker ›</a></div>
+    <table class="data"><thead><tr><th>任务</th><th>上次运行</th><th>结果</th></tr></thead><tbody>
+      <tr><td>待接单超时取消</td><td class="num">3 秒前</td><td><span class="tag ok">✓ 成功</span> <span class="muted small">取消 0 单</span></td></tr>
+      <tr><td>预约单到点放单</td><td class="num">3 秒前</td><td><span class="tag ok">✓ 成功</span> <span class="muted small">放出 1 单</span></td></tr>
+      <tr><td>任务队列处理</td><td class="num">3 秒前</td><td><span class="tag ok">✓ 成功</span> <span class="muted small">处理 2 条</span></td></tr>
+      <tr><td>过期数据清理</td><td class="num">6 分钟前</td><td><span class="tag ok">✓ 成功</span></td></tr>
+    </tbody></table></div>
+</div>
+</div></div></div>
+<script src="shell.js"></script>
+<script>
+var ok = demo.series(60, 34, 12, 7), c4 = demo.series(60, 2, 1.5, 3), c5 = demo.series(60, 0, 0, 5, [44, 48, 3]);
+stackChart('c1', [{ data: ok, color: 'var(--s1)' }, { data: c4, color: 'var(--c4)' }, { data: c5, color: 'var(--c5)' }], 60);
+lineChart('c2', [{ data: demo.series(60, 150, 40, 11, [44, 48, 260]), color: 'var(--s2)', label: 'P95' }, { data: demo.series(60, 30, 6, 2), color: 'var(--s1)', label: 'P50' }], 600, function (v) { return Math.round(v) + ' ms'; });
+</script></body></html>

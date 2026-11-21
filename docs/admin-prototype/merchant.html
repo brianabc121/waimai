@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商户 › 老陈粥铺 · 平台管理后台（原型）</title><link rel="stylesheet" href="admin.css"></head>
+<body data-page="merchants.html" data-title="商户 › 老陈粥铺">
+<div class="shell"><nav class="side"></nav><div class="main"><div class="top"></div><div class="page">
+<div class="row"><a href="merchants.html">‹ 返回商户列表</a><span class="grow"></span><a class="btn">暂停商户</a><a class="btn danger">删除</a></div>
+<div class="grid2" style="grid-template-columns: 1fr 1.4fr">
+  <div class="card"><div class="head"><h2>基本信息</h2><a class="btn small">编辑</a></div>
+    <dl class="kv"><dt>商户名称</dt><dd class="bold">老陈粥铺</dd><dt>状态</dt><dd><span class="tag ok">营业中</span></dd><dt>联系人</dt><dd>陈国强</dd><dt>联系电话</dt><dd class="num">+63 917 555 0142</dd><dt>入驻时间</dt><dd class="num">2026-11-03</dd><dt>备注</dt><dd class="muted">首批商户，三家店共用一套菜单</dd></dl></div>
+  <div class="grid3 stat"><div class="card"><div class="muted small">今日订单</div><div class="v">86</div><div class="small muted">外卖 52 · 自取 14 · 堂食 20</div></div>
+    <div class="card"><div class="muted small">近 7 天订单</div><div class="v">540</div><div class="small muted">完成率 96%</div></div>
+    <div class="card"><div class="muted small">近 7 天营业额</div><div class="v">₱218,460</div><div class="small muted">只读，按已完成订单</div></div></div>
+</div>
+<div class="card flush"><div class="head"><h2>门店（3）</h2><a class="btn small primary">＋ 新增门店</a></div>
+  <table class="data"><thead><tr><th>门店</th><th>店铺链接</th><th>时区 · 货币</th><th>状态</th><th class="right">今日订单</th><th class="right">在售商品</th><th></th></tr></thead><tbody>
+    <tr><td class="bold">马卡蒂店<div class="small muted" style="font-weight:400">Lao Chen Congee · Makati</div></td><td class="mono">/s/laochen-makati</td><td>Asia/Manila · PHP</td><td><span class="tag ok">营业中</span></td><td class="right num">41</td><td class="right num">58</td><td class="right"><a class="btn small">编辑</a> <a class="btn small" href="items.html">商品</a> <a class="btn small">查看门店后台 ↗</a></td></tr>
+    <tr><td class="bold">BGC 店<div class="small muted" style="font-weight:400">Lao Chen Congee · BGC</div></td><td class="mono">/s/laochen-bgc</td><td>Asia/Manila · PHP</td><td><span class="tag ok">营业中</span></td><td class="right num">33</td><td class="right num">58</td><td class="right"><a class="btn small">编辑</a> <a class="btn small">商品</a> <a class="btn small">查看门店后台 ↗</a></td></tr>
+    <tr><td class="bold">奎松店<div class="small muted" style="font-weight:400">Lao Chen Congee · QC</div></td><td class="mono">/s/laochen-qc</td><td>Asia/Manila · PHP</td><td><span class="tag warn">门店暂停接单</span></td><td class="right num">12</td><td class="right num">55</td><td class="right"><a class="btn small">编辑</a> <a class="btn small">商品</a> <a class="btn small">查看门店后台 ↗</a></td></tr>
+  </tbody></table></div>
+<div class="card flush"><div class="head"><h2>账号（7）</h2><a class="btn small primary">＋ 新增店主账号</a></div>
+  <table class="data"><thead><tr><th>用户名</th><th>显示名</th><th>门店</th><th>角色</th><th>状态</th><th>最近登录</th><th></th></tr></thead><tbody>
+    <tr><td class="mono">laochen</td><td>陈国强</td><td>全部 3 家</td><td><span class="tag info">店主</span></td><td><span class="tag ok">启用</span></td><td class="num">今天 09:12</td><td class="right"><a class="btn small">重置密码</a> <a class="btn small danger">停用</a></td></tr>
+    <tr><td class="mono">laochen-mgr1</td><td>李秀英</td><td>马卡蒂店</td><td><span class="tag">店长</span></td><td><span class="tag ok">启用</span></td><td class="num">今天 08:55</td><td class="right"><a class="btn small">重置密码</a> <a class="btn small danger">停用</a></td></tr>
+    <tr><td class="mono">laochen-k1</td><td>后厨一号屏</td><td>马卡蒂店</td><td><span class="tag">后厨</span></td><td><span class="tag ok">启用</span></td><td class="num">今天 07:30</td><td class="right"><a class="btn small">重置密码</a> <a class="btn small danger">停用</a></td></tr>
+    <tr><td class="mono">rider-jun</td><td>Jun</td><td>BGC 店</td><td><span class="tag">骑手</span></td><td><span class="tag">已停用</span></td><td class="num">11-12 18:40</td><td class="right"><a class="btn small">启用</a></td></tr>
+  </tbody></table></div>
+<p class="small muted">“查看门店后台”是只读的，平台不能替商家接单或核款。重置密码会让该账号的所有登录失效，新密码只显示一次。</p>
+</div></div></div>
+<script src="shell.js"></script>
+</body></html>
