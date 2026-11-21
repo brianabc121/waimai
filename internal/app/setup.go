@@ -20,5 +20,12 @@ func NewFromConfig(pool *pgxpool.Pool, cfg config.Config) (*App, error) {
 	if sender != nil {
 		a.SMS = sender
 	}
+	if cfg.VAPIDPublicKey != "" && cfg.VAPIDPrivateKey != "" {
+		subject := cfg.VAPIDSubject
+		if subject == "" {
+			subject = cfg.PublicBaseURL
+		}
+		a.Push = map[string]PushSender{"web": WebPush{PublicKey: cfg.VAPIDPublicKey, PrivateKey: cfg.VAPIDPrivateKey, Subject: subject}}
+	}
 	return a, nil
 }

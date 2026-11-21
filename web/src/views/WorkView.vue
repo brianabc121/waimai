@@ -2,13 +2,14 @@
 // The staff workbench: one screen for people who work in the store or deliver.
 // A person's posts decide which identities they have; they switch between
 // "in store" (their stations, the packing counter) and "rider" (deliveries).
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { locale, pick, setLocale, t } from '../i18n'
 import { currentRole, identities, logout, session, type Identity } from '../session'
 import type { Post } from '../types'
 import WorkRider from './work/WorkRider.vue'
 import WorkStore from './work/WorkStore.vue'
+import { disablePush, enablePush, forgetPush, push, setupWorkbench } from './work/push'
 import './work/strings'
 
 const router = useRouter()
@@ -29,7 +30,20 @@ const other = computed<Identity>(() => identity.value === 'store' ? 'rider' : 's
 const postName = (p: Post) => p.kind === 'station' ? pick(p.station_name ?? '', p.station_name_en ?? '') : p.kind === 'packing' ? t('wk.packing') : t('rider')
 const storePosts = computed(() => posts.value.filter(p => p.kind !== 'rider').map(postName).join('、'))
 const office = computed(() => ['owner', 'manager', 'cashier'].includes(role.value?.role ?? ''))
-async function out() { await logout(); session.loaded = true; router.replace('/login') }
+async function out() {
+  await forgetPush()
+  await logout()
+  // What this person left on the phone is not the next person's business.
+  for (const k of Object.keys(localStorage)) if (/^work-(ops|points|tasks)/.test(k)) localStorage.removeItem(k)
+  session.loaded = true; router.replace('/login')
+}
+onMounted(setupWorkbench)
+const pushError = ref('')
+async function togglePush() {
+  pushError.value = ''
+  try { await (push.on ? disablePush() : enablePush()) } catch (e) { pushError.value = (e as Error).message }
+}
+const standalone = window.matchMedia('(display-mode: standalone)').matches
 </script>
 
 <template>
@@ -68,6 +82,13 @@ async function out() { await logout(); session.loaded = true; router.replace('/l
           <router-link v-if="ids.includes('store')" class="row between" to="/kitchen"><span>{{ t('wk.kitchen_screen') }}</span><span>›</span></router-link>
           <router-link v-if="office" class="row between" to="/merchant/orders"><span>{{ t('wk.back_office') }}</span><span>›</span></router-link>
         </div>
+        <div v-if="ids.includes('rider') && push.supported" class="card stack" data-testid="push-card">
+          <div class="row between"><span>{{ t('wk.push') }} <span v-if="push.on" class="tag ok">{{ t('wk.push.on') }}</span></span>
+            <button class="btn small" :disabled="push.busy || push.denied" data-act="push" @click="togglePush">{{ push.on ? t('wk.push.disable') : t('wk.push.enable') }}</button></div>
+          <div class="small muted">{{ push.denied ? t('wk.push.denied') : t('wk.push.hint') }}</div>
+          <div v-if="pushError" class="banner bad small">{{ pushError }}</div>
+        </div>
+        <p v-if="!standalone" class="muted small" style="text-align:center">{{ t('wk.install') }}</p>
         <button class="btn block" data-testid="sign-out" @click="out">{{ t('sign_out') }}</button>
       </div>
 
@@ -121,5 +142,6 @@ async function out() { await logout(); session.loaded = true; router.replace('/l
 .wk .quick { display: flex; gap: 8px; flex-wrap: wrap; }
 .wk .quick button { border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13px; background: #fff; cursor: pointer; }
 .wk .quick button.on { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-soft); font-weight: 600; }
+.wk .duty { display: grid; gap: 6px; border-left: 4px solid var(--line); } .wk .duty.on { border-left-color: var(--ok); }
 .wk .cash input { font-size: 26px; font-weight: 700; border: 2px solid var(--brand); }
 </style>

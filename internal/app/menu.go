@@ -533,10 +533,11 @@ func (a *App) Cleanup(ctx context.Context) error {
 		`DELETE FROM api_instances WHERE last_seen_at < now() - interval '1 day'`,
 		`DELETE FROM api_metrics WHERE bucket < now() - interval '7 days'`,
 		`DELETE FROM api_errors WHERE at < now() - interval '7 days'`,
+		`DELETE FROM rider_tracks WHERE at < now() - interval '7 days'`,
 	} {
 		if _, err := a.DB.Exec(ctx, q); err != nil {
 			return err
 		}
 	}
-	return nil
+	return a.endLongShifts(ctx)
 }

@@ -2,10 +2,13 @@
 // The platform administrator signs in at /login and creates merchants.
 //
 //	ADMIN_USERNAME=admin ADMIN_PASSWORD='a long password' admin
+//
+// "admin vapid" prints a new key pair for web push instead.
 package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -15,6 +18,14 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "vapid" {
+		private, public, err := app.NewVAPIDKeys()
+		if err != nil {
+			log.Fatalf("vapid: %v", err)
+		}
+		fmt.Printf("VAPID_PUBLIC_KEY=%s\nVAPID_PRIVATE_KEY=%s\n", public, private)
+		return
+	}
 	username, password := os.Getenv("ADMIN_USERNAME"), os.Getenv("ADMIN_PASSWORD")
 	if username == "" {
 		username = "admin"

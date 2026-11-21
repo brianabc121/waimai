@@ -195,9 +195,19 @@ func (s *Server) limit(l *limiter) gin.HandlerFunc {
 	}
 }
 
+// sessionToken reads the staff session: the app sends it in the Authorization
+// header, a browser in its cookie.
+func sessionToken(c *gin.Context) string {
+	if h := c.GetHeader("Authorization"); strings.HasPrefix(h, "Bearer ") {
+		return strings.TrimSpace(h[len("Bearer "):])
+	}
+	token, _ := c.Cookie(staffCookie)
+	return token
+}
+
 func (s *Server) requireUser(c *gin.Context) {
-	token, err := c.Cookie(staffCookie)
-	if err != nil || token == "" {
+	token := sessionToken(c)
+	if token == "" {
 		fail(c, app.Err(http.StatusUnauthorized, "UNAUTHENTICATED", "please sign in"))
 		return
 	}
@@ -263,6 +273,7 @@ func (s *Server) Router() *gin.Engine {
 
 	// auth
 	api.POST("/auth/login", s.limit(s.loginLimit), s.login)
+	api.POST("/auth/token", s.limit(s.loginLimit), s.tokenLogin)
 	api.POST("/auth/logout", s.logout)
 
 	auth := api.Group("", s.requireUser)
@@ -341,6 +352,11 @@ func (s *Server) Router() *gin.Engine {
 	auth.GET("/rider/tasks", s.riderTasks)
 	auth.GET("/rider/events", s.riderEvents)
 	auth.POST("/rider/tasks/:id/:action", s.riderAction)
+	auth.GET("/rider/duty", s.riderDuty)
+	auth.POST("/rider/duty", s.setRiderDuty)
+	auth.POST("/rider/locations", s.riderLocations)
+	auth.POST("/rider/devices", s.registerDevice)
+	auth.DELETE("/rider/devices/:id", s.removeDevice)
 
 	// platform admin
 	admin := auth.Group("/admin", requireAdmin)

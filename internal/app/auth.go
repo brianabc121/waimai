@@ -119,6 +119,17 @@ var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("not-a-real-password"), bc
 
 // Login verifies credentials and creates a server-side session.
 func (a *App) Login(ctx context.Context, username, password string) (token string, u *User, err error) {
+	return a.login(ctx, username, password, "cookie", SessionTTL)
+}
+
+// TokenLogin signs the app in. The app keeps the token itself and sends it in
+// a header, so the session lasts longer than a browser's.
+func (a *App) TokenLogin(ctx context.Context, username, password string) (token string, u *User, expires time.Time, err error) {
+	token, u, err = a.login(ctx, username, password, "token", TokenSessionTTL)
+	return token, u, time.Now().Add(TokenSessionTTL), err
+}
+
+func (a *App) login(ctx context.Context, username, password, kind string, ttl time.Duration) (token string, u *User, err error) {
 	var id int64
 	var hash string
 	err = a.DB.QueryRow(ctx, `SELECT id, password_hash FROM users WHERE username=$1 AND active`,
@@ -133,8 +144,8 @@ func (a *App) Login(ctx context.Context, username, password string) (token strin
 		return "", nil, errBadLogin
 	}
 	token, th := newToken()
-	if _, err = a.DB.Exec(ctx, `INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1,$2,$3)`,
-		th, id, time.Now().Add(SessionTTL)); err != nil {
+	if _, err = a.DB.Exec(ctx, `INSERT INTO sessions (token_hash, user_id, expires_at, kind) VALUES ($1,$2,$3,$4)`,
+		th, id, time.Now().Add(ttl), kind); err != nil {
 		return "", nil, err
 	}
 	if _, err = a.DB.Exec(ctx, `UPDATE users SET last_login_at = now() WHERE id=$1`, id); err != nil {
@@ -144,9 +155,41 @@ func (a *App) Login(ctx context.Context, username, password string) (token strin
 	return token, u, err
 }
 
+// Logout ends the session and forgets the devices registered in it. A shift
+// that was started from this sign-in ends with it: a signed-out rider is not
+// tracked.
 func (a *App) Logout(ctx context.Context, token string) error {
-	_, err := a.DB.Exec(ctx, `DELETE FROM sessions WHERE token_hash=$1`, hashToken(token))
-	return err
+	th := hashToken(token)
+	return a.inTx(ctx, func(tx pgx.Tx) error {
+		var userID int64
+		err := tx.QueryRow(ctx, `DELETE FROM sessions WHERE token_hash=$1 RETURNING user_id`, th).Scan(&userID)
+		if isNoRows(err) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM rider_devices WHERE session_hash=$1`, th); err != nil {
+			return err
+		}
+		var mine bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM rider_status WHERE user_id=$1 AND on_duty AND duty_session=$2)`,
+			userID, th).Scan(&mine); err != nil || !mine {
+			return err
+		}
+		if err := setDuty(ctx, tx, userID, false, nil); err != nil {
+			return err
+		}
+		branches, err := riderBranches(ctx, tx, userID)
+		if err != nil {
+			return err
+		}
+		for _, b := range branches {
+			if err := notify(ctx, tx, Event{BranchID: b, RiderIDs: []int64{userID}}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // UserBySession re-reads the user and roles on every request, so that a role

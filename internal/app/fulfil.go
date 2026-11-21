@@ -215,6 +215,12 @@ func (a *App) AssignRider(ctx context.Context, orderID, riderID int64, actor Act
 			map[string]any{"rider_id": riderID, "previous_rider_id": prev}); err != nil {
 			return err
 		}
+		if err := a.pushRider(ctx, tx, riderID, o.ID, "assigned"); err != nil {
+			return err
+		}
+		if err := a.pushRider(ctx, tx, prev, o.ID, "reassigned"); err != nil {
+			return err
+		}
 		return notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID, RiderIDs: riders})
 	})
 }
@@ -418,6 +424,9 @@ func (a *App) Pack(ctx context.Context, orderID int64, bags, manifestVersion int
 		if err := tx.QueryRow(ctx, `SELECT rider_id FROM delivery_tasks WHERE order_id=$1 AND status='assigned'`,
 			o.ID).Scan(&riderID); err == nil {
 			riders = append(riders, riderID)
+			if err := a.pushRider(ctx, tx, riderID, o.ID, "packed"); err != nil {
+				return err
+			}
 		}
 		return notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID, RiderIDs: riders})
 	})
