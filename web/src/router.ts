@@ -18,6 +18,7 @@ export const router = createRouter({
         { path: 'orders', component: () => import('./views/OrdersView.vue') },
         { path: 'tables', component: () => import('./views/TablesView.vue') },
         { path: 'menu', component: () => import('./views/MenuView.vue') },
+        { path: 'templates', component: () => import('./views/TemplatesView.vue') },
         { path: 'promos', component: () => import('./views/PromosView.vue') },
         { path: 'cash', component: () => import('./views/CashView.vue') },
         { path: 'settings', component: () => import('./views/SettingsView.vue') },

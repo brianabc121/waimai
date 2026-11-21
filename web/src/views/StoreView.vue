@@ -4,7 +4,9 @@ import { useRouter } from 'vue-router'
 import { ApiError, get } from '../api'
 import { addLine, clearLines, linePrice, useCart } from '../cart'
 import { locale, money, pick, promoLabel, setLocale, t } from '../i18n'
+import { defaultTemplate, themeVars } from '../theme'
 import type { Item, Storefront } from '../types'
+import MenuList from './MenuList.vue'
 
 const props = defineProps<{ slug: string }>()
 const router = useRouter()
@@ -31,6 +33,7 @@ async function load() {
 }
 onMounted(load)
 
+const tpl = computed(() => store.value?.templates?.delivery ?? defaultTemplate('delivery'))
 const cur = computed(() => store.value?.branch.currency ?? 'PHP')
 const items = computed(() => new Map((store.value?.categories ?? []).flatMap(c => c.items).map(i => [i.id, i])))
 // A closed store can still take orders for later when it offers time slots.
@@ -117,13 +120,10 @@ function qtyOf(it: Item) {
   return cart.lines.filter(l => l.item_id === it.id).reduce((n, l) => n + l.qty, 0)
 }
 
-function scrollTo(id: number) {
-  document.getElementById('cat-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
 </script>
 
 <template>
-  <div class="phone">
+  <div class="phone" :style="themeVars(tpl)">
     <div v-if="error" class="section stack">
       <div class="banner bad">{{ error }}</div>
       <button class="btn" @click="load">{{ t('retry') }}</button>
@@ -132,7 +132,7 @@ function scrollTo(id: number) {
     <template v-else>
       <div class="topbar">
         <div class="row between">
-          <h1>{{ pick(store.branch.name, store.branch.name_en) }}</h1>
+          <h1 class="row" style="gap:8px"><img v-if="tpl.logo_url" :src="tpl.logo_url" alt="" class="logo" />{{ pick(store.branch.name, store.branch.name_en) }}</h1>
           <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
         </div>
         <div class="row between" style="margin-top:10px">
@@ -148,6 +148,7 @@ function scrollTo(id: number) {
         </div>
       </div>
 
+      <img v-if="tpl.cover_url" :src="tpl.cover_url" alt="" class="cover" />
       <div class="section" v-if="!canOrder">
         <div class="banner warn">{{ store.branch.paused ? t('paused') : t('closed') }}</div>
       </div>
@@ -188,35 +189,8 @@ function scrollTo(id: number) {
             </select>
           </label>
         </div>
-        <div class="cats">
-          <button v-for="c in store.categories.filter(c => c.items.length)" :key="c.id" @click="scrollTo(c.id)">{{ pick(c.name, c.name_en) }}</button>
-        </div>
-        <div class="section stack">
-          <div v-for="c in store.categories.filter(c => c.items.length)" :key="c.id" :id="'cat-' + c.id" class="stack" style="scroll-margin-top:60px">
-            <h2>{{ pick(c.name, c.name_en) }}</h2>
-            <div v-for="it in c.items" :key="it.id" class="card item" :class="{ off: !orderable(it) }">
-              <img v-if="it.image_url" :src="it.image_url" alt="" />
-              <div class="grow">
-                <div class="bold">{{ pick(it.name, it.name_en) }}</div>
-                <div class="muted small" v-if="locale === 'zh' && it.name_en">{{ it.name_en }}</div>
-                <div class="muted small" v-if="it.description">{{ it.description }}</div>
-                <div class="row between" style="margin-top:8px">
-                  <span class="price bold">{{ money(it.price, cur) }}</span>
-                  <span v-if="!orderable(it)" class="tag">{{ t('sold_out') }}</span>
-                  <button v-else-if="it.groups.length" class="btn small primary" @click="open(it)">
-                    {{ t('choose') }}<span v-if="qtyOf(it)"> · {{ qtyOf(it) }}</span></button>
-                  <span v-else class="stepper">
-                    <template v-if="qtyOf(it)">
-                      <button @click="changeQty(cart.lines.findIndex(l => l.item_id === it.id), -1)" aria-label="-">−</button>
-                      <span>{{ qtyOf(it) }}</span>
-                    </template>
-                    <button class="fill" @click="open(it)" aria-label="+">+</button>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <MenuList :categories="store.categories" :currency="cur" :layout="tpl.layout" :can-order="orderable" :qty-of="qtyOf"
+          @add="open" @dec="it => changeQty(cart.lines.findIndex(l => l.item_id === it.id), -1)" />
       </template>
 
       <!-- cart bar -->
@@ -289,11 +263,6 @@ function scrollTo(id: number) {
 
 <style scoped>
 .promos { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 0; }
-.cats { display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px; position: sticky; top: 0; background: var(--bg); z-index: 10; }
-.cats button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 14px; white-space: nowrap; cursor: pointer; }
-.item { display: flex; gap: 12px; }
-.item img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; flex: none; }
-.item.off { opacity: .55; }
 .opt { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .opt.off { opacity: .5; }
 </style>

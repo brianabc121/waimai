@@ -5,6 +5,7 @@ import { computed, ref } from 'vue'
 import { ApiError, get, post } from '../api'
 import { locale, setLocale, t } from '../i18n'
 import { useLive } from '../live'
+import { defaultTemplate, themeVars } from '../theme'
 import type { BatchLine, Bill, Storefront, TableAccess } from '../types'
 import BillLines from './BillLines.vue'
 import DineMenu from './DineMenu.vue'
@@ -24,6 +25,7 @@ const busy = ref(false)
 const error = ref('')
 const notice = ref('')
 const menu = ref<InstanceType<typeof DineMenu> | null>(null)
+let storeAt = 0
 let entered = false // a phone exchanges its table code once per sitting
 
 function setPhase(e: unknown) {
@@ -47,7 +49,10 @@ async function refresh() {
     if (r.bill?.session_id !== bill.value?.session_id) { tab.value = 'menu'; notice.value = ''; error.value = '' } // a new sitting
     if (!bill.value || !r.bill || r.bill.session_id !== bill.value.session_id || r.bill.order.version >= bill.value.order.version) bill.value = r.bill
     document.title = `${r.access.store_name} · ${r.access.table_name}`
-    if (!store.value || phase.value !== 'ready') store.value = await get<Storefront>(`/stores/${r.access.slug}`)
+    // Re-read the menu now and then: sold-out marks and the published template can change mid-meal.
+    if (!store.value || phase.value !== 'ready' || Date.now() - storeAt > (ipad ? 20000 : 60000)) {
+      store.value = await get<Storefront>(`/stores/${r.access.slug}`); storeAt = Date.now()
+    }
     phase.value = r.bill ? 'ready' : 'idle'
     if (!live.online.value) live.reconnect() // the stream was refused before this device had access
   } catch (e) {
@@ -92,15 +97,17 @@ async function submit(lines: BatchLine[], expectedTotal: number, key: string) {
   busy.value = false
 }
 
+const channel = ipad ? 'ipad' : 'qr'
+const tpl = computed(() => store.value?.templates?.[channel] ?? defaultTemplate(channel))
 const cur = computed(() => store.value?.branch.currency ?? 'PHP')
 const liveCount = computed(() => bill.value?.order.items.filter(i => i.prep_status !== 'cancelled').reduce((n, i) => n + i.qty, 0) ?? 0)
 </script>
 
 <template>
-  <div :class="ipad ? 'tablet' : 'phone'" style="padding-bottom:0">
+  <div :class="ipad ? 'tablet' : 'phone'" :style="{ paddingBottom: 0, ...themeVars(tpl) }">
     <div class="topbar">
       <div class="row between">
-        <h1>{{ access?.store_name ?? t('dine_in') }}<span v-if="access"> · {{ t('table') }} {{ access.table_name }}</span></h1>
+        <h1 class="row" style="gap:8px"><img v-if="tpl.logo_url" :src="tpl.logo_url" alt="" class="logo" />{{ access?.store_name ?? t('dine_in') }}<span v-if="access"> · {{ t('table') }} {{ access.table_name }}</span></h1>
         <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
       </div>
       <div class="seg" v-if="phase === 'ready'" style="margin-top:10px">
@@ -134,8 +141,9 @@ const liveCount = computed(() => bill.value?.order.items.filter(i => i.prep_stat
     <template v-else-if="store && bill">
       <div class="section" v-if="error" style="padding-bottom:0"><div class="banner bad">{{ error }}</div></div>
       <div v-show="tab === 'menu'">
+        <img v-if="tpl.cover_url" :src="tpl.cover_url" alt="" class="cover" />
         <div class="section" v-if="store.branch.paused" style="padding-bottom:0"><div class="banner warn">{{ t('paused') }}</div></div>
-        <DineMenu ref="menu" :categories="store.categories" :currency="cur" :busy="busy" :wide="ipad"
+        <DineMenu ref="menu" :categories="store.categories" :currency="cur" :busy="busy" :layout="tpl.layout"
           :storage-key="`table-cart:${ipad ? 'ipad' : code}:${bill.session_id}`" @submit="submit">
           <template #notice><div v-if="error" class="banner bad">{{ error }}</div></template>
         </DineMenu>

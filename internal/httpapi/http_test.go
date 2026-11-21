@@ -754,3 +754,68 @@ func TestDineInOverHTTP(t *testing.T) {
 		t.Fatalf("dine-in order in delivery list: %v", l)
 	}
 }
+
+func TestTemplatesOverHTTP(t *testing.T) {
+	f1, f2 := newFixture(t), newFixture(t)
+	b1 := "/merchant/branches/" + fmt.Sprint(f1.branchID) + "/templates"
+	owner, cashier, other := login(t, f1.owner), login(t, f1.cashier), login(t, f2.owner)
+	guest := newClient(t)
+	look := func(channel string) map[string]any {
+		t.Helper()
+		return guest.want(200, "", "GET", "/stores/"+f1.slug, nil)["templates"].(map[string]any)[channel].(map[string]any)
+	}
+
+	// defaults before anything is saved
+	if look("delivery")["layout"] != "list" || look("ipad")["layout"] != "grid" {
+		t.Fatalf("defaults: %v", guest.want(200, "", "GET", "/stores/"+f1.slug, nil)["templates"])
+	}
+	cashier.want(403, "FORBIDDEN", "GET", b1, nil)
+	other.want(404, "NOT_FOUND", "GET", b1, nil)
+	other.want(404, "NOT_FOUND", "PUT", b1+"/delivery", map[string]any{"layout": "grid", "theme_color": "#112233"})
+
+	// validation
+	owner.want(422, "VALIDATION", "PUT", b1+"/delivery", map[string]any{"layout": "fancy", "theme_color": "#112233"})
+	owner.want(422, "VALIDATION", "PUT", b1+"/delivery", map[string]any{"layout": "grid", "theme_color": "red"})
+	owner.want(422, "VALIDATION", "PUT", b1+"/delivery", map[string]any{"layout": "grid", "theme_color": "#112233", "logo_url": "javascript:alert(1)"})
+	owner.want(404, "NOT_FOUND", "PUT", b1+"/kiosk", map[string]any{"layout": "grid", "theme_color": "#112233"})
+	owner.want(409, "NO_DRAFT", "POST", b1+"/delivery/publish", map[string]any{})
+
+	// a saved draft is not visible to guests
+	owner.want(200, "", "PUT", b1+"/delivery", map[string]any{"layout": "featured", "theme_color": "#0B7285", "cover_url": "https://example.com/c.jpg"})
+	if look("delivery")["layout"] != "list" {
+		t.Fatal("draft leaked to the storefront")
+	}
+	list := owner.want(200, "", "GET", b1, nil)["channels"].([]any)
+	if d := list[0].(map[string]any); d["channel"] != "delivery" || d["draft"].(map[string]any)["layout"] != "featured" || d["published"].(map[string]any)["layout"] != "list" {
+		t.Fatalf("draft state: %v", d)
+	}
+
+	// publishing delivery changes delivery only
+	cashier.want(403, "FORBIDDEN", "POST", b1+"/delivery/publish", map[string]any{})
+	owner.want(200, "", "POST", b1+"/delivery/publish", map[string]any{})
+	if d := look("delivery"); d["layout"] != "featured" || d["theme_color"] != "#0b7285" || d["cover_url"] != "https://example.com/c.jpg" {
+		t.Fatalf("published: %v", d)
+	}
+	if look("qr")["layout"] != "list" || look("ipad")["layout"] != "grid" {
+		t.Fatal("publishing delivery changed another channel")
+	}
+	owner.want(409, "NO_DRAFT", "POST", b1+"/delivery/publish", map[string]any{})
+
+	// discard keeps what is live
+	owner.want(200, "", "PUT", b1+"/qr", map[string]any{"layout": "grid", "theme_color": "#112233"})
+	owner.want(200, "", "POST", b1+"/qr/discard", map[string]any{})
+	owner.want(409, "NO_DRAFT", "POST", b1+"/qr/publish", map[string]any{})
+	if look("qr")["layout"] != "list" {
+		t.Fatal("discard changed the live template")
+	}
+
+	// the menu and ordering are the same under any template
+	cust := verifiedCustomer(t)
+	if id, _ := f1.order(t, cust); id == 0 {
+		t.Fatal("ordering broke after a template change")
+	}
+	// the other store is untouched
+	if l := guest.want(200, "", "GET", "/stores/"+f2.slug, nil)["templates"].(map[string]any)["delivery"].(map[string]any)["layout"]; l != "list" {
+		t.Fatalf("template crossed merchants: %v", l)
+	}
+}
