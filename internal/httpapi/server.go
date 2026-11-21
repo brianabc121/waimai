@@ -105,7 +105,17 @@ var (
 // allowed checks the user's role in a branch. A branch the user has no role
 // in is reported as not found, so that ids of other merchants leak nothing.
 func allowed(c *gin.Context, branchID int64, roles []string) bool {
-	role := currentUser(c).RoleIn(branchID)
+	u := currentUser(c)
+	role := u.RoleIn(branchID)
+	if role == "" && u.IsPlatformAdmin {
+		// The platform can look at any store's back office but not act in it:
+		// accepting orders or reconciling cash stays with the merchant.
+		if c.Request.Method == http.MethodGet {
+			return true
+		}
+		fail(c, app.Err(http.StatusForbidden, "READ_ONLY", "the platform view of a store is read-only"))
+		return false
+	}
 	if role == "" {
 		fail(c, app.ErrNotFound)
 		return false
@@ -318,8 +328,7 @@ func (s *Server) Router() *gin.Engine {
 
 	// platform admin
 	admin := auth.Group("/admin", requireAdmin)
-	admin.GET("/merchants", s.listMerchants)
-	admin.POST("/merchants", s.createMerchant)
+	s.adminRoutes(admin)
 
 	s.static(r)
 	return r

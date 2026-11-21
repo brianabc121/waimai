@@ -294,6 +294,9 @@ func (a *App) OpenTable(ctx context.Context, tableID int64, guests int, actor Ac
 		if err != nil {
 			return err
 		}
+		if b.Suspended {
+			return errStoreClosed
+		}
 		publicNo, code, err := nextOrderNo(ctx, tx, b, "D")
 		if err != nil {
 			return err
@@ -422,8 +425,8 @@ func (a *App) AddBatch(ctx context.Context, sessionID int64, source, idemKey str
 		if err != nil {
 			return err
 		}
-		if b.Paused {
-			return Err(http.StatusConflict, "STORE_CLOSED", "the store is not taking orders right now")
+		if !b.takesOrders() {
+			return errStoreClosed
 		}
 		lines, subtotal, err := priceLines(ctx, tx, b.ID, "dine_in", in.Items)
 		if err != nil {

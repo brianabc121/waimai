@@ -634,30 +634,6 @@ func (s *Server) riderAction(c *gin.Context) {
 	c.JSON(200, riderView(o))
 }
 
-// ---- platform admin ----
-
-func (s *Server) listMerchants(c *gin.Context) {
-	m, err := s.App.ListMerchants(c)
-	if err != nil {
-		fail(c, err)
-		return
-	}
-	c.JSON(200, gin.H{"merchants": m})
-}
-
-func (s *Server) createMerchant(c *gin.Context) {
-	var in app.NewMerchant
-	if !bind(c, &in) {
-		return
-	}
-	m, err := s.App.CreateMerchant(c, in)
-	if err != nil {
-		fail(c, err)
-		return
-	}
-	c.JSON(200, m)
-}
-
 // ---- failed deliveries ----
 
 func (s *Server) redeliverOrder(c *gin.Context) {

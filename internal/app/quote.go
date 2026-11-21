@@ -67,8 +67,8 @@ type Quote struct {
 // phone is the verified customer when known; it only matters for promotions
 // with a per-customer limit.
 func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phone string) (*Quote, error) {
-	if b.Paused {
-		return nil, Err(http.StatusConflict, "STORE_CLOSED", "the store is not taking orders right now")
+	if !b.takesOrders() {
+		return nil, errStoreClosed
 	}
 	if in.ScheduledFor != nil {
 		at := in.ScheduledFor.UTC().Truncate(time.Minute)

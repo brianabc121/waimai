@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { locale, setLocale, t } from '../i18n'
-import { currentRole, logout, session, setBranch } from '../session'
+import { currentRole, logout, session, setAdminView, setBranch } from '../session'
 
 const router = useRouter()
 const role = computed(() => currentRole()?.role ?? '')
@@ -10,6 +10,8 @@ const desk = computed(() => ['owner', 'manager', 'cashier'].includes(role.value)
 const manager = computed(() => ['owner', 'manager'].includes(role.value))
 
 async function out() { await logout(); session.loaded = true; router.replace('/login') }
+const viewing = computed(() => !!session.user?.is_platform_admin)
+function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' }
 function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).value)); location.reload() }
 </script>
 
@@ -33,6 +35,8 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
       <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
       <button class="btn link" @click="out">{{ t('sign_out') }}</button>
     </nav>
+    <div v-if="viewing" class="banner info no-print" style="border-radius:0" data-testid="admin-viewing">
+      {{ t('admin_viewing') }} <button class="btn small" style="margin-left:8px" @click="backToAdmin">{{ t('admin_back') }}</button></div>
     <div v-if="!session.branchId" class="page"><div class="banner warn">{{ t('not_found') }}</div></div>
     <router-view v-else :key="session.branchId" />
   </div>
