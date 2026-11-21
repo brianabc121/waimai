@@ -32,6 +32,7 @@ services:
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
       TWILIO_FROM: ${TWILIO_FROM:-}
       TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-}
+      LISTEN_DATABASE_URL: ${LISTEN_DATABASE_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,6 +70,20 @@ services:
     build: .
     command: ["seed"]
     environment: *env
+    profiles: ["tools"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Create the platform administrator or reset its password:
+  #   docker compose run --rm -e ADMIN_PASSWORD='...' admin
+  admin:
+    build: .
+    command: ["admin"]
+    environment:
+      <<: *env
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     profiles: ["tools"]
     depends_on:
       migrate:
