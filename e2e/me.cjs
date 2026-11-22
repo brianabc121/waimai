@@ -101,10 +101,14 @@ await page.click(tid('me-favorites'))
 await page.waitForSelector(tid('fav-store'))
 expect(await page.locator(tid('fav-store')).count() === 1, 'the kept store should be listed')
 await shot('me4-favorites')
-await page.click(tid('tab-home'))
+await page.click(tid('fav-store'))
 await page.waitForURL(u => u.pathname === '/s/makati')
 await page.waitForSelector(tid('favorite') + '[aria-pressed=true]')
-step('a store is kept with the star, listed under favourites, and "home" returns to it')
+// "home" is the marketplace
+await page.click(tid('tab-home'))
+await page.waitForURL(u => u.pathname === '/')
+await page.waitForSelector(tid('mall'))
+step('a store is kept with the star and listed under favourites; "home" is the marketplace')
 
 // ---- feedback, answered by the platform ----
 await page.goto(BASE + '/me/feedback')

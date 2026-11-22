@@ -43,3 +43,4 @@ e2e:
 	node e2e/me.cjs
 	node e2e/orders.cjs
 	node e2e/media.cjs
+	node e2e/mall.cjs

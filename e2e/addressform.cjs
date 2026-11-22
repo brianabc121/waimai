@@ -88,7 +88,7 @@ step('the form shows those three and not Telegram; the phone starts as +63 with 
 await page.locator('.bottombar .btn.primary').click()
 await page.waitForURL('**/o/**')
 await page.locator('text=12F').first().waitFor()
-const orderNo = (await page.locator('.topbar h1').innerText()).replace('订单号', '').trim()
+const orderNo = (await page.locator('[data-testid=order-no]').innerText()).trim()
 await owner.goto(BASE + '/merchant/orders')
 await owner.click(`.ord:has-text("${orderNo}")`)
 const im = owner.locator(tid('order-im'))

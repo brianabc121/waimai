@@ -133,7 +133,7 @@ func (a *App) AdminMall(ctx context.Context) (*MallAdmin, error) {
 		return nil, err
 	}
 	rows, err := a.DB.Query(ctx, `SELECT b.id, b.merchant_id, b.slug, b.name, b.name_en, coalesce(t.published->>'logo_url', ''), b.city,
-		coalesce((SELECT array_agg(c.name ORDER BY c.sort, c.id) FROM branch_categories bc JOIN store_categories c ON c.id = bc.category_id WHERE bc.branch_id = b.id), '{}'),
+		coalesce((SELECT array_agg(c.code ORDER BY c.sort, c.id) FROM branch_categories bc JOIN store_categories c ON c.id = bc.category_id WHERE bc.branch_id = b.id), '{}'),
 		b.mall_listed, b.mall_hidden, m.status = 'suspended', b.lat IS NOT NULL,
 		EXISTS (SELECT 1 FROM delivery_zones z WHERE z.branch_id = b.id AND z.active AND z.polygon IS NOT NULL)
 		FROM branches b JOIN merchants m ON m.id = b.merchant_id

@@ -6,6 +6,7 @@ import { ApiError, get, newKey, post } from '../api'
 import { clearLines, linePrice, quoteItems, useCart } from '../cart'
 import { customer, loadCustomer, loginRoute, prettyPhone } from '../customer'
 import { money, pick, t, whenText } from '../i18n'
+import { mallAddressId } from '../mall'
 import type { Item, Quote, Storefront } from '../types'
 
 const AddressSheet = defineAsyncComponent(() => import('./AddressSheet.vue'))
@@ -62,7 +63,8 @@ async function loadAddresses() {
   const r = await listAddresses(mapMode.value ? props.slug : undefined).catch(() => null)
   if (!r) return
   addresses.value = sorted(r.addresses)
-  if (!address.value) use(addresses.value.find(usable) ?? null)
+  // The address chosen in the marketplace comes first, when this store delivers to it.
+  if (!address.value) use(addresses.value.find(a => a.id === mallAddressId() && usable(a)) ?? addresses.value.find(usable) ?? null)
   // Nothing saved yet: the first thing to do is to add an address. Where the
   // customer may also pick up, the page is shown first, so that they can say so.
   if (!addresses.value.length && !bothServices.value) { startNew.value = true; showSheet.value = true }
