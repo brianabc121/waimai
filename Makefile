@@ -40,6 +40,7 @@ e2e:
 	node e2e/storefront.cjs
 	node e2e/addressform.cjs
 	node e2e/account.cjs
+	node e2e/chat.cjs
 	node e2e/me.cjs
 	node e2e/orders.cjs
 	node e2e/media.cjs

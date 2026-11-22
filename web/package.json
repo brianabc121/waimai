@@ -1,6 +1,7 @@
 {
   "name": "waimai-web",
   "private": true,
+  "license": "GPL-3.0-only",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -11,6 +12,7 @@
   },
   "dependencies": {
     "@capacitor/core": "^8.6.2",
+    "@openim/client-sdk": "3.8.3-hotfix.0",
     "polygon-clipping": "^0.15.7",
     "qrcode": "^1.5.4",
     "vue": "^3.5.13",

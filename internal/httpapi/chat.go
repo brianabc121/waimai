@@ -1,0 +1,224 @@
+package httpapi
+
+import (
+	"crypto/subtle"
+	"errors"
+	"log"
+	"net/http"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/brianabc121/waimai/internal/app"
+)
+
+// Chat between customers and stores (internal/app/chat.go). The browsers talk
+// to OpenIM; these routes hand out its sign-in tokens, serve the lists and the
+// unread counts, and answer OpenIM's callbacks.
+
+func (s *Server) chatRoutes(r *gin.Engine, api *gin.RouterGroup) {
+	w := s.limit(s.publicWrites)
+	api.GET("/customer/unread", s.customerUnread)
+	api.GET("/customer/chats", s.customerChats)
+	api.POST("/customer/chats/login", w, s.customerChatLogin)
+	api.GET("/customer/chats/:slug", s.customerChat)
+	api.POST("/customer/chats/:slug/read", w, s.customerChatRead)
+
+	// OpenIM calls back here from inside the private network. Its callbacks
+	// are not signed, so the address carries a key.
+	r.POST("/im-hooks/:key/:command", s.chatHook)
+}
+
+func (s *Server) chatAdminRoutes(auth, admin *gin.RouterGroup) {
+	auth.GET("/merchant/branches/:bid/chats", s.storeChats)
+	auth.POST("/merchant/branches/:bid/chats/login", s.storeChatLogin)
+	auth.GET("/merchant/branches/:bid/chats/:cid", s.storeChat)
+	auth.POST("/merchant/branches/:bid/chats/:cid/read", s.storeChatRead)
+
+	admin.GET("/chats", s.adminChats)
+	admin.GET("/chats/:id", s.adminChat)
+	admin.POST("/chat-customers/:id/mute", s.adminChatMute)
+	admin.POST("/chat-stores/:id", s.adminStoreChat)
+}
+
+// ---- customer ----
+
+func (s *Server) customerUnread(c *gin.Context) {
+	cu, err := s.customer(c)
+	if err != nil { // nobody is signed in: nothing is unread
+		c.JSON(200, app.Unread{})
+		return
+	}
+	u, err := s.App.CustomerUnread(c, cu.ID)
+	reply(c, u, err)
+}
+
+func (s *Server) customerChats(c *gin.Context) {
+	if cu, ok := s.me(c); ok {
+		chats, err := s.App.CustomerChats(c, cu.ID)
+		reply(c, gin.H{"chats": chats, "enabled": s.App.ChatOn()}, err)
+	}
+}
+
+func (s *Server) customerChatLogin(c *gin.Context) {
+	if cu, ok := s.me(c); ok {
+		l, err := s.App.CustomerChatLogin(c, cu.ID)
+		reply(c, l, err)
+	}
+}
+
+func (s *Server) customerChat(c *gin.Context) {
+	if cu, ok := s.me(c); ok {
+		chat, err := s.App.CustomerChat(c, cu.ID, c.Param("slug"))
+		reply(c, chat, err)
+	}
+}
+
+func (s *Server) customerChatRead(c *gin.Context) {
+	cu, ok := s.me(c)
+	if !ok {
+		return
+	}
+	chat, err := s.App.CustomerChat(c, cu.ID, c.Param("slug"))
+	if err == nil {
+		err = s.App.ReadChat(c, "customer", chat.BranchID, cu.ID)
+	}
+	reply(c, gin.H{"ok": true}, err)
+}
+
+// ---- store ----
+
+func (s *Server) storeChats(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	chats, unread, err := s.App.StoreChats(c, bid, app.ChatFilter{Q: c.Query("q"), Unread: c.Query("unread") == "1", Active: c.Query("active") == "1"})
+	reply(c, gin.H{"chats": chats, "unread": unread, "enabled": s.App.ChatOn()}, err)
+}
+
+func (s *Server) storeChatLogin(c *gin.Context) {
+	if bid, ok := branchScope(c, deskRoles); ok {
+		l, err := s.App.StoreChatLogin(c, bid)
+		reply(c, l, err)
+	}
+}
+
+func (s *Server) storeChat(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	if cid, ok := idParam(c, "cid"); ok {
+		chat, err := s.App.StoreChatWith(c, bid, cid)
+		reply(c, chat, err)
+	}
+}
+
+func (s *Server) storeChatRead(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	if cid, ok := idParam(c, "cid"); ok {
+		reply(c, gin.H{"ok": true}, s.App.ReadChat(c, "store", bid, cid))
+	}
+}
+
+// ---- platform ----
+
+func (s *Server) adminChats(c *gin.Context) {
+	l, err := s.App.AdminChats(c, app.ChatFilter{Q: c.Query("q"), Today: c.Query("today") == "1",
+		BranchID: queryInt(c, "branch_id"), Page: queryPage(c)})
+	reply(c, l, err)
+}
+
+func (s *Server) adminChat(c *gin.Context) {
+	if id, ok := idParam(c, "id"); ok {
+		chat, err := s.App.AdminChat(c, adminActor(c), id, queryInt(c, "before"))
+		reply(c, chat, err)
+	}
+}
+
+func (s *Server) adminChatMute(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	var in struct {
+		Muted bool `json:"muted"`
+	}
+	if !ok || !bind(c, &in) {
+		return
+	}
+	reply(c, gin.H{"ok": true}, s.App.AdminMuteCustomer(c, adminActor(c), id, in.Muted))
+}
+
+func (s *Server) adminStoreChat(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	var in struct {
+		Enabled bool `json:"enabled"`
+	}
+	if !ok || !bind(c, &in) {
+		return
+	}
+	reply(c, gin.H{"ok": true}, s.App.AdminSetStoreChat(c, adminActor(c), id, in.Enabled))
+}
+
+// ---- OpenIM's callbacks ----
+
+// hookRefusal is OpenIM's error number for "the callback said no". The reason
+// goes in errMsg as this system's own code, which the chat pages translate.
+const hookRefusal = 5001
+
+func hookOK(c *gin.Context) {
+	c.JSON(200, gin.H{"actionCode": 0, "errCode": 0, "errMsg": "", "errDlt": "", "nextCode": 0})
+}
+
+func hookNo(c *gin.Context, code, detail string) {
+	c.JSON(200, gin.H{"actionCode": 0, "errCode": hookRefusal, "errMsg": code, "errDlt": detail, "nextCode": 1})
+}
+
+func (s *Server) chatHook(c *gin.Context) {
+	key := s.Cfg.OpenIMHookKey
+	if key == "" || subtle.ConstantTimeCompare([]byte(key), []byte(c.Param("key"))) != 1 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	command := c.Param("command")
+	switch command {
+	case "callbackBeforeSendSingleMsgCommand", "callbackAfterSendSingleMsgCommand":
+		var h app.ChatHook
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
+		if err := c.ShouldBindJSON(&h); err != nil {
+			hookNo(c, "VALIDATION", "unreadable callback")
+			return
+		}
+		if command == "callbackAfterSendSingleMsgCommand" {
+			if err := s.App.ChatAfterSend(c, h); err != nil {
+				log.Printf("chat: a message was not copied: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "not stored"})
+				return
+			}
+			hookOK(c)
+			return
+		}
+		err := s.App.ChatBeforeSend(c, h)
+		var ae *app.Error
+		switch {
+		case err == nil:
+			hookOK(c)
+		case errors.As(err, &ae):
+			hookNo(c, ae.Code, ae.Message)
+		default:
+			// this system cannot tell whether the message is allowed: it does not go out
+			log.Printf("chat: before-send check failed: %v", err)
+			hookNo(c, "CHAT_DOWN", "try again in a moment")
+		}
+	default:
+		// Groups, friends and the rest of OpenIM are not part of this
+		// system: whatever asks first is refused.
+		if strings.HasPrefix(command, "callbackBefore") {
+			hookNo(c, "FORBIDDEN", "not supported")
+			return
+		}
+		hookOK(c)
+	}
+}

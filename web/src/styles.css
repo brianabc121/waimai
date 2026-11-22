@@ -361,6 +361,9 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
 .shop .stepper button { width: 32px; height: 32px; border-radius: 8px; font-size: 20px; }
 .shop .stepper > span { min-width: 34px; text-align: center; font-size: 16px; }
 
+/* the unread number beside a navigation entry */
+.navnum { margin-left: 8px; display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #e5352b; color: #fff; font-size: 11px; font-weight: 700; }
+
 /* The customer's warm look (order list, marketplace): deep red, cream and gold. */
 .warm {
   --brand: #a02c20; --brand-dark: #86231a; --brand-soft: #f8e3b2;

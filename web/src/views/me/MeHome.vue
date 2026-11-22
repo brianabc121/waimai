@@ -54,7 +54,7 @@ interface Entry { key: string; to?: string; open?: boolean; dot?: boolean; icon:
 const common = computed<Entry[]>(() => [
   { key: 'addresses', icon: 'M12 13a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2zM12 21s6.5-5.8 6.5-10.6a6.5 6.5 0 0 0-13 0C5.5 15.2 12 21 12 21z' },
   { key: 'favorites', to: '/me/favorites', icon: 'M12 20s-7.5-4.6-7.5-10.100A4.3 4.3 0 0 1 12 7.200a4.3 4.3 0 0 1 7.5 2.700C19.5 15.4 12 20 12 20z' },
-  { key: 'messages', to: '/me/messages', dot: !!profile.value?.unread, icon: 'M4.5 6.500A2.5 2.5 0 0 1 7 4h10a2.5 2.5 0 0 1 2.5 2.500v7A2.5 2.5 0 0 1 17 16h-5l-4.5 4v-4H7a2.5 2.5 0 0 1-2.5-2.500zM8.5 10h.01M12 10h.01M15.5 10h.01' },
+  { key: 'messages', to: '/me/messages', dot: !!profile.value && profile.value.unread + profile.value.chat_unread > 0, icon: 'M4.5 6.500A2.5 2.5 0 0 1 7 4h10a2.5 2.5 0 0 1 2.5 2.500v7A2.5 2.5 0 0 1 17 16h-5l-4.5 4v-4H7a2.5 2.5 0 0 1-2.5-2.500zM8.5 10h.01M12 10h.01M15.5 10h.01' },
   { key: 'support', to: '/me/support', open: true, icon: 'M5 13v-1a7 7 0 0 1 14 0v1M5 13h2.500v5H6a1 1 0 0 1-1-1zM19 13h-2.500v5H18a1 1 0 0 0 1-1zM16.5 18c0 1.7-1.5 2.5-3.5 2.5' },
 ])
 // the rest, as rows

@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>聊天消息 · 原型</title>
+<link rel="stylesheet" href="proto.css">
+</head>
+<body>
+
+<!-- ?s=customer ：顾客端三屏 -->
+<section data-s="customer" class="phones">
+  <div>
+    <div class="phone">
+      <div class="bar"><span class="back">‹</span><span class="ttl">消息</span></div>
+      <div class="tabs2"><span class="on">聊天 <i class="dot">2</i></span><span>通知 <i class="dot">1</i></span></div>
+      <div class="list">
+        <div class="conv">
+          <div class="ava a1">阿</div>
+          <div class="grow"><div class="row between"><b>阿明海南鸡饭</b><span class="tiny muted">14:32</span></div>
+            <div class="row between"><span class="last">好的，鸡腿换成鸡胸，不加辣</span><i class="dot">2</i></div></div>
+        </div>
+        <div class="conv">
+          <div class="ava a2">川</div>
+          <div class="grow"><div class="row between"><b>川味小馆</b><span class="tiny muted">昨天</span></div>
+            <div class="last">[图片]</div></div>
+        </div>
+        <div class="conv">
+          <div class="ava a3">甜</div>
+          <div class="grow"><div class="row between"><b>甜心糖水铺</b><span class="tiny muted">11-18</span></div>
+            <div class="last">你：谢谢，已经收到了</div></div>
+        </div>
+        <div class="empty-note">聊天记录保留 180 天</div>
+      </div>
+      <div class="tabbar"><span>首页</span><span>订单</span><span class="on">我的</span></div>
+    </div>
+    <div class="caption"><b>① 消息页</b>：原来的“我的消息”加一个“聊天”标签。商城右上角的消息按钮也是打开这一页。</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="bar"><span class="back">‹</span><span class="ttl">阿明海南鸡饭<small>营业中 · 通常 5 分钟内回复</small></span><span class="more">⋯</span></div>
+      <div class="chat">
+        <div class="day">今天 14:28</div>
+        <div class="ocard">
+          <div class="tiny muted">我想问这个订单</div>
+          <div class="row between"><b>订单 #A1042</b><span class="tag warn">备餐中</span></div>
+          <div class="small muted">海南鸡饭（鸡腿）× 1、冬瓜茶 × 1 · S$ 12.50</div>
+        </div>
+        <div class="msg me"><div class="bub">你好，鸡腿可以换成鸡胸吗？不要辣椒酱</div></div>
+        <div class="msg"><div class="ava a1 sm">阿</div><div class="bub">可以的，马上帮你改</div></div>
+        <div class="msg me"><div class="bub img"><div class="pic">📷<span>门口照片</span></div></div></div>
+        <div class="msg me"><div class="bub">送到这个门口就行</div></div>
+        <div class="msg"><div class="ava a1 sm">阿</div><div class="bub">好的，鸡腿换成鸡胸，不加辣</div></div>
+        <div class="read">已读</div>
+      </div>
+      <div class="composer"><span class="plus">＋</span><span class="input">输入消息…</span><span class="send">发送</span></div>
+    </div>
+    <div class="caption"><b>② 聊天页</b>：文字、图片、订单卡片。从订单详情点“联系商家”进来时自动带上订单卡片。</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="bar"><span class="back">‹</span><span class="ttl">阿明海南鸡饭<small>已打烊 · 明天 10:00 营业</small></span><span class="more">⋯</span></div>
+      <div class="chat dimmed">
+        <div class="day">今天 22:41</div>
+        <div class="msg me"><div class="bub">明天中午可以预订 10 份吗？</div></div>
+        <div class="sys">自动回复：我们已打烊，明天 10:00 营业后回复你。急事请打电话 6123 4567。</div>
+      </div>
+      <div class="dim"></div>
+      <div class="sheet">
+        <div class="hd">更多<span>×</span></div>
+        <div class="srow">📞 打电话给商家</div>
+        <div class="srow">🧾 发送我的订单</div>
+        <div class="srow">🔕 不再提醒这家店的消息</div>
+        <div class="srow bad">⚠ 举报这个商家</div>
+        <div class="srow muted">删除这个聊天（只在我这边删除）</div>
+      </div>
+    </div>
+    <div class="caption"><b>③ 打烊自动回复、更多菜单</b>：举报会把最近的聊天内容一起交给平台。</div>
+  </div>
+</section>
+
+<!-- ?s=merchant ：商家端电脑 -->
+<section data-s="merchant" class="desk">
+  <div class="win">
+    <div class="side">
+      <div class="brand">阿明海南鸡饭</div>
+      <a>订单</a><a>桌台</a><a>后厨</a><a class="on">消息 <i class="dot">3</i></a><a>菜单管理</a><a>优惠活动</a><a>骑手</a><a>员工</a><a>设置</a>
+    </div>
+    <div class="clist">
+      <div class="search">搜索顾客、订单号</div>
+      <div class="filters"><span class="chip on">全部</span><span class="chip">未读 3</span><span class="chip">进行中订单</span></div>
+      <div class="conv on">
+        <div class="ava c1">林</div>
+        <div class="grow"><div class="row between"><b>林先生 · 尾号 8821</b><span class="tiny muted">14:31</span></div>
+          <div class="row between"><span class="last">送到这个门口就行</span><i class="dot">2</i></div>
+          <span class="tag warn">#A1042 备餐中</span></div>
+      </div>
+      <div class="conv">
+        <div class="ava c2">陈</div>
+        <div class="grow"><div class="row between"><b>陈小姐 · 尾号 0375</b><span class="tiny muted">14:20</span></div>
+          <div class="row between"><span class="last">请问今天有白斩鸡吗？</span><i class="dot">1</i></div></div>
+      </div>
+      <div class="conv">
+        <div class="ava c3">王</div>
+        <div class="grow"><div class="row between"><b>王先生 · 尾号 4410</b><span class="tiny muted">13:05</span></div>
+          <div class="last">你：已经让骑手放在保安亭了</div>
+          <span class="tag ok">#A1037 已送达</span></div>
+      </div>
+      <div class="conv">
+        <div class="ava c4">周</div>
+        <div class="grow"><div class="row between"><b>周女士 · 尾号 6602</b><span class="tiny muted">昨天</span></div>
+          <div class="last">好的谢谢</div></div>
+      </div>
+    </div>
+    <div class="cpane">
+      <div class="chead"><b>林先生 · 尾号 8821</b><span class="muted small">在本店下过 6 单</span><span class="more">⋯</span></div>
+      <div class="chat">
+        <div class="day">今天 14:28</div>
+        <div class="ocard"><div class="row between"><b>订单 #A1042</b><span class="tag warn">备餐中</span></div>
+          <div class="small muted">海南鸡饭（鸡腿）× 1、冬瓜茶 × 1 · S$ 12.50</div></div>
+        <div class="msg"><div class="ava c1 sm">林</div><div class="bub">你好，鸡腿可以换成鸡胸吗？不要辣椒酱</div></div>
+        <div class="msg me"><div class="bub">可以的，马上帮你改<em>小芳</em></div></div>
+        <div class="msg"><div class="ava c1 sm">林</div><div class="bub img"><div class="pic">📷<span>门口照片</span></div></div></div>
+        <div class="msg"><div class="ava c1 sm">林</div><div class="bub">送到这个门口就行</div></div>
+      </div>
+      <div class="quick"><span class="chip">好的，马上处理</span><span class="chip">已经在做了，请稍等</span><span class="chip">这道菜今天卖完了</span><span class="chip">骑手已出发</span><span class="chip line">＋ 管理快捷回复</span></div>
+      <div class="composer"><span class="plus">＋</span><span class="input">输入消息，回车发送…</span><span class="send">发送</span></div>
+    </div>
+    <div class="info">
+      <h4>顾客</h4>
+      <div>林先生</div><div class="muted small">+65 •••• 8821</div>
+      <h4>当前订单</h4>
+      <div class="ocard flat"><div class="row between"><b>#A1042</b><span class="tag warn">备餐中</span></div>
+        <div class="small muted">外卖 · 14:26 下单<br>海南鸡饭（鸡腿）× 1<br>冬瓜茶 × 1</div><div class="lnk">打开订单 ›</div></div>
+      <h4>最近订单</h4>
+      <div class="small">#A0988 · 11-19 · S$ 18.00</div>
+      <div class="small">#A0931 · 11-15 · S$ 9.50</div>
+      <h4>操作</h4>
+      <div class="lnk bad">拉黑这位顾客</div>
+      <div class="lnk bad">举报给平台</div>
+    </div>
+  </div>
+  <div class="caption wide"><b>④ 商家端“消息”页（电脑、iPad）</b>：左边是聊天列表，中间聊天，右边是这位顾客的订单。一家店共用一个收件箱，谁回的会记下名字（顾客只看到店名）。</div>
+</section>
+
+<!-- ?s=mphone ：商家端手机和提醒 -->
+<section data-s="mphone" class="phones">
+  <div>
+    <div class="phone">
+      <div class="bar"><span class="back">☰</span><span class="ttl">消息</span></div>
+      <div class="filters pad"><span class="chip on">全部</span><span class="chip">未读 3</span><span class="chip">进行中订单</span></div>
+      <div class="list">
+        <div class="conv"><div class="ava c1">林</div><div class="grow"><div class="row between"><b>林先生 · 尾号 8821</b><span class="tiny muted">14:31</span></div><div class="row between"><span class="last">送到这个门口就行</span><i class="dot">2</i></div><span class="tag warn">#A1042 备餐中</span></div></div>
+        <div class="conv"><div class="ava c2">陈</div><div class="grow"><div class="row between"><b>陈小姐 · 尾号 0375</b><span class="tiny muted">14:20</span></div><div class="row between"><span class="last">请问今天有白斩鸡吗？</span><i class="dot">1</i></div></div></div>
+        <div class="conv"><div class="ava c3">王</div><div class="grow"><div class="row between"><b>王先生 · 尾号 4410</b><span class="tiny muted">13:05</span></div><div class="last">你：已经让骑手放在保安亭了</div><span class="tag ok">#A1037 已送达</span></div></div>
+      </div>
+    </div>
+    <div class="caption"><b>⑤ 商家手机上</b>：先看列表，点进去再聊。</div>
+  </div>
+  <div>
+    <div class="phone">
+      <div class="bar"><span class="back">☰</span><span class="ttl">订单</span><span class="bell">💬<i class="dot">3</i></span></div>
+      <div class="scroll" style="padding-top:62px">
+        <div class="card"><div class="row between"><b>#A1042 · 外卖</b><span class="tag warn">备餐中</span></div>
+          <div class="small muted">林先生 · 海南鸡饭 × 1、冬瓜茶 × 1</div>
+          <div class="row" style="margin-top:10px"><span class="btn sm">打印</span><span class="btn sm line">💬 联系顾客 <i class="dot">2</i></span><span class="btn sm primary">出餐</span></div></div>
+        <div class="card"><div class="row between"><b>#A1043 · 自取</b><span class="tag brand">新订单</span></div>
+          <div class="small muted">陈小姐 · 白斩鸡（半只）× 1</div>
+          <div class="row" style="margin-top:10px"><span class="btn sm">打印</span><span class="btn sm line">💬 联系顾客</span><span class="btn sm primary">接单</span></div></div>
+      </div>
+      <div class="toast"><b>林先生</b>（#A1042）：送到这个门口就行<span>查看</span></div>
+    </div>
+    <div class="caption"><b>⑥ 订单页上的提醒</b>：有新消息时响一声、顶部弹出一条，订单卡片上有“联系顾客”。</div>
+  </div>
+  <div>
+    <div class="phone lock">
+      <div class="clock">14:31</div>
+      <div class="push"><div class="row between"><b>阿明海南鸡饭</b><span class="tiny">现在</span></div><div>林先生（#A1042）发来一条消息</div></div>
+      <div class="push cust"><div class="row between"><b>外卖点餐</b><span class="tiny">2 分钟前</span></div><div>阿明海南鸡饭回复了你</div></div>
+    </div>
+    <div class="caption"><b>⑦ 锁屏推送</b>：商家和顾客都能收到（需要各自点一次“开启提醒”）。推送里不带聊天原文。</div>
+  </div>
+</section>
+
+<!-- ?s=admin ：平台后台所有会话 -->
+<section data-s="admin" class="desk">
+  <div class="win">
+    <div class="side">
+      <div class="brand">平台后台</div>
+      <a>总览</a><a>商户</a><a>商品</a><a>顾客服务</a><a class="on">所有会话</a><a>API 监控</a><a>Worker</a><a>密钥设置</a><a>操作记录</a>
+    </div>
+    <div class="clist wide">
+      <div class="search">搜索店名、顾客手机号、订单号、聊天内容</div>
+      <div class="filters"><span class="chip on">全部 1,284</span><span class="chip">被举报 2</span><span class="chip">今天</span><span class="chip">全部门店 ▾</span></div>
+      <div class="conv on">
+        <div class="ava a1">阿</div>
+        <div class="grow"><div class="row between"><b>阿明海南鸡饭 ↔ 林先生 8821</b><span class="tiny muted">14:31</span></div>
+          <div class="last">顾客：送到这个门口就行</div>
+          <span class="tag warn">#A1042 备餐中</span> <span class="tag">6 条</span></div>
+      </div>
+      <div class="conv">
+        <div class="ava a2">川</div>
+        <div class="grow"><div class="row between"><b>川味小馆 ↔ 黄女士 2290</b><span class="tiny muted">14:12</span></div>
+          <div class="last">商家：不好意思，今天水煮鱼卖完了</div>
+          <span class="tag bad">顾客举报：态度恶劣</span> <span class="tag">23 条</span></div>
+      </div>
+      <div class="conv">
+        <div class="ava a1">阿</div>
+        <div class="grow"><div class="row between"><b>阿明海南鸡饭 ↔ 陈小姐 0375</b><span class="tiny muted">14:20</span></div>
+          <div class="last">顾客：请问今天有白斩鸡吗？</div>
+          <span class="tag">1 条</span></div>
+      </div>
+      <div class="conv">
+        <div class="ava a3">甜</div>
+        <div class="grow"><div class="row between"><b>甜心糖水铺 ↔ 吴先生 7714</b><span class="tiny muted">13:48</span></div>
+          <div class="last">商家：[图片]</div>
+          <span class="tag ok">#T0311 已送达</span> <span class="tag">9 条</span></div>
+      </div>
+      <div class="conv">
+        <div class="ava a2">川</div>
+        <div class="grow"><div class="row between"><b>川味小馆 ↔ 郑先生 5061</b><span class="tiny muted">昨天</span></div>
+          <div class="last">顾客：好的谢谢</div>
+          <span class="tag">4 条</span></div>
+      </div>
+    </div>
+    <div class="cpane">
+      <div class="chead"><b>阿明海南鸡饭 ↔ 林先生 8821</b><span class="tag">只读</span><span class="more small muted">导出 · 打开订单 · 打开门店</span></div>
+      <div class="chat">
+        <div class="day">2026-11-22 14:28</div>
+        <div class="ocard"><div class="row between"><b>订单 #A1042</b><span class="tag warn">备餐中</span></div>
+          <div class="small muted">海南鸡饭（鸡腿）× 1、冬瓜茶 × 1 · S$ 12.50</div></div>
+        <div class="msg"><div class="ava c1 sm">林</div><div class="bub">你好，鸡腿可以换成鸡胸吗？不要辣椒酱<em class="dk">顾客 · 14:28</em></div></div>
+        <div class="msg me"><div class="bub">可以的，马上帮你改<em>门店 · 小芳 · 14:29</em></div></div>
+        <div class="msg"><div class="ava c1 sm">林</div><div class="bub img"><div class="pic">📷<span>门口照片</span></div></div></div>
+        <div class="msg"><div class="ava c1 sm">林</div><div class="bub">送到这个门口就行<em class="dk">顾客 · 14:31</em></div></div>
+      </div>
+      <div class="ronly">平台只能查看，不能代替任何一方发消息。每次打开会话都会记进“操作记录”。</div>
+    </div>
+    <div class="info">
+      <h4>门店</h4><div>阿明海南鸡饭</div><div class="muted small">商户：阿明餐饮</div>
+      <h4>顾客</h4><div>林先生</div><div class="muted small">+65 9123 8821</div>
+      <h4>这个会话</h4>
+      <div class="small">开始于 2026-10-03</div><div class="small">共 6 条消息，1 张图片</div><div class="small">举报 0 次</div>
+      <h4>处理</h4>
+      <div class="lnk bad">禁言这位顾客</div>
+      <div class="lnk bad">关闭这家店的聊天功能</div>
+    </div>
+  </div>
+  <div class="caption wide"><b>⑧ 平台后台“所有会话”</b>：能看到全平台每一个聊天，可以按门店、顾客、订单号、内容搜索，被举报的单独筛出来。只读。</div>
+</section>
+
+<script>
+  var s = new URLSearchParams(location.search).get('s') || 'customer';
+  document.querySelectorAll('section').forEach(function (el) { el.hidden = el.dataset.s !== s; });
+</script>
+</body>
+</html>

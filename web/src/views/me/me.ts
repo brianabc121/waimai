@@ -8,7 +8,7 @@ import type { Promotion } from '../../types'
 export interface Wallet { currency: string; balance: number; bonus: number }
 export interface Profile {
   id: number; member_no: string; phone: string; nickname: string; avatar_at: string | null
-  wallets: Wallet[]; unread: number; favorites: number
+  wallets: Wallet[]; unread: number; favorites: number; chat_unread: number
 }
 export interface StoreRef { slug: string; name: string; name_en: string; logo_url: string }
 export interface MyStore extends StoreRef { phone: string; address: string; currency: string; favorite: boolean; last_order_at: string | null }

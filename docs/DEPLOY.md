@@ -502,3 +502,52 @@ base64 -w0 workbench.jks > workbench.jks.txt
 **顾客看不到配送范围**
 
 商城和它的接口只告诉顾客某个位置能不能送、配送费、起送价和大概多久，不会给出配送范围的形状或名字。
+
+## 19. 聊天（顾客和商家发消息）
+
+聊天是可选的，基于开源的 OpenIM。不开的话系统和以前一样，页面上不出现任何聊天入口。方案见 `docs/CHAT_DESIGN.md`。
+
+**需要什么**
+
+- 服务器多出约 1.5 GB 内存（实测空载 1.05 GB）。整台建议 4 核 8 GB。
+- 多出 6 个容器：`openim-server` 和它用的 `im-mongo`、`im-redis`、`im-kafka`、`im-etcd`、`im-minio`。都不对外开端口。
+
+**开通步骤**
+
+1. 在 `.env` 里加四行（后三个各自用 `openssl rand -hex 24` 生成，不要用示例值）：
+
+   ```
+   OPENIM_API_URL=http://openim-server:10002
+   OPENIM_SECRET=……
+   OPENIM_HOOK_KEY=……
+   IM_STORE_PASSWORD=……
+   ```
+
+2. 启动时带上 `im` 这一组：
+
+   ```
+   docker compose --profile im up -d --build
+   ```
+
+   第一次启动 OpenIM 要一两分钟。`docker compose --profile im ps` 里 `openim-server` 显示 `healthy` 就好了。
+
+3. 打开任意一家店的点餐页，里面出现“联系商家”就是开通了。商家后台左边多一个“消息”，平台后台多一个“所有会话”。
+
+以后每次 `docker compose up` 都要带 `--profile im`，否则聊天的容器不会跟着启动（页面会提示“聊天暂时不可用”，下单不受影响）。
+
+**要知道的几件事**
+
+- `OPENIM_SECRET` 是给聊天登录签名的，`OPENIM_HOOK_KEY` 保护 OpenIM 回调我们后端的入口。两个都至少 16 位，太短的话 api 容器会拒绝启动。改了 `OPENIM_SECRET` 之后已经打开的聊天页要刷新一次。
+- `IM_STORE_PASSWORD` 只在第一次创建数据卷时生效，之后改它不会改已有数据库的密码。
+- 如果前面有 Caddy 之类的 TLS 代理，不用加配置：聊天的两个路径 `/im/ws` 和 `/im/api` 都在同一个域名下，由 web 容器转发。代理要支持 WebSocket（Caddy 默认支持）。
+- 聊天内容我们自己的数据库里有一份副本（平台“所有会话”读的就是它），随 PostgreSQL 一起备份。OpenIM 那边的原件在数据卷 `im-mongo` 里，要完整恢复聊天页里的历史就也备份它：`docker compose exec im-mongo mongodump -u root -p "$IM_STORE_PASSWORD" --authenticationDatabase admin --archive > im.archive`。
+- 浏览器端用的 OpenIM 网页 SDK 是 GPL-3.0 授权，见 `web/NOTICE.md`。
+
+**测试**
+
+```
+BASE_URL=http://localhost:8000 node e2e/chat.cjs
+```
+
+没开聊天的环境会直接提示跳过。
+

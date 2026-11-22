@@ -294,6 +294,7 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/customer/orders/:token/review", s.orderReview)
 	api.POST("/customer/orders/:token/review", s.limit(s.publicWrites), s.submitReview)
 	s.meRoutes(api)
+	s.chatRoutes(r, api)
 	s.mallRoutes(api)
 
 	// dine-in guests: scanned table code or paired tablet
@@ -424,6 +425,7 @@ func (s *Server) Router() *gin.Engine {
 	s.adminRoutes(admin)
 	s.meAdminRoutes(admin)
 	s.mallAdminRoutes(admin)
+	s.chatAdminRoutes(auth, admin)
 
 	s.static(r)
 	return r

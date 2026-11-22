@@ -115,7 +115,7 @@ onBeforeUnmount(() => clearInterval(timer))
           <router-link to="/orders" class="txt">{{ t('ml.orders') }}</router-link>
           <button class="msg" :aria-label="t('ml.messages')" data-testid="mall-messages" @click="messages">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.500c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.150-2.9-.400L5 20l.9-3.300C4.4 15.4 3.5 13.6 3.5 11.500c0-3.9 3.8-7 8.5-7z" /><path d="M8.5 11.500h.01M12 11.500h.01M15.5 11.500h.01" /></svg>
-            <i v-if="me.profile?.unread" data-testid="mall-unread">{{ me.profile.unread > 99 ? '99+' : me.profile.unread }}</i>
+            <i v-if="me.profile && me.profile.unread + me.profile.chat_unread" data-testid="mall-unread">{{ me.profile.unread + me.profile.chat_unread > 99 ? '99+' : me.profile.unread + me.profile.chat_unread }}</i>
           </button>
           <router-link to="/me" class="avatar" :aria-label="t('me.me')">
             <template v-if="me.profile">{{ displayName(me.profile).slice(0, 1) }}</template>

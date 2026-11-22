@@ -38,6 +38,10 @@ services:
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
       TWILIO_FROM: ${TWILIO_FROM:-}
       TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-}
+      # Chat (docs/CHAT_DESIGN.md). Empty OPENIM_API_URL: no chat anywhere.
+      OPENIM_API_URL: ${OPENIM_API_URL:-}
+      OPENIM_SECRET: ${OPENIM_SECRET:-}
+      OPENIM_HOOK_KEY: ${OPENIM_HOOK_KEY:-}
       DIRECT_DATABASE_URL: ${DIRECT_DATABASE_URL:-}
       LISTEN_DATABASE_URL: ${LISTEN_DATABASE_URL:-}
     depends_on:
@@ -96,5 +100,144 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # ---- Chat: OpenIM and what it needs (docs/CHAT_DESIGN.md) ----
+  # Optional. Started with "docker compose --profile im up -d" after setting
+  # OPENIM_API_URL, OPENIM_SECRET and OPENIM_HOOK_KEY in .env. None of these
+  # publishes a port: browsers reach OpenIM through the web container
+  # (/im/ws and /im/api in deploy/nginx.conf), and OpenIM calls the api
+  # container back inside this network.
+  openim-server:
+    image: ghcr.io/openimsdk/openim-server:v3.8.3-patch.18
+    init: true
+    profiles: ["im"]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "./mage check"]
+      interval: 5s
+      timeout: 60s
+      retries: 10
+      start_period: 5m
+    environment:
+      IMENV_MONGODB_ADDRESS: im-mongo:27017
+      IMENV_MONGODB_USERNAME: openIM
+      IMENV_MONGODB_PASSWORD: ${IM_STORE_PASSWORD:-openIM123}
+      IMENV_KAFKA_ADDRESS: im-kafka:9094
+      IMENV_DISCOVERY_ETCD_ADDRESS: im-etcd:2379
+      IMENV_REDIS_ADDRESS: im-redis:6379
+      IMENV_REDIS_PASSWORD: ${IM_STORE_PASSWORD:-openIM123}
+      IMENV_MINIO_INTERNALADDRESS: im-minio:9000
+      # nothing is uploaded to OpenIM (pictures go through this system), so
+      # its file store is never reached from outside
+      IMENV_MINIO_EXTERNALADDRESS: http://im-minio:9000
+      IMENV_MINIO_ACCESSKEYID: root
+      IMENV_MINIO_SECRETACCESSKEY: ${IM_STORE_PASSWORD:-openIM123}
+      IMENV_SHARE_SECRET: ${OPENIM_SECRET:-}
+      IMENV_LOG_ISSTDOUT: "true"
+      IMENV_LOG_REMAINLOGLEVEL: "3"
+      # every member of a store's staff signs in as the store: all stay on line
+      IMENV_SHARE_MULTILOGIN_POLICY: "0"
+      # a page asks for a new sign-in each time it opens; 7 days is ample
+      IMENV_OPENIM_RPC_AUTH_TOKENPOLICY_EXPIRE: "7"
+      # The api container decides who may write (before) and keeps a copy
+      # (after). Groups and friends are not used: asked about, always refused.
+      IMENV_WEBHOOKS_URL: http://api:8080/im-hooks/${OPENIM_HOOK_KEY:-}
+      IMENV_WEBHOOKS_BEFORESENDSINGLEMSG_ENABLE: "true"
+      IMENV_WEBHOOKS_BEFORESENDSINGLEMSG_FAILEDCONTINUE: "false"
+      IMENV_WEBHOOKS_AFTERSENDSINGLEMSG_ENABLE: "true"
+      IMENV_WEBHOOKS_BEFORESENDGROUPMSG_ENABLE: "true"
+      IMENV_WEBHOOKS_BEFORESENDGROUPMSG_FAILEDCONTINUE: "false"
+      IMENV_WEBHOOKS_BEFORECREATEGROUP_ENABLE: "true"
+      IMENV_WEBHOOKS_BEFORECREATEGROUP_FAILEDCONTINUE: "false"
+      IMENV_WEBHOOKS_BEFOREADDFRIEND_ENABLE: "true"
+      IMENV_WEBHOOKS_BEFOREADDFRIEND_FAILEDCONTINUE: "false"
+    depends_on: [im-mongo, im-redis, im-etcd, im-kafka, im-minio]
+    restart: unless-stopped
+
+  im-mongo:
+    image: mongo:7.0.28
+    profiles: ["im"]
+    # starts the database, then makes OpenIM's own user once
+    command: >
+      bash -c '
+      docker-entrypoint.sh mongod --wiredTigerCacheSizeGB 1 --auth &
+      until mongosh -u root -p $$IM_PASSWORD --authenticationDatabase admin --eval "db.runCommand({ ping: 1 })" &>/dev/null; do sleep 1; done &&
+      mongosh -u root -p $$IM_PASSWORD --authenticationDatabase admin --eval "
+      db = db.getSiblingDB(\"openim_v3\");
+      if (!db.getUser(\"openIM\")) db.createUser({ user: \"openIM\", pwd: \"$$IM_PASSWORD\", roles: [{ role: \"readWrite\", db: \"openim_v3\" }] });
+      " &&
+      tail -f /dev/null
+      '
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${IM_STORE_PASSWORD:-openIM123}
+      MONGO_INITDB_DATABASE: openim_v3
+      IM_PASSWORD: ${IM_STORE_PASSWORD:-openIM123}
+    volumes:
+      - im-mongo:/data/db
+    restart: unless-stopped
+
+  im-redis:
+    image: redis:7.0.0
+    profiles: ["im"]
+    command: ["redis-server", "--requirepass", "${IM_STORE_PASSWORD:-openIM123}", "--appendonly", "yes"]
+    volumes:
+      - im-redis:/data
+    restart: unless-stopped
+
+  im-etcd:
+    image: bitnamilegacy/etcd:3.5.21
+    profiles: ["im"]
+    user: root
+    environment:
+      ETCD_NAME: s1
+      ETCD_DATA_DIR: /etcd-data
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://0.0.0.0:2380
+      ETCD_INITIAL_CLUSTER: s1=http://0.0.0.0:2380
+      ETCD_INITIAL_CLUSTER_TOKEN: tkn
+      ETCD_INITIAL_CLUSTER_STATE: new
+      ALLOW_NONE_AUTHENTICATION: "yes"
+    command: ["etcd"]
+    volumes:
+      - im-etcd:/etcd-data
+    restart: unless-stopped
+
+  im-kafka:
+    image: bitnamilegacy/kafka:3.5.1
+    profiles: ["im"]
+    user: root
+    environment:
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@im-kafka:9093
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_NUM_PARTITIONS: 8
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CFG_LISTENERS: "INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:9094"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "INTERNAL://im-kafka:9092,EXTERNAL://im-kafka:9094"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+    volumes:
+      - im-kafka:/bitnami/kafka
+    restart: unless-stopped
+
+  im-minio:
+    image: bitnamilegacy/minio:2024.1.13
+    profiles: ["im"]
+    user: root
+    environment:
+      MINIO_ROOT_USER: root
+      MINIO_ROOT_PASSWORD: ${IM_STORE_PASSWORD:-openIM123}
+    command: minio server /data --console-address ':9090'
+    volumes:
+      - im-minio:/data
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  im-mongo:
+  im-redis:
+  im-etcd:
+  im-kafka:
+  im-minio:

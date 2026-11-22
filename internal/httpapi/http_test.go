@@ -44,7 +44,7 @@ func TestMain(m *testing.M) {
 	a.OTPDevEcho = true
 	hub := httpapi.NewHub()
 	go hub.Listen(ctx, dbURL)
-	srv := httpapi.NewServer(a, config.Config{}, hub)
+	srv := httpapi.NewServer(a, config.Config{OpenIMHookKey: "hook-key"}, hub)
 	metrics = a.NewMetrics(log.Printf)
 	srv.Metrics = metrics
 	server = httptest.NewServer(srv.Router())

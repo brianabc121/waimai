@@ -58,7 +58,7 @@ await page.fill(tid('login-phone'), local)
 await page.check(tid('login-agree'))
 await page.click(tid('login-send'))
 await page.waitForURL(u => u.pathname === '/me/messages')
-await page.waitForSelector(tid('msg-empty'))
+await page.waitForSelector(`${tid('msg-empty')}, ${tid('chats-empty')}`)   // the chats come first where chat is set up
 step('a page that belongs to the account goes through login and comes back')
 
 // ---- the page itself ----
