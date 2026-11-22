@@ -4,7 +4,7 @@
 // Usage: BASE_URL=http://localhost:8080 node e2e/mapzones.cjs
 // Needs seed data and the API started with GOOGLE_MAPS_API_KEY=stub.
 const { chromium } = require('playwright')
-const { customerLogin } = require('./lib.cjs')
+const { openAddressMap } = require('./lib.cjs')
 const { mkdirSync } = require('node:fs')
 
 ;(async () => {
@@ -277,8 +277,7 @@ await cust.waitForSelector('.item')
 expect(await cust.locator('select').count(), 0, 'no area list in map mode')
 await cust.click('.item:has-text("瓶装水") .stepper button.fill')
 await cust.click('.item:has-text("冰柠檬茶") .stepper button.fill')
-await cust.click(tid('deliver-to')) // "can you deliver to me?"
-await cust.waitForSelector(tid('picker'))
+await openAddressMap(cust) // the address is pinned at checkout
 await result('in')
 expect(await cust.locator(tid('picker') + ' svg polygon, ' + tid('picker') + ' svg circle.zone').count(), 0, 'no zone outlines on the customer map')
 // typed searches stay in the store's country, near the store, wherever the map is
@@ -290,8 +289,7 @@ await cust.locator(tid('pin-place')).first().click()
 await result('in')
 await goTo('14.70, 121.20')
 await result('out')
-expect(await cust.isDisabled(tid('pin-confirm')), true, 'out of range cannot be confirmed')
-expect(await cust.locator(tid('pin-pickup')).count(), 1, 'out of range offers pickup')
+expect((await cust.locator(tid('picker')).textContent()).includes('这家店的外卖不能选它'), true, 'out of range: the address may be kept, but not for delivery from this store')
 await cust.screenshot({ path: `${SHOTS}/m6-out-of-range.png` })
 // about 80 m east of the top zone's edge: outside every outline, inside the tolerance
 await goTo('14.5547, 121.0316')
@@ -305,14 +303,16 @@ await cust.mouse.up()
 await result('in')
 await cust.screenshot({ path: `${SHOTS}/m7-near-edge.png` })
 await cust.click(tid('pin-confirm'))
-await cust.waitForSelector(tid('picker'), { state: 'detached' })
-await cust.waitForSelector(tid('deliver-terms'))
-expect((await cust.locator('body').innerText()).includes('萨尔塞多村'), false, 'the store page does not name the zone')
-step('a customer asks about a spot: in range, out of range, and near the edge within the tolerance; no zone is shown')
+await cust.waitForSelector(tid('af-place') + ' b')
+await cust.waitForSelector(tid('af-terms'))
+await cust.fill(tid('af-name'), '地图顾客')
+await cust.fill(tid('af-unit'), '3F')
+await cust.click(tid('af-save'))
+await cust.waitForSelector(tid('address-form'), { state: 'detached' })
+await cust.waitForSelector('.totals')
+expect((await cust.locator('body').innerText()).includes('萨尔塞多村'), false, 'the address does not name the zone')
+step('a customer pins the address: in range, out of range, and near the edge within the tolerance; no zone is shown')
 
-await cust.click('.bottombar .btn.primary')
-// the new address starts from the spot just looked up
-await customerLogin(cust, null, { name: '地图顾客' })
 expect((await cust.locator('body').innerText()).includes('萨尔塞多村'), false, 'checkout does not name the zone')
 await cust.click('.bottombar .btn.primary')
 await cust.waitForURL('**/o/**')

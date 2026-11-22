@@ -7,6 +7,7 @@ import { post, put } from '../api'
 import { both, t, toMajor, toMinor } from '../i18n'
 import type { Item, Station } from '../types'
 import ImageUpload from './ImageUpload.vue'
+import PhotoList from './PhotoList.vue'
 
 const props = defineProps<{ item: Item | null; categoryId?: number; cats: { id: number; name: string }[]; stations: Station[]; cur: string; base: string }>()
 const emit = defineEmits<{ saved: []; close: [] }>()
@@ -14,17 +15,19 @@ const emit = defineEmits<{ saved: []; close: [] }>()
 interface OptForm { name: string; name_en: string; extra: number; sold_out: boolean }
 interface GroupForm { name: string; name_en: string; min_select: number; max_select: number; options: OptForm[] }
 interface Form { id: number; category_id: number; name: string; name_en: string; description: string; image_url: string
+  photos: string[]; details: string
   price: number; published: boolean; sold_out: boolean; limited: boolean; stock: number; needs_prep: boolean
   delivery_available: boolean; pickup_available: boolean; sort: number; station_id: number | null; groups: GroupForm[] }
 
 function blank(): Form {
-  return { id: 0, category_id: 0, name: '', name_en: '', description: '', image_url: '', price: 0, published: false, sold_out: false,
+  return { id: 0, category_id: 0, name: '', name_en: '', description: '', image_url: '', photos: [], details: '', price: 0, published: false, sold_out: false,
     limited: false, stock: 0, needs_prep: true, delivery_available: true, pickup_available: true, sort: 0, station_id: null, groups: [] }
 }
 
 const it = props.item
 const f = reactive<Form>(it ? {
   id: it.id, category_id: it.category_id, name: it.name, name_en: it.name_en, description: it.description, image_url: it.image_url,
+  photos: [...(it.photos ?? [])], details: it.details ?? '',
   price: toMajor(it.price), published: it.published, sold_out: it.sold_out, limited: it.stock_qty !== null, stock: it.stock_qty ?? 0,
   needs_prep: it.needs_prep, delivery_available: it.delivery_available, pickup_available: it.pickup_available, sort: it.sort, station_id: it.station_id,
   groups: it.groups.map(g => ({ name: g.name, name_en: g.name_en, min_select: g.min_select, max_select: g.max_select,
@@ -35,7 +38,7 @@ const busy = ref(false)
 
 async function save() {
   const body = {
-    category_id: f.category_id, name: f.name, name_en: f.name_en, description: f.description, image_url: f.image_url,
+    category_id: f.category_id, name: f.name, name_en: f.name_en, description: f.description, image_url: f.image_url, photos: f.photos, details: f.details,
     price: toMinor(f.price), published: f.published, sold_out: f.sold_out, stock_qty: f.limited ? Math.max(0, Math.floor(f.stock)) : null,
     needs_prep: f.needs_prep, delivery_available: f.delivery_available, pickup_available: f.pickup_available, sort: f.sort, station_id: f.needs_prep ? f.station_id : null,
     groups: f.groups.map(g => ({ name: g.name, name_en: g.name_en, min_select: Number(g.min_select), max_select: Number(g.max_select),
@@ -64,6 +67,9 @@ async function save() {
         </div>
         <label class="field"><span>{{ t('description') }}</span><input v-model="f.description" /></label>
         <ImageUpload v-model="f.image_url" :base="base" :ratio="1" :width="800" :label="t('im.dish')" :hint="t('im.dish_hint')" testid="item-image" />
+        <PhotoList v-model="f.photos" :base="base" :ratio="1" :width="800" :max="8" :label="t('im.more')" :hint="t('im.more_hint')" testid="item-photos" />
+        <label class="field"><span>{{ t('im.details') }}</span>
+          <textarea v-model="f.details" rows="4" maxlength="2000" :placeholder="t('im.details_ph')" data-testid="item-details"></textarea></label>
         <div class="grid2">
           <label class="check"><input type="checkbox" v-model="f.published" />{{ t('published') }}</label>
           <label class="check"><input type="checkbox" v-model="f.needs_prep" />{{ t('needs_prep') }}</label>

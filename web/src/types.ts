@@ -23,6 +23,8 @@ export interface Item {
   id: number; category_id: number; name: string; name_en: string; description: string; image_url: string
   price: number; published: boolean; sold_out: boolean; stock_qty: number | null; needs_prep: boolean
   delivery_available: boolean; pickup_available: boolean; sort: number; station_id: number | null; groups: OptionGroup[]
+  // The dish page: more pictures after image_url, and a longer text.
+  photos?: string[]; details?: string
   // How many were ordered so far; only the customer's store page gets it.
   sold?: number
 }

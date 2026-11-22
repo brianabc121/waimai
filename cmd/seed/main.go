@@ -87,6 +87,12 @@ func seedPictures(ctx context.Context, a *app.App) {
 		if slug != "makati" { // the second store shows a page without promo media
 			continue
 		}
+		// one dish with a full dish page: more pictures and details
+		_, err = a.DB.Exec(ctx, `UPDATE menu_items SET photos=$3, details=$4
+			WHERE branch_id=$1 AND name=$2 AND photos = '[]' AND details = ''`, bid, "盐酥鸡",
+			[]string{"/demo/fried-combo.jpg", "/demo/chicken-cutlet.jpg"},
+			"主料：鸡腿肉、地瓜粉、九层塔\n份量：约 300 克，一人份\n做法：每天现腌，下单后现炸，撒椒盐\n过敏原：含麸质、大豆")
+		must(err)
 		have, err := a.ListMedia(ctx, bid)
 		must(err)
 		if len(have) > 0 {

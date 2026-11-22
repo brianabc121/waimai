@@ -2,10 +2,11 @@
 // A picture field: upload a photo and crop it to the shape this picture is
 // shown in, or paste a link as before. The cropped picture is what is stored.
 import { onBeforeUnmount, reactive, ref } from 'vue'
-import { ApiError, upload } from '../api'
+import { ApiError } from '../api'
 import { t } from '../i18n'
 import '../media'
 import MediaCropper, { type CropResult } from './MediaCropper.vue'
+import { cropUpload, PICTURE_TYPES } from './cropUpload'
 
 // base is the API prefix of the branch; ratio is width / height; width is the stored width in pixels.
 const props = defineProps<{ modelValue: string; base: string; ratio: number; width: number; label: string; hint?: string; testid?: string }>()
@@ -21,7 +22,7 @@ function picked(e: Event) {
   input.value = ''
   if (!f) return
   error.value = ''
-  if (!/^image\/(jpeg|png|webp|gif)$/.test(f.type)) { error.value = t('pm.bad_type'); return }
+  if (!PICTURE_TYPES.test(f.type)) { error.value = t('pm.bad_type'); return }
   close()
   Object.assign(crop, { open: true, src: URL.createObjectURL(f), busy: false, error: '' })
 }
@@ -31,24 +32,10 @@ function close() {
 }
 onBeforeUnmount(close)
 
-// The chosen part is drawn at the stored size and sent as a JPEG.
 async function save(r: CropResult) {
   crop.busy = true; crop.error = ''
   try {
-    const img = new Image()
-    img.src = crop.src
-    await img.decode()
-    const sw = r.crop.w * img.naturalWidth, sh = r.crop.h * img.naturalHeight
-    const c = document.createElement('canvas')
-    c.width = Math.round(Math.min(props.width, sw)); c.height = Math.round(c.width / props.ratio)
-    const g = c.getContext('2d')!
-    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height)
-    g.imageSmoothingQuality = 'high'
-    g.drawImage(img, r.crop.x * img.naturalWidth, r.crop.y * img.naturalHeight, sw, sh, 0, 0, c.width, c.height)
-    const blob = await new Promise<Blob | null>(done => c.toBlob(done, 'image/jpeg', 0.85))
-    if (!blob) throw new Error(t('pm.bad_type'))
-    const { url } = await upload<{ url: string }>(`${props.base}/images`, blob)
-    emit('update:modelValue', url)
+    emit('update:modelValue', await cropUpload(crop.src, r, props.base, props.ratio, props.width))
     close()
   } catch (e) { crop.error = e instanceof ApiError || e instanceof Error ? e.message : String(e) }
   crop.busy = false

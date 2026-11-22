@@ -20,9 +20,6 @@ const (
 	// mallReachDeg is a first cut around the customer, a little more than the
 	// farthest a delivery area may reach from its store (maxZoneReachM).
 	mallReachDeg = 0.32
-	// mallPickupM is how far a store may be to be offered for pickup when it
-	// does not deliver to the customer's spot.
-	mallPickupM = 5000
 	// mallMinReviews is how many reviews a store needs before its rating is shown.
 	mallMinReviews = 5
 	mallMaxStores  = 200
@@ -137,13 +134,12 @@ type MallQuery struct {
 	CustomerID int64
 }
 
-// MallList is the answer: the stores that deliver to the spot, and those
-// nearby that only offer pickup there.
+// MallList is the answer: the stores that deliver to the spot. A store that
+// does not deliver there is left out, even when it offers pickup nearby.
 type MallList struct {
 	// Region is where the spot is, going by the nearest store.
 	Region *MallRegionRef `json:"region"`
 	Stores []MallStore    `json:"stores"`
-	Pickup []MallStore    `json:"pickup"`
 	// Frequent are the slugs, among Stores, the customer keeps or ordered from.
 	Frequent []string `json:"frequent"`
 }
@@ -270,8 +266,8 @@ func storeIDs(list []*MallStore) []int64 {
 
 // MallStores answers the marketplace page.
 func (a *App) MallStores(ctx context.Context, q MallQuery) (*MallList, error) {
-	out := &MallList{Stores: []MallStore{}, Pickup: []MallStore{}, Frequent: []string{}}
-	var delivers, pickup []*MallStore
+	out := &MallList{Stores: []MallStore{}, Frequent: []string{}}
+	var delivers []*MallStore
 	if q.At != nil {
 		at := *q.At
 		if !validLatLng(at) {
@@ -301,12 +297,9 @@ func (a *App) MallStores(ctx context.Context, q MallQuery) (*MallList, error) {
 			if b.DeliveryEnabled {
 				hit, _ = matchZone(zones[b.ID], at, b.ZoneToleranceM)
 			}
-			switch {
-			case hit != nil:
+			if hit != nil {
 				s.Delivery = &MallDelivery{Fee: hit.Zone.Fee, MinOrder: max(b.MinOrderAmount, hit.Zone.MinOrder), EtaMinutes: hit.Zone.EtaMinutes}
 				delivers = append(delivers, s)
-			case b.PickupEnabled && d <= mallPickupM:
-				pickup = append(pickup, s)
 			}
 		}
 		if nearest != nil {
@@ -342,7 +335,7 @@ func (a *App) MallStores(ctx context.Context, q MallQuery) (*MallList, error) {
 		out.Region = &MallRegionRef{CountryCode: strings.ToUpper(q.CountryCode), City: q.City, District: q.District}
 	}
 
-	all := append(append([]*MallStore{}, delivers...), pickup...)
+	all := delivers
 	if err := a.mallPromos(ctx, all); err != nil {
 		return nil, err
 	}
@@ -400,11 +393,6 @@ func (a *App) MallStores(ctx context.Context, q MallQuery) (*MallList, error) {
 	for _, s := range mallSorted(delivers, q.Sort) {
 		if keep(s) && len(out.Stores) < mallMaxStores {
 			out.Stores = append(out.Stores, *s)
-		}
-	}
-	for _, s := range mallSorted(pickup, "distance") {
-		if keep(s) && len(out.Pickup) < 30 {
-			out.Pickup = append(out.Pickup, *s)
 		}
 	}
 	return out, nil

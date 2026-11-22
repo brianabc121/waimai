@@ -55,11 +55,11 @@ expect((await page.textContent(tid('mall-count'))).includes(String(list.length))
 const tea = await page.textContent(store('tea'))
 expect(/4\.9/.test(tea) && /₱29/.test(tea) && /₱100/.test(tea) && /20 分钟/.test(tea), `the tea store's card: ${tea}`)
 expect(/休息中/.test(await page.textContent(store('luwei'))), 'the closed store does not say so')
-expect(await page.locator(`${tid('mall-pickup')} [data-slug=fries]`).count() === 1, 'the pickup store is not under "pickup nearby"')
+expect(await page.locator('[data-slug=fries]').count() === 0 && await page.locator(tid('mall-pickup')).count() === 0, 'a store that only offers pickup here is shown')
 await page.waitForFunction(sel => /Stub St/.test(document.querySelector(sel).textContent), tid('mall-loc'))
 expect(await page.locator(tid('customer-tabs')).isVisible(), 'no bottom navigation on a phone')
 await page.screenshot({ path: `${SHOTS}/mall-01-home.png`, fullPage: true })
-step('home page: the stores that deliver to where the device is, the closed one last, pickup apart')
+step('home page: only the stores that deliver to where the device is, the closed one last')
 
 // Nothing about delivery areas reaches the customer.
 const body = await page.textContent('body')

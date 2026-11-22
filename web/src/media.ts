@@ -47,5 +47,8 @@ extend({
   'im.upload': ['上传图片', 'Upload a picture'], 'im.change': ['换一张', 'Replace'], 'im.remove': ['移除', 'Remove'],
   'im.crop_title': ['裁剪图片', 'Crop the picture'], 'im.or_link': ['或者填图片链接', 'or paste a picture link'],
   'im.dish': ['菜品图片', 'Dish picture'], 'im.dish_hint': ['正方形，上传时裁剪', 'Square; cropped when uploaded'],
-  'im.logo': ['店铺头像', 'Store logo'], 'im.cover': ['封面图', 'Cover picture'], 'im.cover_hint': ['横幅 3:1', 'A 3:1 banner'],
+  'im.more': ['更多菜品图', 'More pictures'], 'im.more_hint': ['顾客点开菜品时左右滑动查看', 'Customers swipe through them on the dish page'],
+  'im.earlier': ['往前移', 'Move earlier'], 'im.later': ['往后移', 'Move later'],
+  'im.details': ['商品详情', 'Details'], 'im.details_ph': ['如主料、份量、做法、过敏原，顾客点开菜品时看到', 'Ingredients, portion, how it is made, allergens: shown on the dish page'],
+  'im.logo': ['店铺头像', 'Store logo'], 'im.cover': ['封面图', 'Cover picture'], 'im.cover_hint': ['16:9，没有宣传物料时显示在点餐页顶部', '16:9; shown at the top of the ordering page when there is no promo media'],
 })

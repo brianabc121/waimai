@@ -5,6 +5,7 @@
 // It checks how our code drives that interface, not the real map's looks.
 // Usage: BASE_URL=http://localhost:8080 node e2e/mapgoogle.cjs   (needs seed data)
 const { chromium } = require('playwright')
+const { openAddressMap } = require('./lib.cjs')
 const { mkdirSync } = require('node:fs')
 const path = require('node:path')
 
@@ -186,8 +187,8 @@ try {
   cust.on('pageerror', e => errors.push(`pageerror: ${e.message}`))
   await cust.setViewportSize({ width: 390, height: 844 })
   await cust.goto(`${BASE}/s/${slug}`)
-  await cust.click(tid('deliver-to'))
-  await cust.waitForSelector(tid('picker'))
+  await cust.click('.item .stepper button.fill')
+  await openAddressMap(cust)
   await cust.waitForSelector(tid('pin-result'))
   const c = await cust.evaluate(() => { const c = window.__fakeMaps.at(-1).getCenter(); return [c.lat(), c.lng()] })
   close(c[0], STORE[0], 'the customer map opens on the store (lat)', 0.0001); close(c[1], STORE[1], 'the customer map opens on the store (lng)', 0.0001)

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"regexp"
 	"slices"
@@ -86,11 +87,15 @@ type OptionGroupInput struct {
 }
 
 type ItemInput struct {
-	CategoryID        int64              `json:"category_id"`
-	Name              string             `json:"name"`
-	NameEn            string             `json:"name_en"`
-	Description       string             `json:"description"`
-	ImageURL          string             `json:"image_url"`
+	CategoryID  int64  `json:"category_id"`
+	Name        string `json:"name"`
+	NameEn      string `json:"name_en"`
+	Description string `json:"description"`
+	ImageURL    string `json:"image_url"`
+	// Photos are more pictures for the dish page, after the main one.
+	Photos []string `json:"photos"`
+	// Details is the longer text on the dish page.
+	Details           string             `json:"details"`
 	Price             int64              `json:"price"`
 	Published         bool               `json:"published"`
 	SoldOut           bool               `json:"sold_out"`
@@ -102,6 +107,12 @@ type ItemInput struct {
 	StationID         *int64             `json:"station_id"`
 	Groups            []OptionGroupInput `json:"groups"`
 }
+
+// The dish page holds the main picture and up to this many more.
+const (
+	maxItemPhotos  = 8
+	maxItemDetails = 2000
+)
 
 // SaveItem creates (id == 0) or updates an item and replaces its option
 // groups. Editing never touches past orders: they keep their own snapshot.
@@ -117,6 +128,23 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 	}
 	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(in.ImageURL)), "javascript:") {
 		return 0, ErrValidation("invalid image_url")
+	}
+	photos := []string{}
+	for _, p := range in.Photos {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if strings.HasPrefix(strings.ToLower(p), "javascript:") || len(p) > 1000 {
+			return 0, ErrValidation("invalid photo")
+		}
+		photos = append(photos, p)
+	}
+	if len(photos) > maxItemPhotos {
+		return 0, ErrValidation(fmt.Sprintf("at most %d more photos", maxItemPhotos))
+	}
+	if len([]rune(in.Details)) > maxItemDetails {
+		return 0, ErrValidation(fmt.Sprintf("the details must be at most %d characters", maxItemDetails))
 	}
 	for _, g := range in.Groups {
 		if strings.TrimSpace(g.Name) == "" || len(g.Options) == 0 {
@@ -152,17 +180,17 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 		var err error
 		if id == 0 {
 			err = tx.QueryRow(ctx, `INSERT INTO menu_items (branch_id, category_id, name, name_en, description,
-				image_url, price, published, sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort, station_id)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
+				image_url, price, published, sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort, station_id, photos, details)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
 				branchID, in.CategoryID, in.Name, in.NameEn, in.Description, in.ImageURL, in.Price, in.Published,
-				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort, in.StationID).Scan(&id)
+				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort, in.StationID, photos, in.Details).Scan(&id)
 		} else {
 			err = tx.QueryRow(ctx, `UPDATE menu_items SET category_id=$3, name=$4, name_en=$5, description=$6,
 				image_url=$7, price=$8, published=$9, sold_out=$10, stock_qty=$11, needs_prep=$12,
-				delivery_available=$13, pickup_available=$14, sort=$15, station_id=$16, updated_at=now()
+				delivery_available=$13, pickup_available=$14, sort=$15, station_id=$16, photos=$17, details=$18, updated_at=now()
 				WHERE id=$1 AND branch_id=$2 AND NOT archived RETURNING id`,
 				id, branchID, in.CategoryID, in.Name, in.NameEn, in.Description, in.ImageURL, in.Price, in.Published,
-				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort, in.StationID).Scan(&id)
+				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort, in.StationID, photos, in.Details).Scan(&id)
 		}
 		if isNoRows(err) {
 			return ErrNotFound

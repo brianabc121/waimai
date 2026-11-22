@@ -220,6 +220,8 @@ type Item struct {
 	NameEn            string        `json:"name_en"`
 	Description       string        `json:"description"`
 	ImageURL          string        `json:"image_url"`
+	Photos            []string      `json:"photos"`
+	Details           string        `json:"details"`
 	Price             int64         `json:"price"`
 	Published         bool          `json:"published"`
 	SoldOut           bool          `json:"sold_out"`
@@ -292,7 +294,7 @@ func loadZones(ctx context.Context, q Querier, branchID int64, activeOnly bool) 
 // groups. publishedOnly hides drafts (customer view).
 func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly bool) ([]*Item, error) {
 	rows, err := q.Query(ctx, `SELECT id, category_id, name, name_en, description, image_url, price, published,
-		sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort, station_id
+		sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort, station_id, photos, details
 		FROM menu_items WHERE branch_id=$1 AND NOT archived AND (published OR NOT $2) ORDER BY sort, id`,
 		branchID, publishedOnly)
 	if err != nil {
@@ -304,7 +306,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 		it := &Item{Groups: []OptionGroup{}}
 		if err := rows.Scan(&it.ID, &it.CategoryID, &it.Name, &it.NameEn, &it.Description, &it.ImageURL,
 			&it.Price, &it.Published, &it.SoldOut, &it.StockQty, &it.NeedsPrep, &it.DeliveryAvailable,
-			&it.PickupAvailable, &it.Sort, &it.StationID); err != nil {
+			&it.PickupAvailable, &it.Sort, &it.StationID, &it.Photos, &it.Details); err != nil {
 			rows.Close()
 			return nil, err
 		}

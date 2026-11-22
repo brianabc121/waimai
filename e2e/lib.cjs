@@ -72,4 +72,27 @@ async function addAddress(page, { name = '李小红', unit = '12F', at, wechat, 
   await page.waitForSelector(tid('address-form'), { state: 'detached' })
 }
 
-module.exports = { customerLogin, addAddress, pickZone }
+// openAddressMap goes from the store page (with something in the cart) to the
+// map of a new delivery address at checkout, logging in on the way. The store
+// page itself has no "do you deliver to me" box: the address is chosen here.
+async function openAddressMap(page) {
+  const tid = (id) => `[data-testid=${id}]`
+  await page.click('.bottombar .btn.primary')
+  await page.waitForURL(u => u.pathname === '/account/login' || u.pathname.endsWith('/checkout'))
+  if (new URL(page.url()).pathname === '/account/login') {
+    await page.fill(tid('login-phone'), '9' + String(Math.floor(Math.random() * 1e9)).padStart(9, '0'))
+    await page.check(tid('login-agree'))
+    await page.click(tid('login-send'))
+  }
+  await page.waitForSelector('.co[data-ready]')
+  const form = page.locator(tid('address-form')), empty = page.locator(`${tid('checkout-address')}[data-empty]`)
+  if (!(await form.isVisible())) {
+    if (!(await empty.count())) await page.click(tid('service-delivery'))
+    await empty.click()
+  }
+  await form.waitFor()
+  if (!(await page.locator(tid('pin-confirm')).isVisible())) await page.click(tid('af-place'))
+  await page.waitForSelector(tid('picker'))
+}
+
+module.exports = { customerLogin, addAddress, pickZone, openAddressMap }
