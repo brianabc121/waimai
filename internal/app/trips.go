@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log"
 	"math"
 	"time"
 
@@ -331,14 +333,21 @@ func (a *App) AdvanceTripsAt(ctx context.Context, now time.Time) (int, error) {
 		return 0, err
 	}
 	for _, id := range ids {
-		if err := a.inTx(ctx, func(tx pgx.Tx) error { return advanceTrip(ctx, tx, id, now) }); err != nil {
+		if err := a.inTx(ctx, func(tx pgx.Tx) error { return advanceTrip(ctx, tx, id, now, a.Router == nil) }); err != nil {
+			return 0, err
+		}
+	}
+	if a.Router != nil {
+		if err := a.planTrips(ctx, now); err != nil {
 			return 0, err
 		}
 	}
 	return len(ids), nil
 }
 
-func advanceTrip(ctx context.Context, tx pgx.Tx, id int64, now time.Time) error {
+// advanceTrip moves one trip on. straight: there is no route service, so a
+// trip on the road gets the straight-line estimate right here.
+func advanceTrip(ctx context.Context, tx pgx.Tx, id int64, now time.Time, straight bool) error {
 	var (
 		branchID, riderID               int64
 		status, reason                  string
@@ -449,7 +458,7 @@ func advanceTrip(ctx context.Context, tx pgx.Tx, id int64, now time.Time) error 
 		}
 	}
 
-	if status != "loading" && store != nil {
+	if straight && status != "loading" && store != nil {
 		if err := planStraight(ctx, tx, id, *store); err != nil {
 			return err
 		}
@@ -554,29 +563,20 @@ func bestRound(store LatLng, stops []LatLng) ([]int, float64) {
 	return best, bestLen
 }
 
-// planStraight fills in the planned route of a trip that has none yet, as
-// straight lines from the store through the drops and back. It is worked out
-// once, when the rider has left. A trip with an order that has no position on
-// the map gets no planned route.
-func planStraight(ctx context.Context, tx pgx.Tx, tripID int64, store LatLng) error {
-	var source string
-	if err := tx.QueryRow(ctx, `SELECT planned_source FROM rider_trips WHERE id=$1`, tripID).Scan(&source); err != nil || source != "" {
-		return err
-	}
-	rows, err := tx.Query(ctx, `SELECT o.id, o.dest_lat, o.dest_lng FROM rider_trip_orders x JOIN orders o ON o.id = x.order_id
+// tripStops reads where a trip drops its orders. missing: an order has no
+// position on the map, so no route can be planned.
+func tripStops(ctx context.Context, q Querier, tripID int64) (ids []int64, stops []LatLng, missing bool, err error) {
+	rows, err := q.Query(ctx, `SELECT o.id, o.dest_lat, o.dest_lng FROM rider_trip_orders x JOIN orders o ON o.id = x.order_id
 		WHERE x.trip_id=$1 AND x.outcome <> 'removed' ORDER BY x.id`, tripID)
 	if err != nil {
-		return err
+		return nil, nil, false, err
 	}
-	var ids []int64
-	var stops []LatLng
-	missing := false
+	defer rows.Close()
 	for rows.Next() {
 		var id int64
 		var lat, lng *float64
 		if err := rows.Scan(&id, &lat, &lng); err != nil {
-			rows.Close()
-			return err
+			return nil, nil, false, err
 		}
 		if lat == nil || lng == nil {
 			missing = true
@@ -584,21 +584,119 @@ func planStraight(ctx context.Context, tx pgx.Tx, tripID int64, store LatLng) er
 		}
 		ids, stops = append(ids, id), append(stops, LatLng{*lat, *lng})
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil || missing || len(stops) == 0 {
+	return ids, stops, missing, rows.Err()
+}
+
+// savePlan stores the planned route of a trip that has none yet.
+func savePlan(ctx context.Context, q Querier, tripID int64, ids []int64, r *PlannedRoute, source string) error {
+	planned := make([]int64, len(r.Order))
+	for k, i := range r.Order {
+		planned[k] = ids[i]
+	}
+	pj, _ := json.Marshal(r.Path)
+	oj, _ := json.Marshal(planned)
+	var duration *int
+	if r.DurationS > 0 {
+		duration = &r.DurationS
+	}
+	_, err := q.Exec(ctx, `UPDATE rider_trips SET planned_distance_m=$2, planned_path=$3, planned_order=$4, planned_source=$5,
+		planned_duration_s=$6, planned_return_m=$7, planned_mode=$8 WHERE id=$1 AND planned_source=''`,
+		tripID, r.DistanceM, pj, oj, source, duration, r.ReturnM, r.Mode)
+	return err
+}
+
+// planStraight fills in the planned route of a trip that has none yet, as
+// straight lines from the store through the drops and back. It is worked out
+// once, when the rider has left. A trip with an order that has no position on
+// the map gets no planned route.
+func planStraight(ctx context.Context, q Querier, tripID int64, store LatLng) error {
+	var source string
+	if err := q.QueryRow(ctx, `SELECT planned_source FROM rider_trips WHERE id=$1`, tripID).Scan(&source); err != nil || source != "" {
+		return err
+	}
+	ids, stops, missing, err := tripStops(ctx, q, tripID)
+	if err != nil || missing || len(stops) == 0 {
 		return err
 	}
 	order, dist := bestRound(store, stops)
-	path := [][2]float64{{store[0], store[1]}}
-	planned := make([]int64, len(order))
-	for k, i := range order {
-		planned[k] = ids[i]
-		path = append(path, [2]float64{stops[i][0], stops[i][1]})
+	r := &PlannedRoute{Order: order, DistanceM: int(math.Round(dist)), Path: [][2]float64{{store[0], store[1]}}}
+	for _, i := range order {
+		r.Path = append(r.Path, [2]float64{stops[i][0], stops[i][1]})
 	}
-	path = append(path, [2]float64{store[0], store[1]})
-	pj, _ := json.Marshal(path)
-	oj, _ := json.Marshal(planned)
-	_, err = tx.Exec(ctx, `UPDATE rider_trips SET planned_distance_m=$2, planned_path=$3, planned_order=$4, planned_source='straight'
-		WHERE id=$1`, tripID, int(math.Round(dist)), pj, oj)
-	return err
+	r.Path = append(r.Path, [2]float64{store[0], store[1]})
+	r.ReturnM = int(math.Round(metresBetween(stops[order[len(order)-1]], store)))
+	return savePlan(ctx, q, tripID, ids, r, "straight")
+}
+
+// planTries is how often the route service is asked for one trip before the
+// straight-line estimate takes its place.
+const planTries = 3
+
+// planTrips asks the route service for the trips that are on the road and
+// have no planned route yet: once per trip, at the time the rider left. The
+// call is made outside any transaction. A trip the service fails on three
+// times gets the straight-line estimate.
+func (a *App) planTrips(ctx context.Context, now time.Time) error {
+	rows, err := a.DB.Query(ctx, `SELECT t.id, b.lat, b.lng, t.planned_tries FROM rider_trips t JOIN branches b ON b.id = t.branch_id
+		WHERE t.planned_source = '' AND t.status <> 'loading' AND t.planned_tries < $1 AND b.lat IS NOT NULL AND b.lng IS NOT NULL
+			AND t.started_at > $2 ORDER BY t.id`, planTries, now.Add(-tripMaxAge))
+	if err != nil {
+		return err
+	}
+	type todo struct {
+		id    int64
+		store LatLng
+		tries int
+	}
+	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (todo, error) {
+		var t todo
+		return t, r.Scan(&t.id, &t.store[0], &t.store[1], &t.tries)
+	})
+	if err != nil {
+		return err
+	}
+	for _, t := range list {
+		ids, stops, missing, err := tripStops(ctx, a.DB, t.id)
+		if err != nil {
+			return err
+		}
+		if missing || len(stops) == 0 {
+			// nothing to plan; do not look at it again
+			if _, err := a.DB.Exec(ctx, `UPDATE rider_trips SET planned_tries=$2 WHERE id=$1`, t.id, planTries); err != nil {
+				return err
+			}
+			continue
+		}
+		var route *PlannedRoute
+		if len(stops) <= routeMaxStops {
+			callCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			route, err = a.Router.Route(callCtx, t.store, stops)
+			cancel()
+			if err == nil && (len(route.Order) != len(stops) || len(route.Path) < 2) {
+				err = fmt.Errorf("routes: unusable answer")
+			}
+			if err != nil {
+				log.Printf("trip %d: planned route: %v", t.id, err)
+				route = nil
+				if t.tries+1 < planTries {
+					if _, err := a.DB.Exec(ctx, `UPDATE rider_trips SET planned_tries = planned_tries + 1 WHERE id=$1`, t.id); err != nil {
+						return err
+					}
+					continue
+				}
+			}
+		}
+		if route != nil {
+			err = savePlan(ctx, a.DB, t.id, ids, route, "google")
+		} else {
+			err = planStraight(ctx, a.DB, t.id, t.store)
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := a.DB.Exec(ctx, `UPDATE rider_trips SET planned_tries = planned_tries + 1 WHERE id=$1`, t.id); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -6,7 +6,7 @@ export interface TripOrder { order_id: number; public_no: string; picked_up_at: 
   fail_reason?: string; customer_name?: string; address?: string; lat?: number; lng?: number }
 export interface Trip { id: number; rider_id: number; day: string; status: string; end_reason: string; started_at: string; left_store_at: string | null
   last_drop_at: string | null; returned_at: string | null; ended_at: string | null; order_count: number; delivered_count: number; failed_count: number
-  actual_m: number | null; track_points: number; gap_seconds: number; planned_m: number | null; planned_source: string; compare_m: number | null
+  actual_m: number | null; track_points: number; gap_seconds: number; planned_m: number | null; planned_source: string; planned_mode: string; planned_seconds: number | null; compare_m: number | null
   over_m: number | null; detour: boolean; orders: TripOrder[] }
 
 /** metres as "8.1 km" */

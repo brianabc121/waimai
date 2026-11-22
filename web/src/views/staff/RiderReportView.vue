@@ -16,7 +16,7 @@ import './report.css'
 interface Line { id: number; display_name: string; username: string; gone: boolean; shift_minutes: number; trips: number; orders: number
   delivered: number; failed: number; actual_m: number; no_track: number; compare_m: number; compared_actual_m: number; detours: number
   gaps: number; cash: number; on_trip: boolean }
-interface Report { timezone: string; currency: string; detour_percent: number; detour_meters: number; store_set: boolean; riders: Line[] }
+interface Report { timezone: string; currency: string; detour_percent: number; detour_meters: number; store_set: boolean; road_routes: boolean; riders: Line[] }
 interface Day { day: string; trips: number; delivered: number; failed: number; actual_m: number }
 interface Detail { days: Day[]; trips: Trip[] }
 
@@ -110,7 +110,7 @@ const dayText = (d: string) => `${d.slice(5)} ${t('weekday.' + weekday(d))}`
         </table>
         <div v-if="!report.riders.length" class="empty">{{ t('rr.nobody') }}</div>
       </div>
-      <p class="sub" style="margin:-4px 2px 14px">{{ t('rr.note', { p: report.detour_percent, km: report.detour_meters / 1000 }) }}</p>
+      <p class="sub" style="margin:-4px 2px 14px">{{ t(report.road_routes ? 'rr.note_road' : 'rr.note', { p: report.detour_percent, km: report.detour_meters / 1000 }) }}</p>
 
       <div v-if="selected && detail" class="card" style="padding:0;overflow-x:auto" data-testid="rr-trips">
         <div style="padding:12px 14px"><h3 style="margin:0">{{ t('rr.trips_of', { name: selected.display_name }) }}<small>{{ t('rr.trips_d', { n: detail.trips.length }) }}</small></h3></div>

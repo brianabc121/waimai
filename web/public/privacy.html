@@ -48,7 +48,7 @@
 
 <h2>3. 我们使用的第三方服务</h2>
 <ul>
-<li>Google 地图：显示地图和搜索地址时，你的浏览器会直接访问 Google。</li>
+<li>Google 地图：显示地图和搜索地址时，你的浏览器会直接访问 Google。门店启用了推荐路线时，骑手出发那一刻，我们的服务器会把店铺位置和这一趟各个送餐点的经纬度发给 Google 计算路线，不包含姓名、电话和地址文字。</li>
 <li>Firebase Cloud Messaging（Google）和各浏览器厂商的推送服务：传递推送提醒。提醒内容只有单号和地址。</li>
 <li>短信服务商 <span class="todo">填写你用的服务商，例如 Twilio</span>：发送验证码和订单状态短信，会收到你的手机号和短信内容。</li>
 <li>服务器托管 <span class="todo">填写托管商和所在地区</span>。</li>
@@ -82,7 +82,7 @@
 <p>Positions are visible only to the owner, managers and cashiers of your store; a customer sees only the rider of their own order while it is on the way.</p>
 
 <h2>3. Third parties</h2>
-<p>Google Maps (your browser contacts Google when a map or address search is shown); Firebase Cloud Messaging and browser vendors' push services (reminders carry only an order number and address); the SMS provider <span class="todo">name</span> (receives phone numbers and message text); hosting by <span class="todo">provider and region</span>. We do not sell personal data or use it for advertising.</p>
+<p>Google Maps (your browser contacts Google when a map or address search is shown; where planned routes are turned on, our server sends Google the coordinates of the store and of the drops of a rider's trip when the rider leaves, without names, phone numbers or address text); Firebase Cloud Messaging and browser vendors' push services (reminders carry only an order number and address); the SMS provider <span class="todo">name</span> (receives phone numbers and message text); hosting by <span class="todo">provider and region</span>. We do not sell personal data or use it for advertising.</p>
 
 <h2>4. Your rights</h2>
 <p>Contact us to access, correct or delete your personal data or to withdraw consent. Staff can turn off location and notification permissions in the phone's settings at any time; the workbench keeps working, but the store will not see your position and you will not get reminders on a locked screen. Records the law requires us to keep cannot be deleted before that period ends.</p>
