@@ -53,7 +53,7 @@ const entries = computed(() => [
   { key: 'favorites', to: '/me/favorites', icon: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z' },
   { key: 'support', to: '/me/support', open: true, icon: 'M5 13v-1a7 7 0 0 1 14 0v1M5 13h2.5v5H6a1 1 0 0 1-1-1zM19 13h-2.5v5H18a1 1 0 0 0 1-1zM16.5 18c0 1.7-1.5 2.5-3.5 2.5' },
   { key: 'reviews', to: '/me/reviews', icon: 'M5 20V5h9M5 20h14v-8M9 10h4M9 14h6M15.5 9.5l5-5 1.5 1.5-5 5-2 .5z' },
-  { key: 'messages', to: '/me/messages', dot: !!profile.value?.unread, icon: 'M4.5 6.5A2.5 2.5 0 0 1 7 4h10a2.5 2.5 0 0 1 2.5 2.5v7A2.5 2.5 0 0 1 17 16h-5l-4.5 4v-4H7a2.5 2.5 0 0 1-2.5-2.5zM8.5 10h.01M12 10h.01M15.5 10h.01' },
+  { key: 'messages', to: '/me/messages', dot: !!profile.value && profile.value.unread + profile.value.chat_unread > 0, icon: 'M4.5 6.5A2.5 2.5 0 0 1 7 4h10a2.5 2.5 0 0 1 2.5 2.5v7A2.5 2.5 0 0 1 17 16h-5l-4.5 4v-4H7a2.5 2.5 0 0 1-2.5-2.5zM8.5 10h.01M12 10h.01M15.5 10h.01' },
   { key: 'apply', to: '/me/apply', icon: 'M6 21V4M6 5h11l-2 3.5 2 3.5H6M4 21h5' },
   { key: 'addresses', icon: 'M12 13a2.6 2.6 0 1 0 0-5.200001 2.6 2.6 0 0 0 0 5.2zM12 20.5s6-5.4 6-10a6 6 0 0 0-12 0c0 4.6 6 10 6 10z' },
   { key: 'about', to: '/me/about', open: true, icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5.500M12 7.800h.01' },

@@ -35,6 +35,8 @@ type Profile struct {
 	// Unread counts messages not opened yet; Favorites the stores kept.
 	Unread    int `json:"unread"`
 	Favorites int `json:"favorites"`
+	// ChatUnread counts chat messages from stores not read yet.
+	ChatUnread int `json:"chat_unread"`
 }
 
 func wallets(ctx context.Context, q Querier, customerID int64) ([]Wallet, error) {
@@ -55,8 +57,9 @@ func (a *App) CustomerProfile(ctx context.Context, customerID int64) (*Profile, 
 	err := a.DB.QueryRow(ctx, `SELECT phone, nickname, avatar_at,
 		(SELECT count(*) FROM customer_messages m WHERE m.customer_id = c.id AND m.read_at IS NULL),
 		(SELECT count(*) FROM customer_favorites f JOIN branches b ON b.id = f.branch_id
-			WHERE f.customer_id = c.id AND b.deleted_at IS NULL)
-		FROM customers c WHERE id=$1`, customerID).Scan(&p.Phone, &p.Nickname, &p.AvatarAt, &p.Unread, &p.Favorites)
+			WHERE f.customer_id = c.id AND b.deleted_at IS NULL),
+		(SELECT COALESCE(sum(t.customer_unread), 0) FROM chat_threads t WHERE t.customer_id = c.id)
+		FROM customers c WHERE id=$1`, customerID).Scan(&p.Phone, &p.Nickname, &p.AvatarAt, &p.Unread, &p.Favorites, &p.ChatUnread)
 	if err != nil {
 		return nil, err
 	}

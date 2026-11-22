@@ -633,7 +633,7 @@ func (s *Server) saveZoneMode(c *gin.Context) {
 // publicConfig is what every page may know before anyone signs in.
 func (s *Server) publicConfig(c *gin.Context) {
 	mapsKey, pushKey, appPush := s.App.PublicConfig(s.Cfg)
-	c.JSON(200, gin.H{"maps_key": mapsKey, "push_key": pushKey, "app_push": appPush})
+	c.JSON(200, gin.H{"maps_key": mapsKey, "push_key": pushKey, "app_push": appPush, "chat": s.App.ChatOn()})
 }
 
 func (s *Server) locate(c *gin.Context) {
