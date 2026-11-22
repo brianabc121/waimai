@@ -32,9 +32,11 @@ export const sorted = (list: Address[]) => [...list].sort((a, b) => Number(usabl
 
 // Who an order is for, as staff read it: the name with Mr / Ms, and the number to call.
 interface Contact { customer_name: string; customer_phone: string; contact_phone?: string; contact_title?: string }
-export const contactName = (o: Contact) => o.customer_name + (o.contact_title ? t('ad.title_' + o.contact_title) : '')
+// "陈先生" who also ticked Mr is not called 陈先生先生.
+const titled = (name: string, title?: string) => { const x = title ? t('ad.title_' + title) : ''; return name.endsWith(x.trim()) ? name : name + x }
+export const contactName = (o: Contact) => titled(o.customer_name, o.contact_title)
 export const contactPhone = (o: Contact) => o.contact_phone || o.customer_phone
-export const whoLine = (a: Address) => `${a.contact_name}${a.title ? t('ad.title_' + a.title) : ''} ${prettyPhone(a.phone)}`
+export const whoLine = (a: Address) => `${titled(a.contact_name, a.title)} ${prettyPhone(a.phone)}`
 export function prettyPhone(p: string): string {
   const m = p.match(/^\+63(\d{3})(\d{3})(\d{4})$/)
   return m ? `+63 ${m[1]} ${m[2]} ${m[3]}` : p
