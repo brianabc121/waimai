@@ -71,8 +71,6 @@ for (const size of Object.keys(SIZES)) {
   await fits(c, `store ${size}`)
   const side = await visible(c, '[data-testid=side-cart]')
   if (side !== (size === 'pc')) throw new Error(`store ${size}: the cart beside the menu should ${size === 'pc' ? '' : 'not '}show`)
-  const zone = c.locator('select').first()
-  if (await zone.count() && await zone.isVisible()) await zone.selectOption({ index: 1 })
   await c.click('.item:has-text("盐酥鸡") button')
   await c.waitForSelector('.sheet')
   await c.click('.sheet label.opt:has-text("中辣")')

@@ -29,6 +29,16 @@ async function customerLogin(page, phone, address) {
     await addAddress(page, address || {})
     await page.waitForSelector('.totals')
   }
+  await pickZone(page)
+}
+
+// A store whose customers pick their delivery area by name asks for it on the
+// checkout page: take the first one, unless one is chosen already.
+async function pickZone(page) {
+  const zone = page.locator('[data-testid=checkout-zone]')
+  if (!(await zone.count()) || await zone.evaluate(el => el.selectedIndex > 0)) return
+  await zone.selectOption({ index: 1 })
+  await page.waitForSelector('[data-testid=delivery-fee]')
 }
 
 // addAddress fills the open "new address" form and saves it. at is "lat, lng"
@@ -62,4 +72,4 @@ async function addAddress(page, { name = '李小红', unit = '12F', at, wechat, 
   await page.waitForSelector(tid('address-form'), { state: 'detached' })
 }
 
-module.exports = { customerLogin, addAddress }
+module.exports = { customerLogin, addAddress, pickZone }

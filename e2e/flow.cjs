@@ -37,7 +37,6 @@ const shot = (page, name) => page.screenshot({ path: `${SHOTS}/${name}.png`, ful
 const cust = await open({ width: 390, height: 844 })
 await cust.goto(BASE + '/s/makati')
 await cust.waitForSelector('.item')
-await cust.selectOption('select', { index: 1 })
 // popcorn chicken has a required option group
 await cust.click('.item:has-text("盐酥鸡") button')
 await cust.waitForSelector('.sheet')

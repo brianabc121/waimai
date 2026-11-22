@@ -331,17 +331,6 @@ async function sendReport() {
             <span class="muted">›</span>
           </button>
         </div>
-        <div class="pre" v-else-if="cart.service === 'delivery'">
-          <label class="field" style="margin:0">
-            <span>{{ t('deliver_to') }}</span>
-            <select v-model="cart.zoneId">
-              <option :value="null">{{ t('choose_zone') }}</option>
-              <option v-for="z in store.zones" :key="z.id" :value="z.id">
-                {{ pick(z.name, z.name_en) }} · {{ t('delivery_fee') }} {{ money(z.fee, cur) }}
-              </option>
-            </select>
-          </label>
-        </div>
         <div class="pre" v-if="searching">
           <input ref="searchBox" v-model="query" type="search" class="searchbox" :placeholder="t('sf.search')" data-testid="search-box" />
         </div>

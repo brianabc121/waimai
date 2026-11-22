@@ -4,7 +4,7 @@
 // Usage: BASE_URL=http://localhost:8080 node e2e/account.cjs   (needs seed data and OTP_DEV_ECHO=true)
 const { chromium } = require('playwright')
 const { mkdirSync } = require('node:fs')
-const { addAddress } = require('./lib.cjs')
+const { addAddress, pickZone } = require('./lib.cjs')
 
 ;(async () => {
 
@@ -27,7 +27,6 @@ const pretty = `+63 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`
 // Browsing and filling the cart need no account.
 await page.goto(BASE + '/s/makati')
 await page.waitForSelector('.item')
-await page.selectOption('select', { index: 1 })
 await page.click('.item:has-text("瓶装水") .stepper button.fill')
 await page.click('.bottombar .btn.primary')
 await page.waitForURL(u => u.pathname === '/account/login')
@@ -123,6 +122,7 @@ await page.waitForSelector('.totals')
 step('addresses can be added, chosen, changed and deleted from checkout')
 
 // The order goes to the chosen address.
+await pickZone(page)
 await page.locator('.bottombar .btn.primary').click()
 await page.waitForURL('**/o/**')
 await page.locator('text=12F').first().waitFor()
