@@ -32,11 +32,9 @@ const place = computed(() => {
 const categories = computed(() => home.value?.categories ?? [])
 const banners = computed(() => home.value?.banners ?? [])
 const stores = computed(() => list.value?.stores ?? [])
-const pickup = computed(() => list.value?.pickup ?? [])
 const narrowed = computed(() => !!(ask.category || ask.q || ask.filters.length))
 const frequent = computed(() => {
-  const all = [...stores.value, ...pickup.value]
-  return (list.value?.frequent ?? []).map(slug => all.find(s => s.slug === slug)).filter((s): s is MallStore => !!s)
+  return (list.value?.frequent ?? []).map(slug => stores.value.find(s => s.slug === slug)).filter((s): s is MallStore => !!s)
 })
 const sorts = computed(() => byRegion.value ? ['', 'rating'] : ['', 'distance', 'rating', 'fee'])
 const filters = computed(() => byRegion.value ? ['open', 'promo', 'schedule', 'pickup'] : ['open', 'promo', 'schedule'])
@@ -78,7 +76,7 @@ function follow(b: MallBanner) {
 
 // The store a banner leads to, named when it is among the stores listed here.
 const bannerStore = (b: MallBanner) => {
-  const st = b.link_slug ? [...stores.value, ...pickup.value].find(x => x.slug === b.link_slug) : undefined
+  const st = b.link_slug ? stores.value.find(x => x.slug === b.link_slug) : undefined
   return st ? pick(st.name, st.name_en) : ''
 }
 
@@ -212,12 +210,6 @@ onBeforeUnmount(() => clearInterval(timer))
               <div class="acts"><button class="btn primary" @click="showLoc = 'list'">{{ t('ml.change') }}</button><button class="btn" @click="showLoc = 'cities'">{{ t('ml.browse') }}</button></div>
             </div>
 
-            <section v-if="pickup.length" class="pick" data-testid="mall-pickup">
-              <h2 :title="t('ml.pickup_hint')">
-                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v9.500h16V10M3 6.5 4.5 3.500h15L21 6.500v1.300a2.250 2.250 0 0 1-4.5 0 2.250 2.250 0 0 1-4.5 0 2.250 2.250 0 0 1-4.5 0 2.250 2.250 0 0 1-4.5 0zM9.5 19.500v-5h5v5" /></svg>
-                {{ t('ml.pickup_title') }} <small>{{ t('ml.pickup_only') }}</small></h2>
-              <div class="grid rows" :class="{ dim: loading }"><StoreCard v-for="s in pickup" :key="s.slug" :store="s" :categories="categories" compact /></div>
-            </section>
           </template>
         </template>
 
@@ -310,10 +302,6 @@ h2 { font-size: 17px; }
 .grid.dim { opacity: .6; }
 .grid.rows { gap: 0; }
 .skel { height: 120px; border-radius: 14px; background: var(--paper); border: 1px solid var(--line); }
-.pick { display: grid; gap: 8px; margin-top: 4px; }
-.pick h2 { display: flex; align-items: center; gap: 10px; background: var(--gold-soft); border-radius: 10px; padding: 8px 14px; font-size: 19px; font-weight: 800; margin: 0 -4px; }
-.pick h2 svg { color: #8a5a1c; flex: none; }
-.pick h2 small { margin-left: auto; font-weight: 500; font-size: 13.500px; color: var(--ink); white-space: nowrap; }
 .state { text-align: center; padding: 30px 12px; display: grid; gap: 8px; justify-items: center; }
 .state .em { font-size: 54px; line-height: 1; }
 .state p { color: var(--muted); }
@@ -360,7 +348,6 @@ h2 { font-size: 17px; }
   .grid, .grid.rows { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
   .grid.rows { gap: 0 28px; }
   .skel { height: 260px; }
-  .pick h2 { margin: 0; }
 }
 @media (min-width: 1200px) {
   .mlinks .txt.wide { display: block; }

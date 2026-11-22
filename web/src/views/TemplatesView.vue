@@ -77,7 +77,7 @@ const discard = () => run(() => post(base() + '/discard'))
           <span class="row" style="gap:8px"><input type="color" v-model="form.theme_color" name="theme" style="width:56px;height:38px;padding:2px" />
             <input v-model="form.theme_color" maxlength="7" style="width:120px" /></span></label>
         <ImageUpload v-model="form.logo_url" :base="`/merchant/branches/${bid}`" :ratio="1" :width="400" :label="t('im.logo')" testid="tpl-logo" />
-        <ImageUpload v-model="form.cover_url" :base="`/merchant/branches/${bid}`" :ratio="3" :width="1500" :label="t('im.cover')" :hint="t('im.cover_hint')" testid="tpl-cover" />
+        <ImageUpload v-model="form.cover_url" :base="`/merchant/branches/${bid}`" :ratio="16 / 9" :width="1280" :label="t('im.cover')" :hint="t('im.cover_hint')" testid="tpl-cover" />
         <div class="row wrap" style="gap:8px">
           <button class="btn" :disabled="busy || !dirty" data-test="save-draft" @click="save">{{ t('save_draft') }}</button>
           <button class="btn primary" :disabled="busy || (!dirty && !current.draft)" data-test="publish-tpl" @click="publish">{{ t('publish_tpl') }}</button>
@@ -93,7 +93,7 @@ const discard = () => run(() => post(base() + '/discard'))
             <h1 class="row" style="gap:8px"><img v-if="form.logo_url" :src="form.logo_url" alt="" class="logo" />
               {{ pick(store.branch.name, store.branch.name_en) }}<span v-if="channel !== 'delivery'"> · {{ t('table') }} {{ t('preview_table') }}</span></h1>
           </div>
-          <img v-if="form.cover_url" :src="form.cover_url" alt="" class="cover" />
+          <img v-if="form.cover_url" :src="form.cover_url" alt="" class="cover" :style="channel === 'delivery' ? { height: 'auto', aspectRatio: '16 / 9' } : undefined" />
           <MenuList :categories="store.categories" :currency="store.branch.currency" :layout="form.layout"
             :can-order="it => !it.sold_out" :qty-of="() => 0" />
           <div class="pbar"><span class="btn">{{ t('cart') }} · 2</span><span class="grow right bold">{{ money(23800, store.branch.currency) }}</span>

@@ -2,12 +2,11 @@
 // One store of the marketplace. On a phone it is a row with the store's
 // picture on the left; from a tablet up it is a card with the cover on top.
 // What it says about delivery is only the fee, the minimum and the time.
-// `compact` is the short row of the stores one can only collect from.
 import { computed } from 'vue'
 import { money, pick, promoLabel, t } from '../../i18n'
 import { cartCount, distanceText, type MallCategory, type MallStore } from '../../mall'
 
-const props = defineProps<{ store: MallStore; categories: MallCategory[]; compact?: boolean }>()
+const props = defineProps<{ store: MallStore; categories: MallCategory[] }>()
 
 const s = computed(() => props.store)
 const open = computed(() => s.value.status === 'open')
@@ -25,25 +24,7 @@ const isNew = computed(() => s.value.rating == null && !s.value.monthly_sales)
 </script>
 
 <template>
-  <router-link v-if="compact" :to="`/s/${s.slug}`" class="mrow" :class="{ off: !open }" data-testid="mall-store" :data-slug="s.slug">
-    <span class="thumb">
-      <img v-if="cover" :src="cover" alt="" loading="lazy" />
-      <span v-else class="bowl"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M4 11h16a8 8 0 0 1-5 7.4V20H9v-1.6A8 8 0 0 1 4 11z" /></svg></span>
-    </span>
-    <span class="txt">
-      <b>{{ pick(s.name, s.name_en) }}</b>
-      <small>
-        <template v-if="s.rating != null">{{ s.rating.toFixed(1) }}<template v-if="s.monthly_sales"> · </template></template>
-        <template v-if="s.monthly_sales">{{ t('ml.monthly', { n: s.monthly_sales }) }}</template>
-        <template v-if="isNew">{{ t('ml.new') }}</template>
-        <template v-if="!open"> · {{ shut }}</template>
-      </small>
-    </span>
-    <span v-if="far" class="far"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path fill-rule="evenodd" d="M12 22s7-6.3 7-11.8a7 7 0 1 0-14 0C5 15.7 12 22 12 22zm0-9.200a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.200z" /></svg>{{ far }}</span>
-    <i v-if="inCart" class="n" data-testid="mall-cart-count">{{ inCart }}</i>
-  </router-link>
-
-  <router-link v-else :to="`/s/${s.slug}`" class="mcard" :class="{ off: !open }" data-testid="mall-store" :data-slug="s.slug">
+  <router-link :to="`/s/${s.slug}`" class="mcard" :class="{ off: !open }" data-testid="mall-store" :data-slug="s.slug">
     <div class="cover" :style="cover ? { backgroundImage: `url(${cover})` } : {}">
       <span v-if="eta" class="eta">{{ eta }}</span>
       <span v-if="!open" class="veil">{{ shut }}<template v-if="opens"> · {{ opens }}</template></span>
@@ -75,7 +56,6 @@ const isNew = computed(() => s.value.rating == null && !s.value.monthly_sales)
       </p>
       <p v-if="s.tagline" class="tagline">{{ s.tagline }}</p>
       <div class="tags">
-        <span v-if="!s.delivery && s.distance_m != null" class="tag only">{{ t('ml.pickup_only') }}</span>
         <span v-for="(p, i) in s.promos" :key="i" class="tag promo">{{ pick(p.name, p.name_en) || promoLabel(p, s.currency) }}</span>
         <span v-if="s.scheduling" class="tag gold">{{ t('ml.can_schedule') }}</span>
       </div>
@@ -116,7 +96,6 @@ h3 .new { flex: none; font-style: normal; font-size: 12.500px; font-weight: 600;
 .tag { font-size: 12.500px; padding: 2px 9px; border-radius: 7px; background: #efe5d6; color: var(--ink); white-space: nowrap; border: 1px solid transparent; }
 .tag.promo { background: none; color: var(--red); border-color: #c98a78; }
 .tag.gold { background: var(--gold-soft); color: var(--red-deep); }
-.tag.only { background: var(--gold-soft); color: #8a5a1c; }
 .dishes { display: flex; gap: 8px; margin-top: 10px; }
 .dish { width: 76px; font-size: 12px; display: grid; }
 .dish img, .dish .ph { width: 76px; height: 56px; border-radius: 8px; object-fit: cover; background: #efe5d6; }
@@ -126,16 +105,6 @@ h3 .new { flex: none; font-style: normal; font-size: 12.500px; font-weight: 600;
 .mcard.off { box-shadow: inset 4px 0 0 #cdbda8; }
 
 /* the short row */
-.mrow { position: relative; display: flex; align-items: center; gap: 14px; padding: 8px 2px; color: var(--ink); min-width: 0; border-bottom: 1px solid var(--line); }
-.mrow .thumb { flex: none; width: 104px; height: 54px; border-radius: 10px; overflow: hidden; display: block; }
-.mrow .thumb img, .mrow .thumb .bowl { width: 100%; height: 100%; object-fit: cover; display: block; }
-.mrow .txt { flex: 1; min-width: 0; display: grid; }
-.mrow b { font-size: 17px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mrow small { font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mrow .far { flex: none; display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 14.500px; }
-.mrow .far svg { color: #8c7461; }
-.mrow .n { position: absolute; left: 90px; top: 2px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--red); color: #fff; font-style: normal; font-size: 12px; font-weight: 700; display: grid; place-items: center; border: 1.500px solid var(--paper); }
-.mrow.off b { color: #a6978a; }
 
 @media (min-width: 768px) {
   .mcard { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; position: relative; transition: box-shadow .15s; box-shadow: none; }

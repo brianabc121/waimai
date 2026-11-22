@@ -4,12 +4,13 @@ import { useRouter } from 'vue-router'
 import { ApiError, get, post } from '../api'
 import { addLine, linePrice, useCart } from '../cart'
 import { locale, money, pick, promoLabel, setLocale, t } from '../i18n'
-import '../mall'
+import { mallSpot } from '../mall'
 import { defaultTemplate, themeVars } from '../theme'
 import { customer, customerLogout, loadCustomer, loginRoute, prettyPhone } from '../customer'
 import { termsAt, type DeliveryTerms } from '../addresses'
 import type { Item, Storefront } from '../types'
 import CartPanel from './CartPanel.vue'
+import DishDetail from './DishDetail.vue'
 import MediaCarousel from './MediaCarousel.vue'
 import MenuList from './MenuList.vue'
 import StoreReviews from './StoreReviews.vue'
@@ -24,8 +25,7 @@ import { chatEnabled } from '../chat'
 const chatOn = ref(false)
 void chatEnabled().then(v => { chatOn.value = v })
 
-// The map and the address book are only downloaded when a customer opens them.
-const PlacePicker = defineAsyncComponent(() => import('./PlacePicker.vue'))
+// The address book is only downloaded when a customer opens it.
 const AddressSheet = defineAsyncComponent(() => import('./AddressSheet.vue'))
 
 const props = defineProps<{ slug: string }>()
@@ -59,27 +59,23 @@ async function load() {
 onMounted(load)
 onMounted(() => { void loadCustomer() })
 
-// In map mode the delivery area follows the saved pin; areas may have been
-// redrawn since the last visit, so the server is asked again.
+// In map mode the delivery terms (the minimum order) follow the spot the
+// customer is at: the pin saved in the cart, else where the marketplace placed
+// them. Areas may have been redrawn since the last visit, so the server is
+// asked again. The address itself is chosen at checkout.
 const mapMode = computed(() => store.value?.branch.zone_mode === 'map')
-const showPicker = ref(false)
-// What the store says about delivering to the saved pin. Which of its areas
-// that is stays with the store.
+// What the store says about delivering there. Which of its areas that is stays with the store.
 const terms = ref<DeliveryTerms | null>(null)
 async function relocate() {
   cart.zoneId = null
-  if (cart.lat == null || cart.lng == null) { terms.value = null; return }
-  const r = await termsAt(props.slug, cart.lat, cart.lng).catch(() => null)
+  const pinned = cart.lat != null && cart.lng != null
+  const at = pinned ? { lat: cart.lat!, lng: cart.lng! } : mallSpot()
+  if (!at) { terms.value = null; return }
+  const r = await termsAt(props.slug, at.lat, at.lng).catch(() => null)
   if (!r) return
   terms.value = r.deliverable ? r : null
-  if (!r.deliverable) cart.lat = cart.lng = null
+  if (!r.deliverable && pinned) cart.lat = cart.lng = null
 }
-function picked(p: { lat: number; lng: number; name: string }, d: DeliveryTerms | null) {
-  Object.assign(cart, { lat: p.lat, lng: p.lng, placeLabel: p.name, addressId: null })
-  terms.value = d?.deliverable ? d : null
-  showPicker.value = false
-}
-function toPickup() { cart.service = 'pickup'; showPicker.value = false }
 async function checkout() {
   const to = `/s/${props.slug}/checkout`
   // Ordering needs an account; the cart is kept while the customer logs in.
@@ -136,6 +132,15 @@ const hasUnavailable = computed(() => cart.lines.some(l => {
   const it = items.value.get(l.item_id)
   return !it || !orderable(it) || linePrice(l, items.value) === null
 }))
+
+// ---- the dish page ----
+const dish = ref<Item | null>(null)
+// Choosing options goes on in the options sheet, over the dish page's place.
+function addFromDish() {
+  const it = dish.value!
+  if (it.groups.length) dish.value = null
+  open(it)
+}
 
 // ---- item sheet ----
 const sheet = reactive<{ item: Item | null; chosen: Set<number>; qty: number; note: string }>({ item: null, chosen: new Set(), qty: 1, note: '' })
@@ -263,10 +268,10 @@ async function sendReport() {
     </div>
     <div v-else-if="!store" class="section muted">{{ t('loading') }}</div>
     <template v-else>
-      <img v-if="tpl.cover_url && !media.length" :src="tpl.cover_url" alt="" class="cover" />
-      <div class="hero" :class="{ media: media.length }">
-      <!-- promotional pictures and videos, when the store has any -->
+      <div class="hero" :class="{ media: media.length || tpl.cover_url }">
+      <!-- promotional pictures and videos, else the cover: the same 16:9 frame in every store -->
       <div v-if="media.length" class="hero-media"><MediaCarousel :media="media" /><i class="lip"></i></div>
+      <div v-else-if="tpl.cover_url" class="hero-media"><div class="still" data-testid="hero-cover"><img :src="tpl.cover_url" alt="" /></div><i class="lip"></i></div>
       <!-- the store card -->
       <header class="shophead">
         <div class="tools">
@@ -364,20 +369,12 @@ async function sendReport() {
       <div v-else class="menuwrap">
         <div class="pre" v-if="!canOrder"><div class="banner warn">{{ store.branch.paused ? t('paused') : t('closed') }}</div></div>
         <div class="pre" v-else-if="ahead"><div class="banner info">{{ t('closed_can_schedule') }}</div></div>
-        <div class="pre" v-if="cart.service === 'delivery' && mapMode">
-          <button type="button" class="card row between" style="width:100%;text-align:left;cursor:pointer" data-testid="deliver-to" @click="showPicker = true">
-            <span v-if="terms"><span class="muted small">{{ t('deliver_where') }}</span><br /><b>{{ cart.placeLabel || t('sf.pin_set') }}</b>
-              <span class="small muted" data-testid="deliver-terms"><br />{{ t('delivery_fee') }} {{ money(terms.fee, cur) }}<template v-if="terms.eta_minutes"> · {{ t('eta_min', { n: terms.eta_minutes }) }}</template></span></span>
-            <span v-else><b>📍 {{ t('sf.check_delivery') }}</b></span>
-            <span class="muted">›</span>
-          </button>
-        </div>
         <div class="pre" v-if="searching">
           <input ref="searchBox" v-model="query" type="search" class="searchbox" :placeholder="t('sf.search')" data-testid="search-box" />
         </div>
         <p v-if="query.trim() && !shownCats.length" class="muted" style="text-align:center;padding:36px 0;margin:0">{{ t('sf.search_none') }}</p>
         <MenuList ref="menu" :categories="shownCats" :currency="cur" :layout="tpl.layout" :can-order="orderable" :qty-of="qtyOf" stats
-          @add="open" @dec="dec" />
+          @add="open" @dec="dec" @show="dish = $event" />
       </div>
       </div>
 
@@ -415,13 +412,11 @@ async function sendReport() {
         </div>
       </div>
 
-      <div v-if="showPicker" class="sheet-mask" @click.self="showPicker = false">
-        <div class="sheet pickersheet">
-          <PlacePicker :slug="slug" :currency="cur" :start="cart.lat != null && cart.lng != null ? { lat: cart.lat, lng: cart.lng } : null" :name="cart.placeLabel"
-            :shop="shopPin" :pickup="store.branch.pickup_enabled" @done="picked" @close="showPicker = false" @pickup="toPickup" />
-        </div>
-      </div>
       <AddressSheet v-if="showAddresses" manage :slug="mapMode ? slug : undefined" :currency="cur" :shop="shopPin" :country="store?.branch.country_code" :fields="store?.branch.contact_fields" @close="showAddresses = false" />
+
+      <!-- the dish page -->
+      <DishDetail v-if="dish" :item="dish" :currency="cur" :can-order="orderable(dish)" :qty="qtyOf(dish)"
+        @add="addFromDish" @dec="dec(dish!)" @close="dish = null" />
 
       <!-- item options (C04/C05) -->
       <div class="sheet-mask" v-if="sheet.item" @click.self="sheet.item = null">
@@ -517,8 +512,6 @@ async function sendReport() {
   .shop .cartmask { padding-bottom: calc(76px + var(--tabs)); }
   .shop .toast { bottom: calc(96px + var(--tabs)); }
 }
-.pickersheet { height: 94vh; max-height: 94vh; overflow: hidden; }
-@media (min-width: 768px) { .pickersheet { height: min(720px, 90vh); max-width: 620px; } }
 .acct { position: relative; }
 .acct-menu { position: absolute; right: 0; top: 44px; z-index: 30; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .14); padding: 12px; width: 200px; display: grid; gap: 6px; }
 .lang { color: var(--muted); margin-left: 4px; }
@@ -548,6 +541,8 @@ async function sendReport() {
    buttons lie over them; from tablet width up the pictures sit beside the card. */
 .hero { position: relative; }
 .hero-media { position: relative; --promo-foot: 28px; }
+.still { aspect-ratio: 16 / 9; background: #1c1c1c; overflow: hidden; }
+.still img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .hero-media::before { content: ''; position: absolute; inset: 0 0 auto; height: 72px; z-index: 1; pointer-events: none; background: linear-gradient(rgba(0, 0, 0, .45), transparent); }
 .lip { position: absolute; left: 0; right: 0; bottom: -1px; height: 18px; background: #fff; border-radius: 18px 18px 0 0; pointer-events: none; }
 .hero.media .shophead { padding-top: 0; }
@@ -566,7 +561,9 @@ async function sendReport() {
 .shoptabs button.on::after { content: ''; position: absolute; left: 50%; bottom: 6px; width: 22px; height: 3px; margin-left: -11px; border-radius: 2px; background: var(--brand); }
 .shoptabs small { font-size: 11px; color: #8b8f96; margin-left: 2px; font-weight: 400; }
 
-.menuwrap { background: #fff; min-height: 60vh; }
+/* the menu fills the screen under the tabs, so the category rail runs to the bottom however few dishes there are */
+.menuwrap { background: #fff; min-height: calc(100vh - 50px); min-height: calc(100dvh - 50px); display: flex; flex-direction: column; }
+.menuwrap > .menu { flex: 1; }
 .pre { padding: 10px 14px 0; } .pre:last-of-type { padding-bottom: 10px; }
 .searchbox { width: 100%; border: 0; background: #f2f2f2; border-radius: 999px; padding: 9px 16px; font-size: 15px; }
 

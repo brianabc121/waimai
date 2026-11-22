@@ -12,7 +12,7 @@ const props = defineProps<{ categories: Category[]; currency: string; layout: st
   canOrder: (it: Item) => boolean; qtyOf: (it: Item) => number
   // Show how many of a dish were sold and how many are left (the delivery store page).
   stats?: boolean }>()
-defineEmits<{ add: [item: Item]; dec: [item: Item] }>()
+defineEmits<{ add: [item: Item]; dec: [item: Item]; show: [item: Item] }>()
 
 const cats = computed(() => props.categories.filter(c => c.items.length))
 const mode = computed(() => ['list', 'featured', 'grid'].includes(props.layout) ? props.layout : 'list')
@@ -70,7 +70,7 @@ defineExpose({ scrollTo })
         <div v-for="c in cats" :key="c.id" :id="'cat-' + c.id" class="cat">
           <h2>{{ pick(c.name, c.name_en) }}<span v-if="c.required" class="must">{{ t('required') }}</span></h2>
           <div class="items">
-            <div v-for="it in c.items" :key="it.id" class="card item" :class="{ off: !canOrder(it) }">
+            <div v-for="it in c.items" :key="it.id" class="card item" :class="{ off: !canOrder(it) }" :data-item="it.id" @click="$emit('show', it)">
               <img v-if="it.image_url" :src="it.image_url" alt="" />
               <div v-else class="ph">{{ pick(it.name, it.name_en).slice(0, 1) }}</div>
               <div class="grow">
@@ -84,14 +84,14 @@ defineExpose({ scrollTo })
                 <div class="row between buy">
                   <span class="price bold">{{ money(it.price, currency) }}</span>
                   <span v-if="!canOrder(it)" class="tag">{{ t('sold_out') }}</span>
-                  <button v-else-if="it.groups.length" class="btn small primary" @click="$emit('add', it)">
+                  <button v-else-if="it.groups.length" class="btn small primary" @click.stop="$emit('add', it)">
                     {{ t('choose') }}<span v-if="qtyOf(it)"> · {{ qtyOf(it) }}</span></button>
                   <span v-else class="stepper">
                     <template v-if="qtyOf(it)">
-                      <button @click="$emit('dec', it)" aria-label="-">−</button>
+                      <button @click.stop="$emit('dec', it)" aria-label="-">−</button>
                       <span>{{ qtyOf(it) }}</span>
                     </template>
-                    <button class="fill" @click="$emit('add', it)" aria-label="+">+</button>
+                    <button class="fill" @click.stop="$emit('add', it)" aria-label="+">+</button>
                   </span>
                 </div>
               </div>
@@ -112,7 +112,7 @@ defineExpose({ scrollTo })
 .lists { padding: 4px 14px 14px; display: flex; flex-direction: column; gap: 14px; }
 .cat { display: flex; flex-direction: column; gap: 10px; scroll-margin-top: calc(var(--menu-top, 0px) + 60px); }
 .items { display: flex; flex-direction: column; gap: 10px; }
-.item { display: flex; gap: 12px; }
+.item { display: flex; gap: 12px; cursor: pointer; }
 .item img, .item .ph { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; flex: none; }
 .item.off { opacity: .55; }
 .item > .grow { min-width: 0; display: flex; flex-direction: column; }
@@ -122,7 +122,8 @@ defineExpose({ scrollTo })
 
 /* list: a grey category rail on the left, dishes with a large picture on the right */
 /* the grey of the rail runs down the whole menu, however short the rail is */
-.list .body { --rail: 92px; display: flex; align-items: flex-start; background: linear-gradient(to right, #f4f4f4 var(--rail), #fff 0); }
+.menu.list { display: flex; flex-direction: column; }
+.list .body { flex: 1; --rail: 92px; display: flex; align-items: flex-start; background: linear-gradient(to right, #f4f4f4 var(--rail), #fff 0); }
 .list .cats { flex: none; width: var(--rail); flex-direction: column; gap: 0; padding: 0 0 96px; max-height: calc(100vh - var(--menu-top, 0px)); overflow-y: auto; background: none; align-self: flex-start; scrollbar-width: none; }
 .list .cats::-webkit-scrollbar { display: none; }
 .list .cats button { border: 0; border-radius: 0; background: transparent; color: #8b8f96; padding: 16px 8px; white-space: normal; font-size: 13px; line-height: 1.35; }
