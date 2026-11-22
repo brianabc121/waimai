@@ -47,7 +47,6 @@ const own = async (method, path, data) => {
 const me = await own('GET', '/auth/me')
 const bid = me.roles[0].branch_id
 const menu = await own('GET', `/merchant/branches/${bid}/menu`)
-if (menu.branch.zone_mode === 'map') await own('PUT', `/merchant/branches/${bid}/zone-mode`, { zone_mode: 'list', zone_tolerance_m: 200 })
 for (const z of menu.zones) {
   if (z.name.startsWith('地图测试')) await own('DELETE', `/merchant/branches/${bid}/zones/${z.id}`)
   else if (z.polygon.length) await own('PUT', `/merchant/branches/${bid}/zones/${z.id}`, { ...z, polygon: null })
@@ -258,8 +257,7 @@ step('a circle around the store is cut by the zones it crosses; the piece split 
 await shot('m5-overview')
 
 // ---- customers pin their address; the server decides the zone ----
-await page.click(tid('mode-map'))
-await page.waitForSelector(tid('mode-map') + '.on')
+expect(await page.locator(tid('mode-list')).count(), 0, 'the store cannot make customers pick an area from a list')
 const at = await api('POST', '/stores/makati/locate', { lat: 14.5547, lng: 121.0244 })
 expect(at.deliverable, true, 'the store itself can be delivered to')
 expect(at.zone, undefined, 'a customer is not told which zone a spot is in')
@@ -325,9 +323,6 @@ expect(mine.zone_distance_m > 30 && mine.zone_distance_m < 150, true, 'the order
 expect(Math.abs(mine.dest_lat - 14.5547) < 0.002 && Math.abs(mine.dest_lng - 121.0316) < 0.002, true, 'the order keeps the pin for the rider')
 step('the order is priced by the matched zone and keeps the pin for the rider')
 
-// Leave the store the way the other end-to-end tests expect it.
-await page.click(tid('mode-list'))
-await page.waitForSelector(tid('mode-list') + '.on')
 
 if (errors.length) throw new Error('browser errors:\n' + errors.join('\n'))
 await browser.close()

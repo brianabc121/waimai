@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"math"
-	"net/http"
 	"regexp"
 	"strings"
 
@@ -447,32 +446,17 @@ type ZoneModeInput struct {
 	ZoneToleranceM int    `json:"zone_tolerance_m"`
 }
 
-// SaveZoneMode switches between picking a zone from a list and locating on
-// the map, and sets the tolerance outside the outlines.
+// SaveZoneMode sets the tolerance outside the outlines. The area of a
+// delivery always follows the address's pin now; "list" (the customer picks
+// an area by name) can no longer be chosen. It is only what a platform
+// without a map key falls back to (forCustomer).
 func (a *App) SaveZoneMode(ctx context.Context, branchID int64, in ZoneModeInput) (*Branch, error) {
-	if in.ZoneMode != "list" && in.ZoneMode != "map" {
-		return nil, ErrValidation("zone_mode must be list or map")
+	if in.ZoneMode != "" && in.ZoneMode != "map" {
+		return nil, ErrValidation("zone_mode can only be map")
 	}
+	in.ZoneMode = "map"
 	if in.ZoneToleranceM < 0 || in.ZoneToleranceM > 500 {
 		return nil, ErrValidation("tolerance must be 0 to 500 metres")
-	}
-	if in.ZoneMode == "map" {
-		b, err := a.BranchByID(ctx, branchID)
-		if err != nil {
-			return nil, err
-		}
-		if a.mapsOff() && b.ZoneMode != "map" {
-			return nil, Err(http.StatusConflict, "MAPS_DISABLED", "this platform has no map key configured")
-		}
-		var drawn int
-		if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM delivery_zones WHERE branch_id=$1 AND active
-			AND polygon IS NOT NULL`, branchID).Scan(&drawn); err != nil {
-			return nil, err
-		}
-		if b.latLng() == nil || drawn == 0 {
-			return nil, Err(http.StatusConflict, "MAP_NOT_READY",
-				"set the store location and draw at least one active zone first")
-		}
 	}
 	tag, err := a.DB.Exec(ctx, `UPDATE branches SET zone_mode=$2, zone_tolerance_m=$3 WHERE id=$1`,
 		branchID, in.ZoneMode, in.ZoneToleranceM)

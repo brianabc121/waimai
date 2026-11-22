@@ -145,6 +145,10 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	f.branchID = m.BranchID
+	// These tests price a delivery by a zone named in the request, as a platform without a map does.
+	if _, err := a.DB.Exec(ctx, `UPDATE branches SET zone_mode='list' WHERE id=$1`, f.branchID); err != nil {
+		t.Fatal(err)
+	}
 	f.zoneID, _ = a.SaveZone(ctx, f.branchID, 0, app.ZoneInput{Name: "Z", Fee: 5000, Active: true})
 	cat, _ := a.SaveCategory(ctx, f.branchID, 0, app.CategoryInput{Name: "C"})
 	f.itemID, err = a.SaveItem(ctx, f.branchID, 0, app.ItemInput{CategoryID: cat, Name: "tea", Price: 6900,

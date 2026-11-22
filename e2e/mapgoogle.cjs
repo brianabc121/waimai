@@ -47,10 +47,16 @@ const own = async (method, url, data) => {
 const me = await own('GET', '/auth/me')
 const bid = me.roles[0].branch_id
 const STORE = [14.5547, 121.0244]
-await own('PUT', `/merchant/branches/${bid}/location`, { lat: STORE[0], lng: STORE[1], address: '123 Ayala Ave, Makati' })
+// an empty region: as a store saved before regions were read off the map
+await own('PUT', `/merchant/branches/${bid}/location`, { lat: STORE[0], lng: STORE[1], address: '123 Ayala Ave, Makati', region: {} })
 const NAME = '谷歌测试区'
 const CORNERS = [[14.5580, 121.0260], [14.5580, 121.0300], [14.5550, 121.0300], [14.5550, 121.0260]]
-for (const z of (await own('GET', `/merchant/branches/${bid}/menu`)).zones) if (z.name.startsWith('谷歌测试')) await own('DELETE', `/merchant/branches/${bid}/zones/${z.id}`)
+// Only this test's zone is drawn on the map while it runs; the others get their outlines back at the end.
+const others = []
+for (const z of (await own('GET', `/merchant/branches/${bid}/menu`)).zones) {
+  if (z.name.startsWith('谷歌测试')) await own('DELETE', `/merchant/branches/${bid}/zones/${z.id}`)
+  else if (z.polygon.length) { others.push(z); await own('PUT', `/merchant/branches/${bid}/zones/${z.id}`, { ...z, polygon: null }) }
+}
 await own('POST', `/merchant/branches/${bid}/zones`, { name: NAME, name_en: 'Google test', fee: 1000, min_order: 0, active: true, sort: 99, polygon: CORNERS, color: '#7c3aed', eta_minutes: null })
 
 await page.goto(BASE + '/merchant/delivery-map')
@@ -175,7 +181,6 @@ await page.click(tid('tool-browse'))
 
 // ---- the customer's address search stays in the store's country ----
 const slug = saved.slug
-await own('PUT', `/merchant/branches/${bid}/zone-mode`, { zone_mode: 'map', zone_tolerance_m: 200 })
 try {
   const cust = await ctx.newPage()
   cust.on('pageerror', e => errors.push(`pageerror: ${e.message}`))
@@ -202,11 +207,10 @@ try {
   expect(await cust.locator(tid('picker') + ' svg polygon').count(), 0, 'no zone outlines on the customer map')
   await cust.close()
   step('a customer searching "trump tower" is only offered places in the store\'s country, near the store')
-} finally {
-  await own('PUT', `/merchant/branches/${bid}/zone-mode`, { zone_mode: 'list', zone_tolerance_m: 200 })
-}
+} finally { /* nothing to put back */ }
 
 await own('DELETE', `/merchant/branches/${bid}/zones/${zone.id}`)
+for (const z of others) await own('PUT', `/merchant/branches/${bid}/zones/${z.id}`, z)
 if (errors.length) throw new Error('browser errors:\n' + errors.join('\n'))
 await browser.close()
 console.log('mapgoogle: all steps passed')

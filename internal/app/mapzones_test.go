@@ -29,10 +29,7 @@ func TestMapZones(t *testing.T) {
 	s := newStore(t, true)
 	a, ctx := testApp, context.Background()
 
-	// Map mode needs a store location and a drawn zone first.
-	_, err := a.SaveZoneMode(ctx, s.branchID, app.ZoneModeInput{ZoneMode: "map", ZoneToleranceM: 200})
-	wantCode(t, err, "MAP_NOT_READY")
-	_, err = a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: 95, Lng: 0})
+	_, err := a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: 95, Lng: 0})
 	wantCode(t, err, "VALIDATION")
 	store := m(500, 500)
 	b, err := a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: store[0], Lng: store[1], Address: "1 Map St"})
@@ -63,8 +60,9 @@ func TestMapZones(t *testing.T) {
 	}
 	_, err = a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: store[0], Lng: store[1]})
 	noErr(t, err)
-	_, err = a.SaveZoneMode(ctx, s.branchID, app.ZoneModeInput{ZoneMode: "map", ZoneToleranceM: 200})
-	wantCode(t, err, "MAP_NOT_READY") // the only zone has no outline yet
+	// Customers can no longer be made to pick an area from a list.
+	_, err = a.SaveZoneMode(ctx, s.branchID, app.ZoneModeInput{ZoneMode: "list", ZoneToleranceM: 200})
+	wantCode(t, err, "VALIDATION")
 
 	// Outlines are validated.
 	eta := 25
@@ -218,17 +216,20 @@ func TestMapZones(t *testing.T) {
 		t.Fatalf("order after zone changes: %+v", o)
 	}
 
-	// Back to list mode: the list works again and outlines stay.
-	_, err = a.SaveZoneMode(ctx, s.branchID, app.ZoneModeInput{ZoneMode: "list", ZoneToleranceM: 200})
+	// Where the platform has no map key there is no pin: the area named in
+	// the request is used, and the outlines stay.
+	off := *a
+	off.MapsOff = true
+	zid := s.zoneID
+	lq, err := off.CreateQuote(ctx, s.slug, app.QuoteInput{ServiceType: "delivery", ZoneID: &zid, Items: s.cart()}, "+639170000001")
 	noErr(t, err)
-	q = s.quote(t, "delivery", s.cart())
-	if q.ZoneName != "Z" {
-		t.Fatalf("list mode again: %+v", q)
+	if lq.ZoneName != "Z" {
+		t.Fatalf("without a map: %+v", lq)
 	}
 	menu, err = a.AdminMenu(ctx, s.branchID)
 	noErr(t, err)
 	if len(menu.Zones) != 3 || len(menu.Zones[0].Polygon) != 4 {
-		t.Fatalf("zones after switching back: %+v", menu.Zones)
+		t.Fatalf("zones afterwards: %+v", menu.Zones)
 	}
 }
 
@@ -258,10 +259,6 @@ func TestMapModeNeedsPlatformKey(t *testing.T) {
 	_, err = a.CreateQuote(ctx, s.slug, in, "+639170000001")
 	wantCode(t, err, "OUT_OF_ZONE") // with a key the pin is required
 
-	_, err = a.SaveZoneMode(ctx, s.branchID, app.ZoneModeInput{ZoneMode: "list", ZoneToleranceM: 200})
-	noErr(t, err)
-	_, err = off.SaveZoneMode(ctx, s.branchID, app.ZoneModeInput{ZoneMode: "map", ZoneToleranceM: 200})
-	wantCode(t, err, "MAPS_DISABLED")
 }
 
 // Cutting an overlap reshapes several zones at once: all are saved or none.

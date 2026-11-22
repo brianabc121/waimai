@@ -47,8 +47,9 @@ type Branch struct {
 	City        string `json:"city"`
 	District    string `json:"district"`
 	PostalCode  string `json:"postal_code"`
-	// ZoneMode is "list" (the customer picks a zone by name) or "map" (the
-	// customer drops a pin and matchZone decides).
+	// ZoneMode is "map": the delivery address's pin decides the zone
+	// (matchZone). "list" (the customer picks a zone by name) is what
+	// customers get only where the platform has no map key.
 	ZoneMode       string `json:"zone_mode"`
 	ZoneToleranceM int    `json:"zone_tolerance_m"`
 	// Notice scrolls under the store's name; Intro is "about the store".

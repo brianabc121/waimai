@@ -405,11 +405,6 @@ function dropRow(i: number) {
   reorder(ids)
 }
 const tol = ref(200)
-async function setMode(m: 'list' | 'map') {
-  if (readOnly.value || branch.value?.zone_mode === m) return
-  const b = await run(() => put<Branch>(`/merchant/branches/${bid}/zone-mode`, { zone_mode: m, zone_tolerance_m: branch.value!.zone_tolerance_m }))
-  if (b) branch.value = b
-}
 
 // ---- store location ----
 const loc = reactive({ lat: 0, lng: 0, address: '' })
@@ -492,7 +487,7 @@ async function undoClose() {
   if (await run(async () => { await putPolygon(zoneById(u.id), u.polygon); return true })) { undo = null; canUndo.value = false; notice.value = '' }
 }
 async function saveTolerance() {
-  const b = await run(() => put<Branch>(`/merchant/branches/${bid}/zone-mode`, { zone_mode: branch.value!.zone_mode, zone_tolerance_m: Math.round(Number(tol.value) || 0) }))
+  const b = await run(() => put<Branch>(`/merchant/branches/${bid}/zone-mode`, { zone_mode: 'map', zone_tolerance_m: Math.round(Number(tol.value) || 0) }))
   if (b) { branch.value = b; notice.value = t('mz.saved') }
 }
 
@@ -757,9 +752,8 @@ async function fbSave() {
         </section>
         <section>
           <h2>{{ t('mz.how') }}</h2>
-          <div class="seg"><button :class="{ on: branch.zone_mode === 'map' }" :disabled="readOnly" data-testid="mode-map" @click="setMode('map')">{{ t('mz.mode_map') }}</button>
-            <button :class="{ on: branch.zone_mode === 'list' }" :disabled="readOnly" data-testid="mode-list" @click="setMode('list')">{{ t('mz.mode_list') }}</button></div>
-          <p class="small muted" style="margin-top:8px">{{ t(branch.zone_mode === 'map' ? 'mz.mode_map_hint' : 'mz.mode_list_hint') }}</p>
+          <p class="small muted">{{ t('mz.mode_map_hint') }}</p>
+          <div v-if="!store || !drawn.some(z => z.active)" class="banner warn" style="margin-top:8px" data-testid="no-delivery-yet">{{ t('mz.no_delivery_yet') }}</div>
           <div class="row between" style="margin-top:10px"><span>{{ t('mz.tolerance') }}</span>
             <span class="row" style="gap:6px"><b>{{ t('mz.metres', { n: branch.zone_tolerance_m }) }}</b><button class="btn small" data-testid="open-gaps" @click="openGaps">{{ t('mz.view') }}</button></span></div>
           <p class="small muted" style="margin-top:4px">{{ branch.zone_tolerance_m ? t('mz.tolerance_hint', { n: branch.zone_tolerance_m }) : t('mz.tolerance_zero') }}</p>
