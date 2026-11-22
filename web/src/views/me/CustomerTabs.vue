@@ -37,4 +37,10 @@ const home = computed(() => homePath())
 .ctabs a.on svg { color: var(--brand); }
 .ic { position: relative; display: grid; }
 .dot { position: absolute; top: -1px; right: -4px; width: 9px; height: 9px; border-radius: 50%; background: #e5352b; border: 1.5px solid #fff; }
+.ctabs a > span:last-child { line-height: 1.2; }
+/* the warm look: cream bar, the current tab on a gold pill */
+.warm .ctabs > div { background: var(--bg); border-top-color: var(--line); align-items: center; }
+.warm .ctabs a { color: var(--ink); font-size: 13px; justify-self: center; min-width: 76px; height: calc(var(--tabbar-h) - 8px); border-radius: 16px; }
+.warm .ctabs a.on { background: var(--gold); color: var(--red); }
+.warm .ctabs a.on svg { color: var(--red); }
 </style>

@@ -158,15 +158,21 @@ func seedMall(ctx context.Context, a *app.App) {
 		// the banners go on record as the demo administrator's
 		var admin app.AdminActor
 		must(a.DB.QueryRow(ctx, `SELECT id FROM users WHERE username='admin'`).Scan(&admin.ID))
-		id, err := a.AdminSaveBanner(ctx, admin, 0, app.MallBannerInput{Title: "新店开业 · 免配送费", TitleEn: "New store · free delivery",
-			Subtitle: "炸鸡研究所，满 ₱300 免配送费", SubtitleEn: "Fried Chicken Lab: free delivery over ₱300", LinkSlug: "chicken", Active: true})
-		must(err)
-		img, err := assets.ReadFile("assets/fried-chicken-cover.jpg")
-		must(err)
-		must(a.AdminSetBannerImage(ctx, admin, id, img))
-		_, err = a.AdminSaveBanner(ctx, admin, 0, app.MallBannerInput{Title: "下午茶 · 满200减20", TitleEn: "Tea time · save 20 over 200",
-			Subtitle: "茶屿奶茶", SubtitleEn: "Tea Isle", LinkSlug: "tea", Sort: 1, Active: true})
-		must(err)
+		// a banner shows its title large, its subtitle on a ribbon, and the name of the store it leads to
+		for i, b := range []struct {
+			in  app.MallBannerInput
+			pic string
+		}{
+			{app.MallBannerInput{Title: "下午茶", TitleEn: "Tea time", Subtitle: "满₱200减₱20", SubtitleEn: "₱20 off over ₱200", LinkSlug: "tea"}, "bubble-milk-tea.jpg"},
+			{app.MallBannerInput{Title: "新店开业", TitleEn: "New store", Subtitle: "满₱300免配送费", SubtitleEn: "Free delivery over ₱300", LinkSlug: "chicken"}, "fried-chicken-cover.jpg"},
+		} {
+			b.in.Sort, b.in.Active = i, true
+			id, err := a.AdminSaveBanner(ctx, admin, 0, b.in)
+			must(err)
+			img, err := assets.ReadFile("assets/" + b.pic)
+			must(err)
+			must(a.AdminSetBannerImage(ctx, admin, id, img))
+		}
 	}
 	log.Print("marketplace: stores tea chicken bento cutlet luwei fries pasay (owner3 to owner9)")
 }

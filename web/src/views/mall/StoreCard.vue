@@ -2,11 +2,12 @@
 // One store of the marketplace. On a phone it is a row with the store's
 // picture on the left; from a tablet up it is a card with the cover on top.
 // What it says about delivery is only the fee, the minimum and the time.
+// `compact` is the short row of the stores one can only collect from.
 import { computed } from 'vue'
 import { money, pick, promoLabel, t } from '../../i18n'
 import { cartCount, distanceText, type MallCategory, type MallStore } from '../../mall'
 
-const props = defineProps<{ store: MallStore; categories: MallCategory[] }>()
+const props = defineProps<{ store: MallStore; categories: MallCategory[]; compact?: boolean }>()
 
 const s = computed(() => props.store)
 const open = computed(() => s.value.status === 'open')
@@ -20,44 +21,63 @@ const eta = computed(() => open.value && s.value.delivery?.eta_minutes ? t('ml.m
 const far = computed(() => s.value.distance_m != null ? distanceText(s.value.distance_m) : '')
 const picture = computed(() => s.value.logo_url || s.value.cover_url)
 const cover = computed(() => s.value.cover_url || s.value.logo_url)
-const initial = computed(() => pick(s.value.name, s.value.name_en).slice(0, 1))
+const isNew = computed(() => s.value.rating == null && !s.value.monthly_sales)
 </script>
 
 <template>
-  <router-link :to="`/s/${s.slug}`" class="mcard" :class="{ off: !open }" data-testid="mall-store" :data-slug="s.slug">
+  <router-link v-if="compact" :to="`/s/${s.slug}`" class="mrow" :class="{ off: !open }" data-testid="mall-store" :data-slug="s.slug">
+    <span class="thumb">
+      <img v-if="cover" :src="cover" alt="" loading="lazy" />
+      <span v-else class="bowl"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M4 11h16a8 8 0 0 1-5 7.4V20H9v-1.6A8 8 0 0 1 4 11z" /></svg></span>
+    </span>
+    <span class="txt">
+      <b>{{ pick(s.name, s.name_en) }}</b>
+      <small>
+        <template v-if="s.rating != null">{{ s.rating.toFixed(1) }}<template v-if="s.monthly_sales"> · </template></template>
+        <template v-if="s.monthly_sales">{{ t('ml.monthly', { n: s.monthly_sales }) }}</template>
+        <template v-if="isNew">{{ t('ml.new') }}</template>
+        <template v-if="!open"> · {{ shut }}</template>
+      </small>
+    </span>
+    <span v-if="far" class="far"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path fill-rule="evenodd" d="M12 22s7-6.3 7-11.8a7 7 0 1 0-14 0C5 15.7 12 22 12 22zm0-9.200a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.200z" /></svg>{{ far }}</span>
+    <i v-if="inCart" class="n" data-testid="mall-cart-count">{{ inCart }}</i>
+  </router-link>
+
+  <router-link v-else :to="`/s/${s.slug}`" class="mcard" :class="{ off: !open }" data-testid="mall-store" :data-slug="s.slug">
     <div class="cover" :style="cover ? { backgroundImage: `url(${cover})` } : {}">
       <span v-if="eta" class="eta">{{ eta }}</span>
       <span v-if="!open" class="veil">{{ shut }}<template v-if="opens"> · {{ opens }}</template></span>
     </div>
     <div class="pic">
       <img v-if="picture" :src="picture" alt="" loading="lazy" />
-      <span v-else class="letter">{{ initial }}</span>
+      <span v-else class="bowl"><svg viewBox="0 0 24 24" width="56%" height="56%" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M9 3.500c-.8.9.8 1.7 0 2.600M12 3.500c-.8.9.8 1.7 0 2.600M15 3.500c-.8.9.8 1.7 0 2.6" /><path d="M4 11h16a8 8 0 0 1-5 7.400V20H9v-1.600A8 8 0 0 1 4 11z" fill="currentColor" stroke="none" /></svg></span>
       <span v-if="!open" class="veil">{{ shut }}</span>
-      <i v-if="inCart" class="n" data-testid="mall-cart-count">{{ inCart }}</i>
+      <i v-if="inCart" class="n" data-testid="mall-cart-count"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h2.500l2 10h10l2-7H7" /><circle cx="9.5" cy="19" r="1.2" /><circle cx="16.5" cy="19" r="1.2" /></svg>{{ inCart }}</i>
     </div>
     <div class="body">
-      <h3>{{ pick(s.name, s.name_en) }}</h3>
-      <p class="l1">
+      <h3><span>{{ pick(s.name, s.name_en) }}</span><em v-if="isNew" class="new">{{ t('ml.new') }}</em></h3>
+      <p v-if="s.rating != null || s.monthly_sales || kinds" class="l1">
         <span v-if="s.rating != null" class="rate">★ {{ s.rating.toFixed(1) }}</span>
         <span v-if="s.monthly_sales">{{ t('ml.monthly', { n: s.monthly_sales }) }}</span>
         <span v-if="kinds" class="kinds">{{ kinds }}</span>
-        <span class="right"><span v-if="eta" class="etatext">{{ eta }}<template v-if="far"> · </template></span>{{ far }}</span>
       </p>
       <p class="l2">
+        <span v-if="far" class="ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path fill-rule="evenodd" d="M12 22s7-6.3 7-11.800a7 7 0 1 0-14 0C5 15.7 12 22 12 22zm0-9.200a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.200z" /></svg>{{ far }}</span>
+        <span v-if="eta" class="etatext">{{ eta }}</span>
         <span v-if="opens" class="opens">{{ opens }}</span>
         <template v-if="s.delivery">
+          <span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.500h11v10h-11zM13.5 10h4l3 3.500v3h-7" /><circle cx="7" cy="17.5" r="1.8" /><circle cx="17" cy="17.5" r="1.8" /></svg>
+            <template v-if="s.delivery.fee">{{ t('ml.fee_word') }} <b>{{ money(s.delivery.fee, s.currency) }}</b></template>
+            <b v-else>{{ t('ml.fee_free') }}</b></span>
           <span v-if="s.delivery.min_order">{{ t('ml.min', { amt: money(s.delivery.min_order, s.currency) }) }}</span>
-          <span v-if="s.delivery.fee">{{ t('ml.fee', { amt: money(s.delivery.fee, s.currency) }) }}</span>
-          <span v-else class="free">{{ t('ml.fee_free') }}</span>
         </template>
         <span v-else-if="s.min_order_from">{{ t('ml.min_from', { amt: money(s.min_order_from, s.currency) }) }}</span>
       </p>
       <p v-if="s.tagline" class="tagline">{{ s.tagline }}</p>
       <div class="tags">
-        <span v-if="s.rating == null && !s.monthly_sales" class="tag new">{{ t('ml.new') }}</span>
         <span v-if="!s.delivery && s.distance_m != null" class="tag only">{{ t('ml.pickup_only') }}</span>
         <span v-for="(p, i) in s.promos" :key="i" class="tag promo">{{ pick(p.name, p.name_en) || promoLabel(p, s.currency) }}</span>
-        <span v-if="s.scheduling" class="tag">{{ t('ml.can_schedule') }}</span>
+        <span v-if="s.scheduling" class="tag gold">{{ t('ml.can_schedule') }}</span>
       </div>
       <div v-if="s.dishes.length" class="dishes">
         <div v-for="(d, i) in s.dishes" :key="i" class="dish">
@@ -72,49 +92,66 @@ const initial = computed(() => pick(s.value.name, s.value.name_en).slice(0, 1))
 </template>
 
 <style scoped>
-.mcard { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; padding: 12px; background: #fff; border-radius: 14px; color: var(--ink); }
+.mcard { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; padding: 12px 12px 12px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; color: var(--ink); box-shadow: inset 4px 0 0 var(--red); overflow: hidden; }
 .cover { display: none; }
-.pic { position: relative; width: 84px; height: 84px; }
-.pic img, .pic .letter { width: 100%; height: 100%; border-radius: 10px; object-fit: cover; display: block; }
-.pic .letter { display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); font-size: 30px; font-weight: 700; }
-.pic .veil { position: absolute; inset: 0; border-radius: 10px; background: rgba(40, 44, 52, .62); color: #fff; font-size: 13px; font-weight: 700; display: grid; place-items: center; text-align: center; }
-.pic .n { position: absolute; top: -6px; right: -6px; min-width: 19px; height: 19px; padding: 0 4px; border-radius: 10px; background: #e5352b; color: #fff; font-style: normal; font-size: 12px; font-weight: 700; display: grid; place-items: center; border: 1.5px solid #fff; }
+.pic { position: relative; width: 96px; height: 96px; }
+.pic img, .pic .bowl { width: 100%; height: 100%; border-radius: 12px; object-fit: cover; display: block; }
+.bowl { display: grid !important; place-items: center; background: #9a3018; color: #fbe9c2; }
+.pic .veil { position: absolute; inset: 0; border-radius: 12px; background: rgba(59, 31, 20, .62); color: #fff; font-size: 13px; font-weight: 700; display: grid; place-items: center; text-align: center; }
+.pic .n { position: absolute; top: -5px; right: -7px; height: 24px; padding: 0 8px 0 6px; border-radius: 12px; background: var(--paper); color: var(--red); font-style: normal; font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 3px; border: 1.5px solid var(--red); }
 .body { min-width: 0; }
-h3 { font-size: 16.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.l1, .l2 { display: flex; flex-wrap: wrap; gap: 0 9px; font-size: 13px; color: #4b5563; margin-top: 3px; align-items: baseline; }
-.l1 { flex-wrap: nowrap; white-space: nowrap; }
-.l1 .rate { color: var(--brand); font-weight: 700; }
+h3 { font-size: 19px; font-weight: 800; display: flex; align-items: center; gap: 8px; min-width: 0; }
+h3 span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+h3 .new { flex: none; font-style: normal; font-size: 12.500px; font-weight: 600; padding: 1px 8px; border-radius: 6px; background: var(--gold-soft); color: var(--red-deep); }
+.l1, .l2 { display: flex; flex-wrap: wrap; gap: 2px 0; font-size: 14px; color: var(--muted); margin-top: 4px; align-items: center; }
+.l1 > span + span, .l2 > span + span { margin-left: 10px; padding-left: 10px; border-left: 1px solid #cbb9a2; }
+.l1 .rate { color: var(--red); font-weight: 700; }
 .l1 .kinds { display: none; overflow: hidden; text-overflow: ellipsis; }
-.l1 .right { margin-left: auto; color: #6b7280; flex: none; }
-.l2 .free { color: var(--brand); }
-.l2 .opens { color: #6b7280; }
-.tagline { font-size: 12.5px; color: #8b919a; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.l2 .ic { display: inline-flex; align-items: center; gap: 5px; }
+.l2 .ic svg { flex: none; color: #8c7461; }
+.l2 b { color: var(--red); font-weight: 800; font-size: 15.500px; }
+.tagline { font-size: 12.500px; color: var(--muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .tags:empty { display: none; }
-.tag { font-size: 12px; padding: 1px 7px; border-radius: 5px; background: #f1f2f4; color: #5b616b; white-space: nowrap; }
-.tag.promo { background: #fff; color: var(--brand); border: 1px solid #f0a583; }
-.tag.new { background: var(--ok-soft); color: var(--ok); }
-.tag.only { background: var(--warn-soft); color: var(--warn); }
-.dishes { display: flex; gap: 8px; margin-top: 9px; }
+.tag { font-size: 12.500px; padding: 2px 9px; border-radius: 7px; background: #efe5d6; color: var(--ink); white-space: nowrap; border: 1px solid transparent; }
+.tag.promo { background: none; color: var(--red); border-color: #c98a78; }
+.tag.gold { background: var(--gold-soft); color: var(--red-deep); }
+.tag.only { background: var(--gold-soft); color: #8a5a1c; }
+.dishes { display: flex; gap: 8px; margin-top: 10px; }
 .dish { width: 76px; font-size: 12px; display: grid; }
-.dish img, .dish .ph { width: 76px; height: 56px; border-radius: 7px; object-fit: cover; background: #f1f2f4; }
+.dish img, .dish .ph { width: 76px; height: 56px; border-radius: 8px; object-fit: cover; background: #efe5d6; }
 .dish .dn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
-.dish b { color: var(--brand); }
-.off h3, .off .l1, .off .l2, .off .rate { color: #9aa0a8; }
+.dish b { color: var(--red); }
+.off h3, .off .l1, .off .l2, .off .rate, .off .l2 b { color: #a6978a; }
+.mcard.off { box-shadow: inset 4px 0 0 #cdbda8; }
+
+/* the short row */
+.mrow { position: relative; display: flex; align-items: center; gap: 14px; padding: 8px 2px; color: var(--ink); min-width: 0; border-bottom: 1px solid var(--line); }
+.mrow .thumb { flex: none; width: 104px; height: 54px; border-radius: 10px; overflow: hidden; display: block; }
+.mrow .thumb img, .mrow .thumb .bowl { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mrow .txt { flex: 1; min-width: 0; display: grid; }
+.mrow b { font-size: 17px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow small { font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow .far { flex: none; display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 14.500px; }
+.mrow .far svg { color: #8c7461; }
+.mrow .n { position: absolute; left: 90px; top: 2px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--red); color: #fff; font-style: normal; font-size: 12px; font-weight: 700; display: grid; place-items: center; border: 1.500px solid var(--paper); }
+.mrow.off b { color: #a6978a; }
 
 @media (min-width: 768px) {
-  .mcard { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; overflow: hidden; position: relative; transition: box-shadow .15s; }
-  .mcard:hover { box-shadow: 0 6px 20px rgba(0, 0, 0, .1); }
-  .cover { display: block; position: relative; height: 148px; background: var(--brand-soft) center / cover no-repeat; }
-  .cover .eta { position: absolute; top: 10px; right: 10px; background: #fff; border-radius: 12px; padding: 1px 9px; font-size: 13px; font-weight: 700; }
-  .cover .veil { position: absolute; inset: 0; background: rgba(40, 44, 52, .62); color: #fff; font-weight: 700; display: grid; place-items: center; text-align: center; padding: 0 10px; }
+  .mcard { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; position: relative; transition: box-shadow .15s; box-shadow: none; }
+  .mcard.off { box-shadow: none; }
+  .mcard:hover { box-shadow: 0 6px 20px rgba(90, 40, 15, .14); }
+  .cover { display: block; position: relative; height: 148px; background: var(--gold-soft) center / cover no-repeat; }
+  .cover .eta { position: absolute; top: 10px; right: 10px; background: var(--paper); border-radius: 12px; padding: 1px 9px; font-size: 13px; font-weight: 700; }
+  .cover .veil { position: absolute; inset: 0; background: rgba(59, 31, 20, .62); color: #fff; font-weight: 700; display: grid; place-items: center; text-align: center; padding: 0 10px; }
   .pic { width: 56px; height: 56px; margin: -34px 0 0 16px; z-index: 1; }
-  .pic img, .pic .letter { border: 3px solid #fff; border-radius: 12px; }
+  .pic img, .pic .bowl { border: 3px solid var(--paper); border-radius: 12px; }
   .pic .veil { display: none; }
   .body { padding: 6px 16px 14px; }
+  h3 { font-size: 17.500px; }
   .l1 .kinds { display: inline; }
-  .l1 .etatext, .l2 .opens { display: none; }
-  .tags { min-height: 21px; }
+  .l2 .etatext, .l2 .opens { display: none; }
+  .tags { min-height: 25px; }
   .tags:empty { display: flex; }
 }
 </style>

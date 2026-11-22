@@ -9,7 +9,7 @@ extend({
   'ol.title': ['我的订单', 'My orders'], 'ol.search': ['搜索我的订单', 'Search my orders'],
   'ol.t_all': ['全部', 'All'], 'ol.t_active': ['进行中', 'In progress'], 'ol.t_review': ['待评价', 'To review'], 'ol.t_aftersale': ['退款/售后', 'Refunds'],
   'ol.empty': ['还没有订单', 'No orders yet'], 'ol.empty_search': ['没有找到相关订单', 'No orders match'], 'ol.empty_tab': ['这里暂时没有订单', 'Nothing here right now'],
-  'ol.ordered_at': ['下单时间', 'Ordered'], 'ol.n_items': ['共 {n} 件', '{n} items'],
+  'ol.ordered_at': ['下单时间', 'Ordered'], 'ol.n_items': ['共 {n} 件', '{n} items'], 'ol.n_more': ['还有 {n} 样', '{n} more'],
   'ol.more': ['更多', 'More'], 'ol.detail': ['订单详情', 'Order details'],
   'ol.review': ['评价', 'Review'], 'ol.reviewed': ['已评价', 'Reviewed'], 'ol.again': ['再来一单', 'Order again'],
   'ol.to_review': ['待评价', 'To review'], 'ol.done': ['已完成', 'Completed'],
@@ -50,6 +50,17 @@ export function stamp(iso: string, timeZone?: string): string {
   try {
     return d.toLocaleDateString('en-CA', { timeZone }) + ' ' + d.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' })
   } catch { return d.toLocaleString(locale.value === 'zh' ? 'zh-CN' : 'en-US') }
+}
+
+// "11月22日 19:30" / "22 Nov 19:30" on the store's clock.
+export function shortStamp(iso: string, timeZone?: string): string {
+  const d = new Date(iso)
+  try {
+    const time = d.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' })
+    if (locale.value !== 'zh') return d.toLocaleDateString('en-GB', { timeZone, day: 'numeric', month: 'short' }) + ' ' + time
+    const [, m, day] = d.toLocaleDateString('en-CA', { timeZone }).split('-').map(Number)
+    return `${m}月${day}日 ${time}`
+  } catch { return stamp(iso, timeZone) }
 }
 
 export const finished = (status: string) => status === 'delivered' || status === 'picked_up' || status === 'completed'

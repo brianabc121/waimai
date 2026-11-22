@@ -76,6 +76,12 @@ function follow(b: MallBanner) {
   else if (b.link_url) window.location.href = b.link_url
 }
 
+// The store a banner leads to, named when it is among the stores listed here.
+const bannerStore = (b: MallBanner) => {
+  const st = b.link_slug ? [...stores.value, ...pickup.value].find(x => x.slug === b.link_slug) : undefined
+  return st ? pick(st.name, st.name_en) : ''
+}
+
 onMounted(async () => {
   document.title = t('ml.brand')
   void mallHome().then(h => { home.value = h; document.title = mallName(h) }).catch(() => null)
@@ -89,16 +95,17 @@ onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>
-  <div class="mall" :class="{ searching: !!ask.q }" data-testid="mall">
+  <div class="mall warm" :class="{ searching: !!ask.q }" data-testid="mall">
     <header class="mtop">
       <div class="mtop-in">
         <a class="brand" href="/" @click.prevent="clearAll">{{ mallName(home) }}</a>
         <button class="loc" data-testid="mall-loc" @click="showLoc = 'list'">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /></svg>
-          <b>{{ place }}</b><span>›</span>
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 21.500s7-6.2 7-11.500a7 7 0 1 0-14 0c0 5.3 7 11.5 7 11.500z" /><circle cx="12" cy="10" r="2.6" /></svg>
+          <span class="where"><small>{{ t('ml.deliver_to') }}</small><b>{{ place }}</b></span>
+          <svg class="chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
         </button>
         <form class="msearch" role="search" @submit.prevent="search">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg>
           <input v-model="typed" type="search" enterkeyhint="search" :placeholder="t('ml.search_ph')" :aria-label="t('ml.search_ph')" data-testid="mall-search" />
           <button v-if="ask.q" type="button" class="clear" :aria-label="t('close')" data-testid="mall-search-clear" @click="clearSearch">✕</button>
           <button v-else type="submit" class="go">{{ t('ml.search') }}</button>
@@ -107,12 +114,12 @@ onBeforeUnmount(() => clearInterval(timer))
           <router-link to="/me/favorites" class="txt wide">{{ t('ml.favorites') }}</router-link>
           <router-link to="/orders" class="txt">{{ t('ml.orders') }}</router-link>
           <button class="msg" :aria-label="t('ml.messages')" data-testid="mall-messages" @click="messages">
-            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4.5h13a2 2 0 0 1 2 2v8.500a2 2 0 0 1-2 2H11l-4.500 3.500v-3.500h-1a2 2 0 0 1-2-2V6.500a2 2 0 0 1 2-2z" /><path d="M8.500 11h.01M12 11h.01M15.500 11h.01" /></svg>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.500c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.150-2.9-.400L5 20l.9-3.300C4.4 15.4 3.5 13.6 3.5 11.500c0-3.9 3.8-7 8.5-7z" /><path d="M8.5 11.500h.01M12 11.500h.01M15.5 11.500h.01" /></svg>
             <i v-if="me.profile && me.profile.unread + me.profile.chat_unread" data-testid="mall-unread">{{ me.profile.unread + me.profile.chat_unread > 99 ? '99+' : me.profile.unread + me.profile.chat_unread }}</i>
           </button>
           <router-link to="/me" class="avatar" :aria-label="t('me.me')">
             <template v-if="me.profile">{{ displayName(me.profile).slice(0, 1) }}</template>
-            <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.500 5.4" /></svg>
+            <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.400s6.3 1.8 7.5 5.4" /></svg>
           </router-link>
         </nav>
       </div>
@@ -131,7 +138,11 @@ onBeforeUnmount(() => clearInterval(timer))
           <div v-if="banners.length" class="banners" data-testid="mall-banners">
             <a v-for="(b, i) in banners" v-show="i === slide" :key="b.id" class="banner" :class="{ link: b.link_slug || b.link_url }" :aria-label="t('ml.banner')" @click="follow(b)">
               <img v-if="b.image_url" :src="b.image_url" alt="" />
-              <div><b>{{ pick(b.title, b.title_en) }}</b><span>{{ pick(b.subtitle, b.subtitle_en) }}</span></div>
+              <div>
+                <b>{{ pick(b.title, b.title_en) }}</b>
+                <span v-if="pick(b.subtitle, b.subtitle_en)" class="ribbon">{{ pick(b.subtitle, b.subtitle_en) }}</span>
+                <em v-if="bannerStore(b)">{{ bannerStore(b) }}</em>
+              </div>
             </a>
             <div v-if="banners.length > 1" class="dots"><i v-for="(b, i) in banners" :key="b.id" :class="{ on: i === slide }" @click="slide = i"></i></div>
           </div>
@@ -150,6 +161,9 @@ onBeforeUnmount(() => clearInterval(timer))
                 <span>{{ pick(s.name, s.name_en) }}</span>
               </router-link>
             </div>
+            <router-link v-if="frequent.length === 1" class="go" :to="`/s/${frequent[0].slug}`" :aria-label="pick(frequent[0].name, frequent[0].name_en)" tabindex="-1">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg>
+            </router-link>
           </section>
         </template>
 
@@ -167,13 +181,13 @@ onBeforeUnmount(() => clearInterval(timer))
           <p v-if="byRegion" class="regnote" data-testid="mall-region-note">{{ t('ml.region_note') }}</p>
           <div class="listhead">
             <h2 v-if="ask.q" class="found" data-testid="mall-found">{{ stores.length ? t('ml.found', { n: stores.length, q: ask.q }) : t('ml.found_none', { q: ask.q }) }}</h2>
-            <h2 v-else>{{ byRegion ? t('ml.in_city', { city: loc.name }) : t('ml.nearby') }}
+            <h2 v-else class="near">{{ byRegion ? t('ml.in_city', { city: loc.name }) : t('ml.nearby') }}
               <small v-if="list && stores.length" data-testid="mall-count">{{ t(byRegion ? 'ml.in_city_n' : 'ml.nearby_n', { n: stores.length }) }}</small></h2>
             <div class="sorts" data-testid="mall-sorts">
               <button v-for="s in sorts" :key="s" :class="{ on: ask.sort === s }" :data-sort="s" @click="ask.sort = s">{{ sortName(s) }}</button>
-              <span class="bar"></span>
               <div class="filt">
-                <button :class="{ on: ask.filters.length }" data-testid="mall-filter" @click="showFilter = !showFilter">{{ t('ml.filter') }}<template v-if="ask.filters.length"> {{ ask.filters.length }}</template> ▾</button>
+                <button :class="{ on: ask.filters.length }" data-testid="mall-filter" @click="showFilter = !showFilter">{{ t('ml.filter') }}<template v-if="ask.filters.length"> {{ ask.filters.length }}</template>
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 8h9M19 8h1M4 16h1M11 16h9" /><circle cx="16" cy="8" r="2.4" /><circle cx="8" cy="16" r="2.4" /></svg></button>
                 <div v-if="showFilter" class="filtmenu">
                   <label v-for="f in filters" :key="f" class="check"><input type="checkbox" :checked="ask.filters.includes(f)" :data-filter="f" @change="toggle(f)" />{{ t('ml.f_' + f) }}</label>
                 </div>
@@ -199,8 +213,10 @@ onBeforeUnmount(() => clearInterval(timer))
             </div>
 
             <section v-if="pickup.length" class="pick" data-testid="mall-pickup">
-              <h2>{{ t('ml.pickup_title') }} <small>{{ t('ml.pickup_hint') }}</small></h2>
-              <div class="grid" :class="{ dim: loading }"><StoreCard v-for="s in pickup" :key="s.slug" :store="s" :categories="categories" /></div>
+              <h2 :title="t('ml.pickup_hint')">
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v9.500h16V10M3 6.5 4.5 3.500h15L21 6.500v1.300a2.250 2.250 0 0 1-4.5 0 2.250 2.250 0 0 1-4.5 0 2.250 2.250 0 0 1-4.5 0 2.250 2.250 0 0 1-4.5 0zM9.5 19.500v-5h5v5" /></svg>
+                {{ t('ml.pickup_title') }} <small>{{ t('ml.pickup_only') }}</small></h2>
+              <div class="grid rows" :class="{ dim: loading }"><StoreCard v-for="s in pickup" :key="s.slug" :store="s" :categories="categories" compact /></div>
             </section>
           </template>
         </template>
@@ -220,109 +236,134 @@ onBeforeUnmount(() => clearInterval(timer))
 
 <style scoped>
 .mall { min-height: 100vh; padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px); }
-.mtop { position: sticky; top: 0; z-index: 20; background: linear-gradient(#ffe2d2, #fff 70%); }
-.mall.searching .mtop { background: #fff; border-bottom: 1px solid var(--line); }
-.mtop-in { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'loc links' 'search search'; gap: 8px 10px; align-items: center; padding: 12px 14px 10px; }
-.brand { display: none; font-size: 21px; font-weight: 800; color: var(--brand); white-space: nowrap; }
-.loc { grid-area: loc; display: flex; align-items: center; gap: 6px; min-width: 0; border: 0; background: none; padding: 4px 0; cursor: pointer; text-align: left; justify-self: start; max-width: 100%; }
+.mtop { position: sticky; top: 0; z-index: 20; background: var(--red); color: #fff; }
+.mtop-in { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'loc links' 'search search'; gap: 8px 10px; align-items: center; padding: 10px 14px 10px; }
+.brand { display: none; font-size: 22px; font-weight: 800; color: #fff3da; white-space: nowrap; letter-spacing: 1px; }
+.loc { grid-area: loc; display: flex; align-items: center; gap: 8px; min-width: 0; border: 0; background: none; color: #fff; padding: 2px 0; cursor: pointer; text-align: left; justify-self: start; max-width: 100%; }
 .loc svg { flex: none; }
-.loc b { font-size: 17.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.loc span { color: #4b5563; font-size: 20px; line-height: 1; }
+.loc .where { display: grid; min-width: 0; line-height: 1.2; }
+.loc small { font-size: 12px; opacity: .9; }
+.loc b { font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loc .chev { align-self: flex-end; margin-bottom: 3px; }
 .mlinks { grid-area: links; display: flex; align-items: center; gap: 18px; }
-.mlinks .txt, .mlinks .avatar { display: none; color: var(--ink); white-space: nowrap; }
-.msg { position: relative; border: 0; background: none; padding: 2px; color: var(--ink); cursor: pointer; display: grid; }
-.msg i { position: absolute; right: -5px; top: -4px; min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px; background: #e5352b; color: #fff; font-style: normal; font-size: 11px; font-weight: 700; display: grid; place-items: center; border: 1.5px solid #fff; }
-.avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--brand-soft); color: var(--brand) !important; font-weight: 700; place-items: center; }
-.msearch { grid-area: search; display: flex; align-items: center; gap: 6px; height: 42px; padding: 0 4px 0 14px; background: #fff; border: 1.5px solid var(--brand); border-radius: 22px; color: #8b919a; }
-.msearch input { flex: 1; min-width: 0; border: 0; padding: 0; background: none; color: var(--ink); outline: none; -webkit-appearance: none; appearance: none; }
-.msearch .go { border: 0; background: var(--brand); color: #fff; font-weight: 700; border-radius: 17px; height: 32px; padding: 0 15px; cursor: pointer; white-space: nowrap; }
-.msearch .clear { border: 0; background: none; color: #8b919a; width: 34px; height: 34px; cursor: pointer; }
+.mlinks .txt, .mlinks .avatar { display: none; color: #fff; white-space: nowrap; }
+.msg { position: relative; border: 0; background: rgba(255, 255, 255, .2); width: 40px; height: 40px; border-radius: 10px; color: #fff; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.msg i { position: absolute; right: -5px; top: -5px; min-width: 18px; height: 18px; padding: 0 3px; border-radius: 9px; background: var(--gold); color: var(--red); font-style: normal; font-size: 11px; font-weight: 800; display: grid; place-items: center; border: 1.5px solid var(--red); }
+.avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--gold); color: var(--red) !important; font-weight: 800; place-items: center; }
+.msearch { grid-area: search; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 4px 0 14px; background: var(--paper); border-radius: 13px; color: var(--muted); }
+.msearch input { flex: 1; min-width: 0; border: 0; padding: 0; background: none; color: var(--ink); outline: none; font-size: 16px; -webkit-appearance: none; appearance: none; }
+.msearch input::placeholder { color: var(--muted); }
+.msearch .go { border: 0; background: var(--red); color: #fff; font-weight: 800; border-radius: 10px; height: 36px; padding: 0 18px; cursor: pointer; white-space: nowrap; letter-spacing: 1px; }
+.msearch .clear { border: 0; background: none; color: var(--muted); width: 36px; height: 36px; cursor: pointer; }
 
-.mbody { padding: 12px 12px 0; }
+.mbody { padding: 0 12px; }
 .mside { display: none; }
-.mmain { min-width: 0; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); align-content: start; }
+.mmain { min-width: 0; display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-content: start; padding-top: 12px; }
 
-.banners { position: relative; }
-.banner { position: relative; display: block; height: 118px; border-radius: 14px; overflow: hidden; color: #fff; background: linear-gradient(100deg, #d9480f, #ee7b3c); }
+/* on a phone the banner continues the red top, from edge to edge */
+.banners { position: relative; margin: -12px -12px 0; }
+.banner { position: relative; display: block; height: 232px; overflow: hidden; color: #fff; background: linear-gradient(180deg, var(--red), #b23a26); }
 .banner.link { cursor: pointer; }
-.banner img { position: absolute; right: 0; top: 0; height: 100%; width: 46%; object-fit: cover; border-radius: 60px 0 0 60px / 50% 0 0 50%; }
-.banner div { position: relative; padding: 16px 16px 0; max-width: 60%; display: grid; gap: 4px; }
-.banner b { font-size: 17.5px; line-height: 1.25; }
-.banner span { font-size: 12.5px; opacity: .95; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.dots { position: absolute; left: 18px; bottom: 10px; display: flex; gap: 5px; }
-.dots i { width: 6px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .6); cursor: pointer; }
-.dots i.on { width: 14px; background: #fff; }
+.banner img { position: absolute; right: 0; top: 0; height: 100%; width: 68%; object-fit: cover; -webkit-mask-image: linear-gradient(90deg, transparent, #000 42%); mask-image: linear-gradient(90deg, transparent, #000 42%); }
+.banner div { position: relative; padding: 26px 18px 0; max-width: 66%; display: grid; gap: 10px; justify-items: start; text-shadow: 0 1px 6px rgba(80, 20, 10, .35); }
+.banner b { font-size: 34px; line-height: 1.15; font-weight: 900; color: #fff6e3; letter-spacing: 2px; font-family: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", STSong, serif; }
+.banner .ribbon { background: var(--gold); color: var(--red-deep); font-weight: 900; font-size: 21px; font-style: italic; padding: 3px 12px; transform: rotate(-3deg); transform-origin: left center; text-shadow: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  clip-path: polygon(0 8%, 3% 0, 97% 4%, 100% 14%, 98% 50%, 100% 88%, 96% 100%, 3% 96%, 0 86%, 2% 50%); }
+.banner em { font-style: normal; font-size: 17px; opacity: .96; letter-spacing: 1px; }
+.dots { position: absolute; left: 18px; bottom: 12px; display: flex; gap: 6px; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, .5); cursor: pointer; }
+.dots i.on { background: #fff; }
 
-.cats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 4px; background: #fff; border-radius: 14px; padding: 14px 6px; }
-.cats button { border: 0; background: none; display: grid; justify-items: center; gap: 4px; font-size: 13.5px; cursor: pointer; padding: 0; }
-.cats span { width: 46px; height: 46px; border-radius: 50%; background: var(--brand-soft); display: grid; place-items: center; font-size: 24px; border: 2px solid transparent; }
-.cats .on { color: var(--brand); font-weight: 700; }
-.cats .on span { border-color: var(--brand); }
+.cats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 8px; padding: 2px 0; }
+.cats button { border: 0; background: none; border-radius: 14px; display: grid; justify-items: center; gap: 2px; font-size: 15.500px; font-weight: 700; color: var(--ink); cursor: pointer; padding: 8px 0 8px; min-width: 0; }
+.cats span { font-size: 42px; line-height: 1.2; filter: drop-shadow(0 3px 3px rgba(90, 50, 20, .18)); }
+.cats .on { background: var(--gold-soft); color: var(--red); }
 
 h2 { font-size: 17px; }
-h2 small { font-weight: 400; font-size: 13px; color: #6b7280; margin-left: 6px; }
-.freq > div { display: flex; gap: 14px; overflow-x: auto; padding: 10px 2px 2px; scrollbar-width: none; }
-.freq a { flex: none; width: 72px; display: grid; justify-items: center; gap: 5px; color: var(--ink); font-size: 13px; text-align: center; }
-.freq img, .freq .letter { width: 66px; height: 66px; border-radius: 12px; object-fit: cover; }
-.freq .letter { background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; font-size: 24px; font-weight: 700; }
-.freq a span:last-child { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.freq { display: flex; align-items: center; gap: 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 10px 2px; min-width: 0; }
+.freq h2 { flex: none; padding-right: 14px; border-right: 1px solid #cbb9a2; }
+.freq > div { flex: 1; min-width: 0; display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; }
+.freq > div::-webkit-scrollbar { display: none; }
+.freq a { flex: none; display: flex; align-items: center; gap: 10px; color: var(--ink); font-size: 16px; max-width: 220px; }
+.freq img, .freq .letter { width: 36px; height: 36px; border-radius: 9px; object-fit: cover; flex: none; }
+.freq .letter { background: #c2401c; color: #fff3da; display: grid; place-items: center; font-size: 17px; font-weight: 700; }
+.freq a span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.freq .go { flex: none; display: grid; max-width: none; }
 
-.regnote { background: var(--info-soft); color: #1e3a8a; border-radius: 10px; padding: 9px 12px; font-size: 13.5px; }
+.regnote { background: var(--gold-soft); color: var(--ink); border-radius: 10px; padding: 9px 12px; font-size: 13.500px; }
 .listhead { display: grid; gap: 10px; min-width: 0; }
-.found { font-size: 14px; font-weight: 400; color: #4b5563; }
-.sorts { display: flex; align-items: center; gap: 8px; min-height: 34px; overflow-x: auto; scrollbar-width: none; }
-.sorts button { flex: none; border: 0; background: #fff; border-radius: 17px; height: 32px; padding: 0 13px; color: #4b5563; cursor: pointer; white-space: nowrap; }
-.sorts button.on { background: var(--brand-soft); color: var(--brand); font-weight: 700; }
-.sorts .bar { flex: none; width: 1px; height: 16px; background: #d5d8dd; }
-.filt { flex: none; }
-.filtmenu { position: absolute; z-index: 15; right: 12px; margin-top: 6px; background: #fff; border-radius: 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, .16); padding: 12px 16px 4px; min-width: 170px; }
+.near { font-size: 22px; font-weight: 800; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+.near small { font-weight: 500; font-size: 13.500px; color: var(--ink); background: var(--gold-soft); border-radius: 999px; padding: 3px 12px; }
+.found { font-size: 14px; font-weight: 400; color: var(--muted); }
+.sorts { display: flex; align-items: center; min-height: 34px; overflow-x: auto; scrollbar-width: none; }
+.sorts::-webkit-scrollbar { display: none; }
+.sorts button { flex: none; border: 0; background: none; height: 22px; padding: 0 14px; color: var(--ink); cursor: pointer; white-space: nowrap; border-left: 1px solid #cbb9a2; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; }
+.sorts > button:first-child { border-left: 0; }
+.sorts > button.on { background: var(--red); color: #fff; font-weight: 700; height: 32px; border-radius: 9px; border-left: 0; padding: 0 16px; margin-right: 8px; }
+.sorts > button.on + button { border-left: 0; }
+.sorts > button:not(.on) + button.on { margin-left: 8px; }
+.filt { flex: none; margin-left: auto; }
+.filt button.on { color: var(--red); font-weight: 700; }
+.filtmenu { position: absolute; z-index: 15; right: 12px; margin-top: 6px; background: #fff; border-radius: 12px; box-shadow: 0 8px 28px rgba(60, 30, 10, .18); padding: 12px 16px 4px; min-width: 170px; }
 
 .grid { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .grid.dim { opacity: .6; }
-.skel { height: 108px; border-radius: 14px; background: #fff; }
-.pick { display: grid; gap: 10px; margin-top: 6px; }
+.grid.rows { gap: 0; }
+.skel { height: 120px; border-radius: 14px; background: var(--paper); border: 1px solid var(--line); }
+.pick { display: grid; gap: 8px; margin-top: 4px; }
+.pick h2 { display: flex; align-items: center; gap: 10px; background: var(--gold-soft); border-radius: 10px; padding: 8px 14px; font-size: 19px; font-weight: 800; margin: 0 -4px; }
+.pick h2 svg { color: #8a5a1c; flex: none; }
+.pick h2 small { margin-left: auto; font-weight: 500; font-size: 13.500px; color: var(--ink); white-space: nowrap; }
 .state { text-align: center; padding: 30px 12px; display: grid; gap: 8px; justify-items: center; }
 .state .em { font-size: 54px; line-height: 1; }
-.state p { color: #6b7280; }
+.state p { color: var(--muted); }
 .state .acts { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
 .state.small { padding: 16px; display: block; }
-.mfoot { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; align-items: center; color: #6b7280; font-size: 13.5px; padding: 14px 0 6px; }
-.mfoot .lang { border: 1px solid #d5d8dd; background: none; border-radius: 12px; padding: 1px 10px; color: #4b5563; cursor: pointer; font-size: 12.5px; }
+.mfoot { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; align-items: center; color: var(--muted); font-size: 13.500px; padding: 14px 0 6px; }
+.mfoot .lang { border: 1px solid #cbb9a2; background: none; border-radius: 12px; padding: 1px 10px; color: var(--ink); cursor: pointer; font-size: 12.500px; }
 
+@media (max-width: 430px) {
+  .sorts button { padding: 0 9px; font-size: 14.5px; }
+  .sorts > button.on { padding: 0 13px; margin-right: 6px; }
+}
 @media (min-width: 768px) {
   .mall { padding-bottom: 32px; }
   .mtabs { display: none; }
-  .mtop, .mall.searching .mtop { background: #fff; border-bottom: 1px solid var(--line); }
   .mtop-in { max-width: 1320px; margin: 0 auto; grid-template-columns: auto minmax(0, max-content) minmax(180px, 1fr) auto; grid-template-areas: 'brand loc search links'; gap: 18px; padding: 12px 24px; }
   .brand { display: block; grid-area: brand; }
-  .loc { background: #f3f4f6; border-radius: 21px; padding: 9px 14px; max-width: 300px; }
-  .loc b { font-size: 15px; }
+  .loc { background: rgba(255, 255, 255, .14); border-radius: 12px; padding: 5px 12px; max-width: 300px; }
+  .loc svg:first-child { width: 24px; height: 24px; }
+  .loc b { font-size: 15px; } .loc small { font-size: 11px; }
   .mlinks .txt { display: block; }
   .mlinks .txt.wide { display: none; }
   .mlinks .avatar { display: grid; }
   .mbody { max-width: 1320px; margin: 0 auto; padding: 20px 24px 0; display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 22px; align-items: start; }
-  .mside { display: grid; gap: 2px; background: #fff; border-radius: 14px; padding: 10px; position: sticky; top: 86px; }
-  .mside button { border: 0; background: none; border-radius: 9px; padding: 10px 12px; text-align: left; cursor: pointer; display: flex; gap: 8px; align-items: center; }
-  .mside button:hover { background: #f6f6f4; }
-  .mside button.on { background: var(--brand-soft); color: var(--brand); font-weight: 700; }
+  .mside { display: grid; gap: 2px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 10px; position: sticky; top: 90px; }
+  .mside button { border: 0; background: none; border-radius: 10px; padding: 9px 12px; text-align: left; cursor: pointer; display: flex; gap: 10px; align-items: center; font-weight: 600; }
+  .mside button span { font-size: 22px; line-height: 1; }
+  .mside button:hover { background: var(--bg); }
+  .mside button.on { background: var(--gold-soft); color: var(--red); font-weight: 800; }
   .mside hr { border: 0; border-top: 1px solid var(--line); margin: 8px 6px; width: auto; }
   .mside .check { padding: 7px 12px; margin: 0; }
-  .mmain { gap: 16px; }
+  .mmain { gap: 18px; padding-top: 0; }
   .cats { display: none; }
-  .banner { height: 170px; }
-  .banner img { width: 40%; }
-  .banner div { padding: 26px 28px 0; max-width: 56%; }
-  .banner b { font-size: 24px; } .banner span { font-size: 14.5px; }
-  .dots { left: 28px; bottom: 16px; }
+  .banners { margin: 0; }
+  .banner { height: 250px; border-radius: 16px; }
+  .banner img { width: 58%; }
+  .banner div { padding: 40px 36px 0; max-width: 56%; gap: 14px; }
+  .banner b { font-size: 44px; } .banner .ribbon { font-size: 26px; padding: 4px 16px; } .banner em { font-size: 19px; }
+  .dots { left: 36px; bottom: 18px; }
   .listhead { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
   .sorts { overflow: visible; }
-  .filt { position: relative; }
+  .filt { position: relative; margin-left: 0; }
   .filtmenu { right: 0; }
-  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .grid, .grid.rows { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .grid.rows { gap: 0 28px; }
   .skel { height: 260px; }
+  .pick h2 { margin: 0; }
 }
 @media (min-width: 1200px) {
   .mlinks .txt.wide { display: block; }
-  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid, .grid.rows { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 </style>
