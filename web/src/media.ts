@@ -12,9 +12,9 @@ export function cropStyle(c: Crop) {
 }
 
 // largestCrop is the biggest part of a w × h picture that has the frame's shape, centred.
-export function largestCrop(w: number, h: number): Crop {
+export function largestCrop(w: number, h: number, ratio = MEDIA_RATIO): Crop {
   const a = w / h
-  const cw = a > MEDIA_RATIO ? MEDIA_RATIO / a : 1, ch = a > MEDIA_RATIO ? 1 : a / MEDIA_RATIO
+  const cw = a > ratio ? ratio / a : 1, ch = a > ratio ? 1 : a / ratio
   return { x: (1 - cw) / 2, y: (1 - ch) / 2, w: cw, h: ch }
 }
 
@@ -44,4 +44,8 @@ extend({
   'pm.cant_play': ['这个浏览器播放不了这个视频，请先转成 MP4（H.264）再上传。', 'This browser cannot play the video. Convert it to MP4 (H.264) first.'],
   'pm.full': ['最多 {n} 个，请先删除一个。', 'At most {n}. Delete one first.'],
   'pm.uploading': ['正在上传…', 'Uploading…'],
+  'im.upload': ['上传图片', 'Upload a picture'], 'im.change': ['换一张', 'Replace'], 'im.remove': ['移除', 'Remove'],
+  'im.crop_title': ['裁剪图片', 'Crop the picture'], 'im.or_link': ['或者填图片链接', 'or paste a picture link'],
+  'im.dish': ['菜品图片', 'Dish picture'], 'im.dish_hint': ['正方形，上传时裁剪', 'Square; cropped when uploaded'],
+  'im.logo': ['店铺头像', 'Store logo'], 'im.cover': ['封面图', 'Cover picture'], 'im.cover_hint': ['横幅 3:1', 'A 3:1 banner'],
 })
