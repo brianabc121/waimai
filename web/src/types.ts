@@ -13,7 +13,6 @@ export interface Station { id: number; name: string; name_en: string; active: bo
 export type LatLngPair = [number, number]
 export interface Zone { id: number; name: string; name_en: string; fee: number; min_order: number; active: boolean; sort: number
   polygon: LatLngPair[]; color: string; eta_minutes: number | null }
-export interface Located { zone: Zone | null; distance_m: number; nearest: { name: string; name_en: string; distance_m: number } | null }
 export interface Option { id: number; name: string; name_en: string; price_delta: number; sold_out: boolean }
 export interface OptionGroup { id: number; name: string; name_en: string; min_select: number; max_select: number; options: Option[] }
 export interface Item {

@@ -928,20 +928,22 @@ func TestMapZonesOverHTTP(t *testing.T) {
 	admin.want(403, "READ_ONLY", "PUT", b+"/location", loc)
 	admin.want(403, "READ_ONLY", "DELETE", b+"/zones/"+zid, nil)
 
-	// The storefront carries what the customer's map needs.
+	// Customers are not shown how the store divides its area: no zones, no
+	// outlines, no names, no distances. They learn whether a spot can be
+	// delivered to and what it costs.
 	sf := anon.want(200, "", "GET", "/stores/"+f.slug, nil)
 	br := sf["branch"].(map[string]any)
-	if br["zone_mode"] != "map" || br["lat"] != 14.55 || len(sf["zones"].([]any)[0].(map[string]any)["polygon"].([]any)) != 4 {
+	if br["zone_mode"] != "map" || br["lat"] != 14.55 || len(sf["zones"].([]any)) != 0 {
 		t.Fatalf("storefront: %v %v", br, sf["zones"])
 	}
 
 	at := func(lat, lng float64) map[string]any { return map[string]any{"lat": lat, "lng": lng} }
 	in := anon.want(200, "", "POST", "/stores/"+f.slug+"/locate", at(14.555, 121.025))
-	if z, _ := in["zone"].(map[string]any); z == nil || z["name"] != "Near" || z["eta_minutes"] != float64(25) || in["distance_m"] != float64(0) {
+	if in["deliverable"] != true || in["fee"] != float64(4900) || in["eta_minutes"] != float64(25) || len(in) != 4 {
 		t.Fatalf("locate inside: %v", in)
 	}
 	out := anon.want(200, "", "POST", "/stores/"+f.slug+"/locate", at(14.60, 121.025))
-	if out["zone"] != nil || out["nearest"].(map[string]any)["name"] != "Near" {
+	if out["deliverable"] != false || len(out) != 4 {
 		t.Fatalf("locate outside: %v", out)
 	}
 	anon.want(422, "VALIDATION", "POST", "/stores/"+f.slug+"/locate", map[string]any{"lat": 14.5})
@@ -952,19 +954,130 @@ func TestMapZonesOverHTTP(t *testing.T) {
 	items := []map[string]any{{"item_id": f.itemID, "qty": 1}}
 	anon.want(422, "OUT_OF_ZONE", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
 		"zone_id": f.zoneID, "items": items})
-	anon.want(422, "OUT_OF_ZONE", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+	_, refused := anon.do("POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
 		"zone_id": f.zoneID, "lat": 14.60, "lng": 121.025, "items": items})
+	if e := refused["error"].(map[string]any); e["code"] != "OUT_OF_ZONE" || e["details"] != nil {
+		t.Fatalf("out of range must not name the nearest area: %v", e)
+	}
 	q := anon.want(200, "", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
 		"zone_id": f.zoneID, "lat": 14.555, "lng": 121.025, "items": items})
-	if q["zone_name"] != "Near" || q["totals"].(map[string]any)["delivery_fee"] != float64(4900) {
+	if q["zone_name"] != "" || q["zone_id"] != nil || q["totals"].(map[string]any)["delivery_fee"] != float64(4900) {
 		t.Fatalf("quote: %v", q)
 	}
 	cust := verifiedCustomer(t)
 	placed := cust.want(200, "", "POST", "/stores/"+f.slug+"/orders", map[string]any{"quote_id": q["id"],
 		"customer_name": "Ann", "address_line": "1 Main"}, "Idempotency-Key", uniq("key"))
 	o := owner.want(200, "", "GET", "/merchant/orders/"+fmt.Sprint(int64(placed["order_id"].(float64))), nil)
-	if o["dest_lat"] != 14.555 || o["dest_lng"] != 121.025 || o["zone_distance_m"] != nil {
+	if o["dest_lat"] != 14.555 || o["dest_lng"] != 121.025 || o["zone_distance_m"] != nil || o["zone_name"] != "Near" {
 		t.Fatalf("order location: %v", o)
+	}
+	if mine := anon.want(200, "", "GET", "/customer/orders/"+placed["access_token"].(string), nil); mine["zone_name"] != "" {
+		t.Fatalf("the customer's order names the area: %v", mine["zone_name"])
+	}
+
+	// ---- the address book ----
+	addr := func(lat, lng float64) map[string]any {
+		return map[string]any{"contact_name": "陈", "title": "mr", "phone": "0917 555 0123", "place_name": "Trump Tower",
+			"place_address": "Kalayaan Ave, Makati", "lat": lat, "lng": lng, "unit": "40F 4001", "note": "call me",
+			"wechat": "chen88", "label": "home"}
+	}
+	anon.want(403, "PHONE_NOT_VERIFIED", "GET", "/customer/addresses", nil)
+	anon.want(403, "PHONE_NOT_VERIFIED", "POST", "/customer/addresses", addr(14.555, 121.025))
+	bad := addr(14.555, 121.025)
+	bad["phone"] = "12345"
+	cust.want(422, "PHONE_INVALID", "POST", "/customer/addresses", bad)
+	bad = addr(14.555, 121.025)
+	bad["unit"] = ""
+	cust.want(422, "VALIDATION", "POST", "/customer/addresses", bad)
+	near := cust.want(200, "", "POST", "/customer/addresses", addr(14.555, 121.025))
+	if near["is_default"] != true || near["phone"] != "+639175550123" {
+		t.Fatalf("the first address is the default: %v", near)
+	}
+	far := cust.want(200, "", "POST", "/customer/addresses", addr(14.60, 121.025))
+	nearID, farID := fmt.Sprint(int64(near["id"].(float64))), fmt.Sprint(int64(far["id"].(float64)))
+	list := cust.want(200, "", "GET", "/customer/addresses?store="+f.slug, nil)["addresses"].([]any)
+	if len(list) != 2 {
+		t.Fatalf("addresses: %v", list)
+	}
+	for _, x := range list {
+		ad := x.(map[string]any)
+		d := ad["delivery"].(map[string]any)
+		isNear := fmt.Sprint(int64(ad["id"].(float64))) == nearID
+		if d["deliverable"] != isNear || (isNear && d["fee"] != float64(4900)) || len(d) != 4 {
+			t.Fatalf("delivery to %v: %v", ad["id"], d)
+		}
+	}
+	if plain := cust.want(200, "", "GET", "/customer/addresses", nil)["addresses"].([]any); plain[0].(map[string]any)["delivery"] != nil {
+		t.Fatal("without a store there is nothing to say about delivery")
+	}
+
+	// Someone else's address is not theirs to use, see, change or delete.
+	guest := verifiedCustomer(t)
+	if l := guest.want(200, "", "GET", "/customer/addresses", nil)["addresses"].([]any); len(l) != 0 {
+		t.Fatalf("another customer sees %d addresses", len(l))
+	}
+	guest.want(404, "ADDRESS_NOT_FOUND", "PUT", "/customer/addresses/"+nearID, addr(14.555, 121.025))
+	guest.want(404, "ADDRESS_NOT_FOUND", "DELETE", "/customer/addresses/"+nearID, nil)
+	guest.want(404, "ADDRESS_NOT_FOUND", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+		"address_id": near["id"], "items": items})
+	anon.want(403, "PHONE_NOT_VERIFIED", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+		"address_id": near["id"], "items": items})
+
+	// An order to a saved address: the pin decides, and the order keeps a copy.
+	cust.want(422, "OUT_OF_ZONE", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+		"address_id": far["id"], "items": items})
+	q = cust.want(200, "", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+		"address_id": near["id"], "lat": 14.60, "lng": 121.025, "items": items}) // a pin sent alongside is ignored
+	if q["zone_name"] != "" || q["totals"].(map[string]any)["delivery_fee"] != float64(4900) {
+		t.Fatalf("quote for an address: %v", q)
+	}
+	placed = cust.want(200, "", "POST", "/stores/"+f.slug+"/orders", map[string]any{"quote_id": q["id"]},
+		"Idempotency-Key", uniq("key"))
+	o = owner.want(200, "", "GET", "/merchant/orders/"+fmt.Sprint(int64(placed["order_id"].(float64))), nil)
+	if o["customer_name"] != "陈" || o["address_line"] != "Trump Tower, Kalayaan Ave, Makati" || o["address_unit"] != "40F 4001" ||
+		o["address_note"] != "call me" || o["dest_lat"] != 14.555 || o["zone_name"] != "Near" {
+		t.Fatalf("order to an address: %v", o)
+	}
+	// Moving the pin out of range after the quote stops the order.
+	q = cust.want(200, "", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+		"address_id": near["id"], "items": items})
+	moved := cust.want(200, "", "PUT", "/customer/addresses/"+nearID, addr(14.60, 121.025))
+	if moved["is_default"] != false {
+		t.Fatalf("an edit that does not ask for the default drops it: %v", moved)
+	}
+	cust.want(422, "OUT_OF_ZONE", "POST", "/stores/"+f.slug+"/orders", map[string]any{"quote_id": q["id"]},
+		"Idempotency-Key", uniq("key"))
+	// A deleted address cannot be ordered to; the earlier order still has its copy.
+	cust.want(200, "", "PUT", "/customer/addresses/"+nearID, addr(14.555, 121.025))
+	q = cust.want(200, "", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+		"address_id": near["id"], "items": items})
+	cust.want(200, "", "DELETE", "/customer/addresses/"+nearID, nil)
+	cust.want(404, "ADDRESS_NOT_FOUND", "DELETE", "/customer/addresses/"+nearID, nil)
+	cust.want(404, "ADDRESS_NOT_FOUND", "POST", "/stores/"+f.slug+"/orders", map[string]any{"quote_id": q["id"]},
+		"Idempotency-Key", uniq("key"))
+	if o = owner.want(200, "", "GET", "/merchant/orders/"+fmt.Sprint(int64(placed["order_id"].(float64))), nil); o["address_unit"] != "40F 4001" {
+		t.Fatalf("the order lost its address: %v", o)
+	}
+	// the book holds a limited number
+	cust.want(200, "", "DELETE", "/customer/addresses/"+farID, nil)
+	me := int64(cust.want(200, "", "GET", "/customer/session", nil)["customer_id"].(float64))
+	lat, lng := 14.555, 121.025
+	for i := 0; i < app.MaxAddresses; i++ { // straight to the app: the HTTP rate limit is not what is tested here
+		if _, err := a.SaveAddress(context.Background(), me, 0, app.AddressInput{ContactName: "陈", Phone: "9175550123",
+			PlaceName: "Trump Tower", Unit: "4001", Lat: &lat, Lng: &lng, IsDefault: i%2 == 0}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cust.want(409, "ADDRESS_LIMIT", "POST", "/customer/addresses", addr(14.555, 121.025))
+	list = cust.want(200, "", "GET", "/customer/addresses", nil)["addresses"].([]any)
+	defaults := 0
+	for _, x := range list {
+		if x.(map[string]any)["is_default"] == true {
+			defaults++
+		}
+	}
+	if len(list) != app.MaxAddresses || defaults != 1 {
+		t.Fatalf("%d addresses, %d defaults", len(list), defaults)
 	}
 
 	// Removing the only drawn zone is allowed; customers are then out of range everywhere.

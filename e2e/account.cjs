@@ -1,8 +1,10 @@
 // Customer accounts in a real browser: ordering needs a login, the login is a
-// texted code and nothing else, and logging out really ends it.
+// texted code and nothing else, a delivery goes to an address from the
+// customer's address book, and logging out really ends it.
 // Usage: BASE_URL=http://localhost:8080 node e2e/account.cjs   (needs seed data and OTP_DEV_ECHO=true)
 const { chromium } = require('playwright')
 const { mkdirSync } = require('node:fs')
+const { addAddress } = require('./lib.cjs')
 
 ;(async () => {
 
@@ -68,17 +70,73 @@ await page.fill(tid('login-code'), wrong)
 await page.locator(`${tid('login-error')}:has-text("验证码")`).waitFor()
 await page.fill(tid('login-code'), page.__code)         // six digits log in by themselves
 await page.waitForURL(u => u.pathname.endsWith('/checkout'))
-await page.waitForSelector('.totals')
 await page.locator(`${tid('account-phone')}:has-text("${pretty}")`).waitFor()
+step('a wrong code is refused; the right one logs in and comes back to checkout')
+
+// ---- the address book ----
+// With no address yet, checkout opens the form for a new one. The phone is the login number.
+page.on('dialog', d => d.accept())
+await page.waitForSelector(tid('address-form'))
+if ((await page.inputValue(tid('af-phone'))) !== local) throw new Error('a new address should start with the login number')
+await page.click(tid('af-save'))
+await page.locator(`${tid('af-error')}:has-text("收货人")`).waitFor()
+await shot('ac3-address-form')
+await addAddress(page, { name: '王小明', unit: '12F' })
+await page.waitForSelector('.totals')
+await page.locator(`${tid('checkout-address')}:has-text("12F")`).waitFor()
+await page.locator(`${tid('checkout-address')}:has-text("王小明")`).waitFor()
 await page.locator('text=瓶装水').first().waitFor()
-step('a wrong code is refused; the right one logs in and comes back to checkout with the cart')
+step('the first address is added at checkout and the order is priced for it')
+
+// A second address is chosen as soon as it is saved; the book lists both.
+await page.click(tid('checkout-address'))
+await page.waitForSelector(tid('address-sheet'))
+if (await page.locator(tid('address-row')).count() !== 1) throw new Error('the book should list one address')
+await page.click(tid('address-new'))
+await addAddress(page, { name: '李小红', unit: '8B' })
+await page.locator(`${tid('checkout-address')}:has-text("8B")`).waitFor()
+await page.click(tid('checkout-address'))
+await page.waitForFunction(() => document.querySelectorAll('[data-testid=address-row]').length === 2)
+await shot('ac4-address-list')
+// choosing the other one puts it on the order
+await page.click(`${tid('address-row')}:has-text("12F")`)
+await page.waitForSelector(tid('address-sheet'), { state: 'detached' })
+await page.locator(`${tid('checkout-address')}:has-text("12F")`).waitFor()
+// changing one, then deleting it
+await page.click(tid('checkout-address'))
+await page.click(`${tid('address-row')}:has-text("8B") ${tid('address-edit')}`)
+await page.fill(tid('af-unit'), '9C')
+await page.click(tid('af-save'))
+// the address just changed is the one the order goes to
+await page.locator(`${tid('checkout-address')}:has-text("9C")`).waitFor()
+await page.click(tid('checkout-address'))
+await page.click(`${tid('address-row')}:has-text("9C") ${tid('address-edit')}`)
+await page.click(tid('af-delete'))
+await page.waitForFunction(() => document.querySelectorAll('[data-testid=address-row]').length === 1)
+await page.click(tid('address-close'))
+// with the chosen one deleted, the order falls back to the one that is left
+await page.locator(`${tid('checkout-address')}:has-text("12F")`).waitFor()
+await page.waitForSelector('.totals')
+step('addresses can be added, chosen, changed and deleted from checkout')
+
+// The order goes to the chosen address.
+await page.locator('.bottombar .btn.primary').click()
+await page.waitForURL('**/o/**')
+await page.locator('text=12F').first().waitFor()
+step('the order is sent to the chosen address')
 
 // The account button shows who is logged in; logging out ends it.
 await page.goto(BASE + '/s/makati')
 await page.waitForSelector('.item')
 await page.click(tid('account'))
 await page.locator(`${tid('account-menu')}:has-text("${pretty}")`).waitFor()
-await shot('ac3-account-menu')
+await shot('ac5-account-menu')
+// the address book is also reached from here
+await page.click(tid('my-addresses'))
+await page.locator(`${tid('address-row')}:has-text("12F")`).waitFor()
+await page.click(tid('address-close'))
+await page.click(tid('account'))
+await page.waitForSelector(tid('account-menu'))
 await page.click(tid('logout'))
 await page.waitForSelector(tid('account-menu'), { state: 'detached' })
 await page.goto(BASE + '/s/makati/checkout')

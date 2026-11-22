@@ -92,7 +92,7 @@ for (const size of Object.keys(SIZES)) {
   await c.waitForSelector('.totals')
   await fits(c, `checkout ${size}`)
   // on a computer the summary and the button stand beside the form
-  const form = await c.locator('input[autocomplete=name]').boundingBox()
+  const form = await c.locator('[data-testid=checkout-address]').boundingBox()
   const btn = await c.locator('.bottombar .btn.primary').boundingBox()
   if ((btn.x > form.x + form.width) !== (size === 'pc')) throw new Error(`checkout ${size}: the order button is in the wrong place`)
   await shot(c, `v02-checkout-${size}`)

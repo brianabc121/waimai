@@ -120,7 +120,7 @@ async function cancel() {
 
         <div class="card stack side">
           <h2>{{ t('order_summary') }}</h2>
-          <div v-if="order.service_type === 'delivery'" class="muted small">{{ order.zone_name }} · {{ order.address_line }} {{ order.address_unit }}</div>
+          <div v-if="order.service_type === 'delivery'" class="muted small">{{ order.address_line }} {{ order.address_unit }}</div>
           <template v-for="(it, i) in sorted" :key="it.id">
           <div v-if="multi && (i === 0 || sorted[i - 1].basket !== it.basket)" class="muted small bold" data-testid="basket-head">{{ t('basket_n', { n: it.basket }) }}</div>
           <div class="row top between">

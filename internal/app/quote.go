@@ -26,9 +26,12 @@ type QuoteInput struct {
 	ZoneID      *int64 `json:"zone_id"`
 	// Lat/Lng is where the customer dropped the pin. Stores in map mode
 	// decide the zone from it and ignore ZoneID.
-	Lat   *float64         `json:"lat"`
-	Lng   *float64         `json:"lng"`
-	Items []QuoteLineInput `json:"items"`
+	Lat *float64 `json:"lat"`
+	Lng *float64 `json:"lng"`
+	// AddressID is one of the customer's saved addresses. Its pin is used
+	// instead of Lat/Lng, and the order is sent to it.
+	AddressID *int64           `json:"address_id"`
+	Items     []QuoteLineInput `json:"items"`
 	// ScheduledFor is nil for "as soon as possible".
 	ScheduledFor *time.Time `json:"scheduled_for"`
 }
@@ -71,6 +74,8 @@ type Quote struct {
 	Totals        Totals      `json:"totals"`
 	ExpiresAt     time.Time   `json:"expires_at"`
 	Input         QuoteInput  `json:"input"`
+	// address is the saved address named by Input.AddressID, as it is now.
+	address *Address
 }
 
 // computeQuote validates the cart against the live menu and prices it. It is
@@ -110,13 +115,23 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		ScheduledFor: in.ScheduledFor}
 	var deliveryFee, minOrder int64
 	if in.ServiceType == "delivery" {
+		lat, lng := in.Lat, in.Lng
+		if in.AddressID != nil {
+			// The address is read again each time: it may have been moved or
+			// deleted since the quote.
+			ad, err := addressOf(ctx, q, phone, *in.AddressID)
+			if err != nil {
+				return nil, err
+			}
+			quote.address, lat, lng = ad, ad.Lat, ad.Lng
+		}
 		var z Zone
 		if b.ZoneMode == "map" {
 			// The zone comes from the pin, never from the browser's zone_id.
-			if in.Lat == nil || in.Lng == nil {
+			if lat == nil || lng == nil {
 				return nil, Err(http.StatusUnprocessableEntity, "OUT_OF_ZONE", "locate the delivery address on the map")
 			}
-			loc, err := locate(ctx, q, b, LatLng{*in.Lat, *in.Lng})
+			loc, err := locate(ctx, q, b, LatLng{*lat, *lng})
 			if err != nil {
 				return nil, err
 			}
