@@ -55,6 +55,9 @@ type App struct {
 	// MapsOff is set when the platform has no map key. Customers cannot pin
 	// an address then, so every store behaves as "pick a zone from a list".
 	MapsOff bool
+	// Router plans a rider's round trip on real roads. Without one the
+	// planned route of a trip is a straight-line estimate.
+	Router Router
 }
 
 // forCustomer applies platform-wide limits to a store as customers use it.

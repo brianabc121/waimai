@@ -4,7 +4,8 @@
 // The background worker looks at trips once a minute, so this takes about
 // two minutes.
 // Usage: BASE_URL=http://localhost:8080 node e2e/riderreport.cjs
-//        (needs seed data and the API started with GOOGLE_MAPS_API_KEY=stub)
+//        (needs seed data and the API started with GOOGLE_MAPS_API_KEY=stub; with
+//        GOOGLE_ROUTES_API_KEY=stub as well, the planned route is a road route)
 const { chromium } = require('playwright')
 const { mkdirSync } = require('node:fs')
 
@@ -172,8 +173,11 @@ try {
   }
   expect(trip.end_reason, 'returned', 'the trip ended back at the store')
   expect(trip.actual_m > 1250 && trip.actual_m < 1550, true, `about 1.4 km ridden (got ${trip.actual_m})`)
-  expect(trip.planned_source, 'straight', 'the planned route is the straight-line estimate')
-  expect(Math.abs(trip.over_m) < 200, true, `ridden as planned (over ${trip.over_m})`)
+  // With GOOGLE_ROUTES_API_KEY=stub the planned route runs along streets; without, it is straight lines.
+  const road = (await must(owner, 'GET', `/merchant/branches/${bid}/reports/riders?from=${today}&to=${today}`)).road_routes
+  expect(trip.planned_source, road ? 'google' : 'straight', 'where the planned route comes from')
+  if (road) expect(trip.planned_mode === 'TWO_WHEELER' && trip.planned_seconds > 0 && trip.compare_m > trip.actual_m - 200, true, `a road route (${trip.compare_m} m planned)`)
+  else expect(Math.abs(trip.over_m) < 200, true, `ridden as planned (over ${trip.over_m})`)
   await owner.reload()
   await row.click()
   const line = trips.locator(`tr[data-trip="${trip.id}"]`)
@@ -196,8 +200,12 @@ try {
   expect(await owner.locator(tid('actual-km')).innerText(), `${(trip.actual_m / 1000).toFixed(1)} 公里`, 'distance ridden')
   expect(await owner.locator(`${tid('trip-events')} li`).count() >= 5, true, 'collected, left, two drops, back')
   await owner.locator(`${tid('trip-events')} li:has-text("回到店里")`).waitFor()
+  if (road) {
+    await owner.locator(`${tid('planned-by')}:has-text("摩托车")`).waitFor()
+    await owner.locator(`${tid('road-note')}:has-text("预计用时")`).waitFor()
+  }
   await owner.waitForTimeout(600)
-  await shot(owner, 'r03-trip-route')
+  await shot(owner, road ? 'r04-trip-route-google' : 'r03-trip-route')
   // the slider moves the marker; unticking a route hides its line
   const where = () => owner.locator(tid('trip-marker')).getAttribute('transform')
   const end = await where()

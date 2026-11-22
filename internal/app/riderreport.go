@@ -56,6 +56,10 @@ type Trip struct {
 	// PlannedM is the planned round trip; nil when there is no planned route.
 	PlannedM      *int   `json:"planned_m"`
 	PlannedSource string `json:"planned_source"`
+	// PlannedMode is TWO_WHEELER or DRIVE for a route on real roads;
+	// PlannedSeconds how long that route would take, nil when unknown.
+	PlannedMode    string `json:"planned_mode"`
+	PlannedSeconds *int   `json:"planned_seconds"`
 	// CompareM is what ActualM is compared with: the planned route, without
 	// the way back when the rider was not seen coming back.
 	CompareM *int `json:"compare_m"`
@@ -64,18 +68,21 @@ type Trip struct {
 	Detour bool        `json:"detour"`
 	Items  []TripOrder `json:"orders"`
 
-	plannedPath []byte
+	plannedPath   []byte
+	plannedReturn *int
 }
 
 const tripCols = `t.id, t.rider_id, t.status, t.end_reason, t.started_at, t.left_store_at, t.last_drop_at, t.returned_at, t.ended_at,
 	t.order_count, t.delivered_count, t.failed_count, t.actual_distance_m, t.track_points, t.track_gap_s,
-	t.planned_distance_m, t.planned_source, t.planned_path`
+	t.planned_distance_m, t.planned_source, t.planned_path,
+	t.planned_mode, t.planned_duration_s, t.planned_return_m`
 
 func scanTrip(r pgx.CollectableRow, b *Branch) (Trip, error) {
 	loc := b.location()
 	t := Trip{Items: []TripOrder{}}
 	err := r.Scan(&t.ID, &t.RiderID, &t.Status, &t.EndReason, &t.StartedAt, &t.LeftStoreAt, &t.LastDropAt, &t.ReturnedAt, &t.EndedAt,
-		&t.Orders, &t.Delivered, &t.Failed, &t.ActualM, &t.TrackPoints, &t.GapSeconds, &t.PlannedM, &t.PlannedSource, &t.plannedPath)
+		&t.Orders, &t.Delivered, &t.Failed, &t.ActualM, &t.TrackPoints, &t.GapSeconds, &t.PlannedM, &t.PlannedSource, &t.plannedPath,
+		&t.PlannedMode, &t.PlannedSeconds, &t.plannedReturn)
 	if err != nil {
 		return t, err
 	}
@@ -94,7 +101,9 @@ func (t *Trip) compare(b *Branch) {
 	if t.Status == "done" && t.ReturnedAt == nil {
 		// not seen coming back: the way back is left out on both sides
 		var path [][2]float64
-		if json.Unmarshal(t.plannedPath, &path) == nil && len(path) >= 2 {
+		if t.plannedReturn != nil {
+			c -= *t.plannedReturn
+		} else if json.Unmarshal(t.plannedPath, &path) == nil && len(path) >= 2 {
 			n := len(path)
 			c -= int(math.Round(metresBetween(LatLng(path[n-2]), LatLng(path[n-1]))))
 		}
@@ -140,8 +149,10 @@ type RiderReport struct {
 	DetourMeters  int    `json:"detour_meters"`
 	// StoreSet is false when the store has no position: trips are counted but
 	// coming back, distances and routes are not known.
-	StoreSet bool        `json:"store_set"`
-	Riders   []RiderLine `json:"riders"`
+	StoreSet bool `json:"store_set"`
+	// RoadRoutes: planned routes come from the route service, not straight lines.
+	RoadRoutes bool        `json:"road_routes"`
+	Riders     []RiderLine `json:"riders"`
 }
 
 func (a *App) tripsIn(ctx context.Context, b *Branch, riderID *int64, start, end time.Time) ([]Trip, error) {
@@ -165,7 +176,7 @@ func (a *App) RiderReport(ctx context.Context, branchID int64, from, to string) 
 		return nil, err
 	}
 	out := &RiderReport{From: from, To: to, Timezone: b.Timezone, Currency: b.Currency, DetourPercent: b.DetourPercent,
-		DetourMeters: b.DetourMeters, StoreSet: b.Lat != nil && b.Lng != nil}
+		DetourMeters: b.DetourMeters, StoreSet: b.Lat != nil && b.Lng != nil, RoadRoutes: a.Router != nil}
 	trips, err := a.tripsIn(ctx, b, nil, start, end)
 	if err != nil {
 		return nil, err

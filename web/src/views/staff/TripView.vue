@@ -183,7 +183,8 @@ const events = computed<Ev[]>(() => {
         <section>
           <h3>{{ t('rr.two_routes') }}</h3>
           <label class="rt"><input v-model="showPlanned" type="checkbox" name="planned" :disabled="!d.planned_path.length"><i class="sw planned"></i>
-            <span>{{ t('rr.planned') }}<small v-if="d.planned_source === 'straight'" class="sub"> {{ t('rr.straight') }}</small></span>
+            <span>{{ t('rr.planned') }}<small v-if="d.planned_source === 'straight'" class="sub"> {{ t('rr.straight') }}</small>
+              <small v-else-if="d.planned_source === 'google'" class="sub" data-testid="planned-by"> {{ t(d.planned_mode === 'DRIVE' ? 'rr.by_car' : 'rr.by_bike') }}</small></span>
             <b data-testid="planned-km">{{ d.compare_m === null ? '—' : km(d.compare_m) }}</b></label>
           <label class="rt"><input v-model="showActual" type="checkbox" name="actual" :disabled="!path.length"><i class="sw actual"></i>
             <span>{{ t('rr.actual') }}</span><b data-testid="actual-km">{{ d.actual_m === null ? '—' : km(d.actual_m) }}</b></label>
@@ -194,6 +195,7 @@ const events = computed<Ev[]>(() => {
           </div>
           <p v-if="d.detour" class="banner warn small" data-testid="detour-note">{{ t('rr.detour_note', { p: d.detour_percent, km: d.detour_meters / 1000 }) }}</p>
           <p v-if="!d.planned_path.length" class="sub" data-testid="no-planned">{{ !d.store ? t('rr.np.no_store') : missingPlace ? t('rr.np.no_place') : t('rr.np.not_yet') }}</p>
+          <p v-if="d.planned_source === 'google'" class="sub" data-testid="road-note">{{ d.planned_seconds ? t('rr.planned_min', { n: Math.round(d.planned_seconds / 60) }) : '' }}{{ t(d.planned_mode === 'DRIVE' ? 'rr.car_note' : 'rr.bike_note') }}</p>
           <p v-if="d.planned_path.length && d.status === 'done' && !d.returned_at" class="sub">{{ t('rr.no_return_note') }}</p>
           <p v-if="d.gap_seconds" class="sub" data-testid="gap-note">{{ t('rr.gap_note') }}</p>
         </section>

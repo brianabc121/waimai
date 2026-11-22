@@ -13,6 +13,13 @@ func NewFromConfig(pool *pgxpool.Pool, cfg config.Config) (*App, error) {
 	a.OTPDevEcho = cfg.OTPDevEcho
 	a.PublicBaseURL = cfg.PublicBaseURL
 	a.MapsOff = cfg.GoogleMapsKey == ""
+	switch cfg.GoogleRoutesKey {
+	case "":
+	case "stub":
+		a.Router = StubRouter{}
+	default:
+		a.Router = GoogleRoutes{Key: cfg.GoogleRoutesKey}
+	}
 	sender, err := sms.FromConfig(cfg)
 	if err != nil {
 		return nil, err

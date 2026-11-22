@@ -17,9 +17,13 @@ type Config struct {
 	// GoogleMapsKey is the browser key for the delivery map. Empty turns the
 	// map features off; "stub" serves a tile-less map for tests and demos.
 	GoogleMapsKey string
-	EmbedWorker   bool
-	StaticDir     string
-	PublicBaseURL string // customer-facing origin, for order links in SMS
+	// GoogleRoutesKey is a server key for the Routes API: the planned route
+	// of a rider's trip. Empty keeps the straight-line estimate; "stub" is a
+	// stand-in for tests and demos.
+	GoogleRoutesKey string
+	EmbedWorker     bool
+	StaticDir       string
+	PublicBaseURL   string // customer-facing origin, for order links in SMS
 
 	// Web push for the staff workbench in a browser. Empty keys turn it off.
 	// Make a pair with: admin vapid
@@ -58,14 +62,15 @@ func envBool(key string, def bool) bool {
 
 func Load() Config {
 	c := Config{
-		Addr:          env("ADDR", ":8080"),
-		DatabaseURL:   env("DATABASE_URL", "postgres://postgres@localhost:5432/waimai?sslmode=disable"),
-		AppSecret:     env("APP_SECRET", "dev-secret-change-me"),
-		CookieSecure:  envBool("COOKIE_SECURE", false),
-		OTPDevEcho:    envBool("OTP_DEV_ECHO", false),
-		EmbedWorker:   envBool("EMBED_WORKER", false),
-		StaticDir:     env("STATIC_DIR", ""),
-		GoogleMapsKey: env("GOOGLE_MAPS_API_KEY", ""),
+		Addr:            env("ADDR", ":8080"),
+		DatabaseURL:     env("DATABASE_URL", "postgres://postgres@localhost:5432/waimai?sslmode=disable"),
+		AppSecret:       env("APP_SECRET", "dev-secret-change-me"),
+		CookieSecure:    envBool("COOKIE_SECURE", false),
+		OTPDevEcho:      envBool("OTP_DEV_ECHO", false),
+		EmbedWorker:     envBool("EMBED_WORKER", false),
+		StaticDir:       env("STATIC_DIR", ""),
+		GoogleMapsKey:   env("GOOGLE_MAPS_API_KEY", ""),
+		GoogleRoutesKey: env("GOOGLE_ROUTES_API_KEY", ""),
 
 		VAPIDPublicKey:    env("VAPID_PUBLIC_KEY", ""),
 		VAPIDPrivateKey:   env("VAPID_PRIVATE_KEY", ""),

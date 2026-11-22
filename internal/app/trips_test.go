@@ -3,6 +3,7 @@ package app_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -383,5 +384,132 @@ func TestRiderReport(t *testing.T) {
 	noErr(t, err)
 	if tp := det.Trips[1]; tp.PlannedM != nil || tp.PlannedSource != "" {
 		t.Fatalf("no position: %+v", tp)
+	}
+}
+
+// fakeRouter stands in for the route service.
+type fakeRouter struct {
+	calls int
+	fail  bool
+}
+
+func (f *fakeRouter) Route(_ context.Context, store app.LatLng, stops []app.LatLng) (*app.PlannedRoute, error) {
+	f.calls++
+	if f.fail {
+		return nil, errors.New("no network")
+	}
+	// far stop first, 5 km in all, 2.2 km of it the way back
+	order := make([]int, len(stops))
+	for i := range order {
+		order[i] = len(stops) - 1 - i
+	}
+	return &app.PlannedRoute{Order: order, DistanceM: 5000, DurationS: 720, ReturnM: 2200, Mode: "TWO_WHEELER",
+		Path: [][2]float64{{store[0], store[1]}, {store[0] + 0.01, store[1] + 0.002}, {store[0], store[1]}}}, nil
+}
+
+// With a route service the planned route is asked for once, when the rider
+// has left; when it keeps failing the straight-line estimate takes over.
+func TestPlannedRouteFromService(t *testing.T) {
+	a := need(t)
+	ctx := context.Background()
+	s := newStore(t, true)
+	const lat, lng = 14.55, 121.02
+	_, err := a.DB.Exec(ctx, `UPDATE branches SET lat=$2, lng=$3 WHERE id=$1`, s.branchID, lat, lng)
+	noErr(t, err)
+	router := &fakeRouter{}
+	a.Router = router
+	t.Cleanup(func() { a.Router = nil })
+	// trips other tests left open are not this test's business
+	_, err = a.DB.Exec(ctx, `UPDATE rider_trips SET planned_tries=3 WHERE planned_source='' AND branch_id<>$1`, s.branchID)
+	noErr(t, err)
+
+	leave := func(rider int64, placed ...bool) (int64, time.Time, []*app.Order) {
+		t.Helper()
+		var orders []*app.Order
+		for i, on := range placed {
+			o := s.packed(t, rider)
+			if on {
+				_, err := a.DB.Exec(ctx, `UPDATE orders SET dest_lat=$2, dest_lng=$3 WHERE id=$1`, o.ID, lat+0.009*float64(i+1), lng)
+				noErr(t, err)
+			}
+			_, err := a.RiderPickup(ctx, o.Delivery.ID, rider)
+			noErr(t, err)
+			orders = append(orders, o)
+		}
+		trips := tripsOf(t, rider)
+		tr := trips[len(trips)-1]
+		_, err := a.DB.Exec(ctx, `INSERT INTO rider_tracks (user_id, lat, lng, accuracy, at) VALUES ($1,$2,$3,10,$4)`,
+			rider, lat+0.004, lng, tr.started.Add(time.Minute))
+		noErr(t, err)
+		return tr.id, tr.started, orders
+	}
+	id, t0, orders := leave(s.rider1, true, true)
+
+	// still loading at the store: nothing is asked
+	_, err = a.AdvanceTripsAt(ctx, t0.Add(30*time.Second))
+	noErr(t, err)
+	if router.calls != 0 {
+		t.Fatalf("asked before the rider left: %d", router.calls)
+	}
+	_, err = a.AdvanceTripsAt(ctx, t0.Add(90*time.Second))
+	noErr(t, err)
+	_, err = a.AdvanceTripsAt(ctx, t0.Add(150*time.Second))
+	noErr(t, err)
+	if router.calls != 1 {
+		t.Fatalf("asked %d times, want once", router.calls)
+	}
+	d, err := a.TripDetail(ctx, s.branchID, id)
+	noErr(t, err)
+	var order []int64
+	noErr(t, json.Unmarshal(d.PlannedOrder, &order))
+	if d.PlannedSource != "google" || d.PlannedMode != "TWO_WHEELER" || d.PlannedM == nil || *d.PlannedM != 5000 ||
+		d.PlannedSeconds == nil || *d.PlannedSeconds != 720 || len(order) != 2 || order[0] != orders[1].ID || order[1] != orders[0].ID {
+		t.Fatalf("planned by the service: %+v %v", d.Trip, order)
+	}
+	today := time.Now().In(time.FixedZone("", 8*3600)).Format("2006-01-02")
+	rep, err := a.RiderReport(ctx, s.branchID, today, today)
+	noErr(t, err)
+	if !rep.RoadRoutes {
+		t.Fatal("the report must say routes are on real roads")
+	}
+
+	// the rider clocks off on the road: the way back is left out, as the service measured it
+	for _, o := range orders {
+		_, err = a.RiderDeliver(ctx, o.Delivery.ID, s.rider1, o.Totals.Total)
+		noErr(t, err)
+	}
+	_, err = a.DB.Exec(ctx, `UPDATE rider_trips SET status='done', end_reason='off_duty', ended_at=$2 WHERE id=$1`, id, t0.Add(20*time.Minute))
+	noErr(t, err)
+	d, err = a.TripDetail(ctx, s.branchID, id)
+	noErr(t, err)
+	if d.CompareM == nil || *d.CompareM != 2800 {
+		t.Fatalf("without the way back: %+v", d.Trip)
+	}
+
+	// the service is down: three tries, then straight lines
+	router.fail, router.calls = true, 0
+	id2, t2, _ := leave(s.rider2, true)
+	for i := 1; i <= 5; i++ {
+		_, err = a.AdvanceTripsAt(ctx, t2.Add(time.Duration(i)*90*time.Second))
+		noErr(t, err)
+	}
+	d, err = a.TripDetail(ctx, s.branchID, id2)
+	noErr(t, err)
+	if router.calls != 3 || d.PlannedSource != "straight" || d.PlannedM == nil || *d.PlannedM < 1950 || *d.PlannedM > 2050 || d.PlannedMode != "" || d.PlannedSeconds != nil {
+		t.Fatalf("after %d failed calls: %+v", router.calls, d.Trip)
+	}
+	// an order without a place on the map: no route, and nothing is asked
+	_, err = a.DB.Exec(ctx, `UPDATE rider_trips SET status='done', end_reason='off_duty', ended_at=now() WHERE id=$1`, id2)
+	noErr(t, err)
+	router.fail, router.calls = false, 0
+	id3, t3, _ := leave(s.rider2, false)
+	_, err = a.AdvanceTripsAt(ctx, t3.Add(90*time.Second))
+	noErr(t, err)
+	_, err = a.AdvanceTripsAt(ctx, t3.Add(150*time.Second))
+	noErr(t, err)
+	d, err = a.TripDetail(ctx, s.branchID, id3)
+	noErr(t, err)
+	if router.calls != 0 || d.PlannedSource != "" || d.PlannedM != nil {
+		t.Fatalf("no place on the map: %d calls, %+v", router.calls, d.Trip)
 	}
 }
