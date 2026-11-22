@@ -14,7 +14,7 @@ import './strings'
 </template>
 
 <style scoped>
-.stafftabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: -4px 0 16px; }
+.stafftabs { display: flex; gap: 4px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; border-bottom: 1px solid var(--line); margin: -4px 0 16px; }
 .stafftabs a { padding: 9px 14px; font-weight: 600; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; text-decoration: none; }
 .stafftabs a.on { color: var(--brand-dark); border-bottom-color: var(--brand); }
 </style>

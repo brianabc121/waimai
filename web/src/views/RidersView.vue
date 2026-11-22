@@ -92,7 +92,7 @@ const onDuty = computed(() => riders.value.filter(r => r.on_duty).length)
 </template>
 
 <style>
-.riders { display: grid; grid-template-columns: minmax(0, 1fr) 360px; height: calc(100vh - 52px); }
+.riders { display: grid; grid-template-columns: minmax(0, 1fr) 360px; height: calc(100vh - var(--shell-top, 0px)); }
 .riders.nomap { grid-template-columns: minmax(0, 560px); height: auto; }
 .riders-list { overflow: auto; background: #fff; border-left: 1px solid var(--line); }
 .riders .rrow { display: grid; gap: 3px; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: #fff; padding: 11px 16px; cursor: pointer; }

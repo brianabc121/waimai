@@ -35,3 +35,4 @@ e2e:
 	node e2e/riderreport.cjs
 	node e2e/staffexport.cjs
 	node e2e/settings.cjs
+	node e2e/responsive.cjs

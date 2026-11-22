@@ -25,7 +25,7 @@ async function submit() {
 </script>
 
 <template>
-  <div class="phone" style="padding-top:12vh">
+  <div class="phone login">
     <form class="section stack" @submit.prevent="submit">
       <div class="row between"><h1>{{ t('sign_in') }}</h1>
         <button type="button" class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button></div>

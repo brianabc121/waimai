@@ -12,6 +12,8 @@ export function setLocale(l: Locale) {
 // [zh, en]
 const dict: Record<string, [string, string]> = {
   delivery: ['外卖', 'Delivery'], pickup: ['自取', 'Pickup'],
+  pick_order: ['点左边的订单查看详情', 'Choose an order on the left to see it'],
+  nav_menu: ['菜单', 'Menu'], nav_fold: ['收起导航', 'Hide navigation'], close: ['关闭', 'Close'],
   menu: ['点菜', 'Menu'], store_info: ['门店', 'Store'],
   closed: ['休息中', 'Closed'], paused: ['暂停接单', 'Not taking orders'], open: ['营业中', 'Open'],
   hours: ['营业时间', 'Hours'], all_day: ['全天', 'All day'], address: ['地址', 'Address'], phone: ['电话', 'Phone'],

@@ -104,7 +104,7 @@ const liveCount = computed(() => bill.value?.order.items.filter(i => i.prep_stat
 </script>
 
 <template>
-  <div :class="ipad ? 'tablet' : 'phone'" :style="{ paddingBottom: 0, ...themeVars(tpl) }">
+  <div :class="ipad ? 'tablet' : 'phone wide'" :style="{ paddingBottom: 0, ...themeVars(tpl) }">
     <div class="topbar">
       <div class="row between">
         <h1 class="row" style="gap:8px"><img v-if="tpl.logo_url" :src="tpl.logo_url" alt="" class="logo" />{{ access?.store_name ?? t('dine_in') }}<span v-if="access"> · {{ t('table') }} {{ access.table_name }}</span></h1>
@@ -148,7 +148,7 @@ const liveCount = computed(() => bill.value?.order.items.filter(i => i.prep_stat
           <template #notice><div v-if="error" class="banner bad">{{ error }}</div></template>
         </DineMenu>
       </div>
-      <div v-show="tab === 'bill'" class="section stack" :style="ipad ? 'max-width:720px;margin:0 auto' : ''">
+      <div v-show="tab === 'bill'" class="section stack" style="max-width:720px;margin:0 auto">
         <div v-if="notice" class="banner ok" data-test="sent">{{ notice }}</div>
         <BillLines :order="bill.order" />
         <div class="card" v-if="bill.order.items.length"><TotalsTable :totals="bill.order.totals" :currency="cur" :delivery="false" /></div>

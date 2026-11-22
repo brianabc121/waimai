@@ -87,6 +87,8 @@ function scrollTo(id: number) { document.getElementById('cat-' + id)?.scrollInto
 .list .cats button:hover, .list .cats button:focus { background: var(--bg); border-left-color: var(--brand); color: var(--brand-dark); }
 .list .lists { flex: 1; min-width: 0; padding: 12px 12px 14px; }
 .list .cat { scroll-margin-top: 8px; }
+.list .cats { position: sticky; top: 0; }
+
 
 /* featured: signature strip */
 .hero { padding: 12px 14px 0; }
@@ -100,4 +102,20 @@ function scrollTo(id: number) { document.getElementById('cat-' + id)?.scrollInto
 .grid .item { flex-direction: column; gap: 8px; }
 .grid .item img, .grid .item .ph { width: 100%; height: 104px; }
 .grid .desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* where the menu has room (a tablet, a computer; not the phone preview in the back office):
+   dishes side by side, a roomier category rail */
+.menu { container: menu / inline-size; }
+@container menu (min-width: 640px) {
+  .list .items, .featured .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .list .cats { width: 128px; background: none; padding-top: 12px; }
+  .list .cats button { text-align: left; font-size: 14px; padding: 11px 12px; border-radius: 8px; border-left: 0; }
+  .list .cats button:hover, .list .cats button:focus { background: var(--brand-soft); }
+  .list .lists { padding: 12px 14px 14px 16px; }
+  .item img { width: 96px; height: 96px; }
+  .hcard { width: 190px; } .hcard img, .hcard .ph { height: 120px; }
+  .grid .items { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .grid .item img, .grid .item .ph { height: 132px; }
+  .cats button:hover { border-color: var(--brand); color: var(--brand-dark); }
+}
 </style>

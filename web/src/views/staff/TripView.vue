@@ -222,7 +222,7 @@ const events = computed<Ev[]>(() => {
 </template>
 
 <style scoped>
-.trip { display: flex; flex-direction: column; height: calc(100vh - 52px); min-height: 520px; }
+.trip { display: flex; flex-direction: column; height: calc(100vh - var(--shell-top, 0px)); min-height: 520px; }
 .triphead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px; background: #fff; border-bottom: 1px solid var(--line); }
 .triphead h2 { margin: 0; font-size: 17px; }
 .tripbody { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }

@@ -5,9 +5,11 @@ import { computed, onMounted, onUnmounted } from 'vue'
 import { locale, setLocale, t } from '../../i18n'
 import { logout, session } from '../../session'
 import { loadWorkerStatus, monitor, poll } from './monitor'
+import { useShell } from '../../shell'
 
 const router = useRouter()
 const route = useRoute()
+const shell = useShell('admin')
 const title = computed(() => t(String(route.meta.title ?? 'ad.title')))
 // the failed-job badge stays current on every page; errors here are shown by the page itself
 let stop = () => {}
@@ -17,9 +19,12 @@ async function out() { await logout(); session.loaded = true; router.replace('/l
 </script>
 
 <template>
-  <div class="adm">
+  <div class="adm" :class="{ drawer: shell.drawer.value, open: shell.open.value }">
+    <div class="shell-mask" @click="shell.open.value = false"></div>
     <nav class="adm-side">
-      <div class="brand">{{ t('ad.product') }}<small>{{ t('ad.title') }}</small></div>
+      <div class="brand row between"><span>{{ t('ad.product') }}<small>{{ t('ad.title') }}</small></span>
+        <button v-if="!shell.narrow.value" class="shell-fold" :title="t('nav_fold')" :aria-label="t('nav_fold')" @click="shell.fold()">«</button>
+        <button v-else class="shell-fold" :aria-label="t('close')" @click="shell.open.value = false">×</button></div>
       <div class="grp">{{ t('ad.g_monitor') }}</div>
       <router-link to="/admin/dashboard">{{ t('ad.dashboard') }}</router-link>
       <router-link to="/admin/api">{{ t('ad.api') }}</router-link>
@@ -33,9 +38,10 @@ async function out() { await logout(); session.loaded = true; router.replace('/l
     </nav>
     <div class="adm-main">
       <div class="adm-top">
-        <h1>{{ title }}</h1><span class="grow"></span>
+        <button class="shell-menu" data-testid="nav-open" :aria-label="t('nav_menu')" @click="shell.show()"><i></i><i></i><i></i></button>
+        <h1 class="grow">{{ title }}</h1>
         <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
-        <span>{{ session.user?.display_name }}</span>
+        <span class="who">{{ session.user?.display_name }}</span>
         <button class="btn link" @click="out">{{ t('sign_out') }}</button>
       </div>
       <div v-if="!session.user?.is_platform_admin" class="adm-page"><div class="banner bad">{{ t('not_found') }}</div></div>

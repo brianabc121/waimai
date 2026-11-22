@@ -51,7 +51,7 @@ async function load() {
   branch.value = m.branch; zones.value = m.zones
 }
 
-const mq = window.matchMedia('(max-width: 900px)')
+const mq = window.matchMedia('(max-width: 767px)')
 const onMq = () => { narrow.value = mq.matches }
 onMounted(async () => {
   onMq(); mq.addEventListener('change', onMq)
