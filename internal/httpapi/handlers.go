@@ -486,6 +486,24 @@ func (s *Server) saveZone(c *gin.Context) {
 	c.JSON(200, gin.H{"id": id})
 }
 
+// saveZones changes several zones as one (see app.ZoneBatch).
+func (s *Server) saveZones(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	var in app.ZoneBatch
+	if !bind(c, &in) {
+		return
+	}
+	ids, err := s.App.SaveZones(c, bid, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ids": ids})
+}
+
 func (s *Server) deleteZone(c *gin.Context) {
 	bid, ok := branchScope(c, managerRoles)
 	if !ok {

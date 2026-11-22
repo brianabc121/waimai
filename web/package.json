@@ -7,10 +7,11 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node --test tests/geo.test.mjs"
+    "test": "node --test tests/geo.test.mjs tests/cut.test.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.6.2",
+    "polygon-clipping": "^0.15.7",
     "qrcode": "^1.5.4",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"

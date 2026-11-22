@@ -237,6 +237,56 @@ var zoneColorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 // SaveZone creates (id 0) or replaces a delivery zone. A new zone goes to the
 // end of the priority order unless Sort says otherwise; ReorderZones moves it.
 func (a *App) SaveZone(ctx context.Context, branchID, id int64, in ZoneInput) (int64, error) {
+	return saveZone(ctx, a.DB, branchID, id, in)
+}
+
+// ZoneChange is one zone in a ZoneBatch: ID 0 creates a zone.
+type ZoneChange struct {
+	ID int64 `json:"id"`
+	ZoneInput
+}
+
+// ZoneBatch changes several zones as one. Cutting an overlap out of a zone
+// reshapes two or more zones at once (and may split one in two); they must
+// all be saved or none, or the map would be left with a hole or an overlap.
+type ZoneBatch struct {
+	Zones  []ZoneChange `json:"zones"`
+	Delete []int64      `json:"delete"`
+}
+
+// SaveZones applies a batch in one transaction and returns the zones' ids in
+// the order they were given.
+func (a *App) SaveZones(ctx context.Context, branchID int64, in ZoneBatch) ([]int64, error) {
+	if len(in.Zones)+len(in.Delete) == 0 || len(in.Zones)+len(in.Delete) > 50 {
+		return nil, ErrValidation("a batch changes 1 to 50 zones")
+	}
+	ids := make([]int64, 0, len(in.Zones))
+	err := a.inTx(ctx, func(tx pgx.Tx) error {
+		for _, z := range in.Zones {
+			id, err := saveZone(ctx, tx, branchID, z.ID, z.ZoneInput)
+			if err != nil {
+				return err
+			}
+			ids = append(ids, id)
+		}
+		for _, id := range in.Delete {
+			tag, err := tx.Exec(ctx, `DELETE FROM delivery_zones WHERE id=$1 AND branch_id=$2`, id, branchID)
+			if err != nil {
+				return err
+			}
+			if tag.RowsAffected() == 0 {
+				return ErrNotFound
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+func saveZone(ctx context.Context, q Querier, branchID, id int64, in ZoneInput) (int64, error) {
 	if strings.TrimSpace(in.Name) == "" || in.Fee < 0 || in.MinOrder < 0 {
 		return 0, ErrValidation("zone needs a name and non-negative amounts")
 	}
@@ -248,7 +298,7 @@ func (a *App) SaveZone(ctx context.Context, branchID, id int64, in ZoneInput) (i
 	}
 	var poly any // SQL NULL when the zone has no outline
 	if len(in.Polygon) > 0 {
-		b, err := a.BranchByID(ctx, branchID)
+		b, err := scanBranch(q.QueryRow(ctx, `SELECT `+branchCols+` FROM branches WHERE id=$1`, branchID))
 		if err != nil {
 			return 0, err
 		}
@@ -260,12 +310,12 @@ func (a *App) SaveZone(ctx context.Context, branchID, id int64, in ZoneInput) (i
 	}
 	var err error
 	if id == 0 {
-		err = a.DB.QueryRow(ctx, `INSERT INTO delivery_zones (branch_id, name, name_en, fee, min_order, active, sort,
+		err = q.QueryRow(ctx, `INSERT INTO delivery_zones (branch_id, name, name_en, fee, min_order, active, sort,
 			polygon, color, eta_minutes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10) RETURNING id`,
 			branchID, in.Name, in.NameEn, in.Fee, in.MinOrder, in.Active, in.Sort, poly, in.Color,
 			in.EtaMinutes).Scan(&id)
 	} else {
-		err = a.DB.QueryRow(ctx, `UPDATE delivery_zones SET name=$3, name_en=$4, fee=$5, min_order=$6, active=$7, sort=$8,
+		err = q.QueryRow(ctx, `UPDATE delivery_zones SET name=$3, name_en=$4, fee=$5, min_order=$6, active=$7, sort=$8,
 			polygon=$9::jsonb, color=$10, eta_minutes=$11 WHERE id=$1 AND branch_id=$2 RETURNING id`,
 			id, branchID, in.Name, in.NameEn, in.Fee, in.MinOrder, in.Active, in.Sort, poly, in.Color,
 			in.EtaMinutes).Scan(&id)
