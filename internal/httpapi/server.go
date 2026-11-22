@@ -33,6 +33,7 @@ type Server struct {
 
 	publicWrites *limiter // quotes, orders
 	reportLimit  *limiter // reports against a store
+	mallLimit    *limiter // marketplace listings
 	otpLimit     *limiter
 	loginLimit   *limiter
 	// Guests at the tables usually share the restaurant's one public address,
@@ -44,6 +45,7 @@ func NewServer(a *app.App, cfg config.Config, hub *Hub) *Server {
 	return &Server{App: a, Cfg: cfg, Hub: hub,
 		publicWrites: newLimiter(60, 30),
 		reportLimit:  newLimiter(3, 3),
+		mallLimit:    newLimiter(120, 60),
 		// Everyone who orders logs in, and many customers can share one
 		// address; the daily caps in RequestOTP are what limit the cost.
 		otpLimit:   newLimiter(20, 20),
@@ -292,6 +294,7 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/customer/orders/:token/review", s.orderReview)
 	api.POST("/customer/orders/:token/review", s.limit(s.publicWrites), s.submitReview)
 	s.meRoutes(api)
+	s.mallRoutes(api)
 
 	// dine-in guests: scanned table code or paired tablet
 	api.POST("/table-sessions/exchange", s.limit(s.tableLimit), s.exchangeTableCode)
@@ -351,6 +354,8 @@ func (s *Server) Router() *gin.Engine {
 	auth.PUT("/merchant/branches/:bid/location", s.saveLocation)
 	auth.PUT("/merchant/branches/:bid/zone-mode", s.saveZoneMode)
 	auth.PUT("/merchant/branches/:bid/settings", s.saveSettings)
+	auth.GET("/merchant/branches/:bid/mall", s.mallListing)
+	auth.PUT("/merchant/branches/:bid/mall", s.saveMallListing)
 	auth.POST("/merchant/branches/:bid/images", s.uploadImage)
 	auth.GET("/merchant/branches/:bid/media", s.listMedia)
 	auth.POST("/merchant/branches/:bid/media", s.uploadMedia)
@@ -418,6 +423,7 @@ func (s *Server) Router() *gin.Engine {
 	admin := auth.Group("/admin", requireAdmin)
 	s.adminRoutes(admin)
 	s.meAdminRoutes(admin)
+	s.mallAdminRoutes(admin)
 
 	s.static(r)
 	return r
