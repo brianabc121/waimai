@@ -81,7 +81,7 @@ if ((await page.inputValue(tid('af-phone'))) !== local) throw new Error('a new a
 await page.click(tid('af-save'))
 await page.locator(`${tid('af-error')}:has-text("收货人")`).waitFor()
 await shot('ac3-address-form')
-await addAddress(page, { name: '王小明', unit: '12F' })
+await addAddress(page, { name: '王小明', unit: '12F', wechat: 'wang88', photo: true })
 await page.waitForSelector('.totals')
 await page.locator(`${tid('checkout-address')}:has-text("12F")`).waitFor()
 await page.locator(`${tid('checkout-address')}:has-text("王小明")`).waitFor()
@@ -91,7 +91,7 @@ step('the first address is added at checkout and the order is priced for it')
 // A second address is chosen as soon as it is saved; the book lists both.
 await page.click(tid('checkout-address'))
 await page.waitForSelector(tid('address-sheet'))
-if (await page.locator(tid('address-row')).count() !== 1) throw new Error('the book should list one address')
+await page.waitForFunction(() => document.querySelectorAll('[data-testid=address-row]').length === 1)
 await page.click(tid('address-new'))
 await addAddress(page, { name: '李小红', unit: '8B' })
 await page.locator(`${tid('checkout-address')}:has-text("8B")`).waitFor()
@@ -123,7 +123,30 @@ step('addresses can be added, chosen, changed and deleted from checkout')
 await page.locator('.bottombar .btn.primary').click()
 await page.waitForURL('**/o/**')
 await page.locator('text=12F').first().waitFor()
+const orderNo = (await page.locator('.topbar h1').innerText()).replace('订单号', '').trim()
 step('the order is sent to the chosen address')
+
+// The store sees who to call, the WeChat name and the photo of the door.
+const desk = await (await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'zh-CN', ignoreHTTPSErrors: process.env.E2E_INSECURE_TLS === '1' })).newPage()
+desk.on('pageerror', e => errors.push(`pageerror: ${e.message}`))
+await desk.goto(BASE + '/login')
+for (let i = 0; ; i++) {
+  await desk.fill('input[autocomplete=username]', 'cashier1')
+  await desk.fill('input[type=password]', 'demo1234')
+  const res = desk.waitForResponse(r => r.url().endsWith('/auth/login'))
+  await desk.click('button.primary')
+  if ((await res).status() !== 429 || i >= 5) break
+  await desk.waitForTimeout(7000)
+}
+await desk.click(`.ord:has-text("${orderNo}")`)
+await desk.locator(`${tid('order-contact')}:has-text("王小明先生")`).waitFor()
+await desk.locator(`${tid('order-im')}:has-text("wang88")`).waitFor()
+const link = await desk.locator(`${tid('door-photo')} a`).getAttribute('href')
+const img = await desk.request.get(BASE + link)
+if (img.status() !== 200 || img.headers()['content-type'] !== 'image/jpeg') throw new Error('the store cannot open the door photo: ' + img.status())
+await desk.screenshot({ path: `${SHOTS}/ac6-order-contact.png` })
+await desk.context().close()
+step('the store sees the name with Mr, the WeChat name and the photo of the door')
 
 // The account button shows who is logged in; logging out ends it.
 await page.goto(BASE + '/s/makati')

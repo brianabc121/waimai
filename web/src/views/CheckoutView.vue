@@ -3,11 +3,10 @@ import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { listAddresses, sorted, usable, whoLine, type Address } from '../addresses'
 import { ApiError, get, newKey, post } from '../api'
-import { clearLines, quoteItems, useCart } from '../cart'
+import { clearLines, linePrice, quoteItems, useCart } from '../cart'
 import { customer, loadCustomer, loginRoute, prettyPhone } from '../customer'
 import { money, pick, t, whenText } from '../i18n'
-import type { Quote, Storefront } from '../types'
-import TotalsTable from './TotalsTable.vue'
+import type { Item, Quote, Storefront } from '../types'
 
 const AddressSheet = defineAsyncComponent(() => import('./AddressSheet.vue'))
 
@@ -55,7 +54,8 @@ async function loadAddresses() {
   // Nothing saved yet: the first thing to do is to add an address.
   if (!addresses.value.length) { startNew.value = true; showSheet.value = true }
 }
-function openSheet() { startNew.value = false; showSheet.value = true }
+// With nothing saved there is no list to show: go straight to the form.
+function openSheet() { startNew.value = !addresses.value.length; showSheet.value = true }
 function chosen(a: Address) { use(a); showSheet.value = false; void requote() }
 function bookChanged(list: Address[]) {
   addresses.value = list
@@ -84,13 +84,15 @@ function describe(e: unknown): string {
     case 'STORE_CLOSED': return t('closed')
     case 'SCHEDULE_INVALID': return t('schedule_invalid')
     case 'REQUIRED_MISSING': return t('required_missing_named', { names: ((e.details?.categories ?? []) as { name: string; name_en: string }[]).map(c => pick(c.name, c.name_en)).join('、') })
-    case 'BELOW_MINIMUM': return t('below_min', { amt: money((e.details?.minimum ?? 0) - (e.details?.subtotal ?? 0), quote.value?.currency) })
+    case 'BELOW_MINIMUM': short.value = (e.details?.minimum ?? 0) - (e.details?.subtotal ?? 0); return t('below_min', { amt: money((e.details?.minimum ?? 0) - (e.details?.subtotal ?? 0), quote.value?.currency) })
     default: return e.message
   }
 }
 
+// How much is missing to the store's minimum for this address.
+const short = ref(0)
 async function requote() {
-  error.value = ''
+  error.value = ''; short.value = 0
   if (cart.lines.length === 0) { router.replace(`/s/${props.slug}`); return }
   // Without an address there is nothing to price a delivery for yet.
   if (delivery.value && !address.value) { quote.value = null; return }
@@ -122,6 +124,44 @@ onMounted(async () => {
   await loadAddresses()
   await requote()
 })
+
+// ---- what is shown ----
+const cur = computed(() => quote.value?.currency ?? store.value?.branch.currency)
+const items = computed(() => new Map((store.value?.categories ?? []).flatMap(c => c.items).map((i): [number, Item] => [i.id, i])))
+interface Shown { item_id: number; name: string; options: string; note: string; qty: number; total: number | null; basket: number }
+// The dishes as priced by the server; before there is a price (no address
+// yet), as the menu has them.
+const lines = computed<Shown[]>(() => {
+  if (quote.value) return quote.value.lines.map(l => ({ item_id: l.item_id, name: pick(l.name, l.name_en), options: l.options.map(o => pick(o.name, o.name_en)).join(' · '),
+    note: l.note, qty: l.qty, total: l.line_total, basket: l.basket || 1 }))
+  const sent = quoteItems()
+  return cart.lines.map((l, i) => {
+    const it = items.value.get(l.item_id), unit = linePrice(l, items.value)
+    const names = new Map((it?.groups ?? []).flatMap(g => g.options).map(o => [o.id, pick(o.name, o.name_en)]))
+    return { item_id: l.item_id, name: it ? pick(it.name, it.name_en) : '', options: l.option_ids.map(id => names.get(id) ?? '').filter(Boolean).join(' · '),
+      note: l.note, qty: l.qty, total: unit == null ? null : unit * l.qty, basket: sent[i].basket }
+  }).filter(l => l.name)
+})
+const baskets = computed(() => {
+  const by = new Map<number, Shown[]>()
+  for (const l of lines.value) by.set(l.basket, [...(by.get(l.basket) ?? []), l])
+  return [...by.entries()].sort((a, b) => a[0] - b[0]).map(([n, ls]) => ({ n, lines: ls, subtotal: ls.reduce((s, l) => s + (l.total ?? 0), 0) }))
+})
+const subtotal = computed(() => quote.value?.totals.subtotal ?? lines.value.reduce((s, l) => s + (l.total ?? 0), 0))
+const image = (id: number) => items.value.get(id)?.image_url ?? ''
+// About how long a delivery to the chosen address takes, when the store has said.
+const eta = computed(() => !delivery.value || !address.value ? null
+  : mapMode.value ? address.value.delivery?.eta_minutes ?? null : store.value?.zones.find(z => z.id === cart.zoneId)?.eta_minutes ?? null)
+const showSlots = ref(false)
+function now() { if (mustSchedule.value) return; scheduled.value = ''; void requote() }
+function later(s: string) { scheduled.value = s; showSlots.value = false; void requote() }
+// The button answers even when the order cannot go yet: it leads to what is missing.
+function press() {
+  if (delivery.value && !address.value) { openSheet(); return }
+  if (mustSchedule.value && !scheduled.value && slots.value.length) { showSlots.value = true; return }
+  void submit()
+}
+const buttonText = computed(() => busy.value ? t('placing') : short.value > 0 ? t('co.short', { amt: money(short.value, cur.value) }) : t('place_order'))
 
 const ready = computed(() => !!quote.value && customer.verified && (delivery.value ? !!address.value : cart.name.trim() !== ''))
 
@@ -155,69 +195,150 @@ async function submit() {
 </script>
 
 <template>
-  <div class="phone wide">
-    <div class="topbar row"><router-link :to="`/s/${slug}`">‹ {{ t('back_to_menu') }}</router-link></div>
+  <div class="phone wide co">
+    <div class="topbar co-top"><router-link :to="`/s/${slug}`" :aria-label="t('back_to_menu')" class="co-back">‹</router-link><h1>{{ t('co.title') }}</h1></div>
     <div class="section two-cols">
       <div class="stack">
       <div v-if="error" class="banner bad">{{ error }} <button class="btn link" @click="requote">{{ t('retry') }}</button></div>
       <div v-if="notice" class="banner warn">{{ notice }}</div>
 
-      <div class="card stack">
-        <h2>{{ t(cart.service) }}</h2>
+      <!-- where to, and when -->
+      <div class="card co-card">
         <button v-if="delivery" type="button" class="co-addr" data-testid="checkout-address" @click="openSheet">
           <span class="grow" v-if="address">
-            <b><span v-if="address.label" class="tag brand">{{ t('ad.label_' + address.label) }}</span>{{ address.place_name }} {{ address.unit }}</b>
+            <b><span v-if="address.label" class="tag brand">{{ t('ad.label_' + address.label) }}</span>{{ address.place_name }}</b>
+            <span>{{ address.unit }}<template v-if="address.place_address"> · {{ address.place_address }}</template></span>
             <span class="small muted">{{ whoLine(address) }}</span>
-            <span class="small muted" v-if="address.note">{{ address.note }}</span>
           </span>
-          <span class="grow ph" v-else>{{ t(addresses.length ? 'co.choose_address' : 'co.add_address') }}</span>
+          <span class="grow ph" v-else>{{ t(addresses.length ? 'ad.choose' : 'co.add_address') }}</span>
           <span class="chev">›</span>
         </button>
-        <label v-else class="field"><span>{{ t('your_name') }}</span><input v-model="cart.name" maxlength="80" autocomplete="name" /></label>
-        <label class="field" style="margin:0"><span>{{ t('order_note') }}</span><input v-model="cart.note" maxlength="300" /></label>
-      </div>
-
-      <div class="card stack" v-if="slots.length || mustSchedule">
-        <h2>{{ t(cart.service === 'delivery' ? 'deliver_at' : 'pickup_at') }}</h2>
-        <select v-model="scheduled" data-testid="slot" :aria-label="t('when')" @change="requote">
-          <option value="" :disabled="mustSchedule">{{ mustSchedule ? t('pick_time') : t('asap') }}</option>
-          <option v-for="s in slots" :key="s" :value="s">{{ whenText(s, tz) }}</option>
-        </select>
-      </div>
-
-      <div class="card row between" v-if="customer.verified" data-testid="account-phone">
-        <span class="muted">{{ t('phone_number') }}</span><span>{{ prettyPhone(customer.phone) }}</span>
-      </div>
-
-      </div>
-      <aside class="stack side">
-      <div class="card stack" v-if="quote">
-        <h2>{{ t('order_summary') }}</h2>
-        <div v-for="(l, i) in quote.lines" :key="i" class="row top between">
-          <div class="grow"><b>{{ l.qty }} ×</b> {{ pick(l.name, l.name_en) }}
-            <div class="muted small" v-if="l.options.length">{{ l.options.map(o => pick(o.name, o.name_en)).join(' · ') }}</div>
-            <div class="muted small" v-if="l.note">{{ t('note') }}: {{ l.note }}</div></div>
-          <span class="price">{{ money(l.line_total, quote.currency) }}</span>
+        <div v-else class="co-pick" data-testid="checkout-pickup">
+          <b>{{ store ? pick(store.branch.name, store.branch.name_en) : '' }}</b>
+          <span v-if="store?.branch.address">{{ store.branch.address }}</span>
+          <label class="field" style="margin:8px 0 0"><span>{{ t('co.pickup_name') }}</span><input v-model="cart.name" maxlength="80" autocomplete="name" /></label>
         </div>
-        <TotalsTable :totals="quote.totals" :currency="quote.currency" :delivery="cart.service === 'delivery'" />
-        <div class="row between"><span class="muted">{{ t('pay_method') }}</span><span>{{ t(cart.service === 'delivery' ? 'cod' : 'pay_at_pickup') }}</span></div>
-      </div>
-      <div class="bottombar inline"><div>
-        <button class="btn primary block big" :disabled="!ready || busy" @click="submit">
-          {{ busy ? t('placing') : quote ? `${t('place_order')} · ${money(quote.totals.total, quote.currency)}` : t('place_order') }}
+        <button type="button" class="co-when" :class="{ on: !scheduled && !mustSchedule, off: mustSchedule }" :disabled="mustSchedule" data-testid="when-now" @click="now">
+          <b>{{ t(delivery ? 'co.now_delivery' : 'co.now_pickup') }}</b>
+          <span v-if="mustSchedule">{{ t('co.closed_now') }}</span>
+          <span v-else-if="delivery && !address">{{ t('co.need_address') }}</span>
+          <span v-else-if="eta" data-testid="eta">{{ t('co.eta', { n: eta }) }}</span>
         </button>
+        <button v-if="slots.length" type="button" class="co-when" :class="{ on: !!scheduled }" data-testid="when-later" @click="showSlots = true">
+          <b>{{ t(delivery ? 'co.later_delivery' : 'co.later_pickup') }}</b>
+          <span>{{ scheduled ? whenText(scheduled, tz) : t('co.pick_time') }} ›</span>
+        </button>
+      </div>
+
+      <div class="card co-card">
+        <label class="field" style="margin:0"><span>{{ t('order_note') }}</span><input v-model="cart.note" maxlength="300" :placeholder="t('co.note_ph')" /></label>
+      </div>
+      </div>
+
+      <aside class="stack side">
+      <!-- the order -->
+      <div class="card co-card" v-if="store">
+        <div class="co-shop"><b>{{ pick(store.branch.name, store.branch.name_en) }}</b><span class="co-tag">{{ t(delivery ? 'co.by_store' : 'pickup') }}</span></div>
+        <div v-for="b in baskets" :key="b.n" class="co-basket">
+          <div v-if="baskets.length > 1" class="co-bhead">🧺 {{ t('co.basket', { n: b.n }) }}</div>
+          <div v-for="(l, i) in b.lines" :key="i" class="co-line">
+            <img v-if="image(l.item_id)" :src="image(l.item_id)" alt="" class="co-thumb" loading="lazy" />
+            <span v-else class="co-thumb none">{{ l.name.slice(0, 1) }}</span>
+            <div class="grow">
+              <div class="n">{{ l.name }}</div>
+              <div class="small muted" v-if="l.options">{{ l.options }}</div>
+              <div class="small muted" v-if="l.note">{{ t('note') }}: {{ l.note }}</div>
+              <div class="small muted">x {{ l.qty }}</div>
+            </div>
+            <b class="price" v-if="l.total != null">{{ money(l.total, cur) }}</b>
+          </div>
+          <div v-if="baskets.length > 1" class="co-row"><span>{{ t('co.basket_subtotal') }}</span><b>{{ money(b.subtotal, cur) }}</b></div>
+        </div>
+        <div class="co-fees totals">
+          <div class="co-row"><span>{{ t('subtotal') }}</span><span>{{ money(subtotal, cur) }}</span></div>
+          <div class="co-row" v-if="quote?.totals.packaging_fee"><span><i class="ic">袋</i>{{ t('packaging_fee') }}</span><span>{{ money(quote.totals.packaging_fee, cur) }}</span></div>
+          <div class="co-row" v-if="delivery"><span><i class="ic">送</i>{{ t('delivery_fee') }}</span>
+            <span v-if="quote" data-testid="delivery-fee">{{ money(quote.totals.delivery_fee, cur) }}</span><span v-else class="muted">{{ t('co.fee_later') }}</span></div>
+          <template v-if="quote">
+            <div class="co-row" v-if="quote.totals.service_charge"><span>{{ t('service_charge') }}</span><span>{{ money(quote.totals.service_charge, cur) }}</span></div>
+            <div class="co-row" v-if="quote.totals.tax_amount && !quote.totals.tax_inclusive"><span>{{ t('tax') }} {{ quote.totals.tax_rate_bp / 100 }}%</span><span>{{ money(quote.totals.tax_amount, cur) }}</span></div>
+            <div class="co-row disc" v-if="quote.totals.discount"><span><i class="ic">惠</i>{{ pick(quote.totals.promotion_name, quote.totals.promotion_name_en) || t('discount') }}</span><span>−{{ money(quote.totals.discount, cur) }}</span></div>
+            <div class="co-row sum"><b>{{ t('total') }}</b><b>{{ money(quote.totals.total, cur) }}</b></div>
+            <div class="co-row small muted" v-if="quote.totals.tax_amount && quote.totals.tax_inclusive"><span>{{ t('tax_included') }} {{ quote.totals.tax_rate_bp / 100 }}%</span><span>{{ money(quote.totals.tax_amount, cur) }}</span></div>
+          </template>
+        </div>
+        <div class="co-meta">
+          <div class="co-row"><span class="muted">{{ t('pay_method') }}</span><span>{{ t(delivery ? 'cod' : 'pay_at_pickup') }}</span></div>
+          <div class="co-row" v-if="customer.verified" data-testid="account-phone"><span class="muted">{{ t('co.account') }}</span><span>{{ prettyPhone(customer.phone) }}</span></div>
+        </div>
+      </div>
+
+      <div class="bottombar inline"><div>
+        <div class="co-bar">
+          <div class="amt" data-testid="checkout-total">
+            <b>{{ money(quote ? quote.totals.total : subtotal, cur) }}</b>
+            <span v-if="quote?.totals.discount">{{ t('co.saved', { amt: money(quote.totals.discount, cur) }) }}</span>
+            <span v-else-if="!quote && delivery">{{ t('co.no_fee_yet') }}</span>
+          </div>
+          <button class="btn primary" :class="{ off: !ready }" :disabled="busy || (!ready && !(delivery && !address) && !(mustSchedule && !scheduled && slots.length > 0))" data-testid="place-order" @click="press">{{ buttonText }}</button>
+        </div>
       </div></div>
       </aside>
     </div>
+
     <AddressSheet v-if="showSheet" :slug="mapMode ? slug : undefined" :currency="store?.branch.currency" :selected="cart.addressId" :shop="shopPin" :start-new="startNew"
       @select="chosen" @changed="bookChanged" @close="showSheet = false" />
+    <div v-if="showSlots" class="sheet-mask" data-testid="slot-sheet" @click.self="showSlots = false">
+      <div class="sheet">
+        <div class="sheet-head row between"><b>{{ t(delivery ? 'co.later_delivery' : 'co.later_pickup') }}</b><button class="btn link" @click="showSlots = false">{{ t('close') }}</button></div>
+        <div class="sheet-body co-slots">
+          <button v-for="s in slots" :key="s" type="button" :class="{ on: scheduled === s }" data-testid="slot" @click="later(s)">{{ whenText(s, tz) }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.co-addr { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: none; padding: 2px 0 10px; cursor: pointer; font: inherit; color: inherit; border-bottom: 1px solid #f0f1f3; }
-.co-addr .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.co-addr b { font-size: 16px; } .co-addr .tag { margin-right: 6px; font-weight: 400; }
-.co-addr .ph { color: var(--brand); font-weight: 600; }
-.co-addr .chev { color: #8b919a; font-size: 22px; flex: none; }
+.co { background: linear-gradient(#ffe3d3, var(--bg) 150px) no-repeat, var(--bg); }
+.co-top { display: flex; align-items: center; background: none; color: var(--ink); border: 0; }
+.co-top h1 { flex: 1; text-align: center; font-size: 18px; margin: 0 34px 0 0; }
+.co-back { font-size: 30px; line-height: 1; width: 34px; color: var(--ink); text-decoration: none; }
+.co-card { border-radius: 16px; padding: 14px; border: 0; }
+.co-addr { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: none; padding: 4px 0 14px; cursor: pointer; font: inherit; color: inherit; border-bottom: 1px solid #f0f1f3; }
+.co-addr .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.co-addr b { font-size: 18px; } .co-addr .tag { margin-right: 8px; font-weight: 400; vertical-align: 2px; }
+.co-addr .ph { color: var(--brand); font-weight: 700; font-size: 19px; padding: 6px 0; }
+.co-addr .chev { color: #8b919a; font-size: 24px; flex: none; }
+.co-pick { display: flex; flex-direction: column; gap: 3px; padding: 4px 0 14px; border-bottom: 1px solid #f0f1f3; }
+.co-pick b { font-size: 18px; }
+.co-when { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; margin-top: 12px; padding: 14px; border: 1.5px solid #d9dde3; border-radius: 12px; background: #fff; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.co-when b { font-size: 16px; } .co-when span { color: #6b7280; font-size: 14px; text-align: right; }
+.co-when.on { border-color: var(--brand); background: #fff1e8; } .co-when.on span { color: var(--brand); font-weight: 600; }
+.co-when.off { background: #f4f5f7; color: #9aa1ab; cursor: default; }
+.co-shop { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #f0f1f3; }
+.co-shop b { font-size: 17px; }
+.co-tag { border: 1px solid var(--brand); color: var(--brand); border-radius: 6px; font-size: 12px; padding: 1px 7px; }
+.co-basket { padding: 10px 0 2px; border-bottom: 1px solid #f0f1f3; }
+.co-bhead { color: #6b7280; font-size: 13px; margin-bottom: 8px; }
+.co-line { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+.co-line .grow { flex: 1; min-width: 0; } .co-line .n { font-size: 15px; }
+.co-thumb { width: 54px; height: 54px; border-radius: 10px; object-fit: cover; flex: none; }
+.co-thumb.none { display: grid; place-items: center; background: #fdebd9; color: #c2570f; font-size: 20px; font-weight: 600; }
+.co-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; }
+.co-fees { padding: 8px 0; border-bottom: 1px solid #f0f1f3; }
+.co-fees .ic { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; background: var(--brand); color: #fff; font-size: 12px; font-style: normal; margin-right: 8px; }
+.co-fees .disc span:last-child { color: var(--brand); }
+.co-fees .sum { font-size: 17px; border-top: 1px solid #f0f1f3; margin-top: 6px; padding-top: 10px; }
+.co-meta { padding-top: 8px; }
+.co-bar { display: flex; align-items: stretch; background: #1f2329; border-radius: 999px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+.co-bar .amt { flex: 1; min-width: 0; color: #fff; padding: 8px 8px 8px 22px; display: flex; flex-direction: column; justify-content: center; }
+.co-bar .amt b { font-size: 21px; line-height: 1.2; } .co-bar .amt span { font-size: 12px; color: #c9cdd3; }
+.co-bar .btn { border-radius: 0; min-width: 128px; padding: 0 20px; font-size: 17px; font-weight: 700; min-height: 54px; }
+.co-bar .btn.off { background: #c9cdd3; color: #6b7280; border-color: #c9cdd3; opacity: 1; }
+.co :deep(.bottombar > div), .co .bottombar > div { background: none; border-top: 0; }
+.co-slots { display: grid; gap: 8px; }
+.co-slots button { padding: 13px 14px; border: 1.5px solid #d9dde3; border-radius: 10px; background: #fff; font: inherit; text-align: left; cursor: pointer; }
+.co-slots button.on { border-color: var(--brand); background: #fff1e8; color: var(--brand); font-weight: 600; }
+@media (max-width: 899px) { .co { padding-bottom: 96px; } }
 </style>

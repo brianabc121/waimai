@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // Adding or changing a delivery address. On a phone the map opens over the
 // form; on a wide screen it stands beside it.
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ApiError } from '../api'
-import { deleteAddress, saveAddress, termsText, type Address, type AddressInput, type DeliveryTerms } from '../addresses'
+import { deleteAddress, deletePhoto, photoUrl, saveAddress, savePhoto, termsText, type Address, type AddressInput, type DeliveryTerms } from '../addresses'
 import { cart } from '../cart'
 import { customer } from '../customer'
 import { t } from '../i18n'
 import { mapsKey } from '../maps'
+import { shrink } from '../photo'
 import PlacePicker, { type Picked } from './PlacePicker.vue'
 
 const props = defineProps<{
@@ -44,6 +45,25 @@ function picked(p: Picked, d: DeliveryTerms | null) {
   picking.value = false
 }
 
+// A photo of the door (optional). It is sent after the address is saved,
+// because a new address has no id before that.
+const photo = reactive<{ fresh: Blob | null; url: string; removed: boolean }>({ fresh: null, url: a?.photo_at ? photoUrl(a) : '', removed: false })
+async function choosePhoto(e: Event) {
+  const input = e.target as HTMLInputElement, file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  try {
+    const small = await shrink(file)
+    if (photo.fresh) URL.revokeObjectURL(photo.url)
+    Object.assign(photo, { fresh: small, url: URL.createObjectURL(small), removed: false })
+  } catch { error.value = t('ad.e.photo') }
+}
+function removePhoto() {
+  if (photo.fresh) URL.revokeObjectURL(photo.url)
+  Object.assign(photo, { fresh: null, url: '', removed: true })
+}
+onBeforeUnmount(() => { if (photo.fresh) URL.revokeObjectURL(photo.url) })
+
 const error = ref(''), busy = ref(false)
 const phoneOk = computed(() => /^9\d{9}$/.test(f.phone.replace(/[^0-9]/g, '').replace(/^63(?=9\d{9}$)/, '').replace(/^0/, '')))
 function problem(): string {
@@ -58,7 +78,11 @@ async function save() {
   if (error.value || busy.value) return
   busy.value = true
   try {
-    const saved = await saveAddress(a?.id ?? 0, { ...f })
+    let saved = await saveAddress(a?.id ?? 0, { ...f })
+    try {
+      if (photo.fresh) saved = { ...saved, ...(await savePhoto(saved.id, photo.fresh)) }
+      else if (photo.removed && a?.photo_at) { await deletePhoto(saved.id); saved.photo_at = null }
+    } catch { alert(t('ad.e.photo')) }
     emit('saved', { ...saved, delivery: f.lat != null ? terms.value : saved.delivery })
   } catch (e) {
     error.value = e instanceof ApiError
@@ -118,9 +142,19 @@ const labels = ['work', 'home', 'school'] as const
           <div class="af-row"><span class="l">{{ t('ad.f.note') }}</span>
             <div class="grow"><input v-model="f.note" maxlength="300" :placeholder="t('ad.f.note_ph')" data-testid="af-note" /></div></div>
           <div class="af-row"><span class="l">{{ t('ad.f.wechat') }}</span>
-            <div class="grow"><input v-model="f.wechat" maxlength="64" autocapitalize="none" :placeholder="t('ad.f.wechat_ph')" /></div></div>
+            <div class="grow"><input v-model="f.wechat" maxlength="64" autocapitalize="none" :placeholder="t('ad.f.wechat_ph')" data-testid="af-wechat" /></div></div>
           <div class="af-row"><span class="l">{{ t('ad.f.telegram') }}</span>
             <div class="grow"><input v-model="f.telegram" maxlength="64" autocapitalize="none" :placeholder="t('ad.f.optional')" /></div></div>
+          <div class="af-row"><span class="l">{{ t('ad.f.photo') }}</span>
+            <div class="grow af-photo" data-testid="af-photo">
+              <img v-if="photo.url" :src="photo.url" alt="" data-testid="af-photo-img" />
+              <div class="acts">
+                <label class="btn small">{{ t(photo.url ? 'ad.f.photo_change' : 'ad.f.photo_add') }}
+                  <input type="file" accept="image/*" name="door" hidden @change="choosePhoto" /></label>
+                <button v-if="photo.url" type="button" class="btn small link" data-testid="af-photo-remove" @click="removePhoto">{{ t('ad.f.photo_remove') }}</button>
+              </div>
+              <div class="hint" v-if="!photo.url">{{ t('ad.f.photo_hint') }}</div>
+            </div></div>
           <div class="af-row"><span class="l">{{ t('ad.f.label') }}</span>
             <div class="grow af-chips">
               <button v-for="l in labels" :key="l" type="button" :class="{ on: f.label === l }" @click="f.label = f.label === l ? '' : l">{{ t('ad.label_' + l) }}</button>
@@ -139,6 +173,9 @@ const labels = ['work', 'home', 'school'] as const
 </template>
 
 <style scoped>
+.af-photo img { display: block; width: 120px; height: 90px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; }
+.af-photo .acts { display: flex; gap: 8px; align-items: center; }
+.af-photo .hint { font-size: 12px; color: #8b919a; margin-top: 6px; }
 .aform { display: flex; height: 100%; min-height: 0; position: relative; background: var(--bg); }
 .af-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .af-head { display: flex; align-items: center; padding: 12px 14px; background: #fff; border-bottom: 1px solid var(--line); font-size: 17px; flex: none; }

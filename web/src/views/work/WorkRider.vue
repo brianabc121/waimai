@@ -9,6 +9,8 @@ import { both, money, t, toMajor, toMinor, whenText } from '../../i18n'
 import { useLive } from '../../live'
 import { currentRole, reloadUser, session } from '../../session'
 import type { Order } from '../../types'
+import { contactName, contactPhone } from '../../addresses'
+import { shrink } from '../../photo'
 import { duty, flush, loadDuty, openAppSettings, setDuty, track } from './duty'
 import { native } from './native'
 import { askNotifications } from './push'
@@ -102,23 +104,7 @@ async function deliver(o: Order) {
 }
 
 // ---- photo at the door (optional) ----
-// The photo is shrunk on the phone to about 1280 px before it is sent.
 const photo = reactive({ busy: false, error: '' })
-function shrink(file: File): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image(), url = URL.createObjectURL(file)
-    img.onload = () => {
-      const k = Math.min(1, 1280 / Math.max(img.width, img.height))
-      const c = document.createElement('canvas')
-      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
-      c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
-      URL.revokeObjectURL(url)
-      c.toBlob(b => b ? resolve(b) : reject(new Error('photo')), 'image/jpeg', 0.7)
-    }
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('photo')) }
-    img.src = url
-  })
-}
 async function addPhoto(o: Order, e: Event) {
   const input = e.target as HTMLInputElement, file = input.files?.[0]
   input.value = ''
@@ -198,13 +184,18 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
         <!-- on the way, then at the door -->
         <template v-else>
           <div class="card stack">
-            <div><b style="font-size:16px">{{ cur.customer_name }}</b>
+            <div><b style="font-size:16px">{{ contactName(cur) }}</b>
               <div>{{ cur.zone_name }} · {{ cur.address_line }} <b>{{ cur.address_unit }}</b>
                 <span v-if="cur.zone_distance_m" class="tag warn">{{ t('outside_zone', { n: cur.zone_distance_m }) }}</span></div>
               <div v-if="cur.address_note" class="banner warn small" style="margin-top:6px">{{ t('wk.customer_note') }}：{{ cur.address_note }}</div></div>
             <div class="row">
               <a class="btn grow" :href="mapUrl(cur)" target="_blank" rel="noopener" data-act="navigate">{{ t('navigate') }}</a>
-              <a class="btn grow" :href="'tel:' + cur.customer_phone">{{ t('call') }}</a>
+              <a class="btn grow" :href="'tel:' + contactPhone(cur)">{{ t('call') }}</a>
+            </div>
+            <div v-if="cur.contact_wechat || cur.contact_telegram || cur.address_photo" class="small" data-testid="rider-contact">
+              <span v-if="cur.contact_wechat">{{ t('oc.wechat') }} <b>{{ cur.contact_wechat }}</b>　</span>
+              <span v-if="cur.contact_telegram">{{ t('oc.telegram') }} <b>{{ cur.contact_telegram }}</b>　</span>
+              <a v-if="cur.address_photo" :href="`/api/v1/rider/tasks/${cur.delivery!.id}/address-photo`" target="_blank" rel="noopener" data-testid="rider-door-photo">{{ t('oc.door_photo') }} ›</a>
             </div>
             <div class="row between"><span class="muted">{{ t('bags') }} {{ cur.bags }} · {{ due(cur) ? t('wk.cod_short') : t('wk.prepaid') }}</span>
               <b v-if="due(cur)" class="amt">{{ money(cur.totals.total, cur.currency) }}</b></div>

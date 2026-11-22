@@ -34,6 +34,8 @@ type Address struct {
 	Label      string     `json:"label"`
 	IsDefault  bool       `json:"is_default"`
 	LastUsedAt *time.Time `json:"last_used_at"`
+	// PhotoAt is when the photo of the door was added, nil when there is none.
+	PhotoAt *time.Time `json:"photo_at"`
 	// Delivery says whether the store asked about delivers here. It is absent
 	// when no store was named or the store does not decide by the pin.
 	Delivery *DeliveryTerms `json:"delivery,omitempty"`
@@ -71,12 +73,12 @@ func (a *App) DeliveryTermsAt(ctx context.Context, slug string, lat, lng float64
 }
 
 const addressCols = `id, contact_name, title, phone, place_name, place_address, lat, lng, unit, note, wechat, telegram,
-	label, is_default, last_used_at`
+	label, is_default, last_used_at, photo_at`
 
 func scanAddress(row pgx.Row) (*Address, error) {
 	var a Address
 	err := row.Scan(&a.ID, &a.ContactName, &a.Title, &a.Phone, &a.PlaceName, &a.PlaceAddress, &a.Lat, &a.Lng, &a.Unit,
-		&a.Note, &a.Wechat, &a.Telegram, &a.Label, &a.IsDefault, &a.LastUsedAt)
+		&a.Note, &a.Wechat, &a.Telegram, &a.Label, &a.IsDefault, &a.LastUsedAt, &a.PhotoAt)
 	return &a, err
 }
 
@@ -243,6 +245,83 @@ func (a *App) DeleteAddress(ctx context.Context, customerID, id int64) error {
 		return errAddressNotFound
 	}
 	return nil
+}
+
+// ---- photo of the door ----
+
+func isJPEG(image []byte, max int) bool {
+	return len(image) >= 4 && len(image) <= max && image[0] == 0xFF && image[1] == 0xD8 && image[2] == 0xFF
+}
+
+// SaveAddressPhoto keeps a photo of the door for the rider. A second photo
+// replaces the first.
+func (a *App) SaveAddressPhoto(ctx context.Context, customerID, id int64, image []byte) (*Address, error) {
+	if !isJPEG(image, ProofMaxBytes) {
+		return nil, ErrValidation("the photo must be a JPEG of at most 600 KB")
+	}
+	var out *Address
+	err := a.inTx(ctx, func(tx pgx.Tx) error {
+		var err error
+		out, err = scanAddress(tx.QueryRow(ctx, `UPDATE customer_addresses SET photo_at=now(), updated_at=now()
+			WHERE id=$1 AND customer_id=$2 AND deleted_at IS NULL RETURNING `+addressCols, id, customerID))
+		if isNoRows(err) {
+			return errAddressNotFound
+		}
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `INSERT INTO customer_address_photos (address_id, image) VALUES ($1,$2)
+			ON CONFLICT (address_id) DO UPDATE SET image=EXCLUDED.image, created_at=now()`, id, image)
+		return err
+	})
+	return out, err
+}
+
+// DeleteAddressPhoto takes the photo away again.
+func (a *App) DeleteAddressPhoto(ctx context.Context, customerID, id int64) error {
+	return a.inTx(ctx, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `UPDATE customer_addresses SET photo_at=NULL, updated_at=now()
+			WHERE id=$1 AND customer_id=$2 AND deleted_at IS NULL`, id, customerID)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return errAddressNotFound
+		}
+		_, err = tx.Exec(ctx, `DELETE FROM customer_address_photos WHERE address_id=$1`, id)
+		return err
+	})
+}
+
+var errNoPhoto = Err(http.StatusNotFound, "NOT_FOUND", "there is no photo")
+
+func photoBy(ctx context.Context, q Querier, query string, args ...any) ([]byte, error) {
+	var image []byte
+	err := q.QueryRow(ctx, query, args...).Scan(&image)
+	if isNoRows(err) {
+		return nil, errNoPhoto
+	}
+	return image, err
+}
+
+// AddressPhoto returns the photo to the customer who owns the address.
+func (a *App) AddressPhoto(ctx context.Context, customerID, id int64) ([]byte, error) {
+	return photoBy(ctx, a.DB, `SELECT p.image FROM customer_address_photos p JOIN customer_addresses ad ON ad.id = p.address_id
+		WHERE ad.id=$1 AND ad.customer_id=$2 AND ad.deleted_at IS NULL`, id, customerID)
+}
+
+// OrderAddressPhoto returns the door photo of the address an order goes to, for the store.
+func (a *App) OrderAddressPhoto(ctx context.Context, orderID int64) ([]byte, error) {
+	return photoBy(ctx, a.DB, `SELECT p.image FROM customer_address_photos p JOIN orders o ON o.address_id = p.address_id
+		WHERE o.id=$1`, orderID)
+}
+
+// RiderAddressPhoto returns it to the rider carrying the order, and only until
+// the delivery is over.
+func (a *App) RiderAddressPhoto(ctx context.Context, taskID, riderID int64) ([]byte, error) {
+	return photoBy(ctx, a.DB, `SELECT p.image FROM customer_address_photos p JOIN orders o ON o.address_id = p.address_id
+		JOIN delivery_tasks t ON t.order_id = o.id
+		WHERE t.id=$1 AND t.rider_id=$2 AND t.status NOT IN ('delivered', 'failed')`, taskID, riderID)
 }
 
 // addressOf loads an address for the customer who owns phone.

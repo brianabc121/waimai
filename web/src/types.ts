@@ -64,6 +64,8 @@ export interface Cash {
 export interface Order {
   id: number; branch_id: number; public_no: string; pickup_code: string; service_type: 'delivery' | 'pickup' | 'dine_in'
   customer_name: string; customer_phone: string; zone_name: string; address_line: string; address_unit: string
+  // from the saved address: who to call (may differ from the account that ordered), other ways to reach them, a photo of the door
+  contact_phone: string; contact_title: '' | 'mr' | 'ms'; contact_wechat: string; contact_telegram: string; address_photo: boolean
   address_note: string; note: string; currency: string; totals: Totals; payment_method: string
   acceptance_status: string; packing_status: string; fulfillment_status: string; payment_status: string
   display_status: string; close_reason: string; bags: number | null; version: number; manifest_version: number
@@ -78,7 +80,7 @@ export interface Bill { session_id: number; table_id: number; table_name: string
 export interface TableAccess { slug: string; store_name: string; table_name: string; mode: 'qr' | 'ipad' }
 export interface BatchLine { item_id: number; qty: number; option_ids: number[]; note: string }
 export interface Quote { id: string; currency: string; service_type: string; zone_name: string; zone_distance_m: number | null; scheduled_for: string | null; totals: Totals; expires_at: string
-  lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string }[] }
+  lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string; basket?: number }[] }
 export interface ImportRow {
   line: number; category: string; name: string; name_en: string; description: string; price: number; station: string
   action: string; old_price?: number; errors: string[]

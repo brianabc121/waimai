@@ -23,8 +23,10 @@ async function customerLogin(page, phone, address) {
 }
 
 // addAddress fills the open "new address" form and saves it. at is "lat, lng"
-// for the pin; without it the pin stays where the map opened.
-async function addAddress(page, { name = '李小红', unit = '12F', at } = {}) {
+// for the pin; without it the pin stays where the map opened. photo: true adds
+// a (tiny) photo of the door.
+const DOT = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+async function addAddress(page, { name = '李小红', unit = '12F', at, wechat, photo } = {}) {
   const tid = (id) => `[data-testid=${id}]`
   await page.waitForSelector(tid('address-form'))
   await page.fill(tid('af-name'), name)
@@ -42,6 +44,11 @@ async function addAddress(page, { name = '李小红', unit = '12F', at } = {}) {
     await page.waitForSelector(tid('af-place') + ' b')
   }
   await page.fill(tid('af-unit'), unit)
+  if (wechat) await page.fill(tid('af-wechat'), wechat)
+  if (photo) {
+    await page.setInputFiles(tid('af-photo') + ' input[type=file]', { name: 'door.png', mimeType: 'image/png', buffer: DOT })
+    await page.waitForSelector(tid('af-photo-img'))
+  }
   await page.click(tid('af-save'))
   await page.waitForSelector(tid('address-form'), { state: 'detached' })
 }

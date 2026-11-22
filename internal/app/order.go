@@ -82,9 +82,17 @@ type Order struct {
 	ZoneName      string `json:"zone_name"`
 	// DestLat/DestLng is the customer's pin (map-mode stores only);
 	// ZoneDistanceM is how far outside the zone it was, nil when inside.
-	DestLat           *float64  `json:"dest_lat"`
-	DestLng           *float64  `json:"dest_lng"`
-	ZoneDistanceM     *int      `json:"zone_distance_m"`
+	DestLat       *float64 `json:"dest_lat"`
+	DestLng       *float64 `json:"dest_lng"`
+	ZoneDistanceM *int     `json:"zone_distance_m"`
+	// Who the rider calls and how else to reach them; from the saved address.
+	// ContactPhone may differ from CustomerPhone, the account that ordered.
+	ContactPhone    string `json:"contact_phone"`
+	ContactTitle    string `json:"contact_title"`
+	ContactWechat   string `json:"contact_wechat"`
+	ContactTelegram string `json:"contact_telegram"`
+	// AddressPhoto says the customer added a photo of the door.
+	AddressPhoto      bool      `json:"address_photo"`
 	AddressLine       string    `json:"address_line"`
 	AddressUnit       string    `json:"address_unit"`
 	AddressNote       string    `json:"address_note"`
@@ -165,7 +173,8 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	o.accept_deadline, o.created_at, o.accepted_at, o.packed_at, o.handed_off_at, o.completed_at, o.closed_at,
 	o.token_nonce, COALESCE(o.promotion_id, 0), o.promotion_name, o.promotion_name_en, o.scheduled_for, o.release_at,
 	(SELECT b.timezone FROM branches b WHERE b.id = o.branch_id), o.session_id, o.table_name, o.amount_received,
-	o.payment_note, o.dest_lat, o.dest_lng, o.zone_distance_m`
+	o.payment_note, o.dest_lat, o.dest_lng, o.zone_distance_m, o.contact_phone, o.contact_title, o.contact_wechat,
+	o.contact_telegram, EXISTS (SELECT 1 FROM customer_address_photos p WHERE p.address_id = o.address_id)`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}}
@@ -178,7 +187,7 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.AcceptDeadline, &o.CreatedAt, &o.AcceptedAt, &o.PackedAt, &o.HandedOffAt, &o.CompletedAt, &o.ClosedAt,
 		&o.tokenNonce, &t.PromotionID, &t.PromotionName, &t.PromotionNameEn, &o.ScheduledFor, &o.ReleaseAt,
 		&o.Timezone, &o.SessionID, &o.TableName, &o.AmountReceived, &o.PaymentNote, &o.DestLat, &o.DestLng,
-		&o.ZoneDistanceM)
+		&o.ZoneDistanceM, &o.ContactPhone, &o.ContactTitle, &o.ContactWechat, &o.ContactTelegram, &o.AddressPhoto)
 	if err != nil {
 		return nil, err
 	}
