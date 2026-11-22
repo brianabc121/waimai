@@ -176,7 +176,7 @@ func (a *App) RiderReport(ctx context.Context, branchID int64, from, to string) 
 		return nil, err
 	}
 	out := &RiderReport{From: from, To: to, Timezone: b.Timezone, Currency: b.Currency, DetourPercent: b.DetourPercent,
-		DetourMeters: b.DetourMeters, StoreSet: b.Lat != nil && b.Lng != nil, RoadRoutes: a.Router != nil}
+		DetourMeters: b.DetourMeters, StoreSet: b.Lat != nil && b.Lng != nil, RoadRoutes: a.router() != nil}
 	trips, err := a.tripsIn(ctx, b, nil, start, end)
 	if err != nil {
 		return nil, err

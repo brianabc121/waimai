@@ -13,10 +13,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/brianabc121/waimai/internal/config"
 )
 
 // NotifyChannel is the PostgreSQL NOTIFY channel used for refresh hints.
@@ -45,7 +48,7 @@ func last4(s string) string {
 type App struct {
 	DB         *pgxpool.Pool
 	Secret     []byte
-	SMS        SMSSender
+	SMS        SMSSender // read with smsSender()
 	OTPDevEcho bool
 	// Push delivers reminders to riders, by device platform (android, ios,
 	// web). A platform with no sender is skipped.
@@ -58,18 +61,26 @@ type App struct {
 	// Router plans a rider's round trip on real roads. Without one the
 	// planned route of a trip is a straight-line estimate.
 	Router Router
+
+	// The four fields above are rebuilt when an administrator saves a key
+	// (settings.go); mu guards them. base is the configuration from the
+	// environment and effective the one in use, with the saved keys over it.
+	mu          *sync.RWMutex
+	base        config.Config
+	effective   *config.Config
+	settingsSig string
 }
 
 // forCustomer applies platform-wide limits to a store as customers use it.
 func (a *App) forCustomer(b *Branch) *Branch {
-	if a.MapsOff {
+	if a.mapsOff() {
 		b.ZoneMode = "list"
 	}
 	return b
 }
 
 func New(pool *pgxpool.Pool, secret string) *App {
-	return &App{DB: pool, Secret: []byte(secret), SMS: LogSMS{}}
+	return &App{DB: pool, Secret: []byte(secret), SMS: LogSMS{}, mu: &sync.RWMutex{}}
 }
 
 // Error is a business error with a stable code that the HTTP layer maps 1:1.

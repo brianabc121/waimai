@@ -167,3 +167,59 @@ func TestAdminWorkerAndJobs(t *testing.T) {
 		t.Fatalf("job actions are not in the audit log: %v", out)
 	}
 }
+
+func TestAdminSettingsOverHTTP(t *testing.T) {
+	f := newFixture(t)
+	admin, owner := adminClient(t), login(t, f.owner)
+	ctx := context.Background()
+	reset := func() {
+		_, _ = a.DB.Exec(ctx, `DELETE FROM platform_settings`)
+		_ = a.ReloadSettings(ctx)
+		// the shared test App was not built from a configuration: maps stay on
+		a.MapsOff, a.Router, a.Push = false, nil, nil
+	}
+	reset()
+	t.Cleanup(reset)
+
+	for _, r := range [][2]string{{"GET", "/admin/settings"}, {"PUT", "/admin/settings"}, {"POST", "/admin/settings/vapid"}} {
+		owner.want(403, "FORBIDDEN", r[0], r[1], map[string]any{})
+		newClient(t).want(401, "UNAUTHENTICATED", r[0], r[1], map[string]any{})
+	}
+
+	out := admin.want(200, "", "GET", "/admin/settings", nil)
+	if len(out["items"].([]any)) < 10 || out["active"].(map[string]any)["maps"] != "off" {
+		t.Fatalf("settings: %v", out)
+	}
+	if cfg := newClient(t).want(200, "", "GET", "/config", nil); cfg["maps_key"] != "" {
+		t.Fatalf("config before: %v", cfg)
+	}
+
+	const key = "AIzaSy-http-test-key-wxyz"
+	out = admin.want(200, "", "PUT", "/admin/settings", map[string]any{"values": map[string]string{"GOOGLE_MAPS_API_KEY": key}})
+	raw := fmt.Sprint(out)
+	if strings.Contains(raw, key) || !strings.Contains(raw, "••••••••wxyz") {
+		t.Fatalf("the answer must carry the masked key only: %v", out)
+	}
+	if strings.Contains(fmt.Sprint(admin.want(200, "", "GET", "/admin/settings", nil)), key) {
+		t.Fatal("the settings page got the key in the clear")
+	}
+	// the customer pages get the browser key without a restart
+	if cfg := newClient(t).want(200, "", "GET", "/config", nil); cfg["maps_key"] != key {
+		t.Fatalf("config after: %v", cfg)
+	}
+
+	admin.want(422, "SETTINGS_INCOMPLETE", "PUT", "/admin/settings", map[string]any{"values": map[string]string{"SMS_PROVIDER": "webhook"}})
+	admin.want(422, "VALIDATION", "PUT", "/admin/settings", map[string]any{"values": map[string]string{"APP_SECRET": "x"}})
+
+	out = admin.want(200, "", "POST", "/admin/settings/vapid", map[string]any{})
+	if out["active"].(map[string]any)["web_push"] != true {
+		t.Fatalf("after making a pair: %v", out["active"])
+	}
+	if cfg := newClient(t).want(200, "", "GET", "/config", nil); len(fmt.Sprint(cfg["push_key"])) < 40 {
+		t.Fatalf("push key: %v", cfg)
+	}
+	out = admin.want(200, "", "GET", "/admin/audit?action=settings.", nil)
+	if out["total"].(float64) < 2 || strings.Contains(fmt.Sprint(out), key) {
+		t.Fatalf("audit: %v", out)
+	}
+}

@@ -84,6 +84,45 @@ func (s *Server) adminRoutes(admin *gin.RouterGroup) {
 	admin.POST("/jobs/:id/:action", s.adminJobAction) // retry, discard
 
 	admin.GET("/audit", s.adminAudit)
+
+	admin.GET("/settings", s.adminSettings)
+	admin.PUT("/settings", s.adminSaveSettings)
+	admin.POST("/settings/vapid", s.adminNewVAPIDKeys)
+}
+
+// ---- keys of outside services ----
+
+func (s *Server) adminSettings(c *gin.Context) {
+	v, err := s.App.AdminSettings(c)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, v)
+}
+
+func (s *Server) adminSaveSettings(c *gin.Context) {
+	var in struct {
+		Values map[string]string `json:"values"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	v, err := s.App.AdminSaveSettings(c, adminActor(c), in.Values)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, v)
+}
+
+func (s *Server) adminNewVAPIDKeys(c *gin.Context) {
+	v, err := s.App.AdminNewVAPIDKeys(c, adminActor(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, v)
 }
 
 // ---- merchants ----

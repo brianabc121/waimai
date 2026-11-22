@@ -38,6 +38,8 @@ func main() {
 		log.Print("WARNING: APP_SECRET is the development default.")
 	}
 
+	go a.WatchSettings(ctx, log.Printf)
+
 	hub := httpapi.NewHub()
 	go hub.Listen(ctx, cfg.ListenDatabaseURL)
 	workerDone := make(chan struct{})
