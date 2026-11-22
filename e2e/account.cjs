@@ -126,7 +126,7 @@ await pickZone(page)
 await page.locator('.bottombar .btn.primary').click()
 await page.waitForURL('**/o/**')
 await page.locator('text=12F').first().waitFor()
-const orderNo = (await page.locator('.topbar h1').innerText()).replace('订单号', '').trim()
+const orderNo = (await page.locator('[data-testid=order-no]').innerText()).trim()
 step('the order is sent to the chosen address')
 
 // The store sees who to call, the WeChat name and the photo of the door.

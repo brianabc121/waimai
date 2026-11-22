@@ -66,7 +66,7 @@ const expectStatus = async (text) => {
   await cust.waitForFunction(t => document.querySelector('[data-testid=status]')?.textContent?.includes(t), text, { timeout: 8000 })
 }
 await expectStatus('等待商家接单')
-const orderNo = (await cust.locator('.topbar h1').innerText()).replace('订单号', '').trim()
+const orderNo = (await cust.locator('[data-testid=order-no]').innerText()).trim()
 await shot(cust, '04-pending')
 await cust.locator(`.totals tr.disc:has-text("${promoName}")`).waitFor()   // the order keeps the discount
 step(`customer placed ${orderNo}, total ${total}`)
@@ -226,7 +226,7 @@ await shot(later, '15-checkout-scheduled')
 await later.locator('.bottombar .btn.primary').click()
 await later.waitForURL('**/o/**')
 await later.locator(`[data-testid=scheduled]:has-text("${slotText}")`).waitFor()
-const laterNo = (await later.locator('.topbar h1').innerText()).replace('订单号', '').trim()
+const laterNo = (await later.locator('[data-testid=order-no]').innerText()).trim()
 await desk.click(`.ord:has-text("${laterNo}")`)
 await desk.click('.detail button:has-text("接单")')
 await later.waitForFunction(() => document.querySelector('[data-testid=status]')?.textContent?.includes('按预约时间'), null, { timeout: 8000 })

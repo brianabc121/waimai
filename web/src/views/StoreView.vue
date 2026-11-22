@@ -12,6 +12,7 @@ import CartPanel from './CartPanel.vue'
 import MenuList from './MenuList.vue'
 import StoreReviews from './StoreReviews.vue'
 import './storeStrings'
+import '../orders'
 
 // The map and the address book are only downloaded when a customer opens them.
 const PlacePicker = defineAsyncComponent(() => import('./PlacePicker.vue'))
@@ -251,6 +252,7 @@ async function sendReport() {
             <div v-if="showAccount && customer.verified" class="acct-menu" data-testid="account-menu">
               <div class="small muted">{{ t('sf.logged_in') }}</div>
               <div class="bold">{{ prettyPhone(customer.phone) }}</div>
+              <button class="btn small block" data-testid="my-orders" @click="router.push('/orders')">{{ t('ol.title') }}</button>
               <button class="btn small block" data-testid="my-addresses" @click="showAddresses = true; showAccount = false">{{ t('ad.mine') }}</button>
               <button class="btn small block" data-testid="logout" @click="logout">{{ t('sf.logout') }}</button>
             </div>

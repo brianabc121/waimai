@@ -12,10 +12,12 @@ import (
 // ---- merchant order desk ----
 
 // ListOrders returns a branch's orders. scope "active" is everything still in
-// progress; "history" is the most recent finished or closed orders.
+// progress, and orders with an after-sales request the store has not answered;
+// "history" is the most recent finished or closed orders.
 func (a *App) ListOrders(ctx context.Context, branchID int64, scope string) ([]*Order, error) {
 	active := `o.acceptance_status = 'pending' OR (o.acceptance_status = 'accepted'
-		AND o.fulfillment_status NOT IN ('delivered','picked_up'))`
+		AND o.fulfillment_status NOT IN ('delivered','picked_up'))
+		OR EXISTS (SELECT 1 FROM order_aftersales s WHERE s.order_id = o.id AND s.status = 'open')`
 	// Dine-in bills live on the tables screen, not in the delivery/pickup desk.
 	const notDineIn = ` AND o.service_type <> 'dine_in'`
 	if scope == "history" {

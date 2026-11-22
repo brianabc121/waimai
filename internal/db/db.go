@@ -53,5 +53,7 @@ func Migrate(ctx context.Context, url string) error {
 	if err := goose.SetDialect("postgres"); err != nil {
 		return err
 	}
-	return goose.UpContext(ctx, sqlDB, "migrations")
+	// Several branches add migrations at the same time, so a lower number can
+	// arrive after a higher one was applied; it is applied then, not refused.
+	return goose.UpContext(ctx, sqlDB, "migrations", goose.WithAllowMissing())
 }

@@ -39,3 +39,4 @@ e2e:
 	node e2e/responsive.cjs
 	node e2e/storefront.cjs
 	node e2e/account.cjs
+	node e2e/orders.cjs
