@@ -34,7 +34,7 @@ function login(sent) {
 var ITEMS = [['🍜', '#ffe8cc', '招牌牛肉面', '大份 · 加辣', 1, 268], ['🥟', '#e3f2e1', '鲜肉煎饺', '6 个', 2, 240], ['🥤', '#e0ecff', '冻柠茶', '少冰', 1, 85]];
 function addrCard(sel, pickup) {
   var top = sel
-    ? '<div class="addr row"><div class="grow"><div class="row" style="gap:6px"><span class="tag brand">家</span><b style="font-size:17px">Trump Tower at Century City</b></div><div class="small" style="margin-top:3px">40 楼 4001 · Kalayaan Ave, Makati</div><div class="small muted num">陈先生 +63 917 555 0123</div><div style="margin-top:6px"><span class="tag ok">可配送 · 配送费 ₱69</span></div></div><span class="chev">›</span></div>'
+    ? '<div class="addr row"><div class="grow"><div class="row" style="gap:6px"><span class="tag brand">家</span><b style="font-size:17px">Trump Tower at Century City</b></div><div class="small" style="margin-top:3px">40 楼 4001 · Kalayaan Ave, Makati</div><div class="small muted num">陈先生 +63 917 555 0123</div></div><span class="chev">›</span></div>'
     : '<div class="addr row between"><span class="pick">选择收货地址</span><span class="chev">›</span></div>';
   return '<div class="card">' + top +
     '<div class="opt' + (sel ? ' on' : '') + '"><b>立即配送</b><span class="v">' + (sel ? '约 35 分钟送达' : '请选择地址') + '</span></div>' +
