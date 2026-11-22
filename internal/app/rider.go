@@ -61,9 +61,10 @@ func riderBranches(ctx context.Context, q Querier, userID int64) ([]int64, error
 
 var errNotRider = Err(http.StatusForbidden, "NOT_RIDER", "only a rider can do this")
 
-// SetDuty clocks a rider on or off. The last known position is cleared when
-// the shift ends, so the store never shows where someone is after work.
-// session is the sign-in the shift is started from: signing out there ends it.
+// SetDuty clocks a rider on or off: the rider's switch in the workbench. It
+// opens or closes the person's shift (see shifts.go) in the branch where they
+// ride. session is the sign-in the shift is started from: signing out there
+// ends it.
 func (a *App) SetDuty(ctx context.Context, userID int64, on bool, session string) (*RiderStatus, error) {
 	var out *RiderStatus
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
@@ -71,16 +72,22 @@ func (a *App) SetDuty(ctx context.Context, userID int64, on bool, session string
 		if err != nil {
 			return err
 		}
-		if len(branches) == 0 {
-			if on {
+		if on {
+			if len(branches) == 0 {
 				return errNotRider
 			}
-		}
-		var sh []byte
-		if session != "" {
-			sh = hashToken(session)
-		}
-		if err := setDuty(ctx, tx, userID, on, sh); err != nil {
+			var sh []byte
+			if session != "" {
+				sh = hashToken(session)
+			}
+			if _, err := clockOn(ctx, tx, userID, branches[0], "manual", sh, nil); err != nil {
+				return err
+			}
+			// On a shift that was started in another store, still ride.
+			if err := setDuty(ctx, tx, userID, true, sh); err != nil {
+				return err
+			}
+		} else if err := clockOff(ctx, tx, userID, "manual", time.Now(), nil); err != nil {
 			return err
 		}
 		for _, b := range branches {
@@ -103,13 +110,6 @@ func setDuty(ctx context.Context, q Querier, userID int64, on bool, session []by
 	}
 	_, err := q.Exec(ctx, `UPDATE rider_status SET on_duty=false, duty_since=NULL, duty_session=NULL, lat=NULL, lng=NULL,
 		accuracy=NULL, located_at=NULL, updated_at=now() WHERE user_id=$1 AND on_duty`, userID)
-	return err
-}
-
-// endLongShifts clocks off riders who never ended their shift.
-func (a *App) endLongShifts(ctx context.Context) error {
-	_, err := a.DB.Exec(ctx, `UPDATE rider_status SET on_duty=false, duty_since=NULL, duty_session=NULL, lat=NULL, lng=NULL,
-		accuracy=NULL, located_at=NULL, updated_at=now() WHERE on_duty AND duty_since < now() - make_interval(secs => $1)`, dutyMax.Seconds())
 	return err
 }
 

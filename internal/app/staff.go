@@ -150,7 +150,7 @@ type StaffMember struct {
 	// What they have on their plate right now.
 	OpenTasks        int `json:"open_tasks"`        // dishes waiting at their stations
 	ActiveDeliveries int `json:"active_deliveries"` // deliveries not finished yet
-	// OnDuty is set for riders who clocked on.
+	// OnDuty is set for people who clocked on and have not clocked off.
 	OnDuty bool `json:"on_duty"`
 }
 
@@ -172,8 +172,10 @@ func (a *App) listStaff(ctx context.Context, branchID int64, extra string) ([]St
 			WHERE oi.branch_id = r.branch_id AND oi.prep_status IN ('pending','preparing') AND o.acceptance_status = 'accepted'),
 		(SELECT count(*) FROM delivery_tasks d WHERE d.rider_id = u.id AND d.branch_id = r.branch_id
 			AND d.status IN ('assigned','picked_up','arrived')),
-		coalesce((SELECT rs.on_duty FROM rider_status rs WHERE rs.user_id = u.id), false) AND EXISTS (SELECT 1
-			FROM staff_posts p WHERE p.user_id = u.id AND p.branch_id = r.branch_id AND p.kind = 'rider')
+		EXISTS (SELECT 1 FROM staff_shifts sh WHERE sh.user_id = u.id AND sh.branch_id = r.branch_id
+			AND sh.ended_at IS NULL AND NOT sh.voided)
+		OR (coalesce((SELECT rs.on_duty FROM rider_status rs WHERE rs.user_id = u.id), false) AND EXISTS (SELECT 1
+			FROM staff_posts p WHERE p.user_id = u.id AND p.branch_id = r.branch_id AND p.kind = 'rider'))
 		FROM user_branch_roles r JOIN users u ON u.id = r.user_id
 		WHERE r.branch_id=$1 AND u.deleted_at IS NULL`+extra+` ORDER BY u.active DESC, u.id`, branchID)
 	if err != nil {

@@ -3,6 +3,7 @@
 // and kept on the phone while there is no signal.
 import { reactive } from 'vue'
 import { ApiError, get, post } from '../../api'
+import { session } from '../../session'
 import { native, nativePost, plugin } from './native'
 
 export interface Point { lat: number; lng: number; accuracy?: number; battery?: number; at: string }
@@ -24,8 +25,22 @@ function apply(s: { on_duty: boolean; duty_since: string | null; located_at?: st
   duty.on = s.on_duty; duty.since = s.duty_since; duty.loaded = true
   if (!s.on_duty) { duty.sentAt = null; write([]) }
 }
-export async function loadDuty() { try { apply(await get('/rider/duty')) } catch { /* keep what we know */ } }
-export async function setDuty(on: boolean) { apply(await post('/rider/duty', { on_duty: on })) }
+// One shift for the person, whichever identity is in front: riders and
+// in-store staff use the same switch.
+export async function loadDuty() { try { apply(await get('/work/shift')) } catch { /* keep what we know */ } }
+// Where the switch was used, so the manager can tell it was at the store.
+// Best effort: no position is no reason to keep someone from clocking on.
+function here(): Promise<{ lat?: number; lng?: number }> {
+  if (last && Date.now() - Date.parse(last.at) < 2 * 60000) return Promise.resolve({ lat: last.lat, lng: last.lng })
+  if (native || !('geolocation' in navigator)) return Promise.resolve({})
+  return new Promise(done => {
+    const giveUp = setTimeout(() => done({}), 4000)
+    navigator.geolocation.getCurrentPosition(
+      p => { clearTimeout(giveUp); done({ lat: p.coords.latitude, lng: p.coords.longitude }) },
+      () => { clearTimeout(giveUp); done({}) }, { enableHighAccuracy: false, maximumAge: 60000, timeout: 3500 })
+  })
+}
+export async function setDuty(on: boolean) { apply(await post('/work/shift', { on_duty: on, branch_id: session.branchId, ...(await here()) })) }
 
 let sending = false
 export async function flush() {

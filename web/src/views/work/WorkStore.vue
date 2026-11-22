@@ -8,6 +8,8 @@ import { both, minutesSince, pick, t, whenText } from '../../i18n'
 import { useLive } from '../../live'
 import { currentRole, reloadUser, session } from '../../session'
 import type { Order, OrderItem } from '../../types'
+import { duty, loadDuty, setDuty } from './duty'
+import '../staff/strings'
 
 const props = defineProps<{ tab: 'tasks' | 'done'; riderTasks: number }>()
 const emit = defineEmits<{ count: [n: number]; switch: [] }>()
@@ -27,7 +29,17 @@ const filter = ref<'all' | 'packing' | number>('all')
 const { online, refreshNow } = useLive(() => `/merchant/branches/${bid}/events`, async () => {
   await reloadUser() // posts may have been changed by a manager
   orders.value = (await get<{ orders: Order[] }>(`/kitchen/branches/${bid}/board`)).orders
+  void loadDuty() // working without clocking on clocks you on
 })
+
+// ---- clocking on and off: the same shift as the rider's switch ----
+const shiftBusy = ref(false)
+async function toggleShift() {
+  shiftBusy.value = true; error.value = ''
+  try { await setDuty(!duty.on) } catch (e) { error.value = (e as Error).message }
+  shiftBusy.value = false
+}
+const sinceText = computed(() => duty.since ? new Date(duty.since).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '')
 
 const live = (o: Order) => o.items.filter(i => i.prep_status !== 'cancelled' && !i.served_at)
 const accepted = computed(() => orders.value.filter(o => o.acceptance_status === 'accepted'))
@@ -61,7 +73,7 @@ async function run(fn: () => Promise<unknown>) {
   }
   await refreshNow()
 }
-const itemAction = (it: OrderItem, action: string) => run(() => post(`/kitchen/items/${it.id}/${action}`))
+const itemAction = (it: OrderItem, action: string) => run(() => post(`/kitchen/items/${it.id}/${action}?via=work`))
 
 // ---- packing sheet: tick every line, count the bags, confirm ----
 const packId = ref(0)
@@ -74,7 +86,7 @@ const tick = (it: OrderItem) => { pk.ticked.has(it.id) ? pk.ticked.delete(it.id)
 const allTicked = computed(() => !!packOrder.value && live(packOrder.value).every(i => pk.ticked.has(i.id)))
 async function confirmPack() {
   const o = packOrder.value!
-  await run(() => post(`/kitchen/orders/${o.id}/pack`, { bags: pk.bags, manifest_version: o.manifest_version }))
+  await run(() => post(`/kitchen/orders/${o.id}/pack?via=work`, { bags: pk.bags, manifest_version: o.manifest_version }))
   if (!error.value) packId.value = 0
 }
 const handoff = (o: Order) => run(() => post(`/merchant/orders/${o.id}/handoff`))
@@ -87,6 +99,13 @@ const handoff = (o: Order) => run(() => post(`/merchant/orders/${o.id}/handoff`)
     <button v-if="riderTasks" class="banner info" style="border:0;text-align:left;width:100%;cursor:pointer" data-testid="rider-busy" @click="emit('switch')">{{ t('wk.rider_busy', { n: riderTasks }) }} ›</button>
 
     <template v-if="tab === 'tasks'">
+      <div v-if="duty.loaded" class="card duty" :class="{ on: duty.on }" data-testid="shift" :data-on="duty.on">
+        <div class="row between">
+          <div><b>{{ duty.on ? t('sh.on') : t('sh.off') }}</b>
+            <div class="small muted">{{ duty.on ? t('sh.since', { t: sinceText }) : t('sh.off_hint') }}</div></div>
+          <button class="btn" :class="{ primary: !duty.on }" :disabled="shiftBusy" data-act="shift" @click="toggleShift">{{ duty.on ? t('sh.end') : t('sh.start') }}</button>
+        </div>
+      </div>
       <div v-if="myStations.length + (packer ? 1 : 0) > 1" class="chips">
         <button :class="{ on: filter === 'all' }" @click="filter = 'all'">{{ t('wk.all') }} {{ cooking.length + toPack.length }}</button>
         <button v-for="p in myStations" :key="p.station_id!" :class="{ on: filter === p.station_id }" :data-station="p.station_name" @click="filter = p.station_id!">{{ pick(p.station_name ?? '', p.station_name_en ?? '') }} {{ stationCount(p.station_id) }}</button>

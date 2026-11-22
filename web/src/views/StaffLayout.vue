@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { get, post } from '../api'
 import { locale, setLocale, t } from '../i18n'
 import { currentRole, logout, session, setAdminView, setBranch } from '../session'
 
@@ -10,6 +11,14 @@ const desk = computed(() => ['owner', 'manager', 'cashier'].includes(role.value)
 const manager = computed(() => ['owner', 'manager'].includes(role.value))
 const posts = computed(() => currentRole()?.posts ?? [])
 const inStore = computed(() => posts.value.some(p => p.kind !== 'rider'))
+
+// Clocking on and off from the back office: the same shift as in the workbench.
+const shift = ref<{ on_duty: boolean } | null>(null)
+onMounted(async () => { if (role.value) shift.value = await get<{ on_duty: boolean }>('/work/shift').catch(() => null) })
+async function toggleShift() {
+  if (!shift.value) return
+  shift.value = await post<{ on_duty: boolean }>('/work/shift', { on_duty: !shift.value.on_duty, branch_id: session.branchId }).catch(() => shift.value)
+}
 
 async function out() { await logout(); session.loaded = true; router.replace('/login') }
 const viewing = computed(() => !!session.user?.is_platform_admin)
@@ -37,6 +46,8 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
       <router-link v-if="manager" to="/merchant/settings">{{ t('settings') }}</router-link>
       <router-link v-if="posts.length" to="/work">{{ t('my_workbench') }}</router-link>
       <span class="grow"></span>
+      <button v-if="shift" class="shiftbtn" :class="{ on: shift.on_duty }" data-testid="office-shift" :data-on="shift.on_duty" :title="t(shift.on_duty ? 'shift_end' : 'shift_start')" @click="toggleShift">
+        <i></i>{{ t(shift.on_duty ? 'shift_on' : 'shift_start') }}</button>
       <span class="small">{{ session.user?.display_name }}</span>
       <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
       <button class="btn link" @click="out">{{ t('sign_out') }}</button>
@@ -47,3 +58,9 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
     <router-view v-else :key="session.branchId" />
   </div>
 </template>
+
+<style scoped>
+.shiftbtn { background: none; border: 1px solid #8b949e; color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.shiftbtn i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #8b949e; margin-right: 5px; }
+.shiftbtn.on { border-color: #3fb950; } .shiftbtn.on i { background: #3fb950; }
+</style>

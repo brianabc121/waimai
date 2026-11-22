@@ -49,6 +49,7 @@ const dict: Record<string, [string, string]> = {
   'r.customer_cancelled': ['顾客取消', 'Cancelled by customer'], 'r.accept_timeout': ['商家超时未接单', 'Not accepted in time'],
   // staff
   sign_in: ['登录', 'Sign in'], username: ['用户名', 'Username'], password: ['密码', 'Password'], sign_out: ['退出', 'Sign out'],
+  shift_on: ['上班中', 'At work'], shift_start: ['上班', 'Clock on'], shift_end: ['点一下下班', 'Click to clock off'],
   bad_login: ['用户名或密码不对', 'Wrong username or password'],
   orders: ['订单', 'Orders'], menu_admin: ['菜单', 'Menu'], settings: ['设置', 'Settings'], cash: ['核款', 'Cash'], kitchen: ['后厨', 'Kitchen'],
   active: ['进行中', 'Active'], history: ['历史', 'History'], no_orders: ['暂无订单', 'No orders'],

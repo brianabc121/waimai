@@ -84,7 +84,12 @@ await rider.click('[data-testid=identity]')
 await rider.click('[data-testid=switch-go]')
 const duty = rider.locator('[data-testid=duty]')
 await duty.waitFor()
-if (await duty.getAttribute('data-on') !== 'false') throw new Error('a rider starts off duty')
+// Packing on the workbench without clocking on already started the shift:
+// one shift for the person, whichever identity is in front.
+await rider.waitForSelector('[data-testid=duty][data-on=true]')
+await duty.locator('[data-act=duty]').click()
+await rider.waitForSelector('[data-testid=duty][data-on=false]')
+step('working without clocking on started the shift; the rider clocks off')
 await shot(rider, 'd01-off-duty')
 
 // the installable page

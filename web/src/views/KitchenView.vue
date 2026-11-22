@@ -66,8 +66,8 @@ async function run(fn: () => Promise<unknown>) {
   }
   await refreshNow()
 }
-const itemAction = (it: OrderItem, action: string) => run(() => post(`/kitchen/items/${it.id}/${action}`))
-const pack = (o: Order) => run(() => post(`/kitchen/orders/${o.id}/pack`, { bags: check(o).bags, manifest_version: o.manifest_version }))
+const itemAction = (it: OrderItem, action: string) => run(() => post(`/kitchen/items/${it.id}/${action}?via=board`))
+const pack = (o: Order) => run(() => post(`/kitchen/orders/${o.id}/pack?via=board`, { bags: check(o).bags, manifest_version: o.manifest_version }))
 const serve = (it: OrderItem) => run(() => post(`/merchant/bill-items/${it.id}/serve`))
 const handoff = (o: Order) => run(() => post(`/merchant/orders/${o.id}/handoff`))
 
