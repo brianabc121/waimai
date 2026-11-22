@@ -24,6 +24,7 @@ export const router = createRouter({
         { path: 'delivery-map', component: () => import('./views/DeliveryMapView.vue') },
         { path: 'staff', component: () => import('./views/StaffView.vue') },
         { path: 'staff/attendance', component: () => import('./views/staff/AttendanceView.vue') },
+        { path: 'staff/kitchen', component: () => import('./views/staff/KitchenReportView.vue') },
         { path: 'riders', component: () => import('./views/RidersView.vue') },
         { path: 'settings', component: () => import('./views/SettingsView.vue') },
       ],

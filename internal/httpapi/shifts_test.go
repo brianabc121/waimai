@@ -64,3 +64,26 @@ func TestAttendanceOverHTTP(t *testing.T) {
 	stranger.want(404, "NOT_FOUND", "GET", period, nil)
 	stranger.want(404, "NOT_FOUND", "PATCH", edit, map[string]any{"void": true, "reason": "x"})
 }
+
+func TestKitchenReportOverHTTP(t *testing.T) {
+	f := newFixture(t)
+	owner, cashier, kitchen := login(t, f.owner), login(t, f.cashier), login(t, f.kitchen)
+	today := time.Now().In(time.FixedZone("", 8*3600)).Format("2006-01-02")
+	page := fmt.Sprintf("/merchant/branches/%d/reports/kitchen", f.branchID)
+	period := "?from=" + today + "&to=" + today
+
+	cashier.want(403, "FORBIDDEN", "GET", page+period, nil)
+	kitchen.want(403, "FORBIDDEN", "GET", page+"/0"+period, nil)
+	owner.want(422, "VALIDATION", "GET", page, nil)
+	out := owner.want(200, "", "GET", page+period, nil)
+	if out["slow_minutes"] != float64(15) || out["total_qty"] != float64(0) || len(out["people"].([]any)) < 2 {
+		t.Fatalf("report: %v", out)
+	}
+	d := owner.want(200, "", "GET", page+"/0"+period+"&slow=1&station=0&page=2", nil)
+	if d["page"] != float64(2) || len(d["days"].([]any)) != 7 || len(d["items"].([]any)) != 0 {
+		t.Fatalf("detail: %v", d)
+	}
+	owner.want(404, "NOT_FOUND", "GET", page+"/x"+period, nil)
+	owner.want(422, "VALIDATION", "GET", page+"/0"+period+"&station=x", nil)
+	login(t, newFixture(t).owner).want(404, "NOT_FOUND", "GET", page+period, nil)
+}

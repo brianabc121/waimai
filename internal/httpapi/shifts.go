@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/brianabc121/waimai/internal/app"
@@ -90,4 +92,48 @@ func (s *Server) editShift(c *gin.Context) {
 		return
 	}
 	c.JSON(200, sh)
+}
+
+// ---- in-store work summary ----
+
+func (s *Server) kitchenReport(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	out, err := s.App.KitchenReport(c, bid, c.Query("from"), c.Query("to"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+// kitchenDetail is one person's work; id 0 is the shared kitchen screen.
+func (s *Server) kitchenDetail(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id < 0 {
+		fail(c, app.ErrNotFound)
+		return
+	}
+	f := app.KitchenFilter{SlowOnly: c.Query("slow") == "1"}
+	f.Page, _ = strconv.Atoi(c.Query("page"))
+	if v := c.Query("station"); v != "" {
+		st, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			fail(c, app.ErrValidation("station must be a number"))
+			return
+		}
+		f.StationID = &st
+	}
+	out, err := s.App.KitchenDetail(c, bid, id, c.Query("from"), c.Query("to"), f)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, out)
 }
