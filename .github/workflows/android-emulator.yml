@@ -1,0 +1,91 @@
+name: Android emulator test
+
+# Installs the staff workbench app on an Android emulator and walks through a
+# delivery in it (e2e/android.cjs). The screenshots are kept as an artifact.
+# It runs when the app shell or the test changes, and by hand from the Actions tab.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ["mobile/**", "e2e/android.cjs", ".github/workflows/android-emulator.yml"]
+
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: waimai_dev
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/waimai_dev?sslmode=disable
+      # The emulator reaches the computer it runs on at 10.0.2.2.
+      WORKBENCH_URL: http://10.0.2.2:8080
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Server with demo data
+        run: |
+          (cd web && npm ci --no-audit --no-fund && npm run build)
+          go build -o bin/ ./cmd/...
+          ./bin/migrate && ./bin/seed
+          STATIC_DIR=web/dist EMBED_WORKER=true OTP_DEV_ECHO=true GOOGLE_MAPS_API_KEY=stub nohup ./bin/api > "$RUNNER_TEMP/api.log" 2>&1 &
+          for i in $(seq 60); do curl -sf localhost:8080/healthz > /dev/null && exit 0; sleep 0.5; done
+          cat "$RUNNER_TEMP/api.log"; exit 1
+
+      - name: Build the app
+        working-directory: mobile
+        run: |
+          npm ci --no-audit --no-fund
+          npx cap sync android
+          cd android && ./gradlew assembleDebug --console=plain
+
+      - name: Browser for the customer and the desk
+        run: |
+          npm install --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" playwright
+          echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Allow hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run in the emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          SHOTS_DIR: ${{ runner.temp }}/shots
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: bash e2e/android.sh
+
+      - name: Server log
+        if: failure()
+        run: tail -100 "$RUNNER_TEMP/api.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-emulator-screenshots-${{ github.run_number }}
+          path: ${{ runner.temp }}/shots
+          retention-days: 30

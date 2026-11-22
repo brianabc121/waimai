@@ -11,8 +11,13 @@ export const appPush: boolean = native && /WorkbenchApp\/\d+ fcm/.test(navigator
 
 const plugins: Record<string, Promise<any>> = {}
 export function plugin<T = any>(name: string): Promise<T> {
-  // Wrapped in an object: a plugin proxy answers any property, "then" included.
-  return (plugins[name] ??= import('@capacitor/core').then(c => ({ p: c.registerPlugin<T>(name) }))).then(w => w.p)
+  // A plugin answers any property, "then" included, so a promise handed the
+  // plugin itself would try to wait on it and fail ("then() is not
+  // implemented"). The cover below hides "then" and passes the rest through.
+  return (plugins[name] ??= import('@capacitor/core').then(c => {
+    const p = c.registerPlugin<any>(name)
+    return new Proxy({}, { get: (_, k) => k === 'then' ? undefined : p[k] })
+  }))
 }
 
 // nativePost sends a request through the phone instead of the page. Android
