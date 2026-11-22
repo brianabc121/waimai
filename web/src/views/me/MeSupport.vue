@@ -2,6 +2,7 @@
 // Who to turn to: the platform for the account, the store for an order.
 import { onMounted, ref, watch } from 'vue'
 import { pick, t } from '../../i18n'
+import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
 import { me, myStores, platformInfo, type MyStore, type PlatformInfo } from './me'
 
@@ -14,6 +15,7 @@ const chatLink = (v: string) => /^https?:\/\//i.test(v) ? v : ''
 
 <template>
   <MePage :title="t('ms.title')" open>
+    <MeIntro :title="t('mi.support')" :sub="t('mi.support_sub')" :icon="'M5 13v-1a7 7 0 0 1 14 0v1M5 13h2.5v5H6a1 1 0 0 1-1-1zM19 13h-2.5v5H18a1 1 0 0 0 1-1zM16.5 18c0 1.7-1.5 2.5-3.5 2.5'" />
     <div class="card">
       <h2>{{ t('ms.platform') }}</h2>
       <div v-if="info && !info.support_phone && !info.support_email && !info.support_chat" class="note" style="margin-top:8px" data-testid="support-none">{{ t('ms.none') }}</div>

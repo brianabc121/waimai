@@ -4,6 +4,7 @@
 import { ref, watch } from 'vue'
 import { locale, pick, promoLabel, t } from '../../i18n'
 import type { Promotion } from '../../types'
+import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
 import { describe, homeStore, me, myOffers, offerParts, type StoreOffers } from './me'
 
@@ -32,12 +33,9 @@ function valid(p: Promotion): string {
 
 <template>
   <MePage :title="t('mo.title')" class="offers">
-    <div class="top">
-      <div class="info">
-        <span class="ic"><svg viewBox="0 0 28 24" width="40" height="34" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h21v3.500a2.5 2.5 0 0 0 0 5V18h-21v-3.500a2.5 2.5 0 0 0 0-5z" /><path d="M10 6.500v11" stroke-dasharray="1.6 2.2" /><path d="m15.5 15 4.5-6M15.8 9.600h.01M19.7 14.400h.01" /></svg></span>
-        <p><b>{{ t('mo.auto') }}</b><span>{{ t('mo.no_claim') }}</span></p>
-      </div>
-    </div>
+    <MeIntro :title="t('mo.auto')" :sub="t('mo.no_claim')">
+      <template #icon><svg viewBox="0 0 28 24" width="40" height="34" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h21v3.500a2.5 2.5 0 0 0 0 5V18h-21v-3.500a2.5 2.5 0 0 0 0-5z" /><path d="M10 6.500v11" stroke-dasharray="1.6 2.2" /><path d="m15.5 15 4.5-6M15.8 9.600h.01M19.7 14.400h.01" /></svg></template>
+    </MeIntro>
     <div v-if="error" class="banner bad">{{ error }}</div>
     <div v-if="offers && !offers.length" class="card empty" data-testid="offers-empty">{{ t('me.no_offers') }}</div>
     <template v-for="o in offers ?? []" :key="o.store.slug">
@@ -61,15 +59,6 @@ function valid(p: Promotion): string {
 </template>
 
 <style scoped>
-.offers :deep(.mp-bar) { border-bottom: 0; }
-/* the red of the bar runs on under the first card, and ends in a curve */
-.top { margin: -12px -12px 4px; padding: 6px 12px 0; background: linear-gradient(180deg, var(--red) 0, var(--red) 62px, transparent 62px); position: relative; }
-.top::before { content: ""; position: absolute; left: 0; right: 0; top: 40px; height: 44px; background: var(--red); border-radius: 0 0 50% 50% / 0 0 22px 22px; }
-.info { position: relative; display: flex; align-items: center; gap: 16px; background: var(--paper); border-radius: 18px; padding: 14px 16px; box-shadow: 0 6px 18px rgba(90, 40, 15, .12); }
-.info .ic { flex: none; width: 62px; height: 62px; border-radius: 50%; background: #f9dcd6; color: var(--red); display: grid; place-items: center; }
-.info p { display: grid; gap: 4px; min-width: 0; padding-left: 16px; border-left: 1px solid var(--line); }
-.info b { font-size: 16px; line-height: 1.4; }
-.info p span { color: var(--muted); font-size: 15px; }
 .coupon { position: relative; display: flex; align-items: stretch; background: var(--paper); border-radius: 16px; box-shadow: 0 3px 12px rgba(90, 40, 15, .08); min-width: 0; }
 .stub { flex: none; width: 31%; min-width: 106px; max-width: 170px; display: grid; justify-items: center; align-content: center; gap: 4px; padding: 14px 6px; border-radius: 16px 0 0 16px; background: linear-gradient(135deg, #fdeae4, #f9d9d3); color: var(--red); border-right: 1.500px dashed #d9a79a; position: relative; text-align: center; }
 .coupon.ship .stub { background: linear-gradient(135deg, #fdf1d6, #fbe3ad); border-right-color: #dcbf7c; }
@@ -87,6 +76,5 @@ function valid(p: Promotion): string {
 .use:hover { background: var(--red-deep); }
 @media (max-width: 380px) {
   .stub b { font-size: 19px; } .l { padding-left: 14px; } .l > b { font-size: 16.500px; } .use { padding: 6px 8px 6px 12px; font-size: 14px; margin-right: 8px; }
-  .info { gap: 10px; } .info p { padding-left: 10px; } .info .ic { width: 52px; height: 52px; }
 }
 </style>

@@ -2,6 +2,7 @@
 // A note to the platform, and what it answered.
 import { reactive, ref, watch } from 'vue'
 import { t } from '../../i18n'
+import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
 import { dateTime, describe, me, myFeedback, sendFeedback, type Feedback } from './me'
 
@@ -26,6 +27,7 @@ async function submit() {
 
 <template>
   <MePage :title="t('mk.title')">
+    <MeIntro :title="t('mi.feedback')" :sub="t('mi.feedback_sub')" :icon="'M4 6.5h16v11H4zM4.5 7l7.5 6 7.5-6'" />
     <form class="card" data-testid="feedback-form" @submit.prevent="submit">
       <div v-if="sent" class="banner ok" style="margin-bottom:12px" data-testid="feedback-sent">{{ t('mk.sent') }}</div>
       <div v-if="error" class="banner bad" style="margin-bottom:12px" data-testid="feedback-error">{{ error }}</div>
@@ -36,7 +38,7 @@ async function submit() {
       <button class="btn primary block big" :disabled="busy" data-testid="feedback-submit">{{ t('mk.submit') }}</button>
     </form>
     <template v-if="list.length">
-      <h3 style="padding:4px 6px 0">{{ t('mk.mine') }}</h3>
+      <h3 class="me-sec">{{ t('mk.mine') }}</h3>
       <div v-for="x in list" :key="x.id" class="card stack" data-testid="feedback-item">
         <div class="row between"><span class="tag">{{ t('mk.' + x.kind) }}</span><span class="small muted">{{ dateTime(x.created_at) }}</span></div>
         <p style="white-space:pre-wrap">{{ x.content }}</p>
@@ -50,7 +52,7 @@ async function submit() {
 <style scoped>
 .field { margin-bottom: 12px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-.chips button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 14px; cursor: pointer; font-size: 14px; }
-.chips button.on { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); font-weight: 600; }
-.reply { background: #f6f7f8; border-radius: 10px; padding: 10px 12px; font-size: 14px; white-space: pre-wrap; }
+.chips button { border: 1px solid #d9c7ae; background: none; border-radius: 999px; padding: 6px 14px; cursor: pointer; font-size: 14px; color: var(--ink); }
+.chips button.on { background: var(--gold); border-color: var(--gold); color: var(--red); font-weight: 700; }
+.reply { background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 14px; white-space: pre-wrap; }
 </style>

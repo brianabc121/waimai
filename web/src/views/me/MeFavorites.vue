@@ -5,6 +5,7 @@
 import { computed, ref, watch } from 'vue'
 import { pick, t } from '../../i18n'
 import CustomerTabs from './CustomerTabs.vue'
+import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
 import { describe, me, myStores, setFavorite, type MyStore } from './me'
 
@@ -25,6 +26,7 @@ async function toggle(s: MyStore) {
 
 <template>
   <MePage :title="t('mf.title')" open>
+    <MeIntro :title="t('mi.fav')" :sub="t('mi.fav_sub')" :icon="'M12 20s-7.5-4.6-7.5-10.1A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.7C19.5 15.4 12 20 12 20z'" />
     <div v-if="error" class="banner bad">{{ error }}</div>
     <div v-if="!me.profile" class="card empty">{{ t('mf.no_store') }}<br /><router-link to="/account/login?next=/me/favorites" class="btn primary" style="margin-top:14px">{{ t('me.login') }}</router-link></div>
     <template v-else-if="stores">
@@ -35,18 +37,18 @@ async function toggle(s: MyStore) {
             <img v-if="s.logo_url" :src="s.logo_url" alt="" class="me-logo" /><span v-else class="me-logo">{{ pick(s.name, s.name_en).slice(0, 1) }}</span>
             <span class="grow"><b>{{ pick(s.name, s.name_en) }}</b><span class="small muted">{{ s.address }}</span></span>
           </router-link>
-          <button class="btn small" data-testid="fav-remove" @click="toggle(s)">{{ t('mf.unfav') }}</button>
+          <button class="pill" data-testid="fav-remove" @click="toggle(s)">{{ t('mf.unfav') }}</button>
         </div>
       </div>
       <template v-if="visited.length">
-        <h3 style="padding:4px 6px 0">{{ t('mf.visited') }}</h3>
+        <h3 class="me-sec">{{ t('mf.visited') }}</h3>
         <div class="card list">
           <div v-for="s in visited" :key="s.slug" class="store" data-testid="visited-store">
             <router-link :to="`/s/${s.slug}`" class="lnk">
               <img v-if="s.logo_url" :src="s.logo_url" alt="" class="me-logo" /><span v-else class="me-logo">{{ pick(s.name, s.name_en).slice(0, 1) }}</span>
               <span class="grow"><b>{{ pick(s.name, s.name_en) }}</b><span class="small muted">{{ s.address }}</span></span>
             </router-link>
-            <button class="btn small" data-testid="fav-add" @click="toggle(s)">{{ t('mf.fav') }}</button>
+            <button class="pill red" data-testid="fav-add" @click="toggle(s)">{{ t('mf.fav') }}</button>
           </div>
         </div>
       </template>
@@ -57,7 +59,8 @@ async function toggle(s: MyStore) {
 
 <style scoped>
 .list { padding: 2px 14px; }
-.store { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #f0f1f3; }
+.store { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.lnk b { font-size: 16.5px; }
 .store:last-child { border-bottom: 0; }
 .lnk { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; color: var(--ink); }
 .lnk .grow { display: grid; } .lnk .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
