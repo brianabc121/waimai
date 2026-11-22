@@ -105,7 +105,8 @@ await app.click('[data-testid=identity]')
 await app.click('[data-testid=switch-go]')
 const duty = app.locator('[data-testid=duty]')
 await duty.waitFor()
-await duty.locator('[data-act=duty]').click()
+// Packing in the in-store identity already started the shift (one shift for
+// the person, whichever identity is in front), so the switch is already on.
 await app.waitForSelector('[data-testid=duty][data-on=true]')
 // The emulator hands out a position only when it changes, so nudge it until one arrives.
 let lat = 14.5547
