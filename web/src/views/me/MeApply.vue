@@ -4,6 +4,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { ApiError } from '../../api'
 import { t } from '../../i18n'
+import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
 import { dateTime, describe, me, myApplications, sendApplication, type Application } from './me'
 
@@ -28,7 +29,7 @@ async function submit() {
 
 <template>
   <MePage :title="t('ma.title')">
-    <p class="note" style="padding:0 6px">{{ t('ma.intro') }}</p>
+    <MeIntro :title="t('mi.apply')" :sub="t('mi.apply_sub')" :icon="'M5 10.5V19h14v-8.5M3.5 7 5 4h14l1.5 3v1a2.2 2.2 0 0 1-4.25.8 2.2 2.2 0 0 1-4.25 0 2.2 2.2 0 0 1-4.25 0A2.2 2.2 0 0 1 3.5 8zM9.5 19v-4.5h5V19'" />
     <div v-if="sent" class="banner ok" data-testid="apply-sent">{{ t('ma.sent') }}</div>
     <div v-if="pending" class="banner info" data-testid="apply-pending">{{ t('ma.pending') }}</div>
     <form v-else class="card" data-testid="apply-form" @submit.prevent="submit">
@@ -42,7 +43,7 @@ async function submit() {
       <button class="btn primary block big" :disabled="busy" data-testid="apply-submit">{{ t('ma.submit') }}</button>
     </form>
     <template v-if="list.length">
-      <h3 style="padding:4px 6px 0">{{ t('ma.mine') }}</h3>
+      <h3 class="me-sec">{{ t('ma.mine') }}</h3>
       <div v-for="a in list" :key="a.id" class="card stack" data-testid="application" :data-status="a.status">
         <div class="row between"><b>{{ a.store_name }}</b>
           <span class="tag" :class="{ ok: a.status === 'approved', bad: a.status === 'rejected', warn: a.status === 'pending' }">{{ t('ma.s_' + a.status) }}</span></div>
@@ -54,5 +55,5 @@ async function submit() {
 </template>
 
 <style scoped>
-.reply { background: #f6f7f8; border-radius: 10px; padding: 10px 12px; font-size: 14px; white-space: pre-wrap; }
+.reply { background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 14px; white-space: pre-wrap; }
 </style>

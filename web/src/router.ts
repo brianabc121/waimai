@@ -17,6 +17,7 @@ export const router = createRouter({
     { path: '/me/profile', component: () => import('./views/me/MeProfile.vue') },
     { path: '/me/wallet/:account(balance|bonus)', component: () => import('./views/me/MeWallet.vue'), props: true },
     { path: '/me/coupons', component: () => import('./views/me/MeOffers.vue') },
+    { path: '/me/addresses', component: () => import('./views/me/MeAddresses.vue') },
     { path: '/me/favorites', component: () => import('./views/me/MeFavorites.vue') },
     { path: '/me/support', component: () => import('./views/me/MeSupport.vue') },
     { path: '/me/reviews', component: () => import('./views/me/MeReviews.vue') },

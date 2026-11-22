@@ -5,14 +5,12 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginRoute } from '../../customer'
 import { money, pick, t } from '../../i18n'
-import AddressSheet from '../AddressSheet.vue'
 import CustomerTabs from './CustomerTabs.vue'
 import { avatarUrl, displayName, homeStore, loadProfile, me, myOffers, offerParts, plain, type StoreOffers } from './me'
 
 const router = useRouter()
 const ready = ref(false)
 const offers = ref<StoreOffers[]>([])
-const showAddresses = ref(false)
 const toast = ref('')
 const home = homeStore()
 
@@ -37,10 +35,7 @@ function go(path: string, open = false) {
   if (!profile.value && !open) void router.push(loginRoute(path))
   else void router.push(path)
 }
-function addresses() {
-  if (!profile.value) void router.push(loginRoute('/me'))
-  else showAddresses.value = true
-}
+function addresses() { go('/me/addresses') }
 async function share() {
   const url = location.origin + (home ? `/s/${home.slug}` : '/me')
   try {
@@ -139,7 +134,6 @@ const more = computed<Entry[]>(() => [
       </section>
     </div>
 
-    <AddressSheet v-if="showAddresses" manage :slug="home?.slug" :currency="home?.currency" @close="showAddresses = false" />
     <div v-if="toast" class="me-toast">{{ toast }}</div>
     <CustomerTabs active="me" />
   </div>

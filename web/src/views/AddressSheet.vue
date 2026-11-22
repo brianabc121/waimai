@@ -15,8 +15,11 @@ const props = defineProps<{
   country?: string; fields?: string[]
   // open straight on the form for a new address
   startNew?: boolean
+  // the address book as a page of its own ("me" → addresses) rather than a sheet;
+  // the form still opens as a sheet over it
+  page?: boolean
 }>()
-const emit = defineEmits<{ select: [a: Address]; close: []; changed: [list: Address[]] }>()
+const emit = defineEmits<{ select: [a: Address]; close: []; changed: [list: Address[]]; limit: [n: number] }>()
 
 const list = ref<Address[] | null>(null)
 const limit = ref(20)
@@ -28,7 +31,7 @@ async function load() {
   try {
     const r = await listAddresses(props.slug)
     list.value = sorted(r.addresses); limit.value = r.limit
-    emit('changed', list.value)
+    emit('changed', list.value); emit('limit', r.limit)
   } catch (e) { error.value = e instanceof ApiError && e.code === 'NETWORK' ? t('offline') : (e as Error).message }
 }
 onMounted(load)
@@ -47,7 +50,32 @@ function closeForm() { if (props.startNew && !list.value?.length) emit('close');
 </script>
 
 <template>
-  <div class="sheet-mask" data-testid="address-sheet" @click.self="emit('close')">
+  <div v-if="page" class="as-page" data-testid="address-sheet">
+    <div v-if="error" class="banner bad">{{ error }} <button class="btn link" @click="load">{{ t('retry') }}</button></div>
+    <div v-else-if="!list" class="card empty">{{ t('loading') }}</div>
+    <div v-else-if="!list.length" class="card empty" data-testid="address-empty">{{ t('ad.empty') }}</div>
+    <div v-for="a in list ?? []" :key="a.id" class="card ap-row" data-testid="address-row">
+      <span class="ap-pin"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2zM12 21s6.5-5.8 6.5-10.6a6.5 6.5 0 0 0-13 0C5.5 15.2 12 21 12 21z" /></svg></span>
+      <div class="grow">
+        <div class="t"><span v-if="a.label" class="lab">{{ t('ad.label_' + a.label) }}</span>{{ a.place_name }}</div>
+        <div class="u">{{ t('ad.unit_is', { unit: a.unit }) }}</div>
+        <div class="w">{{ whoLine(a) }}</div>
+      </div>
+      <button class="ap-edit" :aria-label="t('ad.edit')" data-testid="address-edit" @click="editing = a">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m13.5 6.5 4 4" /></svg>{{ t('ad.edit_short') }}</button>
+    </div>
+    <div class="ap-foot">
+      <div v-if="full" class="note" style="margin-bottom:8px;text-align:center">{{ t('ad.full', { n: limit }) }}</div>
+      <button class="btn primary block big" :disabled="full" data-testid="address-new" @click="editing = null">＋ {{ t('ad.new') }}</button>
+    </div>
+    <div v-if="editing !== undefined" class="sheet-mask" @click.self="editing = undefined">
+      <div class="sheet asheet form">
+        <AddressForm :address="editing" :slug="slug" :currency="currency" :shop="shop" :country="country" :fields="fields"
+          @saved="saved" @deleted="deleted" @close="closeForm" />
+      </div>
+    </div>
+  </div>
+  <div v-else class="sheet-mask" data-testid="address-sheet" @click.self="emit('close')">
     <div class="sheet asheet" :class="{ form: editing !== undefined }">
       <AddressForm v-if="editing !== undefined" :address="editing" :slug="slug" :currency="currency" :shop="shop" :country="country" :fields="fields"
         @saved="saved" @deleted="deleted" @close="closeForm" />
@@ -97,6 +125,17 @@ function closeForm() { if (props.startNew && !list.value?.length) emit('close');
 .radio.no { background: #f0f1f3; border-color: #dde0e4; }
 .edit { border: 0; background: none; color: #8b919a; padding: 8px; cursor: pointer; flex: none; }
 .as-foot { padding: 12px 14px calc(14px + env(safe-area-inset-bottom)); flex: none; }
+/* the page */
+.as-page { display: grid; gap: 12px; }
+.ap-row { display: flex; align-items: center; gap: 12px; padding: 14px; }
+.ap-pin { flex: none; width: 42px; height: 42px; border-radius: 50%; background: #f9dcd6; color: var(--red); display: grid; place-items: center; }
+.ap-row .grow { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.ap-row .t { font-size: 16.5px; font-weight: 800; overflow-wrap: anywhere; }
+.ap-row .lab { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 0 8px; border-radius: 6px; background: var(--gold-soft); color: var(--red-deep); margin-right: 6px; vertical-align: 2px; }
+.ap-row .u { font-size: 14.5px; }
+.ap-row .w { font-size: 13.5px; color: var(--muted); }
+.ap-edit { flex: none; display: inline-flex; align-items: center; gap: 4px; border: 1px solid #cdb9a0; background: none; border-radius: 999px; padding: 6px 12px; color: var(--ink); cursor: pointer; font-size: 14px; }
+.ap-foot { margin-top: 4px; }
 @media (min-width: 768px) { .asheet { height: min(640px, 86vh); } .asheet.form { height: min(700px, 90vh); } }
 @media (min-width: 900px) { .asheet.form:has(.aform.wide) { max-width: 980px; } }
 </style>

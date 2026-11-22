@@ -5,6 +5,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { customerChats, day, lastLine, listen, connect, type ChatThread } from '../../chat'
 import { pick, t } from '../../i18n'
+import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
 import { dateTime, describe, me, myMessages, readMessages, type Message } from './me'
 
@@ -69,6 +70,7 @@ async function readAll() {
 <template>
   <MePage :title="t('mm.title')">
     <template #right><button v-if="tab === 'notices' && me.profile?.unread" class="btn link small" data-testid="msg-read-all" @click="readAll">{{ t('mm.read_all') }}</button></template>
+    <MeIntro :title="t('mi.msg')" :sub="t('mi.msg_sub')" :icon="'M12 4.5c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.15-2.9-.4L5 20l.9-3.3C4.4 15.4 3.5 13.6 3.5 11.5c0-3.9 3.8-7 8.5-7zM8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01'" />
     <div class="mtabs" role="tablist">
       <button role="tab" :class="{ on: tab === 'chats' }" data-testid="msg-tab-chats" @click="pickTab('chats')">{{ t('ch.tab_chats') }}
         <i v-if="me.profile?.chat_unread" data-testid="msg-chats-unread">{{ me.profile.chat_unread > 99 ? '99+' : me.profile.chat_unread }}</i></button>
@@ -105,13 +107,13 @@ async function readAll() {
 
 <style scoped>
 .msg { display: grid; gap: 6px; text-align: left; width: 100%; cursor: pointer; }
-.msg b { font-size: 15px; } .msg:not(.unread) b { font-weight: 500; color: #4b5563; }
-.mtabs { display: flex; background: #fff; border-radius: 14px; overflow: hidden; }
-.mtabs button { flex: 1; border: 0; background: none; padding: 12px 0; color: var(--muted); font-size: 15px; cursor: pointer; }
-.mtabs button.on { color: var(--ink); font-weight: 700; box-shadow: inset 0 -3px 0 var(--brand); }
+.msg b { font-size: 16px; } .msg:not(.unread) b { font-weight: 500; color: var(--muted); }
+.mtabs { display: flex; gap: 6px; background: var(--paper); border-radius: 999px; padding: 4px; box-shadow: 0 3px 12px rgba(90, 40, 15, .08); }
+.mtabs button { flex: 1; border: 0; background: none; padding: 9px 0; border-radius: 999px; color: var(--ink); font-size: 15.5px; cursor: pointer; }
+.mtabs button.on { background: var(--gold); color: var(--red); font-weight: 800; }
 .mtabs i, .crow .num { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #e5352b; color: #fff; font-size: 11px; font-style: normal; font-weight: 700; flex: none; vertical-align: 1px; }
 .clist { padding: 0 14px; }
-.crow { display: flex; gap: 12px; padding: 13px 0; border-bottom: 1px solid #f0f1f3; color: var(--ink); align-items: flex-start; }
+.crow { display: flex; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line); color: var(--ink); align-items: flex-start; }
 .crow:last-child { border-bottom: 0; }
 .crow .grow { min-width: 0; display: grid; gap: 2px; }
 .crow .last { color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }

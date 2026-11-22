@@ -2,6 +2,7 @@
 // What the platform says about itself, and the papers.
 import { onMounted, ref } from 'vue'
 import { pick, t } from '../../i18n'
+import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
 import { platformInfo, type PlatformInfo } from './me'
 
@@ -11,8 +12,8 @@ onMounted(async () => { info.value = await platformInfo().catch(() => null) })
 
 <template>
   <MePage :title="t('mb.title')" open>
+    <MeIntro :title="info?.name || t('mb.title')" :sub="t('mi.about_sub')" :icon="'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5.5M12 7.8h.01'" />
     <div class="card stack">
-      <h2 v-if="info?.name">{{ info.name }}</h2>
       <p style="white-space:pre-wrap;line-height:1.7" data-testid="about-text">{{ (info && pick(info.about, info.about_en)) || t('mb.default') }}</p>
     </div>
     <div class="card me-rows">
