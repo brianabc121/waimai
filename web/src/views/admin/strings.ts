@@ -34,6 +34,8 @@ extend({
   'ad.tz_cur': ['时区 · 货币', 'Time zone · currency'], 'ad.items_on_sale': ['在售商品', 'Items on sale'],
   'ad.b.open': ['营业中', 'Open'], 'ad.b.closed': ['休息中', 'Closed'], 'ad.b.paused': ['门店暂停接单', 'Paused by the store'],
   'ad.view_store': ['查看门店后台', 'Open store back office'], 'ad.delete_branch_confirm': ['删除门店「{name}」？链接会失效，订单记录保留。', 'Delete store "{name}"? Its link stops working. Orders are kept.'],
+  'ad.reports': ['顾客举报', 'Customer reports'], 'ad.report_reason': ['原因', 'Reason'], 'ad.report_detail': ['具体情况', 'Details'], 'ad.report_contact': ['联系方式', 'Contact'], 'ad.report_time': ['时间', 'Time'],
+  'rr.food_safety': ['食品安全问题', 'Food safety'], 'rr.wrong_info': ['菜品或价格与描述不符', 'Not as described'], 'rr.bad_service': ['服务态度差', 'Bad service'], 'rr.fraud': ['虚假宣传或欺诈', 'Misleading or fraud'], 'rr.other': ['其他', 'Other'],
   'ad.accounts': ['账号', 'Accounts'], 'ad.new_account': ['新增账号', 'New account'], 'ad.all_branches_n': ['全部 {n} 家', 'All {n} stores'],
   'ad.last_login': ['最近登录', 'Last sign-in'], 'ad.never': ['从未', 'Never'], 'ad.reset_password': ['重置密码', 'Reset password'],
   'ad.reset_confirm': ['重置 {name} 的密码？该账号会在所有设备上退出登录。', 'Reset the password of {name}? The account is signed out everywhere.'],

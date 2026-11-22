@@ -170,6 +170,18 @@ const rolesOf = (u: MerchantUser) => [...new Set(u.roles.map(r => r.role))]
           </tbody>
         </table>
       </div>
+      <div class="card flush" v-if="d.reports.length" data-testid="reports">
+        <div class="head"><h2>{{ t('ad.reports') }}（{{ d.reports.length }}）</h2></div>
+        <table class="data">
+          <thead><tr><th>{{ t('ad.report_time') }}</th><th>{{ t('ad.branch') }}</th><th>{{ t('ad.report_reason') }}</th><th>{{ t('ad.report_detail') }}</th><th>{{ t('ad.report_contact') }}</th></tr></thead>
+          <tbody>
+            <tr v-for="r in d.reports" :key="r.id">
+              <td class="num">{{ fmtDateTime(r.created_at) }}</td><td>{{ r.branch_name }}</td>
+              <td><span class="tag warn">{{ t('rr.' + r.reason) }}</span></td><td style="white-space:pre-wrap">{{ r.detail || '—' }}</td><td>{{ r.contact || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <p class="small muted">{{ t('ad.detail_foot') }}</p>
 
       <MerchantEdit v-if="editing" :merchant="m" @close="editing = false" @saved="editing = false; load()" />

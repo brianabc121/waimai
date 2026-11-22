@@ -354,3 +354,7 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
 .sheet.picker { height: 94vh; max-height: 94vh; } .sheet.picker .sheet-body { overflow-y: auto; }
 @media (min-width: 768px) { .sheet.picker { max-width: 760px; height: 88vh; max-height: 88vh; } }
 .sheet.picker .pinmap { height: 42vh; min-height: 240px; flex: none; }
+/* the storefront's − / + : rounded squares, the + filled */
+.shop .stepper { gap: 0; }
+.shop .stepper button { width: 32px; height: 32px; border-radius: 8px; font-size: 20px; }
+.shop .stepper > span { min-width: 34px; text-align: center; font-size: 16px; }

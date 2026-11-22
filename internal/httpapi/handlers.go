@@ -3,6 +3,7 @@ package httpapi
 import (
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -129,6 +130,50 @@ func (s *Server) customerCancel(c *gin.Context) {
 		return
 	}
 	c.JSON(200, customerView(o))
+}
+
+func (s *Server) storeReviews(c *gin.Context) {
+	offset, _ := strconv.Atoi(c.Query("offset"))
+	page, err := s.App.StoreReviews(c, c.Param("slug"), c.Query("filter"), offset)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, page)
+}
+
+func (s *Server) reportStore(c *gin.Context) {
+	var in app.ReportInput
+	if !bind(c, &in) {
+		return
+	}
+	if err := s.App.ReportStore(c, c.Param("slug"), in); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (s *Server) orderReview(c *gin.Context) {
+	r, err := s.App.OrderReview(c, c.Param("token"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, r)
+}
+
+func (s *Server) submitReview(c *gin.Context) {
+	var in app.ReviewInput
+	if !bind(c, &in) {
+		return
+	}
+	r, err := s.App.SubmitReview(c, c.Param("token"), in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, r)
 }
 
 func (s *Server) customerEvents(c *gin.Context) {

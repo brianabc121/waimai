@@ -14,7 +14,7 @@ const saved = ref(false)
 
 const s = reactive({ name: '', name_en: '', address: '', phone: '', tax: 12, tax_inclusive: true, service: 0, packaging: 0,
   min_order: 0, accept_timeout_minutes: 10, delivery_enabled: true, pickup_enabled: true, paused: false, open_time: '00:00', close_time: '00:00', notify_sms: true, scheduling_enabled: false, prep_minutes: 30,
-  kitchen_slow_minutes: 15, detour_percent: 30, detour_km: 1 })
+  kitchen_slow_minutes: 15, detour_percent: 30, detour_km: 1, notice: '', intro: '', baskets_enabled: true })
 const st = reactive({ id: 0, name: '', name_en: '', active: true })
 
 async function load() {
@@ -26,7 +26,8 @@ async function load() {
     accept_timeout_minutes: b.accept_timeout_minutes, delivery_enabled: b.delivery_enabled, pickup_enabled: b.pickup_enabled,
     paused: b.paused, open_time: b.open_time, close_time: b.close_time, notify_sms: b.notify_sms,
     scheduling_enabled: b.scheduling_enabled, prep_minutes: b.prep_minutes,
-    kitchen_slow_minutes: b.kitchen_slow_minutes, detour_percent: b.detour_percent, detour_km: b.detour_meters / 1000 })
+    kitchen_slow_minutes: b.kitchen_slow_minutes, detour_percent: b.detour_percent, detour_km: b.detour_meters / 1000,
+    notice: b.notice, intro: b.intro, baskets_enabled: b.baskets_enabled })
 }
 onMounted(load)
 
@@ -41,7 +42,8 @@ const saveSettings = () => run(() => put(`/merchant/branches/${bid}/settings`, {
   accept_timeout_minutes: s.accept_timeout_minutes, delivery_enabled: s.delivery_enabled, pickup_enabled: s.pickup_enabled,
   paused: s.paused, open_time: s.open_time, close_time: s.close_time, notify_sms: s.notify_sms,
   scheduling_enabled: s.scheduling_enabled, prep_minutes: s.prep_minutes,
-  kitchen_slow_minutes: s.kitchen_slow_minutes, detour_percent: s.detour_percent, detour_meters: Math.round(s.detour_km * 1000) }))
+  kitchen_slow_minutes: s.kitchen_slow_minutes, detour_percent: s.detour_percent, detour_meters: Math.round(s.detour_km * 1000),
+  notice: s.notice, intro: s.intro, baskets_enabled: s.baskets_enabled }))
 
 function editStation(x: Station | null) {
   Object.assign(st, x ? { id: x.id, name: x.name, name_en: x.name_en, active: x.active } : { id: 0, name: '', name_en: '', active: true })
@@ -88,7 +90,10 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
         <label class="check"><input type="checkbox" v-model="s.pickup_enabled" />{{ t('pickup') }}</label>
         <label class="check"><input type="checkbox" v-model="s.notify_sms" />{{ t('notify_sms') }}</label>
         <label class="check"><input type="checkbox" v-model="s.scheduling_enabled" />{{ t('scheduling_enabled') }}</label>
+        <label class="check"><input type="checkbox" name="baskets_enabled" v-model="s.baskets_enabled" />{{ t('set.baskets') }}</label>
       </div>
+      <label class="field"><span>{{ t('set.notice') }}</span><textarea name="notice" v-model="s.notice" rows="2" maxlength="300"></textarea></label>
+      <label class="field"><span>{{ t('set.intro') }}</span><textarea name="intro" v-model="s.intro" rows="3" maxlength="500"></textarea></label>
       <button class="btn primary">{{ t('save') }}</button>
     </form>
 

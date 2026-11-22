@@ -43,6 +43,11 @@ type Branch struct {
 	// customer drops a pin and matchZone decides).
 	ZoneMode       string `json:"zone_mode"`
 	ZoneToleranceM int    `json:"zone_tolerance_m"`
+	// Notice scrolls under the store's name; Intro is "about the store".
+	Notice string `json:"notice"`
+	Intro  string `json:"intro"`
+	// BasketsEnabled lets a customer split one order into baskets.
+	BasketsEnabled bool `json:"baskets_enabled"`
 	// Suspended is set by the platform on the whole merchant. Customers cannot
 	// order; staff can still sign in and finish the orders already in progress.
 	Suspended bool `json:"suspended"`
@@ -127,6 +132,7 @@ const branchCols = `id, merchant_id, slug, name, name_en, address, phone, timezo
 	tax_inclusive, service_charge_bp, packaging_fee, min_order_amount, accept_timeout_minutes,
 	delivery_enabled, pickup_enabled, paused, open_time, close_time, notify_sms, scheduling_enabled, prep_minutes,
 	lat, lng, zone_mode, zone_tolerance_m, kitchen_slow_minutes, detour_percent, detour_meters,
+	notice, intro, baskets_enabled,
 	(SELECT m.status = 'suspended' FROM merchants m WHERE m.id = branches.merchant_id)`
 
 func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
@@ -135,7 +141,8 @@ func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 		&b.Currency, &b.TaxRateBP, &b.TaxInclusive, &b.ServiceChargeBP, &b.PackagingFee, &b.MinOrderAmount,
 		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime, &b.NotifySMS,
 		&b.SchedulingEnabled, &b.PrepMinutes, &b.Lat, &b.Lng, &b.ZoneMode, &b.ZoneToleranceM,
-		&b.KitchenSlowMinutes, &b.DetourPercent, &b.DetourMeters, &b.Suspended)
+		&b.KitchenSlowMinutes, &b.DetourPercent, &b.DetourMeters, &b.Notice, &b.Intro, &b.BasketsEnabled,
+		&b.Suspended)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, ErrNotFound
@@ -211,6 +218,8 @@ type Item struct {
 	Sort              int           `json:"sort"`
 	StationID         *int64        `json:"station_id"`
 	Groups            []OptionGroup `json:"groups"`
+	// Sold is how many were ordered so far; only the storefront fills it in.
+	Sold int `json:"sold"`
 }
 
 // available reports whether the item can be ordered right now for a service type.
@@ -235,7 +244,9 @@ type Category struct {
 	Name   string `json:"name"`
 	NameEn string `json:"name_en"`
 	Sort   int    `json:"sort"`
-	Items  []Item `json:"items"`
+	// Required: an order must contain something from this category.
+	Required bool   `json:"required"`
+	Items    []Item `json:"items"`
 }
 
 func loadZones(ctx context.Context, q Querier, branchID int64, activeOnly bool) ([]Zone, error) {
@@ -343,7 +354,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 }
 
 func loadMenu(ctx context.Context, q Querier, branchID int64, publishedOnly bool) ([]Category, error) {
-	rows, err := q.Query(ctx, `SELECT id, name, name_en, sort FROM menu_categories WHERE branch_id=$1 AND NOT archived ORDER BY sort, id`, branchID)
+	rows, err := q.Query(ctx, `SELECT id, name, name_en, sort, required FROM menu_categories WHERE branch_id=$1 AND NOT archived ORDER BY sort, id`, branchID)
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +362,7 @@ func loadMenu(ctx context.Context, q Querier, branchID int64, publishedOnly bool
 	idx := map[int64]int{}
 	for rows.Next() {
 		c := Category{Items: []Item{}}
-		if err := rows.Scan(&c.ID, &c.Name, &c.NameEn, &c.Sort); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.NameEn, &c.Sort, &c.Required); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -385,6 +396,9 @@ type Storefront struct {
 	Slots []time.Time `json:"slots"`
 	// Templates is the published look of each ordering channel.
 	Templates map[string]Template `json:"templates"`
+	// Sales is the number of orders the store has taken; Rating sums up its reviews.
+	Sales  int           `json:"sales"`
+	Rating ReviewSummary `json:"rating"`
 }
 
 func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) {
@@ -411,16 +425,23 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 		}
 	}
 	cats = shown
-	// Customers see whether a limited item is gone, not the exact stock.
+	sold, sales, err := salesCounts(ctx, a.DB, b.ID)
+	if err != nil {
+		return nil, err
+	}
 	for i := range cats {
 		for j := range cats[i].Items {
 			it := &cats[i].Items[j]
 			if it.StockQty != nil && *it.StockQty <= 0 {
 				it.SoldOut = true
 			}
-			it.StockQty = nil
 			it.StationID = nil
+			it.Sold = sold[it.ID]
 		}
+	}
+	rating, err := reviewSummary(ctx, a.DB, b.ID)
+	if err != nil {
+		return nil, err
 	}
 	promos, err := livePromotions(ctx, a.DB, b)
 	if err != nil {
@@ -430,5 +451,6 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &Storefront{Branch: b, Zones: zones, Categories: cats, Promotions: promos, Slots: b.Slots(time.Now()), Templates: tpl}, nil
+	return &Storefront{Branch: b, Zones: zones, Categories: cats, Promotions: promos, Slots: b.Slots(time.Now()), Templates: tpl,
+		Sales: sales, Rating: *rating}, nil
 }

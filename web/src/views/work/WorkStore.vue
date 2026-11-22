@@ -155,7 +155,7 @@ const handoff = (o: Order) => run(() => post(`/merchant/orders/${o.id}/handoff`)
           <div v-if="packOrder.note" class="banner warn small">{{ t('order_note') }}: {{ packOrder.note }}</div>
           <label v-for="it in live(packOrder)" :key="it.id" class="check" style="align-items:flex-start">
             <input type="checkbox" :checked="pk.ticked.has(it.id)" @change="tick(it)" />
-            <span><b>{{ it.qty }} × {{ both(it.name, it.name_en) }}</b>
+            <span><span v-if="packOrder.items.some(x => x.basket > 1)" class="tag info" style="margin-right:4px">{{ t('basket_short', { n: it.basket }) }}</span><b>{{ it.qty }} × {{ both(it.name, it.name_en) }}</b>
               <span v-if="it.options.length" class="small muted"><br />{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</span>
               <span v-if="it.note" class="small bold" style="color:var(--warn)"><br />{{ t('note') }}: {{ it.note }}</span></span>
           </label>

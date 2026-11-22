@@ -396,6 +396,8 @@ type MerchantDetail struct {
 	Stats    MerchantStats  `json:"stats"`
 	Branches []AdminBranch  `json:"branches"`
 	Users    []MerchantUser `json:"users"`
+	// Reports are customers' complaints about this merchant's stores, newest first.
+	Reports []StoreReport `json:"reports"`
 }
 
 func (a *App) merchantRow(ctx context.Context, q Querier, id int64) (*MerchantRow, error) {
@@ -491,7 +493,12 @@ func (a *App) GetMerchant(ctx context.Context, id int64) (*MerchantDetail, error
 		u.Roles = []UserRole{r}
 		d.Users = append(d.Users, u)
 	}
-	return d, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	d.Reports, err = a.MerchantReports(ctx, id)
+	return d, err
 }
 
 type MerchantInput struct {

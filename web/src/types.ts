@@ -7,6 +7,7 @@ export interface Branch {
   scheduling_enabled: boolean; prep_minutes: number
   kitchen_slow_minutes: number; detour_percent: number; detour_meters: number
   lat: number | null; lng: number | null; zone_mode: 'list' | 'map'; zone_tolerance_m: number
+  notice: string; intro: string; baskets_enabled: boolean
 }
 export interface Station { id: number; name: string; name_en: string; active: boolean; sort: number; item_count: number; open_tasks: number }
 export type LatLngPair = [number, number]
@@ -19,8 +20,10 @@ export interface Item {
   id: number; category_id: number; name: string; name_en: string; description: string; image_url: string
   price: number; published: boolean; sold_out: boolean; stock_qty: number | null; needs_prep: boolean
   delivery_available: boolean; pickup_available: boolean; sort: number; station_id: number | null; groups: OptionGroup[]
+  // How many were ordered so far; only the customer's store page gets it.
+  sold?: number
 }
-export interface Category { id: number; name: string; name_en: string; sort: number; items: Item[] }
+export interface Category { id: number; name: string; name_en: string; sort: number; required?: boolean; items: Item[] }
 export interface Promotion {
   id: number; name: string; name_en: string; kind: 'amount_off' | 'percent_off' | 'free_delivery'
   threshold: number; value: number; max_discount: number | null; applies_delivery: boolean; applies_pickup: boolean
@@ -30,7 +33,14 @@ export interface Promotion {
 export interface Template { layout: 'list' | 'featured' | 'grid'; theme_color: string; logo_url: string; cover_url: string }
 export type Channel = 'delivery' | 'qr' | 'ipad'
 export interface ChannelTemplate { channel: Channel; published: Template; draft: Template | null; published_at: string | null }
-export interface Storefront { branch: Branch; zones: Zone[]; categories: Category[]; promotions: Promotion[]; slots: string[]; templates: Record<Channel, Template> }
+export interface Storefront { branch: Branch; zones: Zone[]; categories: Category[]; promotions: Promotion[]; slots: string[]; templates: Record<Channel, Template>
+  sales: number; rating: ReviewSummary }
+export interface ReviewSummary { count: number; average: number; taste: number; packaging: number; delivery: number }
+export interface Review { id: number; display_name: string; rating: number; taste: number; packaging: number; delivery: number | null
+  comment: string; created_at: string; items: { name: string; name_en: string }[] }
+export interface ReviewPage { summary: ReviewSummary; reviews: Review[]; more: boolean }
+export interface OrderReview { can_review: boolean; review: Review | null }
+export interface StoreReport { id: number; branch_id: number; branch_name: string; reason: string; detail: string; contact: string; created_at: string }
 export interface Totals {
   subtotal: number; packaging_fee: number; delivery_fee: number; service_charge: number
   tax_amount: number; tax_inclusive: boolean; tax_rate_bp: number; discount: number; total: number
@@ -42,6 +52,7 @@ export interface OrderItem {
   options: LineOption[]; note: string; needs_prep: boolean; prep_status: string
   station_id: number | null; station_name: string
   batch_seq: number; batch_source: string; served_at: string | null; void_reason?: string
+  basket: number
 }
 export interface DeliveryTask {
   id: number; rider_id: number; rider_name: string; rider_phone: string; assignment_version: number

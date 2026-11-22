@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError, get, newKey, post } from '../api'
-import { clearLines, useCart } from '../cart'
+import { clearLines, quoteItems, useCart } from '../cart'
 import { money, pick, t, whenText } from '../i18n'
 import type { Quote, Storefront } from '../types'
 import TotalsTable from './TotalsTable.vue'
@@ -56,6 +56,7 @@ function describe(e: unknown): string {
     case 'OUT_OF_ZONE': return t(mapMode.value ? 'pin_needed' : 'choose_zone')
     case 'STORE_CLOSED': return t('closed')
     case 'SCHEDULE_INVALID': return t('schedule_invalid')
+    case 'REQUIRED_MISSING': return t('required_missing_named', { names: ((e.details?.categories ?? []) as { name: string; name_en: string }[]).map(c => pick(c.name, c.name_en)).join('、') })
     case 'BELOW_MINIMUM': return t('below_min', { amt: money((e.details?.minimum ?? 0) - (e.details?.subtotal ?? 0), quote.value?.currency) })
     default: return e.message
   }
@@ -71,7 +72,7 @@ async function requote() {
       zone_id: cart.service === 'delivery' ? cart.zoneId : null,
       // Stores that locate customers on a map decide the area from the pin.
       ...(cart.service === 'delivery' && mapMode.value ? { lat: cart.lat, lng: cart.lng } : {}),
-      items: cart.lines.map(l => ({ item_id: l.item_id, qty: l.qty, option_ids: l.option_ids, note: l.note })),
+      items: quoteItems(),
       scheduled_for: scheduled.value || null,
     })
     idemKey = keyFor(quote.value.id)

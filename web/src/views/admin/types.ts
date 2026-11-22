@@ -15,6 +15,7 @@ export interface MerchantDetail {
   merchant: MerchantRow
   stats: { orders_today: Record<string, number>; orders_7d: number; completed_7d: number; revenue_7d: { currency: string; amount: number }[] }
   branches: AdminBranch[]; users: MerchantUser[]
+  reports: { id: number; branch_id: number; branch_name: string; reason: string; detail: string; contact: string; created_at: string }[]
 }
 export interface AdminItemRow {
   id: number; branch_id: number; branch_name: string; merchant_id: number; merchant_name: string; currency: string

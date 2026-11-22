@@ -39,7 +39,7 @@ function add(it: Item, optionIds: number[], qty: number, note: string) {
   const key = `${it.id}:${ids.join(',')}:${note.trim()}`
   const ex = state.lines.find(l => l.key === key)
   if (ex) ex.qty = Math.min(99, ex.qty + qty)
-  else state.lines.push({ key, item_id: it.id, qty, option_ids: ids, note: note.trim() })
+  else state.lines.push({ key, item_id: it.id, qty, option_ids: ids, note: note.trim(), basket: 1 })
 }
 function open(it: Item) {
   if (it.sold_out) return

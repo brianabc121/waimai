@@ -195,6 +195,12 @@ const dict: Record<string, [string, string]> = {
   preview_hint: ['预览用的是本店已发布的菜单。发布前顾客看到的仍是当前模板。', 'The preview uses your published menu. Guests keep seeing the live template until you publish.'],
   published_ok: ['已发布', 'Published'], preview_table: ['08', '08'],
   conflict: ['订单已被其他人更新，已刷新', 'Someone else updated this order. Refreshed.'],
+  basket_n: ['购物篮{n}', 'Basket {n}'], basket_short: ['篮{n}', 'B{n}'],
+  'set.notice': ['门店公告（显示在点餐页店名下方，最多 300 字）', 'Store notice (under the store name on the ordering page, up to 300 characters)'],
+  'set.intro': ['商家信息（点餐页“商家”里的介绍，最多 500 字）', 'About the store (shown on the Store tab, up to 500 characters)'],
+  'set.baskets': ['允许顾客分购物篮下单', 'Let customers split an order into baskets'],
+  cat_required: ['必选', 'Required'], cat_required_on: ['设为必选', 'Make required'], cat_required_off: ['取消必选', 'Not required'],
+  cat_required_hint: ['必选分类：顾客至少要从里面选一样才能下单', 'Required: a customer must choose at least one dish from it'],
 }
 
 // extend adds the texts of a lazily loaded area (the platform back office).
