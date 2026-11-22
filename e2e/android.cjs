@@ -50,7 +50,7 @@ await cust.locator('.bottombar .btn.primary').click()
 await cust.waitForURL('**/o/**')
 const expectStatus = (text) => cust.waitForFunction(t => document.querySelector('[data-testid=status]')?.textContent?.includes(t), text, { timeout: 20000 })
 await expectStatus('等待商家接单')
-const orderNo = (await cust.locator('.topbar h1').innerText()).replace('订单号', '').trim()
+const orderNo = (await cust.locator('[data-testid=order-no]').innerText()).trim()
 const desk = await open({ width: 1280, height: 800 })
 await login(desk, 'cashier1')
 await desk.click(`.ord:has-text("${orderNo}")`)
@@ -78,7 +78,7 @@ const fix = (lat, lng) => adb('emu', 'geo', 'fix', String(lng), String(lat))
 fix(14.5547, 121.0244)
 await device.shell(`monkey -p ${PKG} -c android.intent.category.LAUNCHER 1`)
 const view = await device.webView({ pkg: PKG })
-const app = await view.page()
+let app = await view.page()
 app.setDefaultTimeout(60000)
 await app.waitForURL('**/login**')
 const ua = await app.evaluate(() => navigator.userAgent)
@@ -138,6 +138,13 @@ step(`in the background the position still moved on the server (${moved.lat.toFi
 
 // ---- back in the app: pick up, arrive, deliver ----
 await device.shell(`monkey -p ${PKG} -c android.intent.category.LAUNCHER 1`)
+// Coming back to the front can drop the test's connection to the web view
+// (the page itself stays as it was): give it a moment, then take it again.
+await sleep(3000)
+if (!(await app.evaluate(() => true).catch(() => false))) {
+  app = await (await device.webView({ pkg: PKG })).page()
+  app.setDefaultTimeout(60000)
+}
 await app.locator(`[data-delivery="${orderNo}"] [data-act=open]`).click()
 await app.waitForSelector('[data-act=pickup]:not([disabled])')
 await shot('a05-pickup')

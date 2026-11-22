@@ -62,6 +62,22 @@ export function quoteItems() {
   return cart.lines.map(l => ({ item_id: l.item_id, qty: l.qty, option_ids: l.option_ids, note: l.note, basket: used.indexOf(l.basket) + 1 }))
 }
 
+// replaceCart fills a store's cart with the lines of an earlier order.
+export function replaceCart(slug: string, service: 'delivery' | 'pickup', lines: Omit<CartLine, 'key'>[]) {
+  useCart(slug)
+  cart.service = service
+  cart.basket = 1
+  cart.lines = []
+  for (const l of lines) {
+    const ids = [...l.option_ids].sort((a, b) => a - b)
+    const basket = l.basket >= 1 && l.basket <= MAX_BASKETS ? l.basket : 1
+    const key = lineKey(basket, l.item_id, ids, l.note)
+    const same = cart.lines.find(x => x.key === key)
+    if (same) same.qty = Math.min(99, same.qty + l.qty)
+    else cart.lines.push({ key, item_id: l.item_id, qty: l.qty, option_ids: ids, note: l.note.trim(), basket })
+  }
+}
+
 export function clearLines() { cart.lines = []; cart.basket = 1 }
 
 // linePrice returns the unit price of a cart line against the current menu,

@@ -7,6 +7,7 @@ import { session } from '../session'
 import type { Order, RiderInfo } from '../types'
 import { contactApps, contactName, contactPhone } from '../addresses'
 import './work/strings'
+import '../orders'
 import TotalsTable from './TotalsTable.vue'
 
 const bid = session.branchId!
@@ -104,6 +105,14 @@ function closeFailed(o: Order) {
   if (!reason.trim()) { error.value = t('reason_required'); return }
   void act(o, 'close-failed', { reason })
 }
+// The customer's after-sales request: the desk settles it with the customer
+// (orders are paid in cash) and records what was agreed.
+function aftersale(o: Order, status: 'resolved' | 'declined') {
+  const reply = prompt(t(status === 'resolved' ? 'as.d.how' : 'as.d.why'))
+  if (reply === null) return
+  if (status === 'declined' && !reply.trim()) { error.value = t('reason_required'); return }
+  void act(o, 'aftersale', { status, reply })
+}
 const canCancel = (o: Order) => o.acceptance_status === 'accepted' && ['none', 'awaiting_handoff', 'awaiting_pickup'].includes(o.fulfillment_status)
 const canAssign = (o: Order) => o.service_type === 'delivery' && o.acceptance_status === 'accepted' && ['none', 'awaiting_handoff'].includes(o.fulfillment_status)
 const waited = (o: Order) => { void now.value; return minutesSince(o.created_at) }
@@ -138,6 +147,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <span class="tag" v-if="o.acceptance_status === 'accepted'">{{ t('p.' + o.packing_status) }}</span>
             <span class="tag" v-if="o.acceptance_status === 'accepted'">{{ t('f.' + o.fulfillment_status) }}</span>
             <span class="tag" :class="o.payment_status === 'paid' ? 'ok' : ''">{{ t(o.payment_status) }}</span>
+            <span v-if="o.aftersale" class="tag" :class="o.aftersale.status === 'open' ? 'bad' : ''" data-testid="aftersale-tag">{{ t('as.d.' + o.aftersale.status) }}</span>
           </div>
         </button>
       </div>
@@ -156,6 +166,18 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <span class="tag" :class="selected.payment_status === 'paid' ? 'ok' : 'warn'">{{ t(selected.payment_method) }} · {{ t(selected.payment_status) }}</span>
           </div>
           <div v-if="selected.close_reason" class="banner bad">{{ t('reason') }}: {{ reasonText(selected.close_reason) }}</div>
+          <div v-if="selected.aftersale" class="banner stack" :class="selected.aftersale.status === 'open' ? 'warn' : 'info'" data-testid="aftersale-box">
+            <div><b>{{ t('as.d.' + selected.aftersale.status) }}</b> · {{ t('as.r.' + selected.aftersale.reason) }} · {{ whenText(selected.aftersale.created_at, selected.timezone) }}</div>
+            <div v-if="selected.aftersale.detail" style="white-space:pre-wrap">{{ selected.aftersale.detail }}</div>
+            <div v-if="selected.aftersale.reply">{{ t('as.d.reply') }}: {{ selected.aftersale.reply }}</div>
+            <template v-if="selected.aftersale.status === 'open'">
+              <div class="small">{{ t('as.d.hint') }}</div>
+              <div class="row wrap">
+                <button class="btn primary small" data-testid="aftersale-resolve" @click="aftersale(selected, 'resolved')">{{ t('as.d.resolve') }}</button>
+                <button class="btn danger small" data-testid="aftersale-decline" @click="aftersale(selected, 'declined')">{{ t('as.d.decline') }}</button>
+              </div>
+            </template>
+          </div>
           <div v-if="selected.scheduled_for" class="banner info">{{ t(selected.service_type === 'delivery' ? 'deliver_at' : 'pickup_at') }} <b>{{ whenText(selected.scheduled_for, selected.timezone) }}</b>
             <span v-if="selected.release_at"> · {{ t('kitchen_from') }} {{ whenText(selected.release_at, selected.timezone) }}</span></div>
 

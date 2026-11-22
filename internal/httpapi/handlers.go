@@ -156,8 +156,11 @@ func customerView(o *app.Order) *app.Order {
 	return o
 }
 
-func (s *Server) customerOrder(c *gin.Context) {
-	o, err := s.App.OrderByToken(c, c.Param("token"))
+// customerPage answers with an order as its customer's page shows it.
+func (s *Server) customerPage(c *gin.Context, o *app.Order, err error) {
+	if err == nil {
+		err = s.App.CustomerOrderView(c, o)
+	}
 	if err != nil {
 		fail(c, err)
 		return
@@ -165,13 +168,68 @@ func (s *Server) customerOrder(c *gin.Context) {
 	c.JSON(200, customerView(o))
 }
 
+func (s *Server) customerOrder(c *gin.Context) {
+	o, err := s.App.OrderByToken(c, c.Param("token"))
+	s.customerPage(c, o, err)
+}
+
 func (s *Server) customerCancel(c *gin.Context) {
 	o, err := s.App.CustomerCancel(c, c.Param("token"))
+	s.customerPage(c, o, err)
+}
+
+// customerOrders lists the logged-in customer's orders.
+func (s *Server) customerOrders(c *gin.Context) {
+	cu, err := s.customer(c)
 	if err != nil {
 		fail(c, err)
 		return
 	}
-	c.JSON(200, customerView(o))
+	before, _ := strconv.ParseInt(c.Query("before"), 10, 64)
+	page, err := s.App.CustomerOrders(c, cu.ID, c.Query("tab"), c.Query("q"), max(before, 0))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, page)
+}
+
+func (s *Server) customerReorder(c *gin.Context) {
+	r, err := s.App.Reorder(c, c.Param("token"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, r)
+}
+
+func (s *Server) customerAftersale(c *gin.Context) {
+	var in app.AftersaleInput
+	if !bind(c, &in) {
+		return
+	}
+	o, err := s.App.RequestAftersale(c, c.Param("token"), in)
+	s.customerPage(c, o, err)
+}
+
+func (s *Server) handleAftersale(c *gin.Context) {
+	id, ok := s.orderScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	var in struct {
+		Status string `json:"status"`
+		Reply  string `json:"reply"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	o, err := s.App.HandleAftersale(c, id, in.Status, in.Reply, staffActor(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, o)
 }
 
 func (s *Server) storeReviews(c *gin.Context) {

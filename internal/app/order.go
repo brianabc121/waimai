@@ -32,6 +32,8 @@ type OrderItem struct {
 	VoidReason  string     `json:"void_reason,omitempty"`
 	// Basket is the customer's basket this line was put in (1 to 4).
 	Basket int `json:"basket"`
+	// ImageURL is the dish's current picture; only the customer's order page gets it.
+	ImageURL string `json:"image_url,omitempty"`
 }
 
 type DeliveryTask struct {
@@ -132,7 +134,11 @@ type Order struct {
 	Items          []OrderItem     `json:"items"`
 	Delivery       *DeliveryTask   `json:"delivery"`
 	Cash           *CashCollection `json:"cash"`
-	tokenNonce     []byte
+	// Aftersale is the customer's after-sales request, nil when there is none.
+	Aftersale *Aftersale `json:"aftersale"`
+	// Store is who sold it; only the customer's order page gets it.
+	Store      *OrderStore `json:"store,omitempty"`
+	tokenNonce []byte
 }
 
 // DisplayStatus derives the single customer-facing status from the four
@@ -285,7 +291,20 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 	for _, c := range cash {
 		byID[c.OrderID].Cash = c
 	}
-	return orders, nil
+	rows, err = q.Query(ctx, `SELECT order_id, `+aftersaleCols+` FROM order_aftersales WHERE order_id = ANY($1)`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var as Aftersale
+		var orderID int64
+		if err := rows.Scan(&orderID, &as.ID, &as.Reason, &as.Detail, &as.Status, &as.Reply, &as.CreatedAt, &as.HandledAt); err != nil {
+			return nil, err
+		}
+		byID[orderID].Aftersale = &as
+	}
+	return orders, rows.Err()
 }
 
 func loadOrder(ctx context.Context, q Querier, id int64) (*Order, error) {

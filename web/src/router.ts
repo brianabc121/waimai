@@ -7,6 +7,7 @@ export const router = createRouter({
     { path: '/', redirect: '/login' },
     { path: '/s/:slug', component: () => import('./views/StoreView.vue'), props: true },
     { path: '/s/:slug/checkout', component: () => import('./views/CheckoutView.vue'), props: true },
+    { path: '/orders', component: () => import('./views/CustomerOrders.vue') },
     { path: '/o/:token', component: () => import('./views/OrderView.vue'), props: true },
     { path: '/t/:code', component: () => import('./views/TableView.vue'), props: true },
     { path: '/ipad', component: () => import('./views/TableView.vue') },

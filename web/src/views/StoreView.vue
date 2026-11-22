@@ -15,6 +15,7 @@ import StoreReviews from './StoreReviews.vue'
 import './storeStrings'
 import CustomerTabs from './me/CustomerTabs.vue'
 import { isFavorite, loadProfile, rememberStore, setFavorite } from './me/me'
+import '../orders'
 import '../media'
 
 // The map and the address book are only downloaded when a customer opens them.
@@ -278,6 +279,7 @@ async function sendReport() {
               <div class="small muted">{{ t('sf.logged_in') }}</div>
               <div class="bold">{{ prettyPhone(customer.phone) }}</div>
               <router-link to="/me" class="btn small block" data-testid="my-center">{{ t('me.me') }}</router-link>
+              <button class="btn small block" data-testid="my-orders" @click="router.push('/orders')">{{ t('ol.title') }}</button>
               <button class="btn small block" data-testid="my-addresses" @click="showAddresses = true; showAccount = false">{{ t('ad.mine') }}</button>
               <button class="btn small block" data-testid="logout" @click="logout">{{ t('sf.logout') }}</button>
             </div>

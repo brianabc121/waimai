@@ -51,7 +51,7 @@ await cust.locator('.bottombar .btn.primary').click()
 await cust.waitForURL('**/o/**')
 const expectStatus = (text) => cust.waitForFunction(t => document.querySelector('[data-testid=status]')?.textContent?.includes(t), text, { timeout: 10000 })
 await expectStatus('等待商家接单')
-const orderNo = (await cust.locator('.topbar h1').innerText()).replace('订单号', '').trim()
+const orderNo = (await cust.locator('[data-testid=order-no]').innerText()).trim()
 
 const desk = await open({ width: 1280, height: 800 })
 await login(desk, 'cashier1')

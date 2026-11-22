@@ -112,7 +112,7 @@ await cust.fill('input[autocomplete=name]', '陈小姐')
 await cust.locator('.bottombar .btn.primary').click()
 await cust.waitForURL('**/o/**')
 await cust.waitForSelector(tid('status'))
-const orderNo = (await cust.locator('.topbar h1').innerText()).replace('订单号', '').trim()
+const orderNo = (await cust.locator('[data-testid=order-no]').innerText()).trim()
 expect(await cust.locator(tid('basket-head')).count(), 2, 'baskets on the order page')
 expect(await cust.locator(tid('review-form')).count(), 0, 'no review before the order is finished')
 step(`order ${orderNo} was placed in two baskets`)
@@ -131,6 +131,8 @@ await api('POST', `/merchant/orders/${o.id}/handoff`, { expected_version: 0 })
 await cust.waitForFunction(() => document.querySelector('[data-testid=status]')?.textContent?.includes('已取餐'), null, { timeout: 8000 })
 
 // ---- the customer reviews the order ----
+// the order page asks "happy with this order?"; a star there opens the form
+await cust.click(`${tid('rate-quick')} .starpick button:nth-child(5)`)
 await cust.waitForSelector(tid('review-form'))
 await cust.locator(`${tid('review-form')} button.primary`).click()
 await cust.locator(`${tid('review-form')} .banner.bad`).waitFor()   // every line needs stars

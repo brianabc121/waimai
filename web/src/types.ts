@@ -60,7 +60,19 @@ export interface OrderItem {
   station_id: number | null; station_name: string
   batch_seq: number; batch_source: string; served_at: string | null; void_reason?: string
   basket: number
+  // the dish's picture; only on the customer's order page
+  image_url?: string
 }
+export interface Aftersale { id: number; reason: string; detail: string; status: 'open' | 'resolved' | 'declined'; reply: string; created_at: string; handled_at: string | null }
+export interface OrderStore { slug: string; name: string; name_en: string; phone: string; address: string; logo_url: string }
+export interface OrderCard {
+  token: string; public_no: string; store: OrderStore; service_type: 'delivery' | 'pickup'; display_status: string
+  created_at: string; timezone: string; total: number; currency: string; item_count: number
+  items: { name: string; name_en: string; qty: number; image_url: string }[]
+  can_review: boolean; reviewed: boolean; aftersale: '' | 'open' | 'resolved' | 'declined'
+}
+export interface Reorder { slug: string; service_type: 'delivery' | 'pickup'
+  lines: { item_id: number; qty: number; option_ids: number[]; note: string; basket: number }[]; missing: { name: string; name_en: string }[] }
 export interface DeliveryTask {
   id: number; rider_id: number; rider_name: string; rider_phone: string; assignment_version: number
   status: string; fail_reason: string; assigned_at: string; seen_at: string | null; proof_at: string | null
@@ -80,6 +92,7 @@ export interface Order {
   dest_lat: number | null; dest_lng: number | null; zone_distance_m: number | null
   accept_deadline: string; scheduled_for: string | null; release_at: string | null; timezone: string; created_at: string; items: OrderItem[]; delivery: DeliveryTask | null; cash: Cash | null
   session_id: number | null; table_name: string; amount_received: number | null; payment_note: string
+  aftersale: Aftersale | null; store?: OrderStore; completed_at?: string | null
 }
 export interface TableDevice { id: number; name: string; paired: boolean; paired_at: string | null }
 export interface TableSummary { id: number; order_id: number; public_no: string; guests: number; opened_at: string; total: number; item_count: number; unserved: number }

@@ -93,7 +93,7 @@ try {
     await cust.locator('.bottombar .btn.primary').click()
     await cust.waitForURL('**/o/**')
     await cust.waitForFunction(() => document.querySelector('[data-testid=status]')?.textContent?.includes('等待商家接单'))
-    const no = (await cust.locator('.topbar h1').innerText()).replace('订单号', '').trim()
+    const no = (await cust.locator('[data-testid=order-no]').innerText()).trim()
     await cust.close()
     await desk.click(`.ord:has-text("${no}")`)
     await desk.click('.detail button:has-text("接单")')
