@@ -339,6 +339,7 @@ func (s *Server) Router() *gin.Engine {
 	auth.PUT("/merchant/branches/:bid/zones/:id", s.saveZone)
 	auth.DELETE("/merchant/branches/:bid/zones/:id", s.deleteZone)
 	auth.PUT("/merchant/branches/:bid/zone-order", s.reorderZones)
+	auth.PUT("/merchant/branches/:bid/zone-batch", s.saveZones)
 	auth.PUT("/merchant/branches/:bid/location", s.saveLocation)
 	auth.PUT("/merchant/branches/:bid/zone-mode", s.saveZoneMode)
 	auth.PUT("/merchant/branches/:bid/settings", s.saveSettings)

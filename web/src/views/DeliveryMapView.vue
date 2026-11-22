@@ -7,6 +7,7 @@ import { both, money, pick, t, toMajor, toMinor } from '../i18n'
 import { session } from '../session'
 import { mapsKey as loadMapsKey, type Spot as Place } from '../maps'
 import * as geo from '../geo'
+import * as cutter from '../cut'
 import type { LatLng, Pt } from '../geo'
 import type { Branch, Zone } from '../types'
 import MapCanvas from './MapCanvas.vue'
@@ -186,16 +187,68 @@ let overlapBefore = new Set<number>()
 let fresh = false // the outline was just drawn and is not saved yet
 
 const edRing = computed(() => pl().ring(ed.polygon))
+// The polygon arithmetic can refuse a degenerate outline; the plain tests in
+// geo.ts stand in then, and nothing is cut.
+function safe<T>(fn: () => T, fallback: () => T): T { try { return fn() } catch { return fallback() } }
+const ringsOverlap = (a: Pt[], b: Pt[]) => safe(() => cutter.overlaps(a, b), () => geo.overlaps(a, b))
 const overlapZones = computed(() => ['edit', 'overlap'].includes(mode.value) && ed.polygon.length >= 3
-  ? rings.value.filter(r => r.id !== ed.id && geo.overlaps(edRing.value, r.ring)).map(r => r.zone) : [])
+  ? rings.value.filter(r => r.id !== ed.id && ringsOverlap(edRing.value, r.ring)).map(r => r.zone) : [])
 const overlapNames = computed(() => overlapZones.value.map(zname).join(pick('、', ', ')))
-const overlapM2 = computed(() => overlapZones.value.reduce((s, z) => s + geo.overlapArea(edRing.value, pl().ring(z.polygon)), 0))
+const overlapM2 = computed(() => overlapZones.value.reduce((s, z) => { const r = pl().ring(z.polygon)
+  return s + safe(() => cutter.sharedArea(edRing.value, r), () => geo.overlapArea(edRing.value, r)) }, 0))
+
+// ---- cutting the overlap out of the zone that loses it ----
+// zone null is the zone being edited. pieces[0] stays that zone; further
+// pieces exist when the cut splits it.
+interface Reshape { zone: Zone | null; pieces: LatLng[][] }
+interface CutPlan { reshapes: Reshape[]; gone: boolean }
+const split = ref<'keep' | 'drop'>('keep')
+// Corners that already exist keep their exact coordinates, so that two zones
+// along one border hold the very same points.
+function backExact(ring: Pt[]): LatLng[] {
+  const known: [Pt, LatLng][] = [...edRing.value.map((p, i) => [p, ed.polygon[i]] as [Pt, LatLng]),
+    ...rings.value.flatMap(r => r.ring.map((p, i) => [p, r.zone.polygon[i]] as [Pt, LatLng]))]
+  return ring.map(p => { const k = known.find(([q]) => q === p || geo.dist(q, p) < 1e-3); return k ? [...k[1]] as LatLng : pl().from(p) })
+}
+function planFor(c: Place2): CutPlan {
+  const plan: CutPlan = { reshapes: [], gone: false }
+  const others = overlapZones.value.map(z => ({ zone: z, ring: pl().ring(z.polygon) }))
+  try {
+    if (c === 'new_over') {
+      for (const o of others) {
+        const cut = cutter.subtract(o.ring, [edRing.value])
+        if (cut.holes) continue // this zone lies inside the other: the list order decides
+        if (!cut.pieces.length) plan.gone = true
+        else plan.reshapes.push({ zone: o.zone, pieces: cut.pieces.map(backExact) })
+      }
+    } else {
+      const clips = others.filter(o => !cutter.subtract(edRing.value, [o.ring]).holes).map(o => o.ring)
+      if (clips.length) {
+        const cut = cutter.subtract(edRing.value, clips)
+        if (!cut.holes) {
+          if (!cut.pieces.length) plan.gone = true
+          else plan.reshapes.push({ zone: null, pieces: cut.pieces.map(backExact) })
+        }
+      }
+    }
+  } catch { return { reshapes: [], gone: false } }
+  return plan
+}
+const canChoose = computed(() => mode.value === 'overlap'
+  ? { new_over: !planFor('new_over').gone, old_over: !planFor('old_over').gone } : { new_over: true, old_over: true })
+const plan = computed<CutPlan | null>(() => place.value && mode.value === 'edit' && overlapZones.value.length ? planFor(place.value) : null)
+const isCut = computed(() => !!plan.value?.reshapes.length)
+const hasSplit = computed(() => !!plan.value?.reshapes.some(r => r.pieces.length > 1))
+// What to draw for a zone while the cut is previewed: [kept piece, ...split-off pieces].
+const shapesOf = (z: Zone): LatLng[][] => plan.value?.reshapes.find(r => r.zone?.id === z.id)?.pieces ?? [z.polygon]
+const edShapes = computed<LatLng[][]>(() => plan.value?.reshapes.find(r => !r.zone)?.pieces ?? [ed.polygon])
 const edStats = computed(() => ({ n: ed.polygon.length, area: geo.area(edRing.value), reach: store.value ? geo.maxReach(pl().to(store.value), edRing.value) : 0 }))
 
 function openEditor(z: Zone, polygon: LatLng[], isFresh: boolean) {
   Object.assign(ed, { id: z.id, name: z.name, name_en: z.name_en, fee: toMajor(z.fee), min_order: toMajor(z.min_order),
     eta: z.eta_minutes ?? '', color: z.color || colorOf(z), active: z.active, polygon: polygon.map(p => [...p] as LatLng) })
-  fresh = isFresh; place.value = null; choice.value = null; error.value = ''; notice.value = ''; badEdges.value = []
+  fresh = isFresh; place.value = null; choice.value = null; split.value = 'keep'; error.value = ''; notice.value = ''; badEdges.value = []
+  cutUndo.value = null
   mode.value = 'edit'
   // What it overlapped before this edit needs no new decision.
   overlapBefore = new Set(isFresh ? [] : overlapZones.value.map(x => x.id))
@@ -208,7 +261,7 @@ function editZone(z: Zone) {
   openEditor(z, z.polygon, false)
   map.value?.fit(z.polygon, 16)
 }
-function choose(c: Place2) { choice.value = c }
+function choose(c: Place2) { if (canChoose.value[c]) choice.value = c }
 function confirmChoice() { if (choice.value) { place.value = choice.value; mode.value = 'edit' } }
 function rechoose() { choice.value = place.value; mode.value = 'overlap' }
 function redraw() { const z = zones.value.find(x => x.id === ed.id) ?? null; startDraw(z) }
@@ -250,26 +303,85 @@ async function saveZone() {
   if (ed.polygon.length && !checkShape(ed.polygon)) return
   // An overlap that was not there before needs a decision first.
   if (!place.value && overlapZones.value.some(z => !overlapBefore.has(z.id))) { choice.value = null; mode.value = 'overlap'; return }
-  const body = { name: ed.name.trim(), name_en: ed.name_en.trim(), fee: toMinor(ed.fee), min_order: toMinor(ed.min_order), active: ed.active,
-    sort: zones.value.find(z => z.id === ed.id)?.sort ?? zones.value.length, polygon: ed.polygon.length ? ed.polygon : null, color: ed.color,
-    eta_minutes: ed.eta === '' ? null : Number(ed.eta) }
+  const mine = { name: ed.name.trim(), name_en: ed.name_en.trim(), fee: toMinor(ed.fee), min_order: toMinor(ed.min_order), active: ed.active,
+    sort: zones.value.find(z => z.id === ed.id)?.sort ?? zones.value.length, color: ed.color, eta_minutes: ed.eta === '' ? null : Number(ed.eta) }
+  const inputOf = (z: Zone) => ({ name: z.name, name_en: z.name_en, fee: z.fee, min_order: z.min_order, active: z.active, sort: z.sort, color: z.color, eta_minutes: z.eta_minutes })
+  // The zone itself first, then the zones it cuts, then pieces split off as
+  // zones of their own (each named after where it came from).
+  const cuts = plan.value?.reshapes ?? []
+  const changes: Record<string, unknown>[] = [{ id: ed.id, ...mine, polygon: ed.polygon.length ? edShapes.value[0] : null }]
+  const undo: Record<string, unknown>[] = [{ ...mine, polygon: ed.polygon.length ? ed.polygon.map(p => [...p]) : null }]
+  for (const r of cuts) if (r.zone) {
+    changes.push({ id: r.zone.id, ...inputOf(r.zone), polygon: r.pieces[0] })
+    undo.push({ id: r.zone.id, ...inputOf(r.zone), polygon: r.zone.polygon })
+  }
+  const pieceOf: number[] = [] // for each split-off piece, the index in `changes` of the zone it came from
+  if (split.value === 'keep') for (const r of cuts) r.pieces.slice(1).forEach((piece, k) => {
+    const src = r.zone ? inputOf(r.zone) : mine
+    pieceOf.push(r.zone ? changes.findIndex(c => c.id === r.zone!.id) : 0)
+    changes.push({ id: 0, ...src, name: `${src.name}-${k + 2}`, name_en: src.name_en ? `${src.name_en}-${k + 2}` : '', polygon: piece })
+  })
+  if (changes.some(c => ((c.polygon as LatLng[] | null)?.length ?? 0) > 200)) { error.value = t('mz.too_many'); return }
+  const first = changes.length - pieceOf.length
   const ok = await run(async () => {
-    const id: number = ed.id || (await post(`/merchant/branches/${bid}/zones`, body)).id
-    if (ed.id) await put(`/merchant/branches/${bid}/zones/${id}`, body)
-    const order = newOrder(id), before = zones.value.map(z => z.id)
+    const { ids } = await put<{ ids: number[] }>(`/merchant/branches/${bid}/zone-batch`, { zones: changes })
+    // The choice also sets the list order, which still decides whatever a cut cannot.
+    let order = newOrder(ids[0])
+    pieceOf.forEach((src, k) => { order = order.filter(x => x !== ids[first + k]); order.splice(order.indexOf(ids[src]) + 1, 0, ids[first + k]) })
+    const before = zones.value.map(z => z.id)
     if (order.length !== before.length || order.some((x, i) => x !== before[i])) await put(`/merchant/branches/${bid}/zone-order`, { ids: order })
     await load()
-    return id
+    return ids
   })
   if (ok === undefined) return
-  mode.value = 'browse'; selected.value = ok
-  const n = gaps.value.filter(g => g.a === ok || g.b === ok).length
-  notice.value = n ? t('mz.gaps_found', { n }) : t('mz.saved')
+  const id = ok[0]
+  mode.value = 'browse'; selected.value = id
+  const n = gaps.value.filter(g => g.a === id || g.b === id).length
+  if (cuts.length) {
+    undo[0].id = id
+    cutUndo.value = { zones: undo, delete: ok.slice(first) }
+    notice.value = t('mz.cut_done')
+  } else notice.value = n ? t('mz.gaps_found', { n }) : t('mz.saved')
+}
+// One step back after a cut: every zone it touched gets its outline back and
+// the pieces it split off are removed. The zones overlap again, as before.
+const cutUndo = ref<{ zones: Record<string, unknown>[]; delete: number[] } | null>(null)
+async function undoCut() {
+  const u = cutUndo.value
+  if (!u) return
+  // The list keeps the order it has now: only the outlines go back.
+  const order = zones.value.map(z => z.id).filter(id => !u.delete.includes(id))
+  if (await run(async () => {
+    await put(`/merchant/branches/${bid}/zone-batch`, u)
+    await put(`/merchant/branches/${bid}/zone-order`, { ids: order })
+    await load(); return true
+  })) { cutUndo.value = null; notice.value = t('mz.cut_undone') }
+}
+
+// ---- overlaps that are already there ----
+// Zones saved before overlaps were cut, or moved since. A zone lying inside
+// another and listed above it is fine as it is: that is how an island works.
+const overlapPairs = computed(() => {
+  const out: { a: Zone; b: Zone }[] = [], rs = rings.value
+  for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {
+    if (!ringsOverlap(rs[i].ring, rs[j].ring)) continue
+    if (safe(() => cutter.subtract(rs[j].ring, [rs[i].ring]).holes, () => false)) continue
+    out.push({ a: rs[i].zone, b: rs[j].zone })
+  }
+  return out
+})
+// The lower zone is opened and the question is asked at once.
+function resolveOverlap(p: { a: Zone; b: Zone }) {
+  if (readOnly.value) return
+  openEditor(p.b, p.b.polygon, false)
+  overlapBefore = new Set()
+  mode.value = 'overlap'
+  map.value?.fit([...p.a.polygon, ...p.b.polygon], 16)
 }
 async function removeZone() {
   const z = zones.value.find(x => x.id === ed.id)
   if (!z) return cancelEdit()
-  if (!confirm(t('mz.delete_confirm', { name: zname(z) }))) return
+  if (!confirm(t('mz.delete_confirm', { name: zname(z) }) + (z.polygon.length >= 3 ? '\n' + t('mz.delete_hole') : ''))) return
   if (await run(async () => { await del(`/merchant/branches/${bid}/zones/${z.id}`); await load(); return true })) { mode.value = 'browse'; notice.value = '' }
 }
 
@@ -447,10 +559,13 @@ async function fbSave() {
 
         <!-- saved zones, lowest priority first so the winner is drawn last -->
         <g v-for="z in shown" :key="z.id" :opacity="dimmed ? 0.5 : z.active ? 1 : 0.45" :data-zone="z.id">
-          <polygon :points="poly(z.polygon, px)" :fill="colorOf(z)" :fill-opacity="selected === z.id && !dimmed ? 0.32 : 0.18" :mask="`url(#dm-m${z.id})`"
+          <polygon :points="poly(shapesOf(z)[0], px)" :fill="colorOf(z)" :fill-opacity="selected === z.id && !dimmed ? 0.32 : 0.18" :mask="`url(#dm-m${z.id})`"
             :class="{ hit: mode === 'browse' }" @click.stop="selected = z.id" />
-          <polygon :points="poly(z.polygon, px)" fill="none" :stroke="colorOf(z)" :stroke-width="selected === z.id && !dimmed ? 3 : 2"
+          <polygon :points="poly(shapesOf(z)[0], px)" fill="none" :stroke="colorOf(z)" :stroke-width="selected === z.id && !dimmed ? 3 : 2"
             stroke-linejoin="round" :stroke-dasharray="z.active ? undefined : '6 5'" />
+          <!-- pieces the cut splits off: kept as a zone of their own, or dropped -->
+          <polygon v-for="(piece, k) in shapesOf(z).slice(1)" :key="k" :points="poly(piece, px)" :fill="split === 'keep' ? colorOf(z) : '#b42318'" fill-opacity="0.12"
+            :stroke="split === 'keep' ? colorOf(z) : '#b42318'" stroke-width="2" stroke-dasharray="6 5" stroke-linejoin="round" data-testid="split-piece" />
         </g>
 
         <!-- gaps between zones -->
@@ -471,8 +586,12 @@ async function fbSave() {
 
         <!-- the zone being edited -->
         <g v-if="(mode === 'edit' || mode === 'overlap') && ed.polygon.length >= 3" data-testid="editing">
-          <polygon :points="poly(ed.polygon, px)" :fill="edColor" fill-opacity="0.3" :stroke="edColor" stroke-width="3" stroke-linejoin="round" />
-          <polygon v-if="overlapZones.length" :points="poly(ed.polygon, px)" fill="url(#dm-hatch)" fill-opacity="0.75" clip-path="url(#dm-ov)" data-testid="overlap-hatch" />
+          <polygon :points="poly(edShapes[0], px)" :fill="edColor" fill-opacity="0.3" :stroke="edColor" stroke-width="3" stroke-linejoin="round" data-testid="ed-shape" />
+          <polygon v-for="(piece, k) in edShapes.slice(1)" :key="'x' + k" :points="poly(piece, px)" :fill="split === 'keep' ? edColor : '#b42318'" fill-opacity="0.12"
+            :stroke="split === 'keep' ? edColor : '#b42318'" stroke-width="2" stroke-dasharray="6 5" stroke-linejoin="round" data-testid="split-piece" />
+          <!-- the outline as drawn, where the cut took something away from it -->
+          <polygon v-if="edShapes[0] !== ed.polygon" :points="poly(ed.polygon, px)" fill="none" :stroke="edColor" stroke-width="1.5" stroke-dasharray="3 5" opacity="0.7" />
+          <polygon v-if="overlapZones.length && !isCut" :points="poly(ed.polygon, px)" fill="url(#dm-hatch)" fill-opacity="0.75" clip-path="url(#dm-ov)" data-testid="overlap-hatch" />
           <template v-for="(p, i) in ed.polygon" :key="'e' + i">
             <line v-if="badEdges.includes(i)" :x1="px(p).x" :y1="px(p).y" :x2="px(ed.polygon[(i + 1) % ed.polygon.length]).x"
               :y2="px(ed.polygon[(i + 1) % ed.polygon.length]).y" stroke="#b42318" stroke-width="4" />
@@ -563,15 +682,17 @@ async function fbSave() {
             <h2>{{ t(fresh && !ed.id ? 'mz.ov_title' : 'mz.ov_title_edit', { names: overlapNames }) }}</h2>
             <p class="muted">{{ t('mz.ov_sub', { area: t('mz.about', { v: geo.fmtArea(overlapM2) }) }) }}</p>
             <div class="dmap-choices">
-              <button type="button" class="dmap-choice" :class="{ on: choice === 'new_over' }" data-testid="choose-new" @click="choose('new_over')">
+              <button type="button" class="dmap-choice" :class="{ on: choice === 'new_over' }" :disabled="!canChoose.new_over" data-testid="choose-new" @click="choose('new_over')">
                 <svg viewBox="0 0 190 70"><rect x="20" y="10" width="92" height="48" rx="6" fill="#2a78d6" fill-opacity=".35" /><rect x="78" y="24" width="92" height="38" rx="6" :fill="edColor" fill-opacity=".9" />
                   <text x="34" y="28" font-size="11" fill="#fff" font-weight="700">{{ t('mz.old') }}</text><text x="146" y="54" font-size="11" fill="#fff" font-weight="700">{{ t('mz.new_s') }}</text></svg>
-                <b>{{ t('mz.new_over') }}</b><div class="small muted">{{ t('mz.new_over_d') }}</div>
+                <b>{{ fresh ? t('mz.new_over') : t('mz.this_over', { names: overlapNames }) }}</b>
+                <div class="small muted">{{ canChoose.new_over ? t('mz.new_over_d') : t('mz.gone_other', { names: overlapNames }) }}</div>
               </button>
-              <button type="button" class="dmap-choice" :class="{ on: choice === 'old_over' }" data-testid="choose-old" @click="choose('old_over')">
+              <button type="button" class="dmap-choice" :class="{ on: choice === 'old_over' }" :disabled="!canChoose.old_over" data-testid="choose-old" @click="choose('old_over')">
                 <svg viewBox="0 0 190 70"><rect x="78" y="24" width="92" height="38" rx="6" :fill="edColor" fill-opacity=".35" /><rect x="20" y="10" width="92" height="48" rx="6" fill="#2a78d6" fill-opacity=".9" />
                   <text x="34" y="28" font-size="11" fill="#fff" font-weight="700">{{ t('mz.old') }}</text><text x="146" y="54" font-size="11" fill="#fff" font-weight="700">{{ t('mz.new_s') }}</text></svg>
-                <b>{{ t('mz.old_over') }}</b><div class="small muted">{{ t('mz.old_over_d', { names: overlapNames }) }}</div>
+                <b>{{ fresh ? t('mz.old_over') : t('mz.other_over', { names: overlapNames }) }}</b>
+                <div class="small muted">{{ canChoose.old_over ? t('mz.old_over_d', { names: overlapNames }) : t('mz.gone_this') }}</div>
               </button>
             </div>
             <div class="row"><button type="button" class="btn" data-testid="overlap-back" @click="mode = 'edit'">{{ t('mz.back_adjust') }}</button><span class="grow"></span>
@@ -586,6 +707,7 @@ async function fbSave() {
       <section v-if="error"><div class="banner bad" data-testid="map-error">{{ error }}</div></section>
       <section v-if="notice"><div class="banner ok row between" data-testid="map-notice"><span>{{ notice }}</span>
         <button v-if="canUndo && mode === 'gaps'" class="btn small" data-testid="undo-close" @click="undoClose">{{ t('mz.undo_close') }}</button>
+        <button v-else-if="cutUndo && mode === 'browse'" class="btn small" data-testid="undo-cut" @click="undoCut">{{ t('mz.undo_close') }}</button>
         <button v-else-if="gaps.length && mode === 'browse'" class="btn small" @click="openGaps">{{ t('mz.view') }}</button></div></section>
 
       <!-- browse -->
@@ -625,6 +747,11 @@ async function fbSave() {
         <section v-if="zones.length">
           <div v-if="undrawnCount" class="banner warn">{{ t('mz.some_undrawn', { n: undrawnCount }) }}</div>
           <div v-else class="banner ok">{{ t('mz.all_drawn', { n: zones.length }) }}</div>
+          <div v-if="overlapPairs.length" class="banner warn" style="margin-top:8px" data-testid="overlap-pairs">
+            <div>{{ t('mz.pairs_found', { n: overlapPairs.length }) }}</div>
+            <div v-for="(p, i) in overlapPairs" :key="i" class="row between" style="margin-top:6px"><span>{{ zname(p.a) }} ↔ {{ zname(p.b) }}</span>
+              <button v-if="!readOnly && !narrow" class="btn small" :data-testid="'resolve-' + i" @click="resolveOverlap(p)">{{ t('mz.resolve') }}</button></div>
+          </div>
           <div v-if="gaps.length" class="banner warn row between" style="margin-top:8px"><span data-testid="gap-count">{{ t('mz.gaps_found', { n: gaps.length }) }}</span>
             <button class="btn small" @click="openGaps">{{ t('mz.view') }}</button></div>
         </section>
@@ -678,8 +805,13 @@ async function fbSave() {
           <div v-if="edStats.area < 10000" class="banner warn" style="margin-top:8px">{{ t('mz.small_area') }}</div>
         </section>
         <section v-else><div class="banner warn">{{ t('mz.undrawn') }}</div></section>
-        <section v-if="overlapZones.length"><div class="banner warn" data-testid="overlap-banner">
-          {{ t(place === 'new_over' ? 'mz.ov_banner_new' : place === 'old_over' ? 'mz.ov_banner_old' : 'mz.ov_banner_order', { names: overlapNames }) }}
+        <section v-if="hasSplit" data-testid="split-choice">
+          <div class="banner warn" style="margin-bottom:8px">{{ t('mz.split') }}</div>
+          <label class="row" style="gap:8px;margin-bottom:6px"><input type="radio" value="keep" v-model="split" style="width:auto" data-testid="split-keep" /><span>{{ t('mz.split_keep') }}</span></label>
+          <label class="row" style="gap:8px"><input type="radio" value="drop" v-model="split" style="width:auto" data-testid="split-drop" /><span>{{ t('mz.split_drop') }}</span></label>
+        </section>
+        <section v-if="overlapZones.length"><div class="banner warn" data-testid="overlap-banner" :data-cut="isCut ? 'yes' : 'no'">
+          {{ t(!isCut ? 'mz.ov_banner_order' : place === 'new_over' ? 'mz.ov_banner_new' : 'mz.ov_banner_old', { names: overlapNames }) }}
           <button type="button" class="btn link" style="font-weight:700" data-testid="rechoose" @click="rechoose">{{ t('mz.rechoose') }}</button></div></section>
         <div class="foot"><button v-if="ed.id" class="btn danger" data-testid="delete-zone" @click="removeZone">{{ t('mz.delete') }}</button>
           <button v-if="!narrow" class="btn" data-testid="redraw" @click="redraw">{{ t('mz.redraw') }}</button>

@@ -240,3 +240,63 @@ func TestMapModeNeedsPlatformKey(t *testing.T) {
 	_, err = off.SaveZoneMode(ctx, s.branchID, app.ZoneModeInput{ZoneMode: "map", ZoneToleranceM: 200})
 	wantCode(t, err, "MAPS_DISABLED")
 }
+
+// Cutting an overlap reshapes several zones at once: all are saved or none.
+func TestZoneBatch(t *testing.T) {
+	s := newStore(t, true)
+	a, ctx := testApp, context.Background()
+	store := m(500, 500)
+	_, err := a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: store[0], Lng: store[1]})
+	noErr(t, err)
+	old, err := a.SaveZone(ctx, s.branchID, 0, app.ZoneInput{Name: "old", Fee: 1000, Active: true, Polygon: box(0, 0, 1000, 1000)})
+	noErr(t, err)
+
+	// The new zone takes the right half; the old one keeps the left, and a
+	// second piece is saved as a zone of its own.
+	batch := app.ZoneBatch{Zones: []app.ZoneChange{
+		{ID: old, ZoneInput: app.ZoneInput{Name: "old", Fee: 1000, Active: true, Polygon: box(0, 0, 500, 1000)}},
+		{ZoneInput: app.ZoneInput{Name: "new", Fee: 2000, Active: true, Polygon: box(500, 0, 1500, 1000)}},
+		{ZoneInput: app.ZoneInput{Name: "old-2", Fee: 1000, Active: true, Polygon: box(1500, 0, 1800, 1000)}},
+	}}
+	ids, err := a.SaveZones(ctx, s.branchID, batch)
+	noErr(t, err)
+	if len(ids) != 3 || ids[0] != old || ids[1] == 0 || ids[2] == 0 {
+		t.Fatalf("ids = %v", ids)
+	}
+	menu, err := a.AdminMenu(ctx, s.branchID)
+	noErr(t, err)
+	shape := map[string]int{}
+	for _, z := range menu.Zones {
+		shape[z.Name] = len(z.Polygon)
+	}
+	if shape["old"] != 4 || shape["new"] != 4 || shape["old-2"] != 4 {
+		t.Fatalf("zones after the batch: %v", shape)
+	}
+
+	// One bad outline leaves everything as it was.
+	bad := app.ZoneBatch{Zones: []app.ZoneChange{
+		{ID: old, ZoneInput: app.ZoneInput{Name: "renamed", Fee: 1000, Active: true, Polygon: box(0, 0, 400, 1000)}},
+		{ZoneInput: app.ZoneInput{Name: "bow", Fee: 1, Active: true, Polygon: app.Polygon{m(0, 0), m(1000, 1000), m(1000, 0), m(0, 1000)}}},
+	}, Delete: []int64{ids[2]}}
+	_, err = a.SaveZones(ctx, s.branchID, bad)
+	wantCode(t, err, "ZONE_SELF_INTERSECTS")
+	menu, err = a.AdminMenu(ctx, s.branchID)
+	noErr(t, err)
+	names := map[string]bool{}
+	for _, z := range menu.Zones {
+		names[z.Name] = true
+	}
+	if names["renamed"] || names["bow"] || !names["old"] || !names["old-2"] {
+		t.Fatalf("a failed batch changed something: %v", names)
+	}
+
+	// Undo: put the old outline back and drop the piece that was split off.
+	_, err = a.SaveZones(ctx, s.branchID, app.ZoneBatch{Zones: []app.ZoneChange{
+		{ID: old, ZoneInput: app.ZoneInput{Name: "old", Fee: 1000, Active: true, Polygon: box(0, 0, 1000, 1000)}},
+	}, Delete: []int64{ids[2]}})
+	noErr(t, err)
+	_, err = a.SaveZones(ctx, s.branchID, app.ZoneBatch{Delete: []int64{ids[2]}})
+	wantCode(t, err, "NOT_FOUND")
+	_, err = a.SaveZones(ctx, s.branchID, app.ZoneBatch{})
+	wantCode(t, err, "VALIDATION")
+}
