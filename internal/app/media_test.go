@@ -121,3 +121,44 @@ func TestPromoMedia(t *testing.T) {
 	_, err = a.AddMedia(ctx, s.branchID, tinyJPEG, app.MediaInput{})
 	noErr(t, err)
 }
+
+func TestDishPictures(t *testing.T) {
+	s := newStore(t, false)
+	ctx := context.Background()
+	a := testApp
+
+	_, err := a.AddImage(ctx, s.branchID, []byte("GIF89a not a jpeg"))
+	wantCode(t, err, "VALIDATION")
+	_, err = a.AddImage(ctx, 0, tinyJPEG)
+	wantCode(t, err, "NOT_FOUND")
+
+	used, err := a.AddImage(ctx, s.branchID, tinyJPEG)
+	noErr(t, err)
+	logo, err := a.AddImage(ctx, s.branchID, tinyJPEG)
+	noErr(t, err)
+	unused, err := a.AddImage(ctx, s.branchID, tinyJPEG)
+	noErr(t, err)
+	got, err := a.Image(ctx, used[len("/api/v1/images/"):])
+	noErr(t, err)
+	if !bytes.Equal(got, tinyJPEG) {
+		t.Fatal("the picture came back different")
+	}
+
+	// A dish and a template can point at an uploaded picture.
+	cat, err := a.SaveCategory(ctx, s.branchID, 0, app.CategoryInput{Name: "P"})
+	noErr(t, err)
+	_, err = a.SaveItem(ctx, s.branchID, 0, app.ItemInput{CategoryID: cat, Name: "pictured", Price: 100, ImageURL: used})
+	noErr(t, err)
+	noErr(t, a.SaveTemplateDraft(ctx, s.branchID, "delivery", app.Template{Layout: "list", ThemeColor: "#d9480f", LogoURL: logo}))
+
+	// The clean-up drops only old pictures nothing points at.
+	_, err = a.DB.Exec(ctx, `UPDATE store_images SET created_at = now() - interval '8 days' WHERE branch_id=$1`, s.branchID)
+	noErr(t, err)
+	noErr(t, a.Cleanup(ctx))
+	for url, want := range map[string]bool{used: true, logo: true, unused: false} {
+		_, err := a.Image(ctx, url[len("/api/v1/images/"):])
+		if (err == nil) != want {
+			t.Fatalf("%s kept = %v, want %v", url, err == nil, want)
+		}
+	}
+}

@@ -320,3 +320,49 @@ func (a *App) MediaPoster(ctx context.Context, token string) ([]byte, error) {
 	}
 	return image, err
 }
+
+// ---- pictures of dishes, the logo and the cover ----
+
+// ImageMaxBytes caps an uploaded picture; the browser crops and shrinks it first.
+const ImageMaxBytes = 1 << 20
+
+const imagePath = "/api/v1/images/"
+
+// AddImage stores a cropped JPEG and returns the address a dish or a template
+// can use for it.
+func (a *App) AddImage(ctx context.Context, branchID int64, image []byte) (string, error) {
+	if !isJPEG(image, ImageMaxBytes) {
+		return "", ErrValidation("the picture must be a JPEG of at most 1 MB")
+	}
+	tok := make([]byte, 12)
+	if _, err := rand.Read(tok); err != nil {
+		return "", err
+	}
+	token := hex.EncodeToString(tok)
+	tag, err := a.DB.Exec(ctx, `INSERT INTO store_images (branch_id, token, content)
+		SELECT id, $2, $3 FROM branches WHERE id=$1 AND deleted_at IS NULL`, branchID, token, image)
+	if err != nil {
+		return "", err
+	}
+	if tag.RowsAffected() == 0 {
+		return "", ErrNotFound
+	}
+	return imagePath + token, nil
+}
+
+// Image returns an uploaded picture by the token in its address.
+func (a *App) Image(ctx context.Context, token string) ([]byte, error) {
+	var image []byte
+	err := a.DB.QueryRow(ctx, `SELECT content FROM store_images WHERE token=$1`, token).Scan(&image)
+	if isNoRows(err) {
+		return nil, ErrNotFound
+	}
+	return image, err
+}
+
+// purgeUnusedImages is part of the daily clean-up: pictures that no dish and
+// no template (published or draft) points at any more, a week after upload.
+const purgeUnusedImages = `DELETE FROM store_images i WHERE i.created_at < now() - interval '7 days'
+	AND NOT EXISTS (SELECT 1 FROM menu_items m WHERE m.image_url = '` + imagePath + `' || i.token)
+	AND NOT EXISTS (SELECT 1 FROM channel_templates t WHERE ('` + imagePath + `' || i.token) IN (
+		t.published->>'logo_url', t.published->>'cover_url', t.draft->>'logo_url', t.draft->>'cover_url'))`

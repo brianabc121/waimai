@@ -7,6 +7,7 @@ import { money, pick, t } from '../i18n'
 import { currentRole, session } from '../session'
 import { themeVars } from '../theme'
 import type { Channel, ChannelTemplate, Storefront, Template } from '../types'
+import ImageUpload from './ImageUpload.vue'
 import MenuList from './MenuList.vue'
 
 const bid = session.branchId!
@@ -75,9 +76,8 @@ const discard = () => run(() => post(base() + '/discard'))
         <label class="field"><span>{{ t('theme_color') }}</span>
           <span class="row" style="gap:8px"><input type="color" v-model="form.theme_color" name="theme" style="width:56px;height:38px;padding:2px" />
             <input v-model="form.theme_color" maxlength="7" style="width:120px" /></span></label>
-        <label class="field"><span>{{ t('logo_url') }}</span><input v-model="form.logo_url" maxlength="500" placeholder="https://" /></label>
-        <label class="field"><span>{{ t('cover_url') }}</span><input v-model="form.cover_url" maxlength="500" placeholder="https://" />
-          <span class="small muted">{{ t('https_only') }}</span></label>
+        <ImageUpload v-model="form.logo_url" :base="`/merchant/branches/${bid}`" :ratio="1" :width="400" :label="t('im.logo')" testid="tpl-logo" />
+        <ImageUpload v-model="form.cover_url" :base="`/merchant/branches/${bid}`" :ratio="3" :width="1500" :label="t('im.cover')" :hint="t('im.cover_hint')" testid="tpl-cover" />
         <div class="row wrap" style="gap:8px">
           <button class="btn" :disabled="busy || !dirty" data-test="save-draft" @click="save">{{ t('save_draft') }}</button>
           <button class="btn primary" :disabled="busy || (!dirty && !current.draft)" data-test="publish-tpl" @click="publish">{{ t('publish_tpl') }}</button>

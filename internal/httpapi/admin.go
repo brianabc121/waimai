@@ -70,6 +70,7 @@ func (s *Server) adminRoutes(admin *gin.RouterGroup) {
 	admin.PUT("/branches/:bid/categories/:id", s.adminSaveCategory)
 	admin.DELETE("/branches/:bid/categories/:id", s.adminDeleteCategory)
 	admin.POST("/branches/:bid/items", s.adminSaveItem)
+	admin.POST("/branches/:bid/images", s.adminUploadImage)
 	admin.POST("/branches/:bid/items/bulk", s.adminBulkItems)
 	admin.PUT("/branches/:bid/items/:id", s.adminSaveItem)
 	admin.PATCH("/branches/:bid/items/:id", s.adminPatchItem)

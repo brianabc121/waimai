@@ -673,6 +673,7 @@ func (a *App) Cleanup(ctx context.Context) error {
 		// door photos of addresses the customer deleted a month ago
 		`DELETE FROM customer_address_photos p USING customer_addresses ad
 			WHERE ad.id = p.address_id AND ad.deleted_at < now() - interval '30 days'`,
+		purgeUnusedImages,
 	} {
 		if _, err := a.DB.Exec(ctx, q); err != nil {
 			return err

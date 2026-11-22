@@ -151,3 +151,43 @@ func (s *Server) reorderMedia(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{"media": list})
 }
+
+// ---- pictures of dishes, the logo and the cover ----
+
+func (s *Server) image(c *gin.Context) {
+	image, err := s.App.Image(c, c.Param("token"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.Header("Cache-Control", "public, max-age=31536000, immutable")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Data(200, "image/jpeg", image)
+}
+
+func (s *Server) saveImage(c *gin.Context, bid int64) {
+	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, app.ImageMaxBytes+1))
+	if err != nil || len(body) > app.ImageMaxBytes {
+		fail(c, app.Err(http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", "the picture is larger than 1 MB"))
+		return
+	}
+	url, err := s.App.AddImage(c, bid, body)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"url": url})
+}
+
+func (s *Server) uploadImage(c *gin.Context) {
+	if bid, ok := branchScope(c, managerRoles); ok {
+		s.saveImage(c, bid)
+	}
+}
+
+// adminUploadImage lets the platform back office add a picture to a dish of any store.
+func (s *Server) adminUploadImage(c *gin.Context) {
+	if bid, ok := idParam(c, "bid"); ok {
+		s.saveImage(c, bid)
+	}
+}

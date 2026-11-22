@@ -6,6 +6,7 @@ import { reactive, ref } from 'vue'
 import { post, put } from '../api'
 import { both, t, toMajor, toMinor } from '../i18n'
 import type { Item, Station } from '../types'
+import ImageUpload from './ImageUpload.vue'
 
 const props = defineProps<{ item: Item | null; categoryId?: number; cats: { id: number; name: string }[]; stations: Station[]; cur: string; base: string }>()
 const emit = defineEmits<{ saved: []; close: [] }>()
@@ -62,7 +63,7 @@ async function save() {
           <label class="field"><span>{{ t('price') }} ({{ cur }})</span><input type="number" min="0" step="0.01" v-model.number="f.price" required /></label>
         </div>
         <label class="field"><span>{{ t('description') }}</span><input v-model="f.description" /></label>
-        <label class="field"><span>{{ t('image_url') }}</span><input v-model="f.image_url" placeholder="https://" /></label>
+        <ImageUpload v-model="f.image_url" :base="base" :ratio="1" :width="800" :label="t('im.dish')" :hint="t('im.dish_hint')" testid="item-image" />
         <div class="grid2">
           <label class="check"><input type="checkbox" v-model="f.published" />{{ t('published') }}</label>
           <label class="check"><input type="checkbox" v-model="f.needs_prep" />{{ t('needs_prep') }}</label>

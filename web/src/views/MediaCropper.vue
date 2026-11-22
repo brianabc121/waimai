@@ -10,7 +10,9 @@ import type { Crop, PromoMedia } from '../types'
 
 export interface CropResult { crop: Crop; title: string; trim_start: number; trim_end: number; poster: Blob | null }
 
-const props = defineProps<{ kind: PromoMedia['kind']; src: string; initial?: PromoMedia | null; busy?: boolean; error?: string }>()
+// ratio is the frame's shape (16:9 for promo media); plain leaves out the title.
+const props = defineProps<{ kind: PromoMedia['kind']; src: string; initial?: PromoMedia | null; busy?: boolean; error?: string; ratio?: number; plain?: boolean }>()
+const shape = props.ratio ?? MEDIA_RATIO
 const emit = defineEmits<{ save: [r: CropResult]; cancel: [] }>()
 
 const stage = ref<HTMLElement | null>(null)
@@ -28,9 +30,9 @@ function loaded() {
   const w = e instanceof HTMLVideoElement ? e.videoWidth : e.naturalWidth
   const h = e instanceof HTMLVideoElement ? e.videoHeight : e.naturalHeight
   if (!w || !h) { failed.value = true; return }
-  full = largestCrop(w, h)
+  full = largestCrop(w, h, shape)
   const c = props.initial?.crop
-  // A saved crop of another shape (the whole of a picture that is not 16:9) starts over.
+  // A saved crop of another shape (the whole of a picture that is not of the frame's shape) starts over.
   const same = c && Math.abs(c.w / c.h - full.w / full.h) < 0.02
   Object.assign(crop, same ? c : full)
   zoom.value = Math.min(4, Math.max(1, full.w / crop.w))
@@ -163,11 +165,11 @@ onBeforeUnmount(() => { if (props.kind === 'video') (el.value as HTMLVideoElemen
 <template>
   <div class="sheet-mask" @click.self="emit('cancel')">
     <form class="sheet center cropper" data-testid="cropper" @submit.prevent="save">
-      <div class="sheet-head"><h2>{{ t('pm.crop_title') }}</h2><div class="muted small">{{ t('pm.crop_hint') }}</div></div>
+      <div class="sheet-head"><h2>{{ t(plain ? 'im.crop_title' : 'pm.crop_title') }}</h2><div class="muted small">{{ t('pm.crop_hint') }}</div></div>
       <div class="sheet-body stack">
         <div v-if="error" class="banner bad">{{ error }}</div>
         <div v-if="failed" class="banner bad">{{ t(kind === 'video' ? 'pm.cant_play' : 'pm.bad_type') }}</div>
-        <div ref="stage" class="stage" :class="{ ready }" tabindex="0" data-testid="crop-stage" :data-crop="[crop.x, crop.y, crop.w, crop.h].map(v => v.toFixed(3)).join(',')"
+        <div ref="stage" class="stage" :class="{ ready }" :style="{ aspectRatio: String(shape), maxWidth: `calc(52vh * ${shape})` }" tabindex="0" data-testid="crop-stage" :data-crop="[crop.x, crop.y, crop.w, crop.h].map(v => v.toFixed(3)).join(',')"
           @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="up" @wheel.prevent="wheel" @keydown="key">
           <video v-if="kind === 'video'" ref="el" :src="src" :style="cropStyle(crop)" playsinline preload="auto"
             @loadedmetadata="loaded" @error="failed = true" @timeupdate="tick" @play="video.playing = true" @pause="video.playing = false"></video>
@@ -196,7 +198,7 @@ onBeforeUnmount(() => { if (props.kind === 'video') (el.value as HTMLVideoElemen
           </div>
         </template>
         <p v-if="kind === 'gif'" class="muted small" style="margin:0">{{ t('pm.gif_note') }}</p>
-        <label class="field" style="margin:0"><span>{{ t('pm.title') }}</span><input v-model="title" maxlength="40" :placeholder="t('pm.title_ph')" data-testid="crop-title" /></label>
+        <label v-if="!plain" class="field" style="margin:0"><span>{{ t('pm.title') }}</span><input v-model="title" maxlength="40" :placeholder="t('pm.title_ph')" data-testid="crop-title" /></label>
       </div>
       <div class="sheet-foot row">
         <button type="button" class="btn grow" @click="emit('cancel')">{{ t('cancel') }}</button>
@@ -208,7 +210,7 @@ onBeforeUnmount(() => { if (props.kind === 'video') (el.value as HTMLVideoElemen
 
 <style scoped>
 .cropper { max-width: 680px; width: 100%; }
-.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #1c1c1c; border-radius: 10px; touch-action: none; cursor: grab; outline-offset: 2px; }
+.stage { position: relative; width: 100%; margin: 0 auto; aspect-ratio: 16 / 9; overflow: hidden; background: #1c1c1c; border-radius: 10px; touch-action: none; cursor: grab; outline-offset: 2px; }
 .stage:active { cursor: grabbing; }
 .stage > img, .stage > video { position: absolute; max-width: none; object-fit: fill; display: block; user-select: none; pointer-events: none; }
 .stage:not(.ready) > img, .stage:not(.ready) > video { visibility: hidden; }
