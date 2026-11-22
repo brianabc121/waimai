@@ -121,7 +121,7 @@ function removeCat(c: Category) { if (confirm(t('ad.cat_delete_confirm', { name:
     <div v-if="error" class="banner bad">{{ error }}</div>
 
     <div class="card flush">
-      <table class="data">
+      <table class="data manycols">
         <thead><tr>
           <th style="width:32px"><input v-if="store" type="checkbox" :checked="allPicked" @change="toggleAll" /></th>
           <th>{{ t('ad.item') }}</th><th v-if="!store">{{ t('ad.branch') }}</th><th>{{ t('category') }}</th><th>{{ t('station') }}</th>

@@ -142,9 +142,10 @@ async function submit() {
 </script>
 
 <template>
-  <div class="phone">
+  <div class="phone wide">
     <div class="topbar row"><router-link :to="`/s/${slug}`">‹ {{ t('back_to_menu') }}</router-link></div>
-    <div class="section stack">
+    <div class="section two-cols">
+      <div class="stack">
       <div v-if="error" class="banner bad">{{ error }} <button class="btn link" @click="requote">{{ t('retry') }}</button></div>
       <div v-if="notice" class="banner warn">{{ notice }}</div>
 
@@ -182,6 +183,8 @@ async function submit() {
         </template>
       </div>
 
+      </div>
+      <aside class="stack side">
       <div class="card stack" v-if="quote">
         <h2>{{ t('order_summary') }}</h2>
         <div v-for="(l, i) in quote.lines" :key="i" class="row top between">
@@ -193,12 +196,12 @@ async function submit() {
         <TotalsTable :totals="quote.totals" :currency="quote.currency" :delivery="cart.service === 'delivery'" />
         <div class="row between"><span class="muted">{{ t('pay_method') }}</span><span>{{ t(cart.service === 'delivery' ? 'cod' : 'pay_at_pickup') }}</span></div>
       </div>
+      <div class="bottombar inline"><div>
+        <button class="btn primary block big" :disabled="!ready || busy" @click="submit">
+          {{ busy ? t('placing') : quote ? `${t('place_order')} · ${money(quote.totals.total, quote.currency)}` : t('place_order') }}
+        </button>
+      </div></div>
+      </aside>
     </div>
-
-    <div class="bottombar"><div>
-      <button class="btn primary block big" :disabled="!ready || busy" @click="submit">
-        {{ busy ? t('placing') : quote ? `${t('place_order')} · ${money(quote.totals.total, quote.currency)}` : t('place_order') }}
-      </button>
-    </div></div>
   </div>
 </template>

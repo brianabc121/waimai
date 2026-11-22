@@ -148,7 +148,7 @@ function qtyOf(it: Item) {
 </script>
 
 <template>
-  <div class="phone" :style="themeVars(tpl)">
+  <div class="phone wide shop" :style="themeVars(tpl)">
     <div v-if="error" class="section stack">
       <div class="banner bad">{{ error }}</div>
       <button class="btn" @click="load">{{ t('retry') }}</button>
@@ -174,6 +174,7 @@ function qtyOf(it: Item) {
       </div>
 
       <img v-if="tpl.cover_url" :src="tpl.cover_url" alt="" class="cover" />
+      <div class="shop-cols"><div class="shop-main">
       <div class="section" v-if="!canOrder">
         <div class="banner warn">{{ store.branch.paused ? t('paused') : t('closed') }}</div>
       </div>
@@ -225,6 +226,35 @@ function qtyOf(it: Item) {
         <MenuList :categories="store.categories" :currency="cur" :layout="tpl.layout" :can-order="orderable" :qty-of="qtyOf"
           @add="open" @dec="it => changeQty(cart.lines.findIndex(l => l.item_id === it.id), -1)" />
       </template>
+      </div>
+
+      <!-- the cart beside the menu on a computer; smaller screens use the bar below -->
+      <aside class="sidecart" v-if="tab === 'menu'" data-testid="side-cart">
+        <div class="card">
+          <div class="row between"><h2>{{ t('cart') }}<span v-if="count" class="muted small"> · {{ count }}</span></h2>
+            <button v-if="count" class="btn link" @click="clearAll">{{ t('clear') }}</button></div>
+          <p v-if="!count" class="muted empty">{{ t('cart_empty') }}</p>
+          <div v-else class="lines stack">
+            <div v-for="(l, i) in cart.lines" :key="l.key" class="row top between">
+              <div class="grow">
+                <div class="bold">{{ items.get(l.item_id) ? pick(items.get(l.item_id)!.name, items.get(l.item_id)!.name_en) : '—' }}</div>
+                <div class="muted small" v-if="optionNames(l)">{{ optionNames(l) }}</div>
+                <div class="muted small" v-if="l.note">{{ t('note') }}: {{ l.note }}</div>
+                <div v-if="!items.get(l.item_id) || !orderable(items.get(l.item_id)!) || linePrice(l, items) === null" class="small" style="color:var(--bad)">{{ t('unavailable') }}</div>
+                <div v-else class="price small">{{ money(linePrice(l, items)! * l.qty, cur) }}</div>
+              </div>
+              <span class="stepper"><button @click="changeQty(i, -1)">−</button><span>{{ l.qty }}</span><button class="fill" @click="changeQty(i, 1)">+</button></span>
+            </div>
+          </div>
+          <template v-if="count">
+            <div v-if="minimum > subtotal" class="small muted">{{ t('below_min', { amt: money(minimum - subtotal, cur) }) }}</div>
+            <div v-else-if="nextPromo" class="small" style="color:var(--brand-dark)">{{ t('more_for_promo', { amt: money(nextPromo.threshold - subtotal, cur), name: promoLabel(nextPromo, cur) }) }}</div>
+            <div class="row between sum"><span>{{ t('subtotal') }}</span><b class="price">{{ money(subtotal, cur) }}</b></div>
+            <button class="btn primary block big" data-testid="go-checkout" :disabled="!canOrder || hasUnavailable || minimum > subtotal" @click="checkout">{{ t('checkout') }}</button>
+          </template>
+        </div>
+      </aside>
+      </div>
 
       <!-- cart bar -->
       <div class="bottombar" v-if="count > 0">
@@ -300,4 +330,12 @@ function qtyOf(it: Item) {
 .promos { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 0; }
 .opt { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .opt.off { opacity: .5; }
+.sidecart { display: none; }
+@media (min-width: 1024px) {
+  .sidecart { display: block; position: sticky; top: 12px; align-self: start; padding: 12px 0; }
+  .sidecart .card { display: grid; gap: 12px; padding: 16px; }
+  .sidecart .lines { max-height: calc(100vh - 300px); overflow-y: auto; }
+  .sidecart .empty { padding: 28px 0; text-align: center; }
+  .sidecart .sum { border-top: 1px solid var(--line); padding-top: 12px; font-size: 17px; }
+}
 </style>

@@ -43,7 +43,7 @@ async function cancel() {
 </script>
 
 <template>
-  <div class="phone" style="padding-bottom:24px">
+  <div class="phone wide" style="padding-bottom:24px">
     <div class="topbar row between">
       <h1>{{ t('order_no') }} {{ order?.public_no }}</h1>
       <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
@@ -55,6 +55,7 @@ async function cancel() {
         <div v-if="!online" class="banner warn">{{ t('offline') }}</div>
         <div v-if="error" class="banner bad">{{ error }}</div>
 
+        <div class="two-cols"><div class="stack">
         <div class="card stack">
           <h2 :style="{ color: closed ? 'var(--bad)' : 'var(--brand-dark)' }" data-testid="status">{{ t('s.' + order.display_status) }}</h2>
           <p v-if="closed && order.close_reason" class="muted">{{ t('reason') }}: {{ reasonText(order.close_reason) }}</p>
@@ -77,8 +78,9 @@ async function cancel() {
         </div>
 
         <TrackRider v-if="order.delivery && ['out_for_delivery', 'rider_arrived'].includes(order.display_status)" :token="token" />
+        </div>
 
-        <div class="card stack">
+        <div class="card stack side">
           <h2>{{ t('order_summary') }}</h2>
           <div v-if="order.service_type === 'delivery'" class="muted small">{{ order.zone_name }} · {{ order.address_line }} {{ order.address_unit }}</div>
           <div v-for="it in order.items" :key="it.id" class="row top between">
@@ -88,6 +90,7 @@ async function cancel() {
             <span class="price">{{ money(it.line_total, order.currency) }}</span>
           </div>
           <TotalsTable :totals="order.totals" :currency="order.currency" :delivery="order.service_type === 'delivery'" />
+        </div>
         </div>
       </template>
     </div>

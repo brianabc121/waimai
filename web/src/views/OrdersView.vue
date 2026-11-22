@@ -119,7 +119,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
     <div v-if="!online" class="banner warn" style="margin-bottom:12px">{{ t('offline') }}</div>
     <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
 
-    <div class="desk">
+    <div class="desk" :class="{ picked: !!selected }">
       <div class="list">
         <div v-if="orders.length === 0" class="card muted">{{ t('no_orders') }}</div>
         <button v-for="o in orders" :key="o.id" class="card ord" :class="{ sel: o.id === selectedId, pend: o.acceptance_status === 'pending' }" @click="selectedId = o.id">
@@ -141,6 +141,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
 
       <div class="detail card" v-if="selected">
         <div class="stack">
+          <button class="btn link backlist" data-testid="order-back" @click="selectedId = null">‹ {{ t('back') }}</button>
           <div class="row between">
             <h2>{{ selected.public_no }} · {{ t(selected.service_type) }}</h2>
             <a class="btn small" :href="`/ticket/${selected.id}`" target="_blank">{{ t('print') }}</a>
@@ -219,6 +220,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
           </div>
         </div>
       </div>
+      <div v-else-if="orders.length" class="detail card muted nopick">{{ t('pick_order') }}</div>
     </div>
   </div>
 </template>
@@ -229,6 +231,13 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
 .ord { text-align: left; cursor: pointer; width: 100%; }
 .ord.sel { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
 .ord.pend { border-left: 5px solid var(--warn); }
-.detail { position: sticky; top: 66px; max-width: 640px; }
-@media (max-width: 760px) { .desk { grid-template-columns: 1fr; } .detail { position: static; } }
+.detail { position: sticky; top: calc(var(--shell-top, 0px) + 14px); max-width: 640px; }
+.nopick { text-align: center; padding: 48px 16px; }
+.backlist { display: none; align-self: flex-start; }
+/* on a phone the list and the order take turns on the screen */
+@media (max-width: 767px) {
+  .desk { grid-template-columns: 1fr; } .detail { position: static; max-width: none; }
+  .desk.picked .list, .nopick { display: none; }
+  .backlist { display: inline-flex; margin: -4px 0 -6px -4px; }
+}
 </style>

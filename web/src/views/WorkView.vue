@@ -133,6 +133,13 @@ const standalone = native || window.matchMedia('(display-mode: standalone)').mat
 .wk-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; max-width: 520px; margin: 0 auto; display: flex; background: #fff; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
 .wk-tabs button { flex: 1; border: 0; background: none; padding: 13px 0; color: var(--muted); font-size: 13.5px; cursor: pointer; }
 .wk-tabs button.on { color: var(--brand); font-weight: 700; }
+@media (min-width: 768px) {
+  .phone.wk { max-width: none; }
+  .phone.wk > .topbar { padding: 16px max(20px, calc((100% - 760px) / 2)); }
+  .phone.wk > .section, .phone.wk > div > .section, .phone.wk .subbar { max-width: 800px; margin-left: auto; margin-right: auto; padding-left: 20px; padding-right: 20px; }
+  .wk-tabs { max-width: 420px; bottom: 16px; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.12); padding-bottom: 0; }
+  .wk { padding-bottom: 96px; }
+}
 .wk-tabs em { font-style: normal; background: var(--brand); color: #fff; border-radius: 999px; font-size: 11px; padding: 0 6px; margin-left: 4px; }
 .wk .idopt { display: grid; gap: 3px; width: 100%; text-align: left; border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; background: #fff; cursor: pointer; }
 .wk .idopt.on { border-color: var(--brand); background: var(--brand-soft); } .wk .idopt b { font-size: 16px; }
