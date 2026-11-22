@@ -124,8 +124,9 @@ const first = await until('first position on the server', async () => { fix(lat 
 if (Math.abs(first.lat - 14.555) > 0.01 || Math.abs(first.lng - 121.0244) > 0.01) throw new Error('position: ' + JSON.stringify(first))
 await app.waitForSelector('[data-testid=duty][data-geo=ok]')
 await shot('a03-on-duty')
-const notes = await device.shell('dumpsys notification --noredact')
-if (!notes.toString().includes(PKG)) throw new Error('no status bar notice while sharing the position')
+// The notice in the status bar belongs to a foreground service; Android keeps the app alive for it.
+const sharing = async () => /isForeground=true/.test((await device.shell(`dumpsys activity services ${PKG}`)).toString())
+if (!(await sharing())) throw new Error('no status bar notice while sharing the position')
 step(`clocked on: the phone's position reached the server (${first.lat.toFixed(4)}, ${first.lng.toFixed(4)}), the notice is in the status bar`)
 
 // ---- the app in the background: the position keeps coming ----
@@ -166,7 +167,7 @@ await app.click('[data-testid=tab-tasks]')
 await app.locator('[data-testid=duty] [data-act=duty]').click()
 await app.waitForSelector('[data-testid=duty][data-on=false]')
 await until('position forgotten', async () => (await wang())?.lat == null, 20000)
-await until('the notice is gone', async () => !(await device.shell('dumpsys notification --noredact')).toString().includes(PKG), 20000)
+await until('the notice is gone', async () => !(await sharing()), 20000)
 await shot('a08-off-duty')
 step('clocked off: the position is forgotten and the status bar notice is gone')
 

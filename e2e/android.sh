@@ -9,4 +9,4 @@ for p in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION POST_NOTIFICATIONS; do
   adb shell pm grant "$PKG" "android.permission.$p"
 done
 adb shell settings put secure location_mode 3
-node e2e/android.cjs || { adb shell dumpsys location | grep -iE "last location|gps provider|fused provider|enabled" | head -20 || true; adb logcat -d | grep -iE "capacitor|geoloc|fused|$PKG" | grep -viE "ActivityTaskManager|WindowManager|InputDispatcher" | tail -120 || true; exit 1; }
+node e2e/android.cjs || { adb shell dumpsys location | grep -iE "last location|gps provider|fused provider|enabled" | head -20 || true; adb logcat -d | grep -E "Capacitor|BackgroundGeolocation" | tail -40 || true; exit 1; }
