@@ -1,5 +1,5 @@
 // The customer's address book and what a store says about delivering to a spot.
-import { del, get, post, put } from './api'
+import { del, get, post, put, upload } from './api'
 import { extend, money, t } from './i18n'
 
 // What a customer is told about delivery to one spot. Which of the store's
@@ -10,15 +10,18 @@ export interface Address {
   id: number; contact_name: string; title: '' | 'mr' | 'ms'; phone: string
   place_name: string; place_address: string; lat: number | null; lng: number | null
   unit: string; note: string; wechat: string; telegram: string
-  label: '' | 'home' | 'work' | 'school'; is_default: boolean; last_used_at: string | null
+  label: '' | 'home' | 'work' | 'school'; is_default: boolean; last_used_at: string | null; photo_at: string | null
   delivery?: DeliveryTerms | null
 }
-export type AddressInput = Omit<Address, 'id' | 'last_used_at' | 'delivery'>
+export type AddressInput = Omit<Address, 'id' | 'last_used_at' | 'delivery' | 'photo_at'>
 
 export const listAddresses = (slug?: string) =>
   get<{ addresses: Address[]; limit: number }>('/customer/addresses' + (slug ? `?store=${encodeURIComponent(slug)}` : ''))
 export const saveAddress = (id: number, a: AddressInput) => id ? put<Address>(`/customer/addresses/${id}`, a) : post<Address>('/customer/addresses', a)
 export const deleteAddress = (id: number) => del(`/customer/addresses/${id}`)
+export const photoUrl = (a: Address) => `/api/v1/customer/addresses/${a.id}/photo?v=${encodeURIComponent(a.photo_at ?? '')}`
+export const savePhoto = (id: number, photo: Blob) => upload<Address>(`/customer/addresses/${id}/photo`, new File([photo], 'door.jpg', { type: 'image/jpeg' }))
+export const deletePhoto = (id: number) => del(`/customer/addresses/${id}/photo`)
 export const termsAt = (slug: string, lat: number, lng: number) => post<DeliveryTerms>(`/stores/${slug}/locate`, { lat, lng })
 
 // An address this store cannot deliver to cannot be chosen for an order.
@@ -27,6 +30,10 @@ export const usable = (a: Address) => !a.delivery || a.delivery.deliverable
 // and the recently used ones ahead.
 export const sorted = (list: Address[]) => [...list].sort((a, b) => Number(usable(b)) - Number(usable(a)))
 
+// Who an order is for, as staff read it: the name with Mr / Ms, and the number to call.
+interface Contact { customer_name: string; customer_phone: string; contact_phone?: string; contact_title?: string }
+export const contactName = (o: Contact) => o.customer_name + (o.contact_title ? t('ad.title_' + o.contact_title) : '')
+export const contactPhone = (o: Contact) => o.contact_phone || o.customer_phone
 export const whoLine = (a: Address) => `${a.contact_name}${a.title ? t('ad.title_' + a.title) : ''} ${prettyPhone(a.phone)}`
 export function prettyPhone(p: string): string {
   const m = p.match(/^\+63(\d{3})(\d{3})(\d{4})$/)
@@ -58,6 +65,11 @@ extend({
   'ad.delete_confirm': ['确定删除这个地址？', 'Delete this address?'],
   'ad.e.name': ['请填写收货人', 'Enter the name'], 'ad.e.phone': ['请输入正确的 +63 手机号，例如 917 555 0123', 'Enter a valid +63 mobile number, e.g. 917 555 0123'],
   'ad.e.place': ['请选择收货地址', 'Choose the address'], 'ad.e.unit': ['请填写门牌号', 'Enter the unit'],
+  'ad.f.photo': ['门口照片', 'Door photo'], 'ad.f.photo_hint': ['（选填）大楼或门口的照片，骑手送餐时能看到', '(optional) a photo of the building or the door, shown to the rider'],
+  'ad.f.photo_add': ['拍照或选图', 'Take or choose a photo'], 'ad.f.photo_change': ['换一张', 'Replace'], 'ad.f.photo_remove': ['删除照片', 'Remove'],
+  'ad.e.photo': ['地址已保存，但照片没有传上去，请稍后在“修改地址”里重试', 'The address is saved, but the photo did not upload. Try again from "Edit address".'],
+  'oc.wechat': ['微信', 'WeChat'], 'oc.telegram': ['Telegram', 'Telegram'], 'oc.door_photo': ['门口照片', 'Door photo'], 'oc.view': ['查看', 'View'],
+  'oc.ordered_by': ['下单账号', 'Ordered by'],
   'co.add_address': ['添加收货地址', 'Add a delivery address'], 'co.title': ['结算', 'Checkout'],
   'co.now_delivery': ['立即配送', 'Deliver now'], 'co.later_delivery': ['预约配送', 'Deliver later'],
   'co.now_pickup': ['尽快自取', 'Pick up as soon as possible'], 'co.later_pickup': ['预约自取', 'Pick up later'],

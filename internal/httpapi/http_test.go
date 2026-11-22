@@ -1038,6 +1038,53 @@ func TestMapZonesOverHTTP(t *testing.T) {
 		o["address_note"] != "call me" || o["dest_lat"] != 14.555 || o["zone_name"] != "Near" {
 		t.Fatalf("order to an address: %v", o)
 	}
+	if o["contact_phone"] != "+639175550123" || o["contact_title"] != "mr" || o["contact_wechat"] != "chen88" || o["address_photo"] != false {
+		t.Fatalf("the order's contact details: %v", o)
+	}
+	// A photo of the door: the customer adds it, the store sees it with the order, nobody else does.
+	orderPath := "/merchant/orders/" + fmt.Sprint(int64(placed["order_id"].(float64)))
+	owns := int64(cust.want(200, "", "GET", "/customer/session", nil)["customer_id"].(float64))
+	nearN := int64(near["id"].(float64))
+	jpeg := append([]byte{0xFF, 0xD8, 0xFF, 0xE0}, make([]byte, 64)...)
+	if _, err := a.SaveAddressPhoto(context.Background(), owns, nearN, []byte("not a photo")); err == nil {
+		t.Fatal("a photo must be a JPEG")
+	}
+	if _, err := a.SaveAddressPhoto(context.Background(), owns+100000, nearN, jpeg); err == nil {
+		t.Fatal("someone else's address took a photo")
+	}
+	if st, _ := owner.do("GET", orderPath+"/address-photo", nil); st != 404 {
+		t.Fatalf("no photo yet: %d", st)
+	}
+	if ad, err := a.SaveAddressPhoto(context.Background(), owns, nearN, jpeg); err != nil || ad.PhotoAt == nil {
+		t.Fatalf("saving the photo: %v %v", ad, err)
+	}
+	if st, _ := owner.do("GET", orderPath+"/address-photo", nil); st != 200 {
+		t.Fatalf("the store reads the photo: %d", st)
+	}
+	withPhoto := false
+	for _, x := range cust.want(200, "", "GET", "/customer/addresses", nil)["addresses"].([]any) {
+		ad := x.(map[string]any)
+		withPhoto = withPhoto || (ad["id"] == near["id"] && ad["photo_at"] != nil)
+	}
+	if !withPhoto {
+		t.Fatal("the address book does not say the address has a photo")
+	}
+	if st, _ := cust.do("GET", "/customer/addresses/"+nearID+"/photo", nil); st != 200 {
+		t.Fatalf("the customer reads the photo: %d", st)
+	}
+	if st, _ := guest.do("GET", "/customer/addresses/"+nearID+"/photo", nil); st != 404 {
+		t.Fatalf("another customer reads the photo: %d", st)
+	}
+	if st, _ := anon.do("GET", orderPath+"/address-photo", nil); st != 401 {
+		t.Fatalf("without a login the order's photo answers %d", st)
+	}
+	if o = owner.want(200, "", "GET", orderPath, nil); o["address_photo"] != true {
+		t.Fatalf("the order does not say there is a photo: %v", o["address_photo"])
+	}
+	cust.want(200, "", "DELETE", "/customer/addresses/"+nearID+"/photo", nil)
+	if st, _ := owner.do("GET", orderPath+"/address-photo", nil); st != 404 {
+		t.Fatalf("a removed photo is still served: %d", st)
+	}
 	// Moving the pin out of range after the quote stops the order.
 	q = cust.want(200, "", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
 		"address_id": near["id"], "items": items})

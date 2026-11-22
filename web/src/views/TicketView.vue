@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { get } from '../api'
 import { both, money, t, whenText } from '../i18n'
 import type { Order } from '../types'
+import { contactName, contactPhone } from '../addresses'
 import TotalsTable from './TotalsTable.vue'
 
 // A browser-printable ticket (80mm-friendly). There is no printer integration
@@ -22,7 +23,9 @@ const sorted = computed(() => [...(o.value?.items ?? [])].sort((a, b) => a.baske
     <h1>{{ o.public_no }}</h1>
     <p v-if="o.scheduled_for"><b>{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</b></p>
     <p><b>{{ t(o.service_type) }}</b> · {{ new Date(o.created_at).toLocaleString() }}</p>
-    <p>{{ o.customer_name }} · {{ o.customer_phone }}</p>
+    <p>{{ contactName(o) }} · {{ contactPhone(o) }}
+      <template v-if="o.contact_wechat"><br />{{ t('oc.wechat') }} {{ o.contact_wechat }}</template>
+      <template v-if="o.contact_telegram"><br />{{ t('oc.telegram') }} {{ o.contact_telegram }}</template></p>
     <p v-if="o.service_type === 'delivery'">{{ o.zone_name }} · {{ o.address_line }} {{ o.address_unit }}<br />{{ o.address_note }}</p>
     <p v-else>{{ t('pickup_code') }}: <b>{{ o.pickup_code }}</b></p>
     <p v-if="o.note"><b>{{ t('order_note') }}: {{ o.note }}</b></p>

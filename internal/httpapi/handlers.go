@@ -862,6 +862,7 @@ func riderView(o *app.Order) *app.Order {
 	o.Cash = nil
 	if o.Delivery != nil && (o.Delivery.Status == "delivered" || o.Delivery.Status == "failed") {
 		o.CustomerPhone, o.AddressUnit, o.AddressNote = "", "", ""
+		o.ContactPhone, o.ContactWechat, o.ContactTelegram, o.AddressPhoto = "", "", "", false
 	}
 	return o
 }
@@ -1276,6 +1277,81 @@ func (s *Server) riderProofPhoto(c *gin.Context) {
 		return
 	}
 	image, err := s.App.RiderProof(c, id, currentUser(c).ID)
+	sendPhoto(c, image, err)
+}
+
+// ---- photo of the customer's door ----
+
+func (s *Server) addressID(c *gin.Context) (cu *app.Customer, id int64, ok bool) {
+	cu, err := s.customer(c)
+	if err == nil {
+		id, err = strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil {
+			err = app.Err(http.StatusNotFound, "ADDRESS_NOT_FOUND", "this address no longer exists")
+		}
+	}
+	if err != nil {
+		fail(c, err)
+		return nil, 0, false
+	}
+	return cu, id, true
+}
+
+// saveAddressPhoto takes the photo as the raw request body, capped before it is read.
+func (s *Server) saveAddressPhoto(c *gin.Context) {
+	cu, id, ok := s.addressID(c)
+	if !ok {
+		return
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, app.ProofMaxBytes+1))
+	if err != nil || len(body) > app.ProofMaxBytes {
+		fail(c, app.Err(http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", "the photo is larger than 600 KB"))
+		return
+	}
+	ad, err := s.App.SaveAddressPhoto(c, cu.ID, id, body)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, ad)
+}
+
+func (s *Server) deleteAddressPhoto(c *gin.Context) {
+	cu, id, ok := s.addressID(c)
+	if !ok {
+		return
+	}
+	if err := s.App.DeleteAddressPhoto(c, cu.ID, id); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (s *Server) addressPhoto(c *gin.Context) {
+	cu, id, ok := s.addressID(c)
+	if !ok {
+		return
+	}
+	image, err := s.App.AddressPhoto(c, cu.ID, id)
+	sendPhoto(c, image, err)
+}
+
+func (s *Server) orderAddressPhoto(c *gin.Context) {
+	id, ok := s.orderScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	image, err := s.App.OrderAddressPhoto(c, id)
+	sendPhoto(c, image, err)
+}
+
+func (s *Server) riderAddressPhoto(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	image, err := s.App.RiderAddressPhoto(c, id, currentUser(c).ID)
 	sendPhoto(c, image, err)
 }
 

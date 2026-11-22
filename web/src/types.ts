@@ -64,6 +64,8 @@ export interface Cash {
 export interface Order {
   id: number; branch_id: number; public_no: string; pickup_code: string; service_type: 'delivery' | 'pickup' | 'dine_in'
   customer_name: string; customer_phone: string; zone_name: string; address_line: string; address_unit: string
+  // from the saved address: who to call (may differ from the account that ordered), other ways to reach them, a photo of the door
+  contact_phone: string; contact_title: '' | 'mr' | 'ms'; contact_wechat: string; contact_telegram: string; address_photo: boolean
   address_note: string; note: string; currency: string; totals: Totals; payment_method: string
   acceptance_status: string; packing_status: string; fulfillment_status: string; payment_status: string
   display_status: string; close_reason: string; bags: number | null; version: number; manifest_version: number
