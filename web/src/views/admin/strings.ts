@@ -82,6 +82,7 @@ extend({
   'ad.set.on': ['已启用', 'On'], 'ad.set.off': ['未启用', 'Off'],
   'ad.set.maps_on': ['地图已启用', 'Map on'], 'ad.set.maps_stub': ['地图是测试底图', 'Test map'], 'ad.set.maps_off': ['地图未启用', 'Map off'],
   'ad.set.routes_on': ['推荐路线已启用', 'Routes on'], 'ad.set.routes_stub': ['推荐路线是测试替身', 'Test routes'], 'ad.set.routes_off': ['推荐路线按直线估算', 'Routes estimated'],
+  'ad.set.otp_today': ['最近 24 小时发出的登录验证码：{n} 条。每个手机号每天最多 10 条，每个网络地址每天最多 30 条。', 'Login codes texted in the last 24 hours: {n}. At most 10 a day per phone and 30 per network address.'],
   'ad.set.sms_log': ['不发送（只记日志）', 'Off (log only)'], 'ad.set.sms_webhook': ['自建网关（Webhook）', 'Webhook gateway'], 'ad.set.sms_twilio': ['Twilio', 'Twilio'],
   'ad.instances': ['实例', 'Instances'], 'ad.offline_hint': ['超过 20 秒没有心跳算失联', 'No heartbeat for 20 seconds counts as lost'],
   'ad.instance': ['实例', 'Instance'], 'ad.started': ['启动时间', 'Started'], 'ad.last_beat': ['最后心跳', 'Last heartbeat'], 'ad.loop_ms': ['上一轮耗时', 'Last loop'],

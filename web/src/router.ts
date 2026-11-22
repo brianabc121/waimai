@@ -11,6 +11,7 @@ export const router = createRouter({
     { path: '/t/:code', component: () => import('./views/TableView.vue'), props: true },
     { path: '/ipad', component: () => import('./views/TableView.vue') },
     { path: '/login', component: () => import('./views/LoginView.vue') },
+    { path: '/account/login', component: () => import('./views/AccountLogin.vue') },
     {
       path: '/merchant', component: () => import('./views/StaffLayout.vue'), meta: { staff: true },
       children: [

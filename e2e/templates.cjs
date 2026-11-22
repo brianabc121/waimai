@@ -3,6 +3,7 @@
 // only that channel, and ordering works the same under the new layout.
 // Usage: BASE_URL=http://localhost:8080 node e2e/templates.cjs   (needs seed data)
 const { chromium } = require('playwright')
+const { customerLogin } = require('./lib.cjs')
 const { mkdirSync } = require('node:fs')
 
 ;(async () => {
@@ -73,7 +74,7 @@ await cust.click('.item:has-text("盐酥鸡") button')
 await cust.click('.sheet label.opt:has-text("中辣")')
 await cust.click('.sheet-foot .btn.primary')
 await cust.click('.bottombar .btn.primary')
-await cust.waitForURL('**/checkout')
+await customerLogin(cust)
 await cust.locator('text=盐酥鸡').first().waitFor()
 step('cart and checkout work the same under the new layout')
 

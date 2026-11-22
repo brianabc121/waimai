@@ -3,6 +3,7 @@
 // steps taken without signal, and the installable page.
 // Usage: BASE_URL=http://localhost:8080 node e2e/duty.cjs   (needs seed data)
 const { chromium } = require('playwright')
+const { customerLogin } = require('./lib.cjs')
 const { mkdirSync } = require('node:fs')
 
 ;(async () => {
@@ -46,14 +47,9 @@ await cust.waitForSelector('.item')
 await cust.selectOption('select', { index: 1 })
 await cust.click('.item:has-text("瓶装水") .stepper button.fill')
 await cust.click('.bottombar .btn.primary')
-await cust.waitForURL('**/checkout')
+await customerLogin(cust)
 await cust.fill('input[autocomplete=name]', '李小红')
 await cust.fill('input[autocomplete=street-address]', '12 Paseo de Roxas')
-await cust.fill('input[type=tel]', '+63918' + String(Date.now()).slice(-7))
-await cust.click('button:has-text("发送验证码")')
-await cust.waitForSelector('input[autocomplete=one-time-code]')
-await cust.click('button:has-text("验证"):not(:has-text("发送"))')
-await cust.waitForSelector('.banner.ok')
 await cust.locator('.bottombar .btn.primary').click()
 await cust.waitForURL('**/o/**')
 const expectStatus = (text) => cust.waitForFunction(t => document.querySelector('[data-testid=status]')?.textContent?.includes(t), text, { timeout: 10000 })

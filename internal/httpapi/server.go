@@ -44,9 +44,11 @@ func NewServer(a *app.App, cfg config.Config, hub *Hub) *Server {
 	return &Server{App: a, Cfg: cfg, Hub: hub,
 		publicWrites: newLimiter(60, 30),
 		reportLimit:  newLimiter(3, 3),
-		otpLimit:     newLimiter(6, 6),
-		loginLimit:   newLimiter(10, 10),
-		tableLimit:   newLimiter(600, 200),
+		// Everyone who orders logs in, and many customers can share one
+		// address; the daily caps in RequestOTP are what limit the cost.
+		otpLimit:   newLimiter(20, 20),
+		loginLimit: newLimiter(10, 10),
+		tableLimit: newLimiter(600, 200),
 	}
 }
 
@@ -265,6 +267,7 @@ func (s *Server) Router() *gin.Engine {
 	api.POST("/otp/request", s.limit(s.otpLimit), s.otpRequest)
 	api.POST("/otp/verify", s.limit(s.otpLimit), s.otpVerify)
 	api.GET("/customer/session", s.customerSession)
+	api.POST("/customer/logout", s.customerLogout)
 	api.POST("/stores/:slug/quotes", s.limit(s.publicWrites), s.createQuote)
 	api.POST("/stores/:slug/orders", s.limit(s.publicWrites), s.placeOrder)
 	api.GET("/customer/orders/:token", s.customerOrder)

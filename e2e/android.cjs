@@ -7,6 +7,7 @@
 // built with WORKBENCH_URL=http://10.0.2.2:8080, adb on PATH.
 // Usage: node e2e/android.cjs   (.github/workflows/android-emulator.yml runs it)
 const { chromium, _android: android } = require('playwright')
+const { customerLogin } = require('./lib.cjs')
 const { mkdirSync, writeFileSync } = require('node:fs')
 const { execFileSync } = require('node:child_process')
 
@@ -45,14 +46,9 @@ await cust.waitForSelector('.item')
 await cust.selectOption('select', { index: 1 })
 await cust.click('.item:has-text("瓶装水") .stepper button.fill')
 await cust.click('.bottombar .btn.primary')
-await cust.waitForURL('**/checkout')
+await customerLogin(cust)
 await cust.fill('input[autocomplete=name]', '李小红')
 await cust.fill('input[autocomplete=street-address]', '12 Paseo de Roxas')
-await cust.fill('input[type=tel]', '+63918' + String(Date.now()).slice(-7))
-await cust.click('button:has-text("发送验证码")')
-await cust.waitForSelector('input[autocomplete=one-time-code]')
-await cust.click('button:has-text("验证"):not(:has-text("发送"))')
-await cust.waitForSelector('.banner.ok')
 await cust.locator('.bottombar .btn.primary').click()
 await cust.waitForURL('**/o/**')
 const expectStatus = (text) => cust.waitForFunction(t => document.querySelector('[data-testid=status]')?.textContent?.includes(t), text, { timeout: 20000 })
@@ -109,7 +105,8 @@ await app.click('[data-testid=identity]')
 await app.click('[data-testid=switch-go]')
 const duty = app.locator('[data-testid=duty]')
 await duty.waitFor()
-await duty.locator('[data-act=duty]').click()
+// Packing in the in-store identity already started the shift (one shift for
+// the person, whichever identity is in front), so the switch is already on.
 await app.waitForSelector('[data-testid=duty][data-on=true]')
 // The emulator hands out a position only when it changes, so nudge it until one arrives.
 let lat = 14.5547

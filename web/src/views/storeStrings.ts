@@ -9,6 +9,7 @@ extend({
   'sf.promos_n': ['{n} 个优惠', '{n} offers'], 'sf.promos': ['优惠活动', 'Offers'],
   'sf.notice': ['公告：', 'Notice: '],
   'sf.search': ['搜索菜品', 'Search dishes'], 'sf.search_none': ['没有找到相关菜品', 'No dishes match'],
+  'sf.account': ['我的账号', 'My account'], 'sf.logged_in': ['已登录', 'Logged in as'], 'sf.logout': ['退出登录', 'Log out'],
   'sf.share': ['分享', 'Share'], 'sf.link_copied': ['链接已复制', 'Link copied'],
   sold_n: ['销量:{n}', 'Sold: {n}'], stock_n: ['库存:{n}', 'In stock: {n}'],
   'sf.required_pick': ['未选必选品', 'Required item missing'], 'sf.required_hint': ['请先选「{name}」', 'Choose from "{name}" first'],

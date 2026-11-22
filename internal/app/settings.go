@@ -326,6 +326,9 @@ type SettingsView struct {
 	// WeakSecret: APP_SECRET is the development default, so the encryption
 	// protects nothing.
 	WeakSecret bool `json:"weak_secret"`
+	// OTPSentToday counts the verification codes texted in the last 24 hours
+	// (each costs a message). Only on the page load, not after a save.
+	OTPSentToday *int `json:"otp_sent_today,omitempty"`
 }
 
 func maskSecret(key, v string) string {
@@ -397,7 +400,11 @@ func (a *App) AdminSettings(ctx context.Context) (*SettingsView, error) {
 	if err != nil {
 		return nil, wrap("settings", err)
 	}
-	return a.settingsView(saved), nil
+	v := a.settingsView(saved)
+	if n, err := a.OTPSentToday(ctx); err == nil {
+		v.OTPSentToday = &n
+	}
+	return v, nil
 }
 
 func checkSetting(key, v string) error {

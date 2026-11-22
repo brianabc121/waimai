@@ -4,6 +4,7 @@
 // Usage: BASE_URL=http://localhost:8080 node e2e/mapzones.cjs
 // Needs seed data and the API started with GOOGLE_MAPS_API_KEY=stub.
 const { chromium } = require('playwright')
+const { customerLogin } = require('./lib.cjs')
 const { mkdirSync } = require('node:fs')
 
 ;(async () => {
@@ -238,16 +239,11 @@ await cust.waitForSelector(tid('deliver-to') + ':has-text("萨尔塞多村")')
 step('a customer pins the address: in range, out of range, and near the edge within the tolerance')
 
 await cust.click('.bottombar .btn.primary')
-await cust.waitForURL('**/checkout')
+await customerLogin(cust)
 await cust.waitForSelector('.totals')
 await cust.waitForSelector(tid('near-zone'))
 await cust.fill('input[autocomplete=name]', '地图顾客')
 await cust.fill('input[autocomplete=street-address]', '1 Map St')
-await cust.fill('input[type=tel]', '+63917' + String(Date.now()).slice(-7))
-await cust.click('button:has-text("发送验证码")')
-await cust.waitForSelector('input[autocomplete=one-time-code]')
-await cust.click('button:has-text("验证"):not(:has-text("发送"))')
-await cust.waitForSelector('.banner.ok')
 await cust.click('.bottombar .btn.primary')
 await cust.waitForURL('**/o/**')
 const orders = await own('GET', `/merchant/branches/${bid}/orders`)

@@ -582,10 +582,10 @@ func TestOTP(t *testing.T) {
 	a := need(t)
 	ctx := context.Background()
 	phone := fmt.Sprintf("+6391%08d", time.Now().UnixNano()%1e8)
-	code, err := a.RequestOTP(ctx, phone)
+	code, err := a.RequestOTP(ctx, phone, "")
 	noErr(t, err)
-	_, err = a.RequestOTP(ctx, phone)
-	wantCode(t, err, "RATE_LIMITED")
+	_, err = a.RequestOTP(ctx, phone, "")
+	wantCode(t, err, "OTP_WAIT")
 	wrong := "000000"
 	if code == wrong {
 		wrong = "000001"
@@ -598,8 +598,8 @@ func TestOTP(t *testing.T) {
 	_, _, err = a.VerifyOTP(ctx, phone, code)
 	wantCode(t, err, "OTP_INVALID")
 
-	phone2 := phone + "1"
-	code, err = a.RequestOTP(ctx, phone2)
+	phone2 := fmt.Sprintf("+6393%08d", time.Now().UnixNano()%1e8)
+	code, err = a.RequestOTP(ctx, phone2, "")
 	noErr(t, err)
 	token, _, err := a.VerifyOTP(ctx, phone2, code)
 	noErr(t, err)

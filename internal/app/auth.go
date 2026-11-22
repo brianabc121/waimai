@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"log"
 	"math/big"
 	"net/http"
 	"regexp"
@@ -22,6 +23,10 @@ const (
 	otpTTL             = 5 * time.Minute
 	otpMaxAttempts     = 5
 	otpResendInterval  = 60 * time.Second
+	// Codes are texted at a price per message; these stop one phone or one
+	// network address from running up the bill.
+	OTPDailyPerPhone = 10
+	OTPDailyPerIP    = 30
 )
 
 type BranchRole struct {
@@ -302,16 +307,42 @@ func normalizePhone(p string) (string, error) {
 	return p, nil
 }
 
+// Customers log in with a mobile number of one country for now.
+const customerCountryCode = "63"
+
+var customerPhoneRe = regexp.MustCompile(`^9[0-9]{9}$`)
+
+// normalizeCustomerPhone accepts the ways people write a Philippine mobile
+// number (+63 917 555 0123, 0917 555 0123, 917 555 0123) and returns +639XXXXXXXXX.
+func normalizeCustomerPhone(p string) (string, error) {
+	p = strings.NewReplacer(" ", "", "-", "", "(", "", ")", "").Replace(p)
+	local := p
+	switch {
+	case strings.HasPrefix(p, "+"+customerCountryCode):
+		local = p[1+len(customerCountryCode):]
+	case strings.HasPrefix(p, customerCountryCode) && len(p) == len(customerCountryCode)+10:
+		local = p[len(customerCountryCode):]
+	case strings.HasPrefix(p, "0"):
+		local = p[1:]
+	}
+	if !customerPhoneRe.MatchString(local) {
+		return "", Err(http.StatusUnprocessableEntity, "PHONE_INVALID", "enter a valid +63 mobile number")
+	}
+	return "+" + customerCountryCode + local, nil
+}
+
 func (a *App) otpHash(phone, code string) []byte {
 	m := hmac.New(sha256.New, a.Secret)
 	m.Write([]byte("otp:" + phone + ":" + code))
 	return m.Sum(nil)
 }
 
-// RequestOTP issues a 6-digit code for a phone number. The code is returned
-// to the caller only when OTPDevEcho is on (development and demos).
-func (a *App) RequestOTP(ctx context.Context, phone string) (devCode string, err error) {
-	phone, err = normalizePhone(phone)
+// RequestOTP texts a 6-digit code to a phone number. ip is the caller's
+// network address, for the daily cap; it is not enforced when OTPDevEcho is
+// on, where every test comes from one address. The code is returned to the
+// caller only when OTPDevEcho is on (development and demos).
+func (a *App) RequestOTP(ctx context.Context, phone, ip string) (devCode string, err error) {
+	phone, err = normalizeCustomerPhone(phone)
 	if err != nil {
 		return "", err
 	}
@@ -321,20 +352,27 @@ func (a *App) RequestOTP(ctx context.Context, phone string) (devCode string, err
 	}
 	code := fmt.Sprintf("%06d", n.Int64())
 	err = a.inTx(ctx, func(tx pgx.Tx) error {
-		// Serialise requests per phone so the resend interval cannot be raced.
+		// Serialise requests per phone so the limits cannot be raced.
 		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "otp:"+phone); err != nil {
 			return err
 		}
 		var recent bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM phone_verifications WHERE phone=$1
-			AND created_at > now() - make_interval(secs => $2))`, phone, otpResendInterval.Seconds()).Scan(&recent); err != nil {
+		var today, fromIP int
+		if err := tx.QueryRow(ctx, `SELECT
+			EXISTS (SELECT 1 FROM phone_verifications WHERE phone=$1 AND created_at > now() - make_interval(secs => $2)),
+			(SELECT count(*) FROM phone_verifications WHERE phone=$1 AND created_at > now() - interval '24 hours'),
+			(SELECT count(*) FROM phone_verifications WHERE ip=$3 AND ip <> '' AND created_at > now() - interval '24 hours')`,
+			phone, otpResendInterval.Seconds(), ip).Scan(&recent, &today, &fromIP); err != nil {
 			return err
 		}
 		if recent {
-			return Err(http.StatusTooManyRequests, "RATE_LIMITED", "please wait a minute before requesting another code")
+			return Err(http.StatusTooManyRequests, "OTP_WAIT", "please wait a minute before requesting another code")
 		}
-		_, err := tx.Exec(ctx, `INSERT INTO phone_verifications (phone, code_hash, expires_at) VALUES ($1,$2,$3)`,
-			phone, a.otpHash(phone, code), time.Now().Add(otpTTL))
+		if today >= OTPDailyPerPhone || (!a.OTPDevEcho && fromIP >= OTPDailyPerIP) {
+			return Err(http.StatusTooManyRequests, "OTP_DAILY_LIMIT", "too many codes today, please try again tomorrow")
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO phone_verifications (phone, code_hash, expires_at, ip) VALUES ($1,$2,$3,$4)`,
+			phone, a.otpHash(phone, code), time.Now().Add(otpTTL), ip)
 		return err
 	})
 	if err != nil {
@@ -342,7 +380,8 @@ func (a *App) RequestOTP(ctx context.Context, phone string) (devCode string, err
 	}
 	msg := fmt.Sprintf("验证码 %s，5 分钟内有效。Your verification code is %s, valid for 5 minutes.", code, code)
 	if err := a.smsSender().Send(ctx, phone, msg); err != nil {
-		return "", wrap("send sms", err)
+		log.Printf("verification code: send: %v", err)
+		return "", Err(http.StatusBadGateway, "SMS_FAILED", "the code could not be sent")
 	}
 	if a.OTPDevEcho {
 		return code, nil
@@ -350,10 +389,17 @@ func (a *App) RequestOTP(ctx context.Context, phone string) (devCode string, err
 	return "", nil
 }
 
-// VerifyOTP checks the latest code for the phone and, on success, creates a
-// customer session. Five wrong attempts void the code.
+// OTPSentToday is how many verification codes were texted in the last 24 hours.
+func (a *App) OTPSentToday(ctx context.Context) (n int, err error) {
+	err = a.DB.QueryRow(ctx, `SELECT count(*) FROM phone_verifications WHERE created_at > now() - interval '24 hours'`).Scan(&n)
+	return n, err
+}
+
+// VerifyOTP checks the latest code for the phone and, on success, logs the
+// customer in: the account is created the first time, and earlier orders of
+// that phone join it. Five wrong attempts void the code.
 func (a *App) VerifyOTP(ctx context.Context, phone, code string) (token string, normalized string, err error) {
-	phone, err = normalizePhone(phone)
+	phone, err = normalizeCustomerPhone(phone)
 	if err != nil {
 		return "", "", err
 	}
@@ -385,10 +431,19 @@ func (a *App) VerifyOTP(ctx context.Context, phone, code string) (token string, 
 		if _, err := tx.Exec(ctx, `UPDATE phone_verifications SET consumed_at = now() WHERE id=$1`, id); err != nil {
 			return err
 		}
+		var customerID int64
+		if err := tx.QueryRow(ctx, `INSERT INTO customers (phone) VALUES ($1)
+			ON CONFLICT (phone) DO UPDATE SET last_login_at = now() RETURNING id`, phone).Scan(&customerID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE orders SET customer_id=$1 WHERE customer_phone=$2 AND customer_id IS NULL`,
+			customerID, phone); err != nil {
+			return err
+		}
 		var th []byte
 		token, th = newToken()
-		_, err = tx.Exec(ctx, `INSERT INTO customer_sessions (token_hash, phone, expires_at) VALUES ($1,$2,$3)`,
-			th, phone, time.Now().Add(CustomerSessionTTL))
+		_, err = tx.Exec(ctx, `INSERT INTO customer_sessions (token_hash, phone, customer_id, expires_at) VALUES ($1,$2,$3,$4)`,
+			th, phone, customerID, time.Now().Add(CustomerSessionTTL))
 		return err
 	})
 	if err != nil {
@@ -400,13 +455,57 @@ func (a *App) VerifyOTP(ctx context.Context, phone, code string) (token string, 
 	return token, phone, nil
 }
 
+// Customer is a logged-in customer.
+type Customer struct {
+	ID    int64  `json:"id"`
+	Phone string `json:"phone"`
+}
+
+// CustomerBySession returns the customer a session token belongs to. Sessions
+// from before accounts existed get their account here.
+func (a *App) CustomerBySession(ctx context.Context, token string) (*Customer, error) {
+	var c Customer
+	var id *int64
+	err := a.DB.QueryRow(ctx, `SELECT customer_id, phone FROM customer_sessions WHERE token_hash=$1 AND expires_at > now()`,
+		hashToken(token)).Scan(&id, &c.Phone)
+	if isNoRows(err) {
+		return nil, Err(http.StatusForbidden, "PHONE_NOT_VERIFIED", "verify your phone number first")
+	} else if err != nil {
+		return nil, err
+	}
+	if id != nil {
+		c.ID = *id
+		return &c, nil
+	}
+	err = a.inTx(ctx, func(tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, `INSERT INTO customers (phone) VALUES ($1)
+			ON CONFLICT (phone) DO UPDATE SET phone = EXCLUDED.phone RETURNING id`, c.Phone).Scan(&c.ID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `UPDATE customer_sessions SET customer_id=$1 WHERE token_hash=$2`, c.ID, hashToken(token))
+		return err
+	})
+	return &c, err
+}
+
 // CustomerPhone returns the verified phone for a customer session token.
 func (a *App) CustomerPhone(ctx context.Context, token string) (string, error) {
-	var phone string
-	err := a.DB.QueryRow(ctx, `SELECT phone FROM customer_sessions WHERE token_hash=$1 AND expires_at > now()`,
-		hashToken(token)).Scan(&phone)
-	if isNoRows(err) {
-		return "", Err(http.StatusForbidden, "PHONE_NOT_VERIFIED", "verify your phone number first")
+	c, err := a.CustomerBySession(ctx, token)
+	if err != nil {
+		return "", err
 	}
-	return phone, err
+	return c.Phone, nil
+}
+
+// CustomerLogout ends one customer session.
+func (a *App) CustomerLogout(ctx context.Context, token string) error {
+	_, err := a.DB.Exec(ctx, `DELETE FROM customer_sessions WHERE token_hash=$1`, hashToken(token))
+	return err
+}
+
+// touchCustomerSessions keeps a customer who orders logged in for another 30 days.
+func touchCustomerSessions(ctx context.Context, tx pgx.Tx, phone string) error {
+	_, err := tx.Exec(ctx, `UPDATE customer_sessions SET expires_at=$2 WHERE phone=$1 AND expires_at > now()`,
+		phone, time.Now().Add(CustomerSessionTTL))
+	return err
 }

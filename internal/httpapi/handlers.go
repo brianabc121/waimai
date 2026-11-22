@@ -28,7 +28,7 @@ func (s *Server) otpRequest(c *gin.Context) {
 	if !bind(c, &in) {
 		return
 	}
-	code, err := s.App.RequestOTP(c, in.Phone)
+	code, err := s.App.RequestOTP(c, in.Phone, c.ClientIP())
 	if err != nil {
 		fail(c, err)
 		return
@@ -65,13 +65,30 @@ func (s *Server) customerPhone(c *gin.Context) (string, error) {
 	return s.App.CustomerPhone(c, token)
 }
 
+// customer is the logged-in customer of this request.
+func (s *Server) customer(c *gin.Context) (*app.Customer, error) {
+	token, err := c.Cookie(customerCookie)
+	if err != nil || token == "" {
+		return nil, app.Err(http.StatusForbidden, "PHONE_NOT_VERIFIED", "verify your phone number first")
+	}
+	return s.App.CustomerBySession(c, token)
+}
+
 func (s *Server) customerSession(c *gin.Context) {
-	phone, err := s.customerPhone(c)
+	cu, err := s.customer(c)
 	if err != nil {
 		c.JSON(200, gin.H{"verified": false})
 		return
 	}
-	c.JSON(200, gin.H{"verified": true, "phone": phone})
+	c.JSON(200, gin.H{"verified": true, "phone": cu.Phone, "customer_id": cu.ID})
+}
+
+func (s *Server) customerLogout(c *gin.Context) {
+	if token, err := c.Cookie(customerCookie); err == nil && token != "" {
+		_ = s.App.CustomerLogout(c, token)
+	}
+	s.setCookie(c, customerCookie, "", -1)
+	c.JSON(200, gin.H{"ok": true})
 }
 
 func (s *Server) createQuote(c *gin.Context) {
