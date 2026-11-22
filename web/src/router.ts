@@ -21,6 +21,7 @@ export const router = createRouter({
         { path: 'tables', component: () => import('./views/TablesView.vue') },
         { path: 'menu', component: () => import('./views/MenuView.vue') },
         { path: 'templates', component: () => import('./views/TemplatesView.vue') },
+        { path: 'media', component: () => import('./views/MediaView.vue') },
         { path: 'promos', component: () => import('./views/PromosView.vue') },
         { path: 'cash', component: () => import('./views/CashView.vue') },
         { path: 'delivery-map', component: () => import('./views/DeliveryMapView.vue') },
