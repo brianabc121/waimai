@@ -332,13 +332,15 @@ func (a *App) AdvanceTripsAt(ctx context.Context, now time.Time) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	// one router for the whole pass: an administrator may change the key meanwhile
+	router := a.router()
 	for _, id := range ids {
-		if err := a.inTx(ctx, func(tx pgx.Tx) error { return advanceTrip(ctx, tx, id, now, a.Router == nil) }); err != nil {
+		if err := a.inTx(ctx, func(tx pgx.Tx) error { return advanceTrip(ctx, tx, id, now, router == nil) }); err != nil {
 			return 0, err
 		}
 	}
-	if a.Router != nil {
-		if err := a.planTrips(ctx, now); err != nil {
+	if router != nil {
+		if err := a.planTrips(ctx, now, router); err != nil {
 			return 0, err
 		}
 	}
@@ -636,7 +638,7 @@ const planTries = 3
 // have no planned route yet: once per trip, at the time the rider left. The
 // call is made outside any transaction. A trip the service fails on three
 // times gets the straight-line estimate.
-func (a *App) planTrips(ctx context.Context, now time.Time) error {
+func (a *App) planTrips(ctx context.Context, now time.Time, router Router) error {
 	rows, err := a.DB.Query(ctx, `SELECT t.id, b.lat, b.lng, t.planned_tries FROM rider_trips t JOIN branches b ON b.id = t.branch_id
 		WHERE t.planned_source = '' AND t.status <> 'loading' AND t.planned_tries < $1 AND b.lat IS NOT NULL AND b.lng IS NOT NULL
 			AND t.started_at > $2 ORDER BY t.id`, planTries, now.Add(-tripMaxAge))
@@ -670,7 +672,7 @@ func (a *App) planTrips(ctx context.Context, now time.Time) error {
 		var route *PlannedRoute
 		if len(stops) <= routeMaxStops {
 			callCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-			route, err = a.Router.Route(callCtx, t.store, stops)
+			route, err = router.Route(callCtx, t.store, stops)
 			cancel()
 			if err == nil && (len(route.Order) != len(stops) || len(route.Path) < 2) {
 				err = fmt.Errorf("routes: unusable answer")

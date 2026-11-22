@@ -130,7 +130,7 @@ step('store back office: a side column on a computer, a drawer on a tablet and a
 // ---- platform back office ----
 for (const size of Object.keys(SIZES)) {
   const p = await as('admin', size)
-  for (const path of ['/admin/dashboard', '/admin/api', '/admin/worker', '/admin/merchants', '/admin/merchants/1', '/admin/items', '/admin/audit']) {
+  for (const path of ['/admin/dashboard', '/admin/api', '/admin/worker', '/admin/merchants', '/admin/merchants/1', '/admin/items', '/admin/audit', '/admin/settings']) {
     await p.goto(BASE + path); await p.waitForSelector('.adm-page'); await fits(p, `${path} ${size}`)
   }
   if (size !== 'pc') {
