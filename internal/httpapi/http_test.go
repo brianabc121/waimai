@@ -983,7 +983,7 @@ func TestMapZonesOverHTTP(t *testing.T) {
 	addr := func(lat, lng float64) map[string]any {
 		return map[string]any{"contact_name": "陈", "title": "mr", "phone": "0917 555 0123", "place_name": "Trump Tower",
 			"place_address": "Kalayaan Ave, Makati", "lat": lat, "lng": lng, "unit": "40F 4001", "note": "call me",
-			"wechat": "chen88", "label": "home"}
+			"wechat": "chen88", "telegram": "chen_tg", "line": "chen.line", "whatsapp": "+63 917 555 0123", "label": "home"}
 	}
 	anon.want(403, "PHONE_NOT_VERIFIED", "GET", "/customer/addresses", nil)
 	anon.want(403, "PHONE_NOT_VERIFIED", "POST", "/customer/addresses", addr(14.555, 121.025))
@@ -993,6 +993,31 @@ func TestMapZonesOverHTTP(t *testing.T) {
 	bad = addr(14.555, 121.025)
 	bad["unit"] = ""
 	cust.want(422, "VALIDATION", "POST", "/customer/addresses", bad)
+	// The number to call may be in another country, written with its code.
+	abroad := addr(14.555, 121.025)
+	abroad["phone"] = "+86 138 0013 8000"
+	if got := cust.want(200, "", "POST", "/customer/addresses", abroad); got["phone"] != "+8613800138000" {
+		t.Fatalf("a number of another country: %v", got["phone"])
+	}
+	cust.want(200, "", "DELETE", "/customer/addresses/"+fmt.Sprint(int64(cust.want(200, "", "GET", "/customer/addresses", nil)["addresses"].([]any)[0].(map[string]any)["id"].(float64))), nil)
+	abroad["phone"] = "+86 12"
+	cust.want(422, "PHONE_INVALID", "POST", "/customer/addresses", abroad)
+	// The store says which other ways to reach the customer it asks for; none at first.
+	if got := anon.want(200, "", "GET", "/stores/"+f.slug, nil)["branch"].(map[string]any)["contact_fields"].([]any); len(got) != 0 {
+		t.Fatalf("a new store asks for %v", got)
+	}
+	settings := map[string]any{"name": "T", "accept_timeout_minutes": 10, "delivery_enabled": true, "pickup_enabled": true,
+		"open_time": "00:00", "close_time": "00:00", "contact_fields": []string{"fax"}}
+	owner.want(422, "VALIDATION", "PUT", "/merchant/branches/"+fmt.Sprint(f.branchID)+"/settings", settings)
+	settings["contact_fields"] = []string{"line", "wechat", "wechat"}
+	owner.want(200, "", "PUT", "/merchant/branches/"+fmt.Sprint(f.branchID)+"/settings", settings)
+	if got := fmt.Sprint(anon.want(200, "", "GET", "/stores/"+f.slug, nil)["branch"].(map[string]any)["contact_fields"]); got != "[wechat line]" {
+		t.Fatalf("the store asks for %v", got)
+	}
+	delete(settings, "contact_fields") // saved without them, they stay
+	if got := fmt.Sprint(owner.want(200, "", "PUT", "/merchant/branches/"+fmt.Sprint(f.branchID)+"/settings", settings)["contact_fields"]); got != "[wechat line]" {
+		t.Fatalf("kept: %v", got)
+	}
 	near := cust.want(200, "", "POST", "/customer/addresses", addr(14.555, 121.025))
 	if near["is_default"] != true || near["phone"] != "+639175550123" {
 		t.Fatalf("the first address is the default: %v", near)
@@ -1042,7 +1067,8 @@ func TestMapZonesOverHTTP(t *testing.T) {
 		o["address_note"] != "call me" || o["dest_lat"] != 14.555 || o["zone_name"] != "Near" {
 		t.Fatalf("order to an address: %v", o)
 	}
-	if o["contact_phone"] != "+639175550123" || o["contact_title"] != "mr" || o["contact_wechat"] != "chen88" || o["address_photo"] != false {
+	if o["contact_phone"] != "+639175550123" || o["contact_title"] != "mr" || o["contact_wechat"] != "chen88" || o["address_photo"] != false ||
+		o["contact_line"] != "chen.line" || o["contact_telegram"] != "" || o["contact_whatsapp"] != "" { // only what the store asks for
 		t.Fatalf("the order's contact details: %v", o)
 	}
 	// A photo of the door: the customer adds it, the store sees it with the order, nobody else does.

@@ -313,7 +313,7 @@ async function submit() {
       </aside>
     </div>
 
-    <AddressSheet v-if="showSheet" :slug="mapMode ? slug : undefined" :currency="store?.branch.currency" :selected="cart.addressId" :shop="shopPin" :start-new="startNew"
+    <AddressSheet v-if="showSheet" :slug="mapMode ? slug : undefined" :currency="store?.branch.currency" :selected="cart.addressId" :shop="shopPin" :country="store?.branch.country_code" :fields="store?.branch.contact_fields" :start-new="startNew"
       @select="chosen" @changed="bookChanged" @close="showSheet = false" />
     <div v-if="showSlots" class="sheet-mask" data-testid="slot-sheet" @click.self="showSlots = false">
       <div class="sheet">

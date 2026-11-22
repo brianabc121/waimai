@@ -939,6 +939,7 @@ func riderView(o *app.Order) *app.Order {
 	if o.Delivery != nil && (o.Delivery.Status == "delivered" || o.Delivery.Status == "failed") {
 		o.CustomerPhone, o.AddressUnit, o.AddressNote = "", "", ""
 		o.ContactPhone, o.ContactWechat, o.ContactTelegram, o.AddressPhoto = "", "", "", false
+		o.ContactLine, o.ContactWhatsapp = "", ""
 	}
 	return o
 }

@@ -11,6 +11,8 @@ import AddressForm from './AddressForm.vue'
 const props = defineProps<{
   slug?: string; currency?: string; selected?: number | null; manage?: boolean
   shop?: { lat: number; lng: number; name: string; country?: string } | null
+  // the store's country (for the telephone code) and the contact names it asks for
+  country?: string; fields?: string[]
   // open straight on the form for a new address
   startNew?: boolean
 }>()
@@ -47,7 +49,7 @@ function closeForm() { if (props.startNew && !list.value?.length) emit('close');
 <template>
   <div class="sheet-mask" data-testid="address-sheet" @click.self="emit('close')">
     <div class="sheet asheet" :class="{ form: editing !== undefined }">
-      <AddressForm v-if="editing !== undefined" :address="editing" :slug="slug" :currency="currency" :shop="shop"
+      <AddressForm v-if="editing !== undefined" :address="editing" :slug="slug" :currency="currency" :shop="shop" :country="country" :fields="fields"
         @saved="saved" @deleted="deleted" @close="closeForm" />
       <template v-else>
         <div class="as-head">{{ t(manage ? 'ad.mine' : 'ad.choose') }}<button :aria-label="t('close')" data-testid="address-close" @click="emit('close')">×</button></div>
