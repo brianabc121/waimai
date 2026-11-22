@@ -5,14 +5,16 @@ import { useRoute, useRouter } from 'vue-router'
 import { money, t } from '../i18n'
 import { useLive } from '../live'
 import { session } from '../session'
-import { addQuickReply, chat, chatCustomerOfOrder, chatSetup, connect, day, deleteQuickReply, describeChat, lastLine, listen, setAutoReply, storeChat, storeChatRead, storeChats, type ChatOrder, type ChatSetup, type ChatThread, type StoreChat } from '../chat'
+import { addQuickReply, chat, chatCustomerOfOrder, chatSetup, connect, day, deleteQuickReply, describeChat, lastLine, listen, setAutoReply, storeChat, storeChatBlock, storeChatRead, storeChats, type ChatOrder, type ChatSetup, type ChatThread, type StoreChat } from '../chat'
+import { chatPush, disableChatPush, enableChatPush, setupChatPush } from '../webpush'
 import ChatPane from './chat/ChatPane.vue'
+import ChatReport from './chat/ChatReport.vue'
 
 const route = useRoute(), router = useRouter()
 const bid = session.branchId!
 const filter = reactive({ q: '', unread: false, active: false })
 const chats = ref<ChatThread[] | null>(null), unread = ref(0), enabled = ref(true)
-const error = ref(''), readOnly = ref(false)
+const error = ref(''), readOnly = ref(false), note = ref(''), reporting = ref(false)
 const selectedId = computed(() => Number(route.query.c) || 0)
 const current = ref<StoreChat | null>(null)
 const me = computed(() => ({ uid: session.user!.id, name: session.user!.display_name || session.user!.username }))
@@ -27,7 +29,7 @@ watch(() => filter.q, () => { clearTimeout(typing); typing = window.setTimeout((
 watch(() => [filter.unread, filter.active], () => void live.refreshNow())
 
 async function openChat(id: number) {
-  current.value = null; error.value = ''
+  current.value = null; error.value = ''; note.value = ''
   if (!id) return
   try { current.value = await storeChat(bid, id) } catch (e) { error.value = (e as { code?: string }).code === 'NOT_FOUND' ? t('not_found') : (e as Error).message }
 }
@@ -42,6 +44,12 @@ async function activity() {
   // the order beside the conversation may have moved on
   if (current.value) current.value = await storeChat(bid, current.value.customer_id!).catch(() => current.value)
   void live.refreshNow()
+}
+
+async function block() {
+  const c = current.value
+  if (!c || (!c.blocked && !confirm(t('ch.block_confirm')))) return
+  await storeChatBlock(bid, c.customer_id!, !c.blocked).then(() => { c.blocked = !c.blocked }, e => { error.value = e.message })
 }
 
 // ---- quick replies and the automatic answer ----
@@ -83,6 +91,7 @@ async function fromOrder(orderId: number) {
 let stop = () => {}
 onMounted(async () => {
   void loadSetup()
+  void setupChatPush('staff')
   if (Number(route.query.order)) void fromOrder(Number(route.query.order))
   stop = listen(() => void live.refreshNow())
   try { await connect(bid) } catch (e) {
@@ -120,6 +129,11 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
         </span>
       </button>
       <p class="ms-shared">{{ t('ch.shared') }}</p>
+      <p v-if="chatPush.supported && !readOnly" class="ms-shared ms-push" data-testid="desk-push">
+        <template v-if="chatPush.on">{{ t('ch.push_is_on') }} <button class="btn link small" :disabled="chatPush.busy" @click="disableChatPush('staff')">{{ t('ch.push_off') }}</button></template>
+        <template v-else-if="chatPush.denied">{{ t('ch.push_denied') }}</template>
+        <button v-else class="btn link small" :disabled="chatPush.busy" data-testid="desk-push-on" @click="enableChatPush('staff')">{{ t('ch.push_ask_desk') }}</button>
+      </p>
     </aside>
 
     <section class="ms-chat">
@@ -130,7 +144,13 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
           <button class="btn link ms-back" data-testid="chat-back" @click="router.push({ query: {} })">‹ {{ t('back') }}</button>
           <b data-testid="chat-with">{{ name(current) }} · {{ t('ch.tail', { n: current.phone_tail ?? '' }) }}</b>
           <span class="small muted">{{ t('ch.orders_here', { n: current.order_count }) }}</span>
+          <span v-if="!readOnly" class="ms-acts">
+            <button class="btn link small" data-testid="chat-block" :data-on="current.blocked || null" @click="block">{{ t(current.blocked ? 'ch.unblock' : 'ch.block') }}</button>
+            <button v-if="current.id" class="btn link small" data-testid="chat-report-open" @click="reporting = true">{{ t('ch.report_customer') }}</button>
+          </span>
         </header>
+        <div v-if="current.blocked" class="banner warn" style="margin:10px 12px 0" data-testid="chat-blocked-note">{{ t('ch.blocked_note') }}</div>
+        <div v-if="note" class="banner ok" style="margin:10px 12px 0" data-testid="chat-note">{{ note }}</div>
         <ChatPane ref="pane" :key="current.peer" :peer="current.peer" self="store" :branch-id="bid" :staff="me" :peer-read-at="peerReadAt"
           :blocked="blocked" desk :upload-path="`/merchant/branches/${bid}/chats/${current.customer_id}/images`" :orders="current.orders"
           @seen="seen" @activity="activity" @order="openOrder">
@@ -159,6 +179,8 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
       <div v-for="o in current.orders" :key="o.id" class="small" data-testid="chat-order">#{{ o.public_no }} · {{ day(o.created_at) }} · {{ money(o.total, o.currency) }} · {{ t('s.' + o.status) }}</div>
     </aside>
 
+    <ChatReport v-if="reporting && current" :path="`/merchant/branches/${bid}/chats/${current.customer_id}/report`" :title="t('ch.report_customer')"
+      @close="reporting = false" @done="reporting = false; note = t('ch.reported')" />
     <div v-if="managing && setup" class="sheet-mask" data-testid="chat-setup" @click.self="managing = false">
       <div class="sheet ms-setup">
         <div class="sheet-head row between"><b>{{ t('ch.quick') }}</b><button class="btn link" @click="managing = false">{{ t('close') }}</button></div>
@@ -204,6 +226,8 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
 .ms-chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #f4f4f4; }
 .ms-head { background: #fff; border-bottom: 1px solid var(--line); padding: 12px 16px; display: flex; gap: 12px; align-items: baseline; flex: none; }
 .ms-back { display: none; }
+.ms-acts { margin-left: auto; display: flex; gap: 12px; white-space: nowrap; } .ms-head { flex-wrap: wrap; }
+.ms-push { padding-top: 0; }
 .ms-info { border-left: 1px solid var(--line); padding: 4px 16px 16px; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
 .ms-info h4 { margin: 12px 0 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
 .ms-order { background: #fafafa; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 4px; }

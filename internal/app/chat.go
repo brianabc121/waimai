@@ -190,7 +190,8 @@ func (a *App) CustomerChats(ctx context.Context, customerID int64) ([]ChatThread
 	rows, err := a.DB.Query(ctx, `SELECT t.id, t.branch_id, b.slug, b.name, t.last_kind, t.last_text, t.last_sender, t.last_at,
 			t.customer_unread, t.msg_count, t.store_read_at, ao.id, ao.public_no, ao.acceptance_status, ao.fulfillment_status
 		FROM chat_threads t JOIN branches b ON b.id=t.branch_id `+activeOrder+`
-		WHERE t.customer_id=$1 AND b.deleted_at IS NULL ORDER BY t.last_at DESC LIMIT 200`, customerID)
+		WHERE t.customer_id=$1 AND b.deleted_at IS NULL AND (t.customer_hidden_at IS NULL OR t.last_at > t.customer_hidden_at)
+		ORDER BY t.last_at DESC LIMIT 200`, customerID)
 	if err != nil {
 		return nil, err
 	}
@@ -345,6 +346,7 @@ type CustomerChat struct {
 	Muted       bool       `json:"muted"`   // the platform stopped this customer from writing
 	ThreadID    int64      `json:"thread_id"`
 	PeerReadAt  *time.Time `json:"peer_read_at"`
+	Quiet       bool       `json:"quiet"` // no reminders about this store's messages
 	// the customer's orders here: what an order card shows, and what can be sent as one
 	Orders []ChatOrder `json:"orders"`
 }
@@ -372,8 +374,8 @@ func (a *App) CustomerChat(ctx context.Context, customerID int64, slug string) (
 	if err := a.storeAccount(ctx, b.ID); err != nil {
 		return nil, err
 	}
-	err = a.DB.QueryRow(ctx, `SELECT id, store_read_at FROM chat_threads WHERE customer_id=$1 AND branch_id=$2`, customerID, b.ID).
-		Scan(&out.ThreadID, &out.PeerReadAt)
+	err = a.DB.QueryRow(ctx, `SELECT id, store_read_at, customer_quiet FROM chat_threads WHERE customer_id=$1 AND branch_id=$2`, customerID, b.ID).
+		Scan(&out.ThreadID, &out.PeerReadAt, &out.Quiet)
 	if err != nil && !isNoRows(err) {
 		return nil, err
 	}
@@ -383,9 +385,10 @@ func (a *App) CustomerChat(ctx context.Context, customerID int64, slug string) (
 // StoreChat is what the store's chat pane with one customer starts from.
 type StoreChat struct {
 	ChatThread
-	Phone  string      `json:"phone_masked"`
-	Orders []ChatOrder `json:"orders"`
-	Total  int         `json:"order_count"`
+	Phone   string      `json:"phone_masked"`
+	Orders  []ChatOrder `json:"orders"`
+	Total   int         `json:"order_count"`
+	Blocked bool        `json:"blocked"` // this store takes no messages from the customer
 }
 
 // StoreChatWith opens the conversation with a customer. There may be no
@@ -395,8 +398,9 @@ func (a *App) StoreChatWith(ctx context.Context, branchID, customerID int64) (*S
 	var phone string
 	err := a.DB.QueryRow(ctx, `SELECT c.phone, COALESCE(NULLIF(c.nickname,''), (SELECT o.customer_name FROM orders o
 			WHERE o.branch_id=$1 AND o.customer_id=c.id ORDER BY o.id DESC LIMIT 1), ''),
-			(SELECT count(*) FROM orders o WHERE o.branch_id=$1 AND o.customer_id=c.id AND o.channel <> 'dine_in')
-		FROM customers c WHERE c.id=$2`, branchID, customerID).Scan(&phone, &out.Customer, &out.Total)
+			(SELECT count(*) FROM orders o WHERE o.branch_id=$1 AND o.customer_id=c.id AND o.channel <> 'dine_in'),
+			EXISTS (SELECT 1 FROM chat_blocks k WHERE k.branch_id=$1 AND k.customer_id=c.id)
+		FROM customers c WHERE c.id=$2`, branchID, customerID).Scan(&phone, &out.Customer, &out.Total, &out.Blocked)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	}
@@ -550,10 +554,11 @@ func (a *App) ChatBeforeSend(ctx context.Context, h ChatHook) error {
 	if err != nil {
 		return err
 	}
-	var enabled, deleted, muted, exists bool
+	var enabled, deleted, muted, exists, blocked bool
 	err = a.DB.QueryRow(ctx, `SELECT b.chat_enabled, b.deleted_at IS NOT NULL, c.chat_muted_at IS NOT NULL,
-			EXISTS (SELECT 1 FROM chat_threads t WHERE t.branch_id=b.id AND t.customer_id=c.id)
-		FROM branches b, customers c WHERE b.id=$1 AND c.id=$2`, m.branchID, m.customerID).Scan(&enabled, &deleted, &muted, &exists)
+			EXISTS (SELECT 1 FROM chat_threads t WHERE t.branch_id=b.id AND t.customer_id=c.id),
+			EXISTS (SELECT 1 FROM chat_blocks k WHERE k.branch_id=b.id AND k.customer_id=c.id)
+		FROM branches b, customers c WHERE b.id=$1 AND c.id=$2`, m.branchID, m.customerID).Scan(&enabled, &deleted, &muted, &exists, &blocked)
 	if isNoRows(err) {
 		return ErrNotFound
 	}
@@ -566,6 +571,9 @@ func (a *App) ChatBeforeSend(ctx context.Context, h ChatHook) error {
 	if m.sender == "customer" {
 		if muted {
 			return errChatMuted
+		}
+		if blocked {
+			return errChatBlocked
 		}
 		if !exists {
 			var n int
@@ -686,9 +694,18 @@ func (a *App) ChatAfterSend(ctx context.Context, h ChatHook) error {
 			unread = `customer_unread = customer_unread + CASE WHEN customer_read_at >= $5 THEN 0 ELSE 1 END,
 				store_unread = 0, store_read_at = GREATEST(store_read_at, $5)`
 		}
-		if _, err := tx.Exec(ctx, `UPDATE chat_threads SET last_kind=$2, last_text=$3, last_sender=$4, last_at=$5,
-			msg_count = msg_count + 1, `+unread+` WHERE id=$1`, threadID, m.kind, preview(m.kind, m.body), m.sender, at); err != nil {
+		var storeUnread, customerUnread int
+		if err := tx.QueryRow(ctx, `UPDATE chat_threads SET last_kind=$2, last_text=$3, last_sender=$4, last_at=$5,
+			msg_count = msg_count + 1, `+unread+` WHERE id=$1 RETURNING store_unread, customer_unread`,
+			threadID, m.kind, preview(m.kind, m.body), m.sender, at).Scan(&storeUnread, &customerUnread); err != nil {
 			return err
+		}
+		// the other side's first unread message: remind them in a while if it
+		// is still unread then (chat_alerts.go)
+		if first := (m.sender == "customer" && storeUnread == 1) || (m.sender == "store" && customerUnread == 1); first && !m.auto {
+			if err := chatAlerts(ctx, tx, threadID, m.sender); err != nil {
+				return err
+			}
 		}
 		return notify(ctx, tx, Event{BranchID: m.branchID})
 	})
@@ -707,17 +724,22 @@ type AdminChatRow struct {
 	Merchant    string `json:"merchant"`
 	Muted       bool   `json:"muted"`
 	ChatEnabled bool   `json:"chat_enabled"`
+	Reports     int    `json:"reports"` // complaints the platform has not dealt with
+	Blocked     bool   `json:"blocked"` // the store takes no messages from this customer
 }
 
 type AdminChatList struct {
-	Chats []AdminChatRow `json:"chats"`
-	Total int            `json:"total"`
-	Today int            `json:"today"`
+	Chats    []AdminChatRow `json:"chats"`
+	Total    int            `json:"total"`
+	Today    int            `json:"today"`
+	Reported int            `json:"reported"`
 }
 
 const adminChatCols = `t.id, t.branch_id, b.slug, b.name, m.name, t.customer_id, ` + customerName + `, c.phone, t.last_kind, t.last_text,
 	t.last_sender, t.last_at, t.msg_count, ao.id, ao.public_no, ao.acceptance_status, ao.fulfillment_status,
-	c.chat_muted_at IS NOT NULL, b.chat_enabled`
+	c.chat_muted_at IS NOT NULL, b.chat_enabled,
+	(SELECT count(*) FROM chat_reports r WHERE r.thread_id=t.id AND r.resolved_at IS NULL),
+	EXISTS (SELECT 1 FROM chat_blocks k WHERE k.branch_id=t.branch_id AND k.customer_id=t.customer_id)`
 
 const adminChatFrom = ` FROM chat_threads t JOIN customers c ON c.id=t.customer_id JOIN branches b ON b.id=t.branch_id
 	JOIN merchants m ON m.id=b.merchant_id ` + activeOrder
@@ -727,7 +749,7 @@ func scanAdminChat(row interface{ Scan(...any) error }) (AdminChatRow, error) {
 	var oid *int64
 	var no, acc, ful *string
 	err := row.Scan(&r.ID, &r.BranchID, &r.Slug, &r.StoreName, &r.Merchant, &r.CustomerID, &r.Customer, &r.Phone, &r.LastKind, &r.LastText,
-		&r.LastSender, &r.LastAt, &r.Count, &oid, &no, &acc, &ful, &r.Muted, &r.ChatEnabled)
+		&r.LastSender, &r.LastAt, &r.Count, &oid, &no, &acc, &ful, &r.Muted, &r.ChatEnabled, &r.Reports, &r.Blocked)
 	r.PhoneTail, r.Order = last4(r.Phone), orderTag(oid, no, acc, ful)
 	return r, err
 }
@@ -743,6 +765,9 @@ func (a *App) AdminChats(ctx context.Context, f ChatFilter) (*AdminChatList, err
 	if f.Today {
 		where += ` AND t.last_at > now() - interval '1 day'`
 	}
+	if f.Reported {
+		where += ` AND EXISTS (SELECT 1 FROM chat_reports r WHERE r.thread_id=t.id AND r.resolved_at IS NULL)`
+	}
 	if q := strings.TrimSpace(f.Q); q != "" {
 		args = append(args, like(q))
 		n := len(args)
@@ -754,7 +779,8 @@ func (a *App) AdminChats(ctx context.Context, f ChatFilter) (*AdminChatList, err
 	if err := a.DB.QueryRow(ctx, `SELECT count(*)`+adminChatFrom+` WHERE `+where, args...).Scan(&out.Total); err != nil {
 		return nil, err
 	}
-	if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM chat_threads WHERE last_at > now() - interval '1 day'`).Scan(&out.Today); err != nil {
+	if err := a.DB.QueryRow(ctx, `SELECT (SELECT count(*) FROM chat_threads WHERE last_at > now() - interval '1 day'),
+		(SELECT count(DISTINCT thread_id) FROM chat_reports WHERE resolved_at IS NULL)`).Scan(&out.Today, &out.Reported); err != nil {
 		return nil, err
 	}
 	limit, offset := f.limitOffset()
@@ -788,9 +814,10 @@ type ChatLine struct {
 
 type AdminChat struct {
 	AdminChatRow
-	StartedAt time.Time   `json:"started_at"`
-	Messages  []ChatLine  `json:"messages"`
-	Orders    []ChatOrder `json:"orders"`
+	StartedAt time.Time    `json:"started_at"`
+	Messages  []ChatLine   `json:"messages"`
+	Orders    []ChatOrder  `json:"orders"`
+	Reports   []ChatReport `json:"report_list"`
 }
 
 // adminChatPage is how many messages the platform's page loads at a time.
@@ -838,6 +865,9 @@ func (a *App) AdminChat(ctx context.Context, actor AdminActor, id, before int64)
 		out.Messages[i], out.Messages[j] = out.Messages[j], out.Messages[i]
 	}
 	if out.Orders, err = chatOrders(ctx, a.DB, row.BranchID, row.CustomerID, 5); err != nil {
+		return nil, err
+	}
+	if out.Reports, err = chatReports(ctx, a.DB, id); err != nil {
 		return nil, err
 	}
 	if before == 1<<62 { // opening it, not paging further back

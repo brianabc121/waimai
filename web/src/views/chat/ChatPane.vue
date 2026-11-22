@@ -141,7 +141,7 @@ const stamp = (i: number) => i === 0 || list.value[i].at - list.value[i - 1].at 
         <div class="cp-msg" :class="{ me: m.mine, failed: m.state === 'failed' }" data-testid="chat-msg" :data-mine="m.mine" :data-state="m.state">
           <div class="cp-bub" @click="m.state === 'failed' && deliver(m)">
             <span v-if="m.kind === 'text'">{{ m.text }}</span>
-            <a v-else-if="m.kind === 'image'" class="cp-img" :href="m.image" target="_blank" rel="noopener" data-testid="chat-image" @click="m.state === 'failed' && $event.preventDefault()"><img :src="m.image" alt="" @load="toBottom" /></a>
+            <a v-else-if="m.kind === 'image'" class="cp-img" :href="m.image" target="_blank" rel="noopener" data-testid="chat-image" @click="m.state === 'failed' && $event.preventDefault()"><img :src="m.image" :alt="t('ch.kind_image')" @load="toBottom" @error="m.kind = 'other'; m.text = t('ch.img_gone')" /></a>
             <button v-else-if="m.kind === 'order'" type="button" class="cp-order" data-testid="chat-order-card" :disabled="!orderOf(m.orderId)" @click.stop="orderOf(m.orderId) && emit('order', orderOf(m.orderId)!)">
               <template v-if="orderOf(m.orderId)">
                 <b>{{ t('ch.order_card', { no: orderOf(m.orderId)!.public_no }) }}</b><i class="tag warn">{{ t('s.' + orderOf(m.orderId)!.status) }}</i>

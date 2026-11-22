@@ -122,6 +122,7 @@ extend({
   'ad.auto_refresh': ['每 10 秒自动刷新', 'Refreshes every 10 seconds'], 'ad.close': ['关闭', 'Close'],
   'ad.no_traffic': ['这段时间没有请求', 'No requests in this period'], 'ad.error_rate': ['错误率（5xx）', 'Error rate (5xx)'], 'ad.endpoint': ['接口', 'Endpoint'],
   'ad.h.ok': ['正常', 'Healthy'], 'ad.h.warn': ['注意', 'Attention'], 'ad.h.bad': ['异常', 'Down'],
+  'ad.h.chat_name': ['聊天服务', 'Chat server'], 'ad.h.chat_ok': ['OpenIM 有应答', 'OpenIM answers'], 'ad.h.chat_down': ['OpenIM 没有应答，顾客和商家暂时发不了消息', 'OpenIM does not answer; nobody can send messages'],
   'ad.h.db_name': ['数据库', 'Database'], 'ad.h.queue_name': ['任务队列', 'Job queue'], 'ad.h.unknown': ['数据库连不上，无法判断', 'Unknown while the database is unreachable'],
   'ad.h.api': ['近 5 分钟 5xx {rate} · P95 {p95}', 'Last 5 min: {rate} 5xx · P95 {p95}'], 'ad.h.api_idle': ['近 5 分钟没有请求', 'No requests in the last 5 minutes'],
   'ad.h.worker': ['{n} 个实例在线，周期任务都成功', '{n} online, every task succeeded'], 'ad.h.worker_none': ['没有实例在线', 'No worker is online'],

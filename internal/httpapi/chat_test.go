@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/brianabc121/waimai/internal/app"
 )
 
 // fakeIM stands in for the OpenIM server: it remembers the accounts made.
@@ -52,6 +55,7 @@ var msgSeq int
 func say(t *testing.T, from, to, text string, uid int64) string {
 	t.Helper()
 	msgSeq++
+	time.Sleep(3 * time.Millisecond) // later than a "read" just before it, as real messages are
 	content, _ := json.Marshal(map[string]string{"content": text})
 	body := map[string]any{"sendID": from, "recvID": to, "contentType": 101, "sessionType": 1, "content": string(content),
 		"serverMsgID": fmt.Sprintf("m-%d-%d", time.Now().UnixNano(), msgSeq), "sendTime": time.Now().UnixMilli()}
@@ -418,5 +422,199 @@ func TestChatCards(t *testing.T) {
 	say(t, oIM, bIM, "hi", 0)
 	if len(im.sent) != 1 {
 		t.Fatalf("switched off: %v", im.sent)
+	}
+}
+
+type sentPush struct {
+	token string
+	m     app.PushMessage
+}
+
+// fakePush and fakeSMS remember what would have gone out.
+type fakePush struct{ sent []sentPush }
+
+func (f *fakePush) Send(_ context.Context, d app.Device, m app.PushMessage) error {
+	f.sent = append(f.sent, sentPush{d.Token, m})
+	return nil
+}
+
+type fakeSMS struct{ sent []string }
+
+func (f *fakeSMS) Send(_ context.Context, phone, msg string) error {
+	f.sent = append(f.sent, phone+" "+msg)
+	return nil
+}
+
+// Reminders for messages nobody read, blocks, reports and what is thrown away.
+func TestChatAlerts(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	push, sms := &fakePush{}, &fakeSMS{}
+	oldSMS, oldPush := a.SMS, a.Push
+	a.IM, a.SMS, a.Push = &fakeIM{users: map[string]string{}}, sms, map[string]app.PushSender{"web": push}
+	t.Cleanup(func() { a.IM, a.SMS, a.Push = nil, oldSMS, oldPush })
+	cust, admin := verifiedCustomer(t), adminClient(t)
+	owner, cashier, kitchen := login(t, f.owner), login(t, f.cashier), login(t, f.kitchen)
+	bid := fmt.Sprint(f.branchID)
+	custID := int64(cust.want(200, "", "GET", "/customer/me", nil)["id"].(float64))
+	ownerID := int64(owner.want(200, "", "GET", "/auth/me", nil)["id"].(float64))
+	cIM, bIM := fmt.Sprintf("c_%d", custID), "b_"+bid
+	// due runs the reminders that are waiting as if their time had come
+	due := func() {
+		t.Helper()
+		if _, err := a.DB.Exec(ctx, `UPDATE jobs SET run_at=now() WHERE kind='chat_alert' AND status='pending'`); err != nil {
+			t.Fatal(err)
+		}
+		if err := a.RunJobs(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := a.DB.Exec(ctx, `UPDATE branches SET notify_sms=true WHERE id=$1`, f.branchID); err != nil {
+		t.Fatal(err)
+	}
+
+	// the desk: the owner's browser asked for reminders, the kitchen's does not count
+	sub := func(name string) string { return `{"endpoint":"https://push.example/` + name + `","keys":{}}` }
+	owner.want(200, "", "POST", "/rider/devices", map[string]any{"platform": "web", "token": sub("owner"), "app_version": "web"})
+	kitchen.want(200, "", "POST", "/rider/devices", map[string]any{"platform": "web", "token": sub("kitchen"), "app_version": "web"})
+	if why := say(t, cIM, bIM, "hello", 0); why != "" {
+		t.Fatal(why)
+	}
+	say(t, cIM, bIM, "anyone?", 0) // rides on the first reminder
+	due()
+	if len(push.sent) != 1 || push.sent[0].token != sub("owner") || !strings.Contains(push.sent[0].m.URL, fmt.Sprintf("/merchant/messages?c=%d", custID)) ||
+		strings.Contains(push.sent[0].m.Body+push.sent[0].m.Title, "hello") {
+		t.Fatalf("one reminder to the desk, without the text: %+v", push.sent)
+	}
+	// a message that was read in time brings no reminder
+	push.sent = nil
+	cashier.want(200, "", "POST", fmt.Sprintf("/merchant/branches/%s/chats/%d/read", bid, custID), nil)
+	say(t, cIM, bIM, "third", 0)
+	cashier.want(200, "", "POST", fmt.Sprintf("/merchant/branches/%s/chats/%d/read", bid, custID), nil)
+	due()
+	if len(push.sent) != 0 {
+		t.Fatalf("read in time: %+v", push.sent)
+	}
+
+	// the customer: no browser and an order under way, so a text, once per order
+	f.order(t, cust)
+	sms.sent = nil
+	say(t, bIM, cIM, "we are out of rice", ownerID)
+	due()
+	if len(sms.sent) != 1 || strings.Contains(sms.sent[0], "rice") {
+		t.Fatalf("one text without the message: %v", sms.sent)
+	}
+	cust.want(200, "", "POST", "/customer/chats/"+f.slug+"/read", nil)
+	say(t, bIM, cIM, "noodles instead?", ownerID)
+	due()
+	if len(sms.sent) != 1 {
+		t.Fatalf("one text per order: %v", sms.sent)
+	}
+	// with a browser that asked for reminders: a push, and no text
+	cust.want(422, "VALIDATION", "POST", "/customer/devices", map[string]any{"token": "nonsense"})
+	dev := cust.want(200, "", "POST", "/customer/devices", map[string]any{"token": sub("cust")})
+	cust.want(200, "", "POST", "/customer/chats/"+f.slug+"/read", nil)
+	push.sent = nil
+	say(t, bIM, cIM, "still there?", ownerID)
+	due()
+	if len(push.sent) != 1 || push.sent[0].token != sub("cust") || push.sent[0].m.URL != "/chat/"+f.slug || len(sms.sent) != 1 {
+		t.Fatalf("a push to the customer: %+v %v", push.sent, sms.sent)
+	}
+	// "no reminders about this store"
+	cust.want(200, "", "POST", "/customer/chats/"+f.slug+"/read", nil)
+	cust.want(200, "", "POST", "/customer/chats/"+f.slug+"/quiet", map[string]any{"quiet": true})
+	if cust.want(200, "", "GET", "/customer/chats/"+f.slug, nil)["quiet"] != true {
+		t.Fatal("quiet is remembered")
+	}
+	push.sent = nil
+	say(t, bIM, cIM, "hello?", ownerID)
+	due()
+	if len(push.sent) != 0 {
+		t.Fatalf("quiet: %+v", push.sent)
+	}
+	cust.want(200, "", "DELETE", fmt.Sprintf("/customer/devices/%d", int64(dev["id"].(float64))), nil)
+
+	// the customer takes the conversation off their list; the next message brings it back
+	cust.want(200, "", "POST", "/customer/chats/"+f.slug+"/hide", nil)
+	if l := list(cust.want(200, "", "GET", "/customer/chats", nil), "chats"); len(l) != 0 {
+		t.Fatalf("hidden: %v", l)
+	}
+	if l := list(owner.want(200, "", "GET", "/merchant/branches/"+bid+"/chats", nil), "chats"); len(l) != 1 {
+		t.Fatalf("the store still has it: %v", l)
+	}
+	say(t, bIM, cIM, "back", ownerID)
+	if l := list(cust.want(200, "", "GET", "/customer/chats", nil), "chats"); len(l) != 1 {
+		t.Fatalf("back on the list: %v", l)
+	}
+
+	// the store blocks the customer: they cannot write, the store still can
+	kitchen.want(403, "FORBIDDEN", "POST", fmt.Sprintf("/merchant/branches/%s/chats/%d/block", bid, custID), map[string]any{"blocked": true})
+	cashier.want(200, "", "POST", fmt.Sprintf("/merchant/branches/%s/chats/%d/block", bid, custID), map[string]any{"blocked": true})
+	if why := say(t, cIM, bIM, "hey", 0); why != "CHAT_BLOCKED" {
+		t.Fatalf("blocked: %q", why)
+	}
+	if why := say(t, bIM, cIM, "sorry", ownerID); why != "" {
+		t.Fatalf("the store writes: %q", why)
+	}
+	if owner.want(200, "", "GET", fmt.Sprintf("/merchant/branches/%s/chats/%d", bid, custID), nil)["blocked"] != true {
+		t.Fatal("the pane says blocked")
+	}
+	cashier.want(200, "", "POST", fmt.Sprintf("/merchant/branches/%s/chats/%d/block", bid, custID), map[string]any{"blocked": false})
+	if why := say(t, cIM, bIM, "hey", 0); why != "" {
+		t.Fatalf("unblocked: %q", why)
+	}
+
+	// both sides report; the platform sees it marked and deals with it
+	cust.want(422, "VALIDATION", "POST", "/customer/chats/"+f.slug+"/report", map[string]any{"reason": "nope"})
+	cust.want(422, "VALIDATION", "POST", "/customer/chats/"+f.slug+"/report", map[string]any{"reason": "other"})
+	cust.want(200, "", "POST", "/customer/chats/"+f.slug+"/report", map[string]any{"reason": "abuse", "detail": "rude"})
+	cust.want(200, "", "POST", "/customer/chats/"+f.slug+"/report", map[string]any{"reason": "abuse", "detail": "again"}) // kept as one
+	cashier.want(200, "", "POST", fmt.Sprintf("/merchant/branches/%s/chats/%d/report", bid, custID), map[string]any{"reason": "spam"})
+	l := admin.want(200, "", "GET", "/admin/chats?reported=1&branch_id="+bid, nil)
+	rows := list(l, "chats")
+	if len(rows) != 1 || rows[0].(map[string]any)["reports"].(float64) != 2 || l["reported"].(float64) < 1 {
+		t.Fatalf("reported conversations: %v", l)
+	}
+	tid := int64(rows[0].(map[string]any)["id"].(float64))
+	if r := list(admin.want(200, "", "GET", fmt.Sprintf("/admin/chats/%d", tid), nil), "report_list"); len(r) != 2 || r[0].(map[string]any)["reported_by"] != "store" {
+		t.Fatalf("the reports: %v", r)
+	}
+	var storeReports int
+	if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM store_reports WHERE branch_id=$1`, f.branchID).Scan(&storeReports); err != nil || storeReports != 1 {
+		t.Fatalf("the customer's report joins the store's reports: %d %v", storeReports, err)
+	}
+	admin.want(200, "", "POST", fmt.Sprintf("/admin/chats/%d/reports/resolve", tid), nil)
+	admin.want(404, "NOT_FOUND", "POST", fmt.Sprintf("/admin/chats/%d/reports/resolve", tid), nil)
+	if rows := list(admin.want(200, "", "GET", "/admin/chats?reported=1&branch_id="+bid, nil), "chats"); len(rows) != 0 {
+		t.Fatalf("dealt with: %v", rows)
+	}
+
+	// old messages go, except in a conversation whose report is recent
+	if _, err := a.DB.Exec(ctx, `UPDATE chat_messages SET sent_at = now() - interval '200 days' WHERE thread_id=$1`, tid); err != nil {
+		t.Fatal(err)
+	}
+	count := func() (n int) {
+		t.Helper()
+		if err := a.Cleanup(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM chat_messages WHERE thread_id=$1`, tid).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if count() == 0 {
+		t.Fatal("a conversation reported lately is kept")
+	}
+	if _, err := a.DB.Exec(ctx, `UPDATE chat_reports SET resolved_at = now() - interval '100 days' WHERE thread_id=$1`, tid); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(); n != 0 {
+		t.Fatalf("old messages are deleted: %d left", n)
+	}
+
+	// the platform's front page says whether the chat server answers
+	if chat := admin.want(200, "", "GET", "/admin/overview", nil)["chat"].(map[string]any); chat["on"] != true || chat["state"] != "ok" {
+		t.Fatalf("health: %v", chat)
 	}
 }

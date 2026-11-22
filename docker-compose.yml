@@ -137,6 +137,9 @@ services:
       IMENV_SHARE_MULTILOGIN_POLICY: "0"
       # a page asks for a new sign-in each time it opens; 7 days is ample
       IMENV_OPENIM_RPC_AUTH_TOKENPOLICY_EXPIRE: "7"
+      # messages are kept 180 days, like this system's own copy (its nightly
+      # task deletes older ones)
+      IMENV_OPENIM_CRONTASK_RETAINCHATRECORDS: "180"
       # The api container decides who may write (before) and keeps a copy
       # (after). Groups and friends are not used: asked about, always refused.
       IMENV_WEBHOOKS_URL: http://api:8080/im-hooks/${OPENIM_HOOK_KEY:-}

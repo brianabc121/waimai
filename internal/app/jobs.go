@@ -120,6 +120,12 @@ func (a *App) runJob(ctx context.Context, j *claimedJob) error {
 			return err
 		}
 		return a.sendPush(ctx, p)
+	case "chat_alert":
+		var p chatAlertJob
+		if err := json.Unmarshal(j.Payload, &p); err != nil {
+			return err
+		}
+		return a.runChatAlert(ctx, p)
 	case "menu_import":
 		var p struct {
 			ID int64 `json:"id"`

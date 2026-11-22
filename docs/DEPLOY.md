@@ -542,6 +542,9 @@ base64 -w0 workbench.jks > workbench.jks.txt
 - 如果前面有 Caddy 之类的 TLS 代理，不用加配置：聊天的两个路径 `/im/ws` 和 `/im/api` 都在同一个域名下，由 web 容器转发。代理要支持 WebSocket（Caddy 默认支持）。
 - 聊天内容我们自己的数据库里有一份副本（平台“所有会话”读的就是它），随 PostgreSQL 一起备份。OpenIM 那边的原件在数据卷 `im-mongo` 里，要完整恢复聊天页里的历史就也备份它：`docker compose exec im-mongo mongodump -u root -p "$IM_STORE_PASSWORD" --authenticationDatabase admin --archive > im.archive`。
 - 浏览器端用的 OpenIM 网页 SDK 是 GPL-3.0 授权，见 `web/NOTICE.md`。
+- **提醒**：对方没在看页面时用浏览器推送提醒，用的是平台后台“密钥设置”里的浏览器推送密钥（和员工工作台同一套）。没配密钥就没有“开启提醒”的入口，聊天本身不受影响。顾客有进行中订单又没开推送时会发一条短信，要门店设置里开着“短信通知顾客”，并且配了短信服务。短信里的链接用 `PUBLIC_BASE_URL`。
+- **保留时间**：消息 180 天，图片 90 天，由每天的清理任务删除；被举报的会话保留到平台处理完再加 90 天。
+- **是否正常**：平台后台“总览”有一张“聊天服务”卡片，变红说明 OpenIM 没有应答，先看 `docker compose --profile im ps` 和 `docker compose logs openim-server`。
 
 **测试**
 

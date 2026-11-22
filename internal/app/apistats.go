@@ -290,6 +290,7 @@ type Overview struct {
 	Worker HealthWorker `json:"worker"`
 	DB     HealthDB     `json:"db"`
 	Queue  HealthQueue  `json:"queue"`
+	Chat   HealthChat   `json:"chat"` // the chat server; On false: none is configured
 	// Day is the traffic of the last 24 hours.
 	Day         APITotals  `json:"day"`
 	OrdersToday int        `json:"orders_today"` // by each store's own calendar day
@@ -349,6 +350,7 @@ func (a *App) AdminOverview(ctx context.Context) (*Overview, error) {
 	pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	pingErr := a.DB.Ping(pingCtx)
 	cancel()
+	out.Chat = a.chatHealth(ctx)
 	st := a.DB.Stat()
 	out.DB = HealthDB{State: "ok", PingMS: int(time.Since(start).Milliseconds()), InUse: int(st.AcquiredConns()), Max: int(st.MaxConns())}
 	if pingErr != nil {
