@@ -284,7 +284,7 @@ func (a *App) sendPush(ctx context.Context, p pushJob) error {
 	var sent int
 	var last error
 	for _, d := range devices {
-		sender := a.Push[d.Platform]
+		sender := a.pushSender(d.Platform)
 		if sender == nil {
 			continue // this platform is not set up on this server
 		}

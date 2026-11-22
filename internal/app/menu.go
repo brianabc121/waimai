@@ -360,7 +360,7 @@ func (a *App) SaveZoneMode(ctx context.Context, branchID int64, in ZoneModeInput
 		if err != nil {
 			return nil, err
 		}
-		if a.MapsOff && b.ZoneMode != "map" {
+		if a.mapsOff() && b.ZoneMode != "map" {
 			return nil, Err(http.StatusConflict, "MAPS_DISABLED", "this platform has no map key configured")
 		}
 		var drawn int

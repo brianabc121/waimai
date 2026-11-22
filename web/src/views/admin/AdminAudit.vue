@@ -13,7 +13,7 @@ const to = ref('')
 const page = ref(1)
 const list = reactive<{ items: AuditEntry[]; total: number }>({ items: [], total: 0 })
 const error = ref('')
-const groups = ['merchant', 'branch', 'user', 'item', 'category', 'job']
+const groups = ['merchant', 'branch', 'user', 'item', 'category', 'job', 'settings']
 
 async function load() {
   // "to" is a whole day: everything before the start of the next one

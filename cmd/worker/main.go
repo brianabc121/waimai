@@ -26,5 +26,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	go a.WatchSettings(ctx, log.Printf)
 	a.RunWorker(ctx, log.Printf, false)
 }

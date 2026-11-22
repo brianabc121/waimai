@@ -45,6 +45,7 @@ export const router = createRouter({
         { path: 'merchants/:id', component: () => import('./views/admin/AdminMerchantDetail.vue'), props: true, meta: { title: 'ad.merchants' } },
         { path: 'items', component: () => import('./views/admin/AdminItems.vue'), meta: { title: 'ad.items' } },
         { path: 'worker', component: () => import('./views/admin/AdminWorker.vue'), meta: { title: 'ad.worker' } },
+        { path: 'settings', component: () => import('./views/admin/AdminSettings.vue'), meta: { title: 'ad.settings' } },
         { path: 'audit', component: () => import('./views/admin/AdminAudit.vue'), meta: { title: 'ad.audit' } },
       ],
     },
