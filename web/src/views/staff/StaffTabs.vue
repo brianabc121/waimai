@@ -9,6 +9,7 @@ import './strings'
     <router-link to="/merchant/staff" exact-active-class="on" data-tab="list">{{ t('sr.tab.list') }}</router-link>
     <router-link to="/merchant/staff/attendance" active-class="on" data-tab="attendance">{{ t('sr.tab.attendance') }}</router-link>
     <router-link to="/merchant/staff/kitchen" active-class="on" data-tab="kitchen">{{ t('sr.tab.kitchen') }}</router-link>
+    <router-link to="/merchant/staff/riders" active-class="on" data-tab="riders">{{ t('sr.tab.riders') }}</router-link>
   </nav>
 </template>
 

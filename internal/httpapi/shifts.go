@@ -137,3 +137,44 @@ func (s *Server) kitchenDetail(c *gin.Context) {
 	}
 	c.JSON(200, out)
 }
+
+// ---- rider work summary ----
+
+func (s *Server) riderReport(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	out, err := s.App.RiderReport(c, bid, c.Query("from"), c.Query("to"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+func (s *Server) riderDetail(c *gin.Context) {
+	bid, id, ok := staffScope(c)
+	if !ok {
+		return
+	}
+	out, err := s.App.RiderDetail(c, bid, id, c.Query("from"), c.Query("to"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
+func (s *Server) tripDetail(c *gin.Context) {
+	bid, id, ok := staffScope(c)
+	if !ok {
+		return
+	}
+	out, err := s.App.TripDetail(c, bid, id)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, out)
+}

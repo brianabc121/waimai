@@ -258,3 +258,130 @@ func TestRiderTrips(t *testing.T) {
 		t.Fatalf("store without a position: %+v", tr)
 	}
 }
+
+func TestRiderReport(t *testing.T) {
+	a := need(t)
+	ctx := context.Background()
+	s := newStore(t, true)
+	const lat, lng = 14.55, 121.02
+	_, err := a.DB.Exec(ctx, `UPDATE branches SET lat=$2, lng=$3 WHERE id=$1`, s.branchID, lat, lng)
+	noErr(t, err)
+	at := func(o *app.Order, dLat, dLng float64) {
+		t.Helper()
+		_, err := a.DB.Exec(ctx, `UPDATE orders SET dest_lat=$2, dest_lng=$3 WHERE id=$1`, o.ID, lat+dLat, lng+dLng)
+		noErr(t, err)
+	}
+	// Two orders: one 1 km north, one 2 km north. The best round is 4 km
+	// whichever comes first; the rider goes far first, with a detour, and rides 5.7 km.
+	near, far := s.packed(t, s.rider1), s.packed(t, s.rider1)
+	at(near, 0.009, 0)
+	at(far, 0.018, 0)
+	_, err = a.RiderPickup(ctx, near.Delivery.ID, s.rider1)
+	noErr(t, err)
+	_, err = a.RiderPickup(ctx, far.Delivery.ID, s.rider1)
+	noErr(t, err)
+	tr := tripsOf(t, s.rider1)[0]
+	t0 := tr.started
+	fix := func(after time.Duration, dLat, dLng float64) {
+		t.Helper()
+		_, err := a.DB.Exec(ctx, `INSERT INTO rider_tracks (user_id, lat, lng, accuracy, at) VALUES ($1,$2,$3,10,$4)`,
+			s.rider1, lat+dLat, lng+dLng, t0.Add(after))
+		noErr(t, err)
+	}
+	fix(1*time.Minute, 0.004, 0)
+	_, err = a.AdvanceTripsAt(ctx, t0.Add(90*time.Second))
+	noErr(t, err)
+
+	// on the road: the planned route is there, nothing to compare yet
+	today := time.Now().In(time.FixedZone("", 8*3600)).Format("2006-01-02")
+	rep, err := a.RiderReport(ctx, s.branchID, today, today)
+	noErr(t, err)
+	if !rep.StoreSet || len(rep.Riders) != 2 || rep.Riders[0].ID != s.rider1 || !rep.Riders[0].OnTrip || rep.Riders[0].Trips != 1 ||
+		rep.Riders[0].Orders != 2 || rep.Riders[0].CompareM != 0 || rep.Riders[1].Trips != 0 {
+		t.Fatalf("on the road: %+v", rep)
+	}
+	d, err := a.TripDetail(ctx, s.branchID, tr.id)
+	noErr(t, err)
+	if d.PlannedSource != "straight" || d.PlannedM == nil || *d.PlannedM < 3950 || *d.PlannedM > 4050 || d.OverM != nil || d.Store == nil {
+		t.Fatalf("planned: %+v", d.Trip)
+	}
+
+	fix(3*time.Minute, 0.018, 0)
+	_, err = a.RiderDeliver(ctx, far.Delivery.ID, s.rider1, far.Totals.Total)
+	noErr(t, err)
+	fix(5*time.Minute, 0.018, 0.011) // a detour of 1.2 km to the east and back
+	fix(7*time.Minute, 0.009, 0)
+	_, err = a.RiderFail(ctx, near.Delivery.ID, s.rider1, "nobody home")
+	noErr(t, err)
+	_, err = a.DB.Exec(ctx, `UPDATE rider_trips SET last_drop_at=$2 WHERE id=$1`, tr.id, t0.Add(7*time.Minute))
+	noErr(t, err)
+	fix(9*time.Minute, 0.0003, 0)
+	_, err = a.AdvanceTripsAt(ctx, t0.Add(10*time.Minute))
+	noErr(t, err)
+
+	rep, err = a.RiderReport(ctx, s.branchID, today, today)
+	noErr(t, err)
+	l := rep.Riders[0]
+	if l.Trips != 1 || l.Delivered != 1 || l.Failed != 1 || l.OnTrip || l.Detours != 1 || l.NoTrack != 0 ||
+		l.CompareM < 3950 || l.CompareM > 4050 || l.ActualM != l.ComparedActualM || l.ActualM < 5500 || l.ActualM > 5900 ||
+		l.Cash != far.Totals.Total || l.ShiftMinutes < 0 {
+		t.Fatalf("after the trip: %+v", l)
+	}
+	det, err := a.RiderDetail(ctx, s.branchID, s.rider1, today, today)
+	noErr(t, err)
+	if len(det.Days) != 1 || det.Days[0].Trips != 1 || det.Days[0].Delivered != 1 || len(det.Trips) != 1 {
+		t.Fatalf("detail: %+v", det)
+	}
+	tp := det.Trips[0]
+	if !tp.Detour || tp.OverM == nil || *tp.OverM < 1500 || len(tp.Items) != 2 || tp.Items[0].PublicNo != far.PublicNo ||
+		*tp.Items[0].DropSeq != 1 || tp.Items[1].Outcome != "failed" || tp.Items[1].FailReason != "nobody home" || tp.Items[0].Lat != nil {
+		t.Fatalf("trip in the list: %+v", tp)
+	}
+	d, err = a.TripDetail(ctx, s.branchID, tr.id)
+	noErr(t, err)
+	var path [][3]float64
+	var planned [][2]float64
+	var order []int64
+	noErr(t, json.Unmarshal(d.ActualPath, &path))
+	noErr(t, json.Unmarshal(d.PlannedPath, &planned))
+	noErr(t, json.Unmarshal(d.PlannedOrder, &order))
+	if len(path) < 5 || len(planned) != 4 || len(order) != 2 || d.RiderName != "R1" || d.Items[0].Lat == nil || d.Items[0].Address == "" || d.PathForgotten {
+		t.Fatalf("trip detail: %+v path %v planned %v order %v", d.Trip, path, planned, order)
+	}
+	// another store cannot read it
+	other := newStore(t, true)
+	_, err = a.TripDetail(ctx, other.branchID, tr.id)
+	wantCode(t, err, "NOT_FOUND")
+
+	// a trip that ended on the road is compared without the way back
+	solo := s.packed(t, s.rider2)
+	at(solo, 0.009, 0)
+	_, err = a.RiderPickup(ctx, solo.Delivery.ID, s.rider2)
+	noErr(t, err)
+	_, err = a.RiderDeliver(ctx, solo.Delivery.ID, s.rider2, 0)
+	noErr(t, err)
+	_, err = a.SetDuty(ctx, s.rider2, false, "")
+	noErr(t, err)
+	_, err = a.AdvanceTrips(ctx)
+	noErr(t, err)
+	det, err = a.RiderDetail(ctx, s.branchID, s.rider2, today, today)
+	noErr(t, err)
+	if tp := det.Trips[0]; tp.EndReason != "off_duty" || tp.PlannedM == nil || tp.CompareM == nil || *tp.CompareM*2 < *tp.PlannedM-5 ||
+		*tp.CompareM*2 > *tp.PlannedM+5 || tp.ActualM != nil || tp.OverM != nil {
+		t.Fatalf("ended on the road: %+v", tp)
+	}
+
+	// an order without a position on the map: no planned route
+	blind := s.packed(t, s.rider2)
+	_, err = a.RiderPickup(ctx, blind.Delivery.ID, s.rider2)
+	noErr(t, err)
+	_, err = a.RiderDeliver(ctx, blind.Delivery.ID, s.rider2, 0)
+	noErr(t, err)
+	_, err = a.AdvanceTrips(ctx)
+	noErr(t, err)
+	det, err = a.RiderDetail(ctx, s.branchID, s.rider2, today, today)
+	noErr(t, err)
+	if tp := det.Trips[1]; tp.PlannedM != nil || tp.PlannedSource != "" {
+		t.Fatalf("no position: %+v", tp)
+	}
+}

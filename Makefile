@@ -32,3 +32,4 @@ e2e:
 	node e2e/duty.cjs
 	node e2e/attendance.cjs
 	node e2e/kitchenreport.cjs
+	node e2e/riderreport.cjs
