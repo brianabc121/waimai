@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { money, t } from '../i18n'
 import { useLive } from '../live'
 import { session } from '../session'
-import { chat, connect, day, describeChat, lastLine, listen, storeChat, storeChatRead, storeChats, type ChatThread, type StoreChat } from '../chat'
+import { addQuickReply, chat, chatCustomerOfOrder, chatSetup, connect, day, deleteQuickReply, describeChat, lastLine, listen, setAutoReply, storeChat, storeChatRead, storeChats, type ChatOrder, type ChatSetup, type ChatThread, type StoreChat } from '../chat'
 import ChatPane from './chat/ChatPane.vue'
 
 const route = useRoute(), router = useRouter()
@@ -44,8 +44,46 @@ async function activity() {
   void live.refreshNow()
 }
 
+// ---- quick replies and the automatic answer ----
+const pane = ref<{ put: (text: string) => void } | null>(null)
+const setup = ref<ChatSetup | null>(null), managing = ref(false), newQuick = ref(''), setupError = ref('')
+const auto = reactive({ on: true, text: '' })
+const manager = computed(() => ['owner', 'manager'].includes(session.user?.roles.find(r => r.branch_id === bid)?.role ?? ''))
+async function loadSetup() {
+  try { setup.value = await chatSetup(bid); auto.on = setup.value.auto_reply_on; auto.text = setup.value.auto_reply } catch { /* the page works without them */ }
+}
+const quickDefaults = () => [t('ch.q1'), t('ch.q2'), t('ch.q3'), t('ch.q4')]
+async function addQuick(text: string) {
+  setupError.value = ''
+  try { setup.value!.quick_replies.push(await addQuickReply(bid, text)); newQuick.value = '' } catch (e) { setupError.value = (e as Error).message }
+}
+async function addDefaults() { for (const q of quickDefaults()) await addQuick(q) }
+async function removeQuick(id: number) {
+  setupError.value = ''
+  try { await deleteQuickReply(bid, id); setup.value!.quick_replies = setup.value!.quick_replies.filter(q => q.id !== id) } catch (e) { setupError.value = (e as Error).message }
+}
+async function saveAuto() {
+  setupError.value = ''
+  try { await setAutoReply(bid, auto.on, auto.text); managing.value = false } catch (e) { setupError.value = (e as Error).message }
+}
+function openOrder(o: ChatOrder) { void router.push({ path: '/merchant/orders', query: { order: o.id } }) }
+
+// "message the customer" on the order desk leads here with ?order=<id>
+async function fromOrder(orderId: number) {
+  try {
+    const r = await chatCustomerOfOrder(bid, orderId)
+    await router.replace({ query: { c: r.customer_id } })
+  } catch (e) {
+    const code = (e as { code?: string }).code ?? ''
+    error.value = code === 'CHAT_NO_ACCOUNT' ? describeChat(code) : code === 'NOT_FOUND' ? t('not_found') : (e as Error).message
+    await router.replace({ query: {} })
+  }
+}
+
 let stop = () => {}
 onMounted(async () => {
+  void loadSetup()
+  if (Number(route.query.order)) void fromOrder(Number(route.query.order))
   stop = listen(() => void live.refreshNow())
   try { await connect(bid) } catch (e) {
     const code = (e as { code?: string }).code
@@ -93,8 +131,16 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
           <b data-testid="chat-with">{{ name(current) }} · {{ t('ch.tail', { n: current.phone_tail ?? '' }) }}</b>
           <span class="small muted">{{ t('ch.orders_here', { n: current.order_count }) }}</span>
         </header>
-        <ChatPane :key="current.peer" :peer="current.peer" self="store" :branch-id="bid" :staff="me" :peer-read-at="peerReadAt"
-          :blocked="blocked" desk @seen="seen" @activity="activity" />
+        <ChatPane ref="pane" :key="current.peer" :peer="current.peer" self="store" :branch-id="bid" :staff="me" :peer-read-at="peerReadAt"
+          :blocked="blocked" desk :upload-path="`/merchant/branches/${bid}/chats/${current.customer_id}/images`" :orders="current.orders"
+          @seen="seen" @activity="activity" @order="openOrder">
+          <template #above>
+            <div v-if="setup && !blocked" class="ms-quick" data-testid="chat-quick">
+              <button v-for="q in setup.quick_replies" :key="q.id" type="button" data-testid="chat-quick-item" @click="pane?.put(q.body)">{{ q.body }}</button>
+              <button type="button" class="more" data-testid="chat-quick-manage" @click="managing = true">{{ t(setup.quick_replies.length ? 'ch.quick_manage' : 'ch.quick') }}</button>
+            </div>
+          </template>
+        </ChatPane>
       </template>
     </section>
 
@@ -112,10 +158,35 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
       <div v-if="!current.orders.length" class="small muted">{{ t('ch.no_orders') }}</div>
       <div v-for="o in current.orders" :key="o.id" class="small" data-testid="chat-order">#{{ o.public_no }} · {{ day(o.created_at) }} · {{ money(o.total, o.currency) }} · {{ t('s.' + o.status) }}</div>
     </aside>
+
+    <div v-if="managing && setup" class="sheet-mask" data-testid="chat-setup" @click.self="managing = false">
+      <div class="sheet ms-setup">
+        <div class="sheet-head row between"><b>{{ t('ch.quick') }}</b><button class="btn link" @click="managing = false">{{ t('close') }}</button></div>
+        <div class="ms-setup-body">
+          <div v-if="setupError" class="banner bad">{{ setupError }}</div>
+          <p v-if="!setup.quick_replies.length" class="small muted">{{ t('ch.quick_none') }} <button class="btn link small" data-testid="chat-quick-defaults" @click="addDefaults">{{ t('ch.quick_defaults') }}</button></p>
+          <div v-for="q in setup.quick_replies" :key="q.id" class="ms-q"><span>{{ q.body }}</span><button class="btn link small bad" :aria-label="t('delete')" data-testid="chat-quick-del" @click="removeQuick(q.id)">×</button></div>
+          <form class="ms-q" @submit.prevent="newQuick.trim() && addQuick(newQuick)">
+            <input v-model="newQuick" maxlength="200" :placeholder="t('ch.quick_add')" data-testid="chat-quick-new" /><button class="btn small" :disabled="!newQuick.trim()" data-testid="chat-quick-add">{{ t('ch.add') }}</button>
+          </form>
+          <h4>{{ t('ch.auto_title') }}</h4>
+          <p class="small muted">{{ t('ch.auto_hint') }}<template v-if="!manager"> {{ t('ch.auto_manager') }}</template></p>
+          <label class="row" style="gap:8px"><input v-model="auto.on" type="checkbox" :disabled="!manager" data-testid="chat-auto-on" /> {{ t('ch.auto_title') }}</label>
+          <textarea v-model="auto.text" rows="2" maxlength="200" :disabled="!manager || !auto.on" :placeholder="t('ch.auto_placeholder')" data-testid="chat-auto-text"></textarea>
+          <button v-if="manager" class="btn primary" data-testid="chat-auto-save" @click="saveAuto">{{ t('save') }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style>
+.ms-quick { display: flex; gap: 6px; padding: 6px 12px; background: #fff; border-top: 1px solid #eee; overflow-x: auto; scrollbar-width: none; }
+.ms-quick button { flex: none; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid #d6dae0; border-radius: 14px; background: #fff; padding: 3px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+.ms-quick button.more { border-style: dashed; color: var(--muted); }
+.ms-setup-body { padding: 14px 16px 18px; display: grid; gap: 8px; overflow-y: auto; }
+.ms-setup-body h4 { margin: 10px 0 0; } .ms-setup-body textarea, .ms-q input { font: inherit; padding: 8px 10px; border: 1px solid #d6dae0; border-radius: 8px; width: 100%; }
+.ms-q { display: flex; gap: 8px; align-items: center; } .ms-q span { flex: 1; min-width: 0; overflow-wrap: anywhere; background: #f6f7f8; border-radius: 8px; padding: 6px 10px; }
 .msgs { display: grid; grid-template-columns: 320px minmax(0, 1fr) 240px; height: calc(100dvh - var(--shell-top, 0px)); background: #fff; }
 .ms-list { border-right: 1px solid var(--line); overflow-y: auto; min-width: 0; }
 .ms-search { padding: 12px 12px 6px; } .ms-search input { width: 100%; border: 0; background: #f1f3f5; border-radius: 10px; padding: 9px 12px; font: inherit; }

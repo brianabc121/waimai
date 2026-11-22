@@ -45,7 +45,8 @@ function goBack() { if (window.history.state?.back) router.back(); else void rou
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.6 3.5h2.6l1.3 3.6-1.8 1.4a12 12 0 0 0 5.800 5.800l1.4-1.800 3.600 1.300v2.600a2 2 0 0 1-2.200 2A16.500 16.500 0 0 1 4.600 5.700a2 2 0 0 1 2-2.200z" /></svg></a></span>
     </header>
     <div v-if="error" class="banner bad" style="margin:12px">{{ error }}</div>
-    <ChatPane v-if="info" :peer="info.peer" self="customer" :peer-read-at="info.peer_read_at" :blocked="blocked" @seen="seen">
+    <ChatPane v-if="info" :peer="info.peer" self="customer" :peer-read-at="info.peer_read_at" :blocked="blocked"
+      :upload-path="`/customer/chats/${slug}/images`" :orders="info.orders" @seen="seen" @order="o => o.token && router.push(`/o/${o.token}`)">
       <template #top>
         <div class="ch-tip" data-testid="chat-privacy">{{ t('ch.privacy') }}</div>
         <div v-if="!info.open_now" class="ch-tip warn" data-testid="chat-closed-note">{{ t('ch.closed_note') }}</div>

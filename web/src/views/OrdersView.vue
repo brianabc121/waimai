@@ -9,6 +9,11 @@ import { contactApps, contactName, contactPhone } from '../addresses'
 import './work/strings'
 import '../orders'
 import TotalsTable from './TotalsTable.vue'
+import { chatEnabled } from '../chat'
+
+// "message the customer" shows only where chat is set up
+const chatOn = ref(false)
+void chatEnabled().then(v => { chatOn.value = v })
 
 const bid = session.branchId!
 const scope = ref<'active' | 'history'>('active')
@@ -184,6 +189,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
           <div>
             <div class="muted small">{{ t('customer') }}</div>
             <div data-testid="order-contact">{{ contactName(selected) }} · <a :href="'tel:' + contactPhone(selected)">{{ contactPhone(selected) }}</a>
+              <router-link v-if="chatOn && selected.service_type !== 'dine_in'" class="btn link small" style="margin-left:6px" data-testid="order-chat" :to="{ path: '/merchant/messages', query: { order: selected.id } }">{{ t('ch.contact_customer') }}</router-link>
               <span v-if="selected.contact_phone && selected.contact_phone !== selected.customer_phone" class="small muted"> · {{ t('oc.ordered_by') }} {{ selected.customer_phone }}</span></div>
             <div v-if="contactApps(selected).length" class="small" data-testid="order-im">
               <span v-for="(c, i) in contactApps(selected)" :key="c.field"><template v-if="i"> · </template>{{ c.label }} <b>{{ c.value }}</b></span></div>

@@ -32,7 +32,7 @@ interface Row {
   id: number; branch_id: number; slug: string; store_name: string; merchant: string; customer_id: number; customer: string; phone: string; phone_tail: string
   last_kind: string; last_text: string; last_sender: string; last_at: string; count: number; order: Tag | null; muted: boolean; chat_enabled: boolean
 }
-interface Line { id: number; sender: 'customer' | 'store' | 'system'; staff?: string; kind: string; body: string; sent_at: string }
+interface Line { id: number; sender: 'customer' | 'store' | 'system'; staff?: string; kind: string; body: string; order_no: string; sent_at: string }
 interface Order { id: number; public_no: string; status: string; total: number; currency: string; created_at: string }
 interface Detail extends Row { started_at: string; messages: Line[]; orders: Order[] }
 
@@ -127,8 +127,10 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
         <div class="ax-msgs" data-testid="ax-messages">
           <button v-if="more" class="btn link small" style="align-self:center" data-testid="ax-earlier" @click="earlier">{{ t('ax.earlier') }}</button>
           <div v-for="m in detail.messages" :key="m.id" class="ax-msg" :class="m.sender" data-testid="ax-msg" :data-sender="m.sender">
-            <div class="bub"><span v-if="m.kind === 'text' || m.kind === 'system'">{{ m.body }}</span><span v-else class="muted">{{ m.kind === 'image' ? t('ax.image') : t('ax.order') }}</span>
-              <em>{{ m.sender === 'store' ? t('ax.from_store') + (m.staff ? ' · ' + m.staff : '') : t('ax.from_customer') }} · {{ fmtDateTime(m.sent_at) }}</em></div>
+            <div class="bub"><span v-if="m.kind === 'text' || m.kind === 'system'">{{ m.body }}</span>
+              <a v-else-if="m.kind === 'image'" :href="m.body" target="_blank" rel="noopener" data-testid="ax-image"><img :src="m.body" alt="" /></a>
+              <span v-else data-testid="ax-order">{{ t('ax.order') }} #{{ m.order_no }}</span>
+              <em>{{ m.sender === 'store' ? t('ax.from_store') + ' · ' + (m.staff || t('ch.auto')) : t('ax.from_customer') }} · {{ fmtDateTime(m.sent_at) }}</em></div>
           </div>
         </div>
         <div class="ax-note">{{ t('ax.note') }}</div>
@@ -155,6 +157,7 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
 </template>
 
 <style>
+.ax-msg .bub img { display: block; max-width: 220px; max-height: 260px; border-radius: 8px; }
 .axc { display: grid; grid-template-columns: 380px minmax(0, 1fr) 250px; height: calc(100dvh - 52px); background: #fff; }
 .ax-list { border-right: 1px solid var(--line); overflow-y: auto; min-width: 0; }
 .ax-search { padding: 12px 12px 6px; } .ax-search input { width: 100%; border: 0; background: #f1f3f5; border-radius: 10px; padding: 9px 12px; font: inherit; }

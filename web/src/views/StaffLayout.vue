@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { get, post } from '../api'
 import { locale, setLocale, t } from '../i18n'
 import { currentRole, logout, session, setAdminView, setBranch } from '../session'
 import { useShell } from '../shell'
 import { storeChats } from '../chat'
 
-const router = useRouter()
+const router = useRouter(), route = useRoute()
 const shell = useShell('store')
 const role = computed(() => currentRole()?.role ?? '')
 const desk = computed(() => ['owner', 'manager', 'cashier'].includes(role.value))
@@ -23,15 +23,32 @@ async function toggleShift() {
   shift.value = await post<{ on_duty: boolean }>('/work/shift', { on_duty: !shift.value.on_duty, branch_id: session.branchId }).catch(() => shift.value)
 }
 
-// The number on "messages": customers' chat messages nobody at the desk has read.
-const chatUnread = ref(0)
-let chatTimer = 0
+// The number on "messages": customers' chat messages nobody at the desk has
+// read. When it grows while another page is open, a line across the top says
+// so (with a soft tone, unless the order sound is switched off).
+const chatUnread = ref(0), chatNew = ref(false)
+let chatTimer = 0, chatKnown = -1, chatSoon = 0
+function tone() {
+  if (localStorage.getItem('order-sound') === 'off') return
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const o = ctx.createOscillator(), g = ctx.createGain()
+    o.frequency.value = 660; o.connect(g); g.connect(ctx.destination)
+    g.gain.setValueAtTime(0.2, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35)
+    o.start(); o.stop(ctx.currentTime + 0.4)
+  } catch { /* no sound on this device */ }
+}
 async function countChats() {
   if (!desk.value || !session.branchId || document.visibilityState !== 'visible') return
-  chatUnread.value = await storeChats(session.branchId, { unread: true }).then(r => r.unread, () => chatUnread.value)
+  const n = await storeChats(session.branchId, { unread: true }).then(r => r.unread, () => chatUnread.value)
+  if (chatKnown >= 0 && n > chatKnown && route.path !== '/merchant/messages') { chatNew.value = true; tone() }
+  if (!n) chatNew.value = false
+  chatKnown = chatUnread.value = n
 }
-onMounted(() => { void countChats(); chatTimer = window.setInterval(countChats, 20000) })
-onBeforeUnmount(() => clearInterval(chatTimer))
+const countSoon = () => { clearTimeout(chatSoon); chatSoon = window.setTimeout(countChats, 400) }
+onMounted(() => { void countChats(); chatTimer = window.setInterval(countChats, 20000); window.addEventListener('live-refresh', countSoon) })
+onBeforeUnmount(() => { clearInterval(chatTimer); clearTimeout(chatSoon); window.removeEventListener('live-refresh', countSoon) })
+watch(() => route.path, p => { if (p === '/merchant/messages') chatNew.value = false })
 
 async function out() { await logout(); session.loaded = true; router.replace('/login') }
 const viewing = computed(() => !!session.user?.is_platform_admin)
@@ -84,6 +101,9 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
       </div>
     </nav>
     <main class="shell-main">
+      <div v-if="chatNew" class="chat-toast" data-testid="chat-toast"><span>{{ t('ch.new_msg') }}</span>
+        <router-link to="/merchant/messages" @click="chatNew = false">{{ t('ch.new_msg_go') }}</router-link>
+        <button :aria-label="t('close')" @click="chatNew = false">×</button></div>
       <div v-if="viewing" class="banner info no-print" style="border-radius:0" data-testid="admin-viewing">
         {{ t('admin_viewing') }} <button class="btn small" style="margin-left:8px" @click="backToAdmin">{{ t('admin_back') }}</button></div>
       <div v-if="!session.branchId" class="page"><div class="banner warn">{{ t('not_found') }}</div></div>

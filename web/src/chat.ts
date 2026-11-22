@@ -3,7 +3,8 @@
 // is the only place that touches its SDK. The lists and the unread counts
 // come from this system's own API.
 import { reactive } from 'vue'
-import { ApiError, get, post } from './api'
+import { ApiError, del, get, post, put, upload } from './api'
+import { shrink } from './photo'
 import { extend, t } from './i18n'
 
 export interface ChatLogin { user_id: string; token: string; ws_url: string; api_url: string; platform_id: number }
@@ -13,18 +14,25 @@ export interface ChatThread {
   peer: string; last_kind: string; last_text: string; last_sender: 'customer' | 'store' | 'system'; last_at: string
   unread: number; count: number; peer_read_at: string | null; order: OrderTag | null
 }
-export interface ChatOrder { id: number; public_no: string; status: string; service_type: string; total: number; currency: string; created_at: string; open: boolean }
+export interface ChatOrder { id: number; public_no: string; status: string; service_type: string; total: number; currency: string; created_at: string; open: boolean; token?: string }
 export interface CustomerChat {
   branch_id: number; slug: string; store_name: string; store_name_en: string; phone: string; open_now: boolean; open_time: string
-  peer: string; enabled: boolean; muted: boolean; thread_id: number; peer_read_at: string | null
+  peer: string; enabled: boolean; muted: boolean; thread_id: number; peer_read_at: string | null; orders: ChatOrder[]
 }
 export interface StoreChat extends ChatThread { phone_masked: string; orders: ChatOrder[]; order_count: number }
 
 // One message as the pages show it.
 export interface ChatMsg {
-  id: string; mine: boolean; kind: 'text' | 'other'; text: string; at: number
+  id: string; mine: boolean; kind: 'text' | 'image' | 'order' | 'other'; text: string; at: number
   state: 'sent' | 'sending' | 'failed'; staff?: string; error?: string
+  image?: string   // the picture's address
+  orderId?: number
+  auto?: boolean   // the answer a closed store gives by itself
+  retry?: () => Promise<ChatMsg>   // how a picture or a card that failed is sent again
 }
+export interface QuickReply { id: number; body: string }
+export interface ChatSetup { quick_replies: QuickReply[]; auto_reply_on: boolean; auto_reply: string }
+export const chatImageUrl = (token: string) => `/api/v1/chat-images/${token}`
 
 // ---- this system's API ----
 export const customerChats = () => get<{ chats: ChatThread[]; enabled: boolean }>('/customer/chats')
@@ -34,6 +42,11 @@ export const customerUnread = () => get<{ chats: number; notices: number; total:
 export const storeChats = (bid: number, q: { q?: string; unread?: boolean; active?: boolean } = {}) =>
   get<{ chats: ChatThread[]; unread: number; enabled: boolean }>(`/merchant/branches/${bid}/chats?q=${encodeURIComponent(q.q ?? '')}&unread=${q.unread ? 1 : ''}&active=${q.active ? 1 : ''}`)
 export const storeChat = (bid: number, customerId: number) => get<StoreChat>(`/merchant/branches/${bid}/chats/${customerId}`)
+export const chatSetup = (bid: number) => get<ChatSetup>(`/merchant/branches/${bid}/chat-setup`)
+export const addQuickReply = (bid: number, body: string) => post<QuickReply>(`/merchant/branches/${bid}/chat-quick-replies`, { body })
+export const deleteQuickReply = (bid: number, id: number) => del(`/merchant/branches/${bid}/chat-quick-replies/${id}`)
+export const setAutoReply = (bid: number, on: boolean, text: string) => put(`/merchant/branches/${bid}/chat-auto-reply`, { on, text })
+export const chatCustomerOfOrder = (bid: number, orderId: number) => get<{ customer_id: number }>(`/merchant/branches/${bid}/chat-order/${orderId}`)
 export const storeChatRead = (bid: number, customerId: number) => post(`/merchant/branches/${bid}/chats/${customerId}/read`)
 
 // chatOn says whether this installation has chat at all (the entry points hide without it).
@@ -61,13 +74,22 @@ function absolute(u: string, ws: boolean): string {
 
 // toMsg turns the SDK's message into ours. What is not a text shows as a placeholder.
 function toMsg(m: any, self: string): ChatMsg {
-  let staff = ''
-  try { staff = JSON.parse(m.ex || '{}').name ?? '' } catch { /* no extra */ }
-  const text = m.contentType === 101
-  return {
-    id: m.clientMsgID, mine: m.sendID === self, kind: text ? 'text' : 'other', text: text ? (m.textElem?.content ?? '') : '',
-    at: m.sendTime || m.createTime || Date.now(), state: m.status === 3 ? 'failed' : 'sent', staff,
+  let staff = '', auto = false
+  try { const ex = JSON.parse(m.ex || '{}'); staff = ex.name ?? ''; auto = !!ex.auto } catch { /* no extra */ }
+  const out: ChatMsg = {
+    id: m.clientMsgID, mine: m.sendID === self, kind: 'other', text: '',
+    at: m.sendTime || m.createTime || Date.now(), state: m.status === 3 ? 'failed' : 'sent', staff, auto,
   }
+  if (m.contentType === 101) { out.kind = 'text'; out.text = m.textElem?.content ?? '' }
+  else if (m.contentType === 110) {
+    // this system's own cards: a picture uploaded here, or an order
+    try {
+      const card = JSON.parse(m.customElem?.data || '{}')
+      if (card.t === 'image' && /^[0-9a-f]+$/.test(card.token ?? '')) { out.kind = 'image'; out.image = chatImageUrl(card.token) }
+      else if (card.t === 'order' && Number(card.order) > 0) { out.kind = 'order'; out.orderId = Number(card.order) }
+    } catch { /* shown as "cannot be shown" */ }
+  }
+  return out
 }
 
 async function open(loginPath: string): Promise<Sdk> {
@@ -165,6 +187,30 @@ export async function sendText(branchId: number | undefined, peer: string, text:
   } catch (e) { throw chatError(e) }
 }
 
+async function sendCard(branchId: number | undefined, peer: string, card: object, extra?: { uid: number; name: string }): Promise<ChatMsg> {
+  const s = await connect(branchId)
+  try {
+    const m = (await s.createCustomMessage({ data: JSON.stringify(card), extension: '', description: '' })).data
+    if (extra) m.ex = JSON.stringify(extra)
+    const sent = (await s.sendMessage({ recvID: peer, groupID: '', message: m })).data
+    return toMsg({ ...m, ...sent, ex: m.ex }, chat.user)
+  } catch (e) { throw chatError(e) }
+}
+
+// sendImage shrinks a picture, uploads it to this system (uploadPath is the
+// conversation's own address for that) and sends its token as a card.
+export async function sendImage(branchId: number | undefined, peer: string, uploadPath: string, file: File, extra?: { uid: number; name: string }): Promise<ChatMsg> {
+  let token: string
+  try { token = (await upload<{ token: string }>(uploadPath, await shrink(file))).token } catch (e) {
+    if (e instanceof ApiError) throw new ApiError(e.status, e.code, describeChat(e.code === 'FILE_TOO_LARGE' || e.code === 'VALIDATION' ? 'BAD_IMAGE' : e.code))
+    throw new ApiError(0, 'BAD_IMAGE', describeChat('BAD_IMAGE'))
+  }
+  return sendCard(branchId, peer, { t: 'image', token }, extra)
+}
+
+export const sendOrder = (branchId: number | undefined, peer: string, orderId: number, extra?: { uid: number; name: string }) =>
+  sendCard(branchId, peer, { t: 'order', order: orderId }, extra)
+
 // ---- words ----
 export function clock(at: number | string): string {
   const d = new Date(at), now = new Date()
@@ -209,6 +255,19 @@ extend({
   'ch.err_VALIDATION': ['这条消息发不了（太长或格式不支持）', 'This message cannot be sent (too long or not supported)'],
   'ch.err_FORBIDDEN': ['你没有回复顾客的权限', 'You are not allowed to answer customers'],
   'ch.err_NOT_FOUND': ['找不到对方', 'The other side was not found'],
+  'ch.err_BAD_IMAGE': ['这张图片发不了，请换一张（支持常见照片格式）', 'This picture cannot be sent. Try another one.'],
+  'ch.err_CHAT_NO_ACCOUNT': ['这位顾客下单时没有登录账号，不能发消息，请打电话', 'This customer ordered without an account. Please call instead.'],
+  'ch.pic': ['发图片', 'Send a picture'], 'ch.send_order': ['发订单', 'Send an order'], 'ch.pick_order': ['选择要发送的订单', 'Choose an order to send'],
+  'ch.no_orders_here': ['在这家店还没有订单', 'No orders with this store yet'], 'ch.order_card': ['订单 #{no}', 'Order #{no}'], 'ch.order_gone': ['订单', 'Order'],
+  'ch.view_order': ['查看订单 ›', 'View order ›'], 'ch.auto': ['自动回复', 'Automatic reply'],
+  'ch.quick': ['快捷回复', 'Quick replies'], 'ch.quick_manage': ['设置', 'Manage'], 'ch.quick_add': ['添加一条快捷回复', 'Add a quick reply'], 'ch.quick_none': ['还没有快捷回复。把常说的话加进来，回复时点一下就能填好。', 'No quick replies yet. Add what you say often and fill it in with one tap.'],
+  'ch.quick_defaults': ['加入几条常用的', 'Add some common ones'], 'ch.auto_title': ['打烊自动回复', 'Automatic reply while closed'],
+  'ch.auto_hint': ['不在营业时间收到顾客消息时，自动回这一句（同一位顾客 6 小时内只回一次）。', 'Sent when a customer writes outside opening hours (once in 6 hours per customer).'],
+  'ch.auto_placeholder': ['留空就用默认的：现在不在营业时间，营业后会尽快回复您。', 'Leave empty for the standard sentence.'], 'ch.auto_manager': ['只有店长能改', 'Only a manager can change this'],
+  'ch.new_msg': ['有新的顾客消息', 'New message from a customer'], 'ch.new_msg_go': ['去查看', 'Open'],
+  'ch.add': ['添加', 'Add'],
+  'ch.q1': ['您好，已经收到您的消息，马上为您处理。', 'Hello, we got your message and are on it.'], 'ch.q2': ['您的餐正在制作中，请稍等。', 'Your order is being prepared.'],
+  'ch.q3': ['骑手已经出发，很快送到。', 'The rider is on the way.'], 'ch.q4': ['不好意思让您久等了。', 'Sorry to keep you waiting.'],
   // the store's side
   'ch.nav': ['消息', 'Messages'], 'ch.search': ['搜索顾客、手机尾号、订单号', 'Search name, phone ending, order no.'],
   'ch.f_all': ['全部', 'All'], 'ch.f_unread': ['未读', 'Unread'], 'ch.f_active': ['进行中订单', 'Open orders'],
