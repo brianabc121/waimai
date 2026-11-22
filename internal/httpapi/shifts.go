@@ -47,6 +47,17 @@ func (s *Server) setShift(c *gin.Context) {
 	c.JSON(200, st)
 }
 
+// myAttendance is the signed-in person's own shifts in one month.
+func (s *Server) myAttendance(c *gin.Context) {
+	bid, _ := strconv.ParseInt(c.Query("branch_id"), 10, 64)
+	out, err := s.App.MyAttendance(c, currentUser(c), bid, c.Query("month"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, out)
+}
+
 func (s *Server) attendance(c *gin.Context) {
 	bid, ok := branchScope(c, managerRoles)
 	if !ok {
@@ -55,6 +66,10 @@ func (s *Server) attendance(c *gin.Context) {
 	out, err := s.App.Attendance(c, bid, c.Query("from"), c.Query("to"))
 	if err != nil {
 		fail(c, err)
+		return
+	}
+	if wantsXLSX(c) {
+		attendanceXLSX(c, out)
 		return
 	}
 	c.JSON(200, out)
@@ -106,6 +121,15 @@ func (s *Server) kitchenReport(c *gin.Context) {
 		fail(c, err)
 		return
 	}
+	if wantsXLSX(c) {
+		dishes, err := s.App.KitchenDishes(c, bid, c.Query("from"), c.Query("to"))
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		kitchenXLSX(c, out, dishes)
+		return
+	}
 	c.JSON(200, out)
 }
 
@@ -148,6 +172,15 @@ func (s *Server) riderReport(c *gin.Context) {
 	out, err := s.App.RiderReport(c, bid, c.Query("from"), c.Query("to"))
 	if err != nil {
 		fail(c, err)
+		return
+	}
+	if wantsXLSX(c) {
+		trips, err := s.App.TripsInPeriod(c, bid, c.Query("from"), c.Query("to"))
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		ridersXLSX(c, out, trips)
 		return
 	}
 	c.JSON(200, out)

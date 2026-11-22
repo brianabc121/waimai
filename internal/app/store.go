@@ -31,7 +31,11 @@ type Branch struct {
 	NotifySMS            bool   `json:"notify_sms"`
 	SchedulingEnabled    bool   `json:"scheduling_enabled"`
 	PrepMinutes          int    `json:"prep_minutes"`
-	OpenNow              bool   `json:"open_now"`
+	// What the work summaries count as a slow dish and as a detour.
+	KitchenSlowMinutes int  `json:"kitchen_slow_minutes"`
+	DetourPercent      int  `json:"detour_percent"`
+	DetourMeters       int  `json:"detour_meters"`
+	OpenNow            bool `json:"open_now"`
 	// Lat/Lng is where the store is, set on the delivery map page.
 	Lat *float64 `json:"lat"`
 	Lng *float64 `json:"lng"`
@@ -122,7 +126,7 @@ func (b *Branch) checkSchedule(now, at time.Time) error {
 const branchCols = `id, merchant_id, slug, name, name_en, address, phone, timezone, currency, tax_rate_bp,
 	tax_inclusive, service_charge_bp, packaging_fee, min_order_amount, accept_timeout_minutes,
 	delivery_enabled, pickup_enabled, paused, open_time, close_time, notify_sms, scheduling_enabled, prep_minutes,
-	lat, lng, zone_mode, zone_tolerance_m,
+	lat, lng, zone_mode, zone_tolerance_m, kitchen_slow_minutes, detour_percent, detour_meters,
 	(SELECT m.status = 'suspended' FROM merchants m WHERE m.id = branches.merchant_id)`
 
 func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
@@ -130,7 +134,8 @@ func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 	err := row.Scan(&b.ID, &b.MerchantID, &b.Slug, &b.Name, &b.NameEn, &b.Address, &b.Phone, &b.Timezone,
 		&b.Currency, &b.TaxRateBP, &b.TaxInclusive, &b.ServiceChargeBP, &b.PackagingFee, &b.MinOrderAmount,
 		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime, &b.NotifySMS,
-		&b.SchedulingEnabled, &b.PrepMinutes, &b.Lat, &b.Lng, &b.ZoneMode, &b.ZoneToleranceM, &b.Suspended)
+		&b.SchedulingEnabled, &b.PrepMinutes, &b.Lat, &b.Lng, &b.ZoneMode, &b.ZoneToleranceM,
+		&b.KitchenSlowMinutes, &b.DetourPercent, &b.DetourMeters, &b.Suspended)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, ErrNotFound

@@ -65,7 +65,7 @@ extend({
   'kr.via.work': ['手机工作台', 'Own workbench'], 'kr.via.board': ['后厨大屏（{name} 登录）', 'Kitchen screen ({name} signed in)'], 'kr.via.unknown': ['后台或来源不明', 'Back office or unknown'],
   'weekday.0': ['周日', 'Sun'], 'weekday.1': ['周一', 'Mon'], 'weekday.2': ['周二', 'Tue'], 'weekday.3': ['周三', 'Wed'], 'weekday.4': ['周四', 'Thu'], 'weekday.5': ['周五', 'Fri'], 'weekday.6': ['周六', 'Sat'],
   'att.today': ['今天', 'Today'], 'att.by_day': ['按天', 'By day'], 'att.by_month': ['按月', 'By month'],
-  'att.add': ['补一条记录', 'Add a shift'],
+  'att.add': ['补一条记录', 'Add a shift'], 'att.export': ['导出 Excel', 'Export to Excel'],
   'att.k.worked': ['这一天上过班', 'Worked this day'], 'att.k.worked_of': ['人 / 在职 {n} 人', 'of {n} active'],
   'att.k.absent': ['没有记录：{names}', 'No record: {names}'], 'att.k.all_in': ['在职的人都有记录', 'Everyone has a record'],
   'att.k.on_now': ['现在在岗', 'At work now'], 'att.k.people': ['人', ''],
