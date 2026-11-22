@@ -14,7 +14,6 @@ var maps = [];
 function mapBox(id, h, inner) { return '<div class="map" style="height:' + h + '"><svg class="base" id="' + id + '"></svg>' + (inner || '') + '<div class="attrib">示意底图 · 正式版使用 Google 地图</div></div>'; }
 function drawMap(id, view, at, color) { maps.push(function () {
   var svg = document.getElementById(id); baseMap(svg, view);
-  ZONES.slice().reverse().forEach(function (z) { drawZone(svg, z, { label: false }); });
   pin(svg, STORE, { text: '马卡蒂小馆' }); pin(svg, at, { color: color, icon: 'dot', lift: true });
 }); }
 function phone(body, cap) { return '<div><div class="phone">' + body + '</div><div class="caption">' + cap + '</div></div>'; }
@@ -35,7 +34,7 @@ function login(sent) {
 var ITEMS = [['🍜', '#ffe8cc', '招牌牛肉面', '大份 · 加辣', 1, 268], ['🥟', '#e3f2e1', '鲜肉煎饺', '6 个', 2, 240], ['🥤', '#e0ecff', '冻柠茶', '少冰', 1, 85]];
 function addrCard(sel, pickup) {
   var top = sel
-    ? '<div class="addr row"><div class="grow"><div class="row" style="gap:6px"><span class="tag brand">家</span><b style="font-size:17px">Trump Tower at Century City</b></div><div class="small" style="margin-top:3px">40 楼 4001 · Kalayaan Ave, Makati</div><div class="small muted num">陈先生 +63 917 555 0123</div><div style="margin-top:6px"><span class="tag ok">可配送 · 波布拉西翁 / Rockwell</span></div></div><span class="chev">›</span></div>'
+    ? '<div class="addr row"><div class="grow"><div class="row" style="gap:6px"><span class="tag brand">家</span><b style="font-size:17px">Trump Tower at Century City</b></div><div class="small" style="margin-top:3px">40 楼 4001 · Kalayaan Ave, Makati</div><div class="small muted num">陈先生 +63 917 555 0123</div><div style="margin-top:6px"><span class="tag ok">可配送 · 配送费 ₱69</span></div></div><span class="chev">›</span></div>'
     : '<div class="addr row between"><span class="pick">选择收货地址</span><span class="chev">›</span></div>';
   return '<div class="card">' + top +
     '<div class="opt' + (sel ? ' on' : '') + '"><b>立即配送</b><span class="v">' + (sel ? '约 35 分钟送达' : '请选择地址') + '</span></div>' +
@@ -63,8 +62,8 @@ function checkout(sel) {
 var ADDRS = [
   ['on', '家', 'Trump Tower at Century City', '门牌号：40 楼 4001', '陈先生 +63 917 555 0123', '<span class="tag ok">可配送 · 配送费 ₱69</span>'],
   ['', '公司', 'Ayala Tower One', '门牌号：12 楼 1203', '陈先生 +63 917 555 0123', '<span class="tag ok">可配送 · 配送费 ₱49</span>'],
-  ['', '', 'One Rockwell East Tower', '门牌号：大堂前台', 'Brian +63 917 555 0123', '<span class="tag warn">边界附近 · 按“波布拉西翁 / Rockwell”配送 ₱69</span>'],
-  ['no', '学校', '2658 Tramo St, Pasay', '门牌号：Brgy 51', 'Brian +63 966 802 9171', '<span class="tag bad">不在本店配送范围 · 距最近配送区约 2.1 公里</span>']
+  ['', '', 'One Rockwell East Tower', '门牌号：大堂前台', 'Brian +63 917 555 0123', '<span class="tag ok">可配送 · 配送费 ₱69</span>'],
+  ['no', '学校', '2658 Tramo St, Pasay', '门牌号：Brgy 51', 'Brian +63 966 802 9171', '<span class="tag bad">不在本店配送范围</span>']
 ];
 function addrRows() {
   return ADDRS.map(function (a) {
@@ -81,7 +80,7 @@ function formBody(filled, noPhoto) {
   return '<div class="card" style="padding:4px 14px">' +
     '<div class="frow"><span class="l">收货人</span><div class="grow">' + (f ? '陈' : '<span class="ph">请输入收货人称呼</span>') + '<div class="row small" style="margin-top:10px;gap:6px"><span class="ck on">✓</span>先生 <span class="ck" style="margin-left:14px"></span>女士</div></div></div>' +
     '<div class="frow"><span class="l">联系电话</span><div class="grow num"><b style="font-weight:600">+63</b>&nbsp; 917 555 0123<div class="hint">默认用登录的手机号，可以改成别人的</div></div></div>' +
-    '<div class="frow"><span class="l">收货地址</span><div class="grow">' + (f ? '<b>Trump Tower at Century City</b><div class="small muted">Kalayaan Ave, Makati, Metro Manila</div><div style="margin-top:4px"><span class="tag ok">可配送 · 波布拉西翁 / Rockwell</span></div>' : '<span class="ph">在地图上选择收货地址</span>') + '</div><span class="chev">›</span></div>' +
+    '<div class="frow"><span class="l">收货地址</span><div class="grow">' + (f ? '<b>Trump Tower at Century City</b><div class="small muted">Kalayaan Ave, Makati, Metro Manila</div><div style="margin-top:4px"><span class="tag ok">可配送 · 配送费 ₱69</span></div>' : '<span class="ph">在地图上选择收货地址</span>') + '</div><span class="chev">›</span></div>' +
     '<div class="frow"><span class="l">门牌号</span><div class="grow">' + (f ? '40 楼 4001' : '<span class="ph">楼层、房号（详细地址）</span>') + '</div></div>' +
     '<div class="frow"><span class="l">骑手备注</span><div class="grow">' + (f ? '到了打电话，不要按门铃' : '<span class="ph">（选填）怎么找到你</span>') + '</div></div>' +
     '<div class="frow"><span class="l">微信号</span><div class="grow"><span class="ph">（选填）电话打不通时联系</span></div></div>' +
@@ -111,7 +110,7 @@ function mapPick(mode) {
     drawMap(id, '330 98 480 400', [570, 298], '#1d4ed8');
     h += mapBox(id, '330px', '<div class="bubble" style="top:58px">拖动地图，把图钉对准门口</div><div class="locate">◎</div>') +
       '<div style="background:#fff;flex:1"><div class="srch">🔍 <span class="muted">搜索大楼、街道或地标</span></div>' +
-      '<div class="zonebar ok"><b>可配送 · 波布拉西翁 / Rockwell</b><div class="small muted num">配送费 ₱69 · 起送 ₱300 · 约 35 分钟</div></div>' +
+      '<div class="zonebar ok"><b>这个位置可以配送</b><div class="small muted num">配送费 ₱69 · 起送 ₱300 · 约 35 分钟</div></div>' +
       '<div class="listhd"><span>📍 图钉附近的地址</span><span class="done">完成</span></div>' +
       place('Trump Tower at Century City', 'Kalayaan Ave, Makati · 距图钉 12 米', true) +
       place('Century City Mall', 'Kalayaan Ave cor. Salamanca St, Makati · 60 米') +
@@ -121,7 +120,7 @@ function mapPick(mode) {
     drawMap(id, '20 330 480 400', [185, 570], '#b42318');
     h += mapBox(id, '330px', '<div class="locate">◎</div>') +
       '<div style="background:#fff;flex:1"><div class="srch">🔍 <span class="muted">搜索大楼、街道或地标</span></div>' +
-      '<div class="zonebar bad"><b>这个位置不在本店配送范围</b><div class="small num">离最近的配送区“马卡蒂 CBD”约 600 米。可以把图钉移进彩色范围，或改为到店自取。</div></div>' +
+      '<div class="zonebar bad"><b>这个位置不在本店配送范围</b><div class="small num">可以换一个收货位置，或改为到店自取。</div></div>' +
       '<div class="listhd"><span>📍 图钉附近的地址</span><span class="done">完成</span></div>' +
       place('Cash &amp; Carry Mall', 'Filmore St, Makati · 距图钉 25 米', true) +
       place('Palanan Barangay Hall', 'Dian St, Makati · 140 米') +
@@ -139,14 +138,14 @@ function pc() {
     '<div class="dim" style="top:34px"></div>' +
     '<div class="dialog"><div style="display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--bg)"><div class="bar"><span class="ttl" style="margin:0;text-align:left">新增收货地址</span><span style="font-size:22px;color:#8b919a;font-weight:400">×</span></div><div style="padding:12px;display:grid;gap:10px;font-size:14px">' + formBody(true, true) + '<div class="btn primary">保存地址</div></div></div>' +
     '<div style="display:flex;flex-direction:column;position:relative">' + mapBox('mpc', '330px', '<div class="bubble" style="top:36px">拖动地图，把图钉对准门口</div><div class="locate">◎</div>') +
-    '<div class="srch">🔍 <span class="muted">搜索大楼、街道或地标</span></div><div class="zonebar ok"><b>可配送 · 波布拉西翁 / Rockwell</b> <span class="small muted num">配送费 ₱69 · 起送 ₱300 · 约 35 分钟</span></div>' +
+    '<div class="srch">🔍 <span class="muted">搜索大楼、街道或地标</span></div><div class="zonebar ok"><b>这个位置可以配送</b> <span class="small muted num">配送费 ₱69 · 起送 ₱300 · 约 35 分钟</span></div>' +
     '<div class="listhd"><span>📍 图钉附近的地址</span></div>' + place('Trump Tower at Century City', 'Kalayaan Ave, Makati · 距图钉 12 米', true) + place('Century City Mall', 'Kalayaan Ave cor. Salamanca St, Makati · 60 米') + '</div></div></div>' +
     '<div class="caption" style="max-width:none;margin-bottom:20px"><b>电脑和 iPad 横屏</b>：结算页分两栏；地址表单和地图并排放在一个对话框里，不用来回跳页面</div>';
 }
 
 var s = new URLSearchParams(location.search).get('s') || 'login', html;
 if (s === 'login') html = '<div class="phones">' + phone(login(false), '<b>① 没登录点“去结算”</b>，先到这个页面。只有短信验证码一种方式') + phone(login(true), '<b>② 验证码已发</b>，60 秒后才能重发。填满 6 位自动登录，回到结算页') + '</div>';
-else if (s === 'checkout') html = '<div class="phones">' + phone(checkout(false), '<b>刚登录、还没选地址</b>：配送费等选了地址再算，提交按钮是灰的') + phone(checkout(true), '<b>选好地址</b>：显示所属配送区、配送费和预计时间') + '</div>';
+else if (s === 'checkout') html = '<div class="phones">' + phone(checkout(false), '<b>刚登录、还没选地址</b>：配送费等选了地址再算，提交按钮是灰的') + phone(checkout(true), '<b>选好地址</b>：显示能不能送、配送费和预计时间') + '</div>';
 else if (s === 'address') html = '<div class="phones">' + phone(addrSheet(), '<b>点“选择收货地址”</b>：每个地址都标出这家店能不能送、配送费多少') + phone(form(false), '<b>点“新增收货地址”</b>') + phone(form(true), '<b>从地图选好位置回来</b>') + '</div>';
 else if (s === 'map') html = '<div class="phones">' + phone(mapPick('search'), '<b>方式一：输入地址</b>，边打字边给推荐位置') + phone(mapPick('drag'), '<b>方式二：拖动地图</b>，推荐图钉附近的地址给你选') + phone(mapPick('out'), '<b>图钉在配送范围外</b>') + '</div>';
 else html = pc();
