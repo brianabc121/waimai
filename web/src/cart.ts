@@ -10,9 +10,11 @@ interface CartState { slug: string; service: 'delivery' | 'pickup'; zoneId: numb
   basket: number
   // The delivery pin of stores that locate customers on a map.
   lat: number | null; lng: number | null; placeLabel: string
+  // The saved address this order goes to (logged-in customers).
+  addressId: number | null
   name: string; addressLine: string; addressUnit: string; addressNote: string; note: string }
 
-const empty = (slug: string): CartState => ({ slug, service: 'delivery', zoneId: null, lines: [], basket: 1, lat: null, lng: null, placeLabel: '', name: '', addressLine: '', addressUnit: '', addressNote: '', note: '' })
+const empty = (slug: string): CartState => ({ slug, service: 'delivery', zoneId: null, lines: [], basket: 1, lat: null, lng: null, placeLabel: '', addressId: null, name: '', addressLine: '', addressUnit: '', addressNote: '', note: '' })
 
 export const cart = reactive<CartState>(empty(''))
 

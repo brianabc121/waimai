@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { listAddresses, sorted, usable, whoLine, type Address } from '../addresses'
 import { ApiError, get, newKey, post } from '../api'
 import { clearLines, quoteItems, useCart } from '../cart'
 import { customer, loadCustomer, loginRoute, prettyPhone } from '../customer'
 import { money, pick, t, whenText } from '../i18n'
 import type { Quote, Storefront } from '../types'
 import TotalsTable from './TotalsTable.vue'
+
+const AddressSheet = defineAsyncComponent(() => import('./AddressSheet.vue'))
 
 const props = defineProps<{ slug: string }>()
 const router = useRouter()
@@ -30,6 +33,36 @@ async function loadStore() {
   if (scheduled.value && !slots.value.includes(scheduled.value)) scheduled.value = ''
 }
 
+// A delivery goes to one of the customer's saved addresses. The one used last
+// time on this device stays chosen; otherwise the default, or the first this
+// store delivers to.
+const delivery = computed(() => cart.service === 'delivery')
+const addresses = ref<Address[]>([])
+const address = computed(() => addresses.value.find(a => a.id === cart.addressId && usable(a)) ?? null)
+const showSheet = ref(false), startNew = ref(false)
+const shopPin = computed(() => { const b = store.value?.branch; return b && b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng, name: pick(b.name, b.name_en) } : null })
+function use(a: Address | null) {
+  cart.addressId = a?.id ?? null
+  // The store page shows the same spot.
+  if (a && a.lat != null && a.lng != null) Object.assign(cart, { lat: a.lat, lng: a.lng, placeLabel: a.place_name })
+}
+async function loadAddresses() {
+  if (!delivery.value) return
+  const r = await listAddresses(mapMode.value ? props.slug : undefined).catch(() => null)
+  if (!r) return
+  addresses.value = sorted(r.addresses)
+  if (!address.value) use(addresses.value.find(usable) ?? null)
+  // Nothing saved yet: the first thing to do is to add an address.
+  if (!addresses.value.length) { startNew.value = true; showSheet.value = true }
+}
+function openSheet() { startNew.value = false; showSheet.value = true }
+function chosen(a: Address) { use(a); showSheet.value = false; void requote() }
+function bookChanged(list: Address[]) {
+  addresses.value = list
+  // the chosen address was deleted, or moved to where the store does not deliver: fall back to another
+  if (cart.addressId != null && !address.value) { use(list.find(usable) ?? null); void requote() }
+}
+
 // The idempotency key belongs to one confirmed quote. It is kept across a
 // reload so that a retry after a timeout finds the original order.
 let idemKey = ''
@@ -46,7 +79,8 @@ function describe(e: unknown): string {
   switch (e.code) {
     case 'NETWORK': return t('offline')
     case 'ITEM_UNAVAILABLE': return t('unavailable')
-    case 'OUT_OF_ZONE': return t(mapMode.value ? 'pin_needed' : 'choose_zone')
+    case 'OUT_OF_ZONE': return mapMode.value ? t('ad.cannot') : t('choose_zone')
+    case 'ADDRESS_NOT_FOUND': return t('co.address_gone')
     case 'STORE_CLOSED': return t('closed')
     case 'SCHEDULE_INVALID': return t('schedule_invalid')
     case 'REQUIRED_MISSING': return t('required_missing_named', { names: ((e.details?.categories ?? []) as { name: string; name_en: string }[]).map(c => pick(c.name, c.name_en)).join('、') })
@@ -58,13 +92,15 @@ function describe(e: unknown): string {
 async function requote() {
   error.value = ''
   if (cart.lines.length === 0) { router.replace(`/s/${props.slug}`); return }
+  // Without an address there is nothing to price a delivery for yet.
+  if (delivery.value && !address.value) { quote.value = null; return }
   if (mustSchedule.value && !scheduled.value) { quote.value = null; error.value = slots.value.length ? t('pick_time') : t('closed'); return }
   try {
     quote.value = await post<Quote>(`/stores/${props.slug}/quotes`, {
       service_type: cart.service,
       zone_id: cart.service === 'delivery' ? cart.zoneId : null,
-      // Stores that locate customers on a map decide the area from the pin.
-      ...(cart.service === 'delivery' && mapMode.value ? { lat: cart.lat, lng: cart.lng } : {}),
+      // Stores that locate customers on a map decide the area from the address's pin.
+      address_id: delivery.value ? cart.addressId : null,
       items: quoteItems(),
       scheduled_for: scheduled.value || null,
     })
@@ -74,6 +110,7 @@ async function requote() {
     error.value = describe(e)
     // The offered times move on; fetch fresh ones when the chosen one is gone.
     if (e instanceof ApiError && (e.code === 'SCHEDULE_INVALID' || e.code === 'STORE_CLOSED')) await loadStore()
+    if (e instanceof ApiError && e.code === 'ADDRESS_NOT_FOUND') { use(null); await loadAddresses() }
   }
 }
 
@@ -82,11 +119,11 @@ const toLogin = () => router.replace(loginRoute(`/s/${props.slug}/checkout`, pro
 onMounted(async () => {
   if (!(await loadCustomer(true))) { toLogin(); return }
   await loadStore()
+  await loadAddresses()
   await requote()
 })
 
-const ready = computed(() => !!quote.value && customer.verified && cart.name.trim() !== ''
-  && (cart.service === 'pickup' || cart.addressLine.trim() !== ''))
+const ready = computed(() => !!quote.value && customer.verified && (delivery.value ? !!address.value : cart.name.trim() !== ''))
 
 async function submit() {
   if (!quote.value || busy.value) return
@@ -94,8 +131,8 @@ async function submit() {
   error.value = ''; notice.value = ''
   try {
     const r = await post(`/stores/${props.slug}/orders`, {
-      quote_id: quote.value.id, customer_name: cart.name, address_line: cart.addressLine,
-      address_unit: cart.addressUnit, address_note: cart.addressNote, note: cart.note,
+      // a delivery takes the name and the address from the saved address
+      quote_id: quote.value.id, customer_name: delivery.value ? '' : cart.name, note: cart.note,
     }, { 'Idempotency-Key': idemKey })
     clearLines()
     sessionStorage.removeItem('order-key')
@@ -126,14 +163,17 @@ async function submit() {
       <div v-if="notice" class="banner warn">{{ notice }}</div>
 
       <div class="card stack">
-        <div class="row between"><h2>{{ t(cart.service) }}</h2><span class="tag brand" v-if="quote?.zone_name">{{ quote.zone_name }}</span></div>
-        <p v-if="quote?.zone_distance_m" class="small muted" style="margin:0" data-testid="near-zone">{{ t('near_zone', { name: quote.zone_name }) }}</p>
-        <label class="field"><span>{{ t('your_name') }}</span><input v-model="cart.name" maxlength="80" autocomplete="name" /></label>
-        <template v-if="cart.service === 'delivery'">
-          <label class="field"><span>{{ t('street') }}</span><input v-model="cart.addressLine" maxlength="300" autocomplete="street-address" /></label>
-          <label class="field"><span>{{ t('unit') }}</span><input v-model="cart.addressUnit" maxlength="100" /></label>
-          <label class="field"><span>{{ t('address_note') }}</span><input v-model="cart.addressNote" maxlength="300" /></label>
-        </template>
+        <h2>{{ t(cart.service) }}</h2>
+        <button v-if="delivery" type="button" class="co-addr" data-testid="checkout-address" @click="openSheet">
+          <span class="grow" v-if="address">
+            <b><span v-if="address.label" class="tag brand">{{ t('ad.label_' + address.label) }}</span>{{ address.place_name }} {{ address.unit }}</b>
+            <span class="small muted">{{ whoLine(address) }}</span>
+            <span class="small muted" v-if="address.note">{{ address.note }}</span>
+          </span>
+          <span class="grow ph" v-else>{{ t(addresses.length ? 'co.choose_address' : 'co.add_address') }}</span>
+          <span class="chev">›</span>
+        </button>
+        <label v-else class="field"><span>{{ t('your_name') }}</span><input v-model="cart.name" maxlength="80" autocomplete="name" /></label>
         <label class="field" style="margin:0"><span>{{ t('order_note') }}</span><input v-model="cart.note" maxlength="300" /></label>
       </div>
 
@@ -169,5 +209,15 @@ async function submit() {
       </div></div>
       </aside>
     </div>
+    <AddressSheet v-if="showSheet" :slug="mapMode ? slug : undefined" :currency="store?.branch.currency" :selected="cart.addressId" :shop="shopPin" :start-new="startNew"
+      @select="chosen" @changed="bookChanged" @close="showSheet = false" />
   </div>
 </template>
+
+<style scoped>
+.co-addr { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: none; padding: 2px 0 10px; cursor: pointer; font: inherit; color: inherit; border-bottom: 1px solid #f0f1f3; }
+.co-addr .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.co-addr b { font-size: 16px; } .co-addr .tag { margin-right: 6px; font-weight: 400; }
+.co-addr .ph { color: var(--brand); font-weight: 600; }
+.co-addr .chev { color: #8b919a; font-size: 22px; flex: none; }
+</style>

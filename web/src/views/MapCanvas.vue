@@ -3,7 +3,7 @@
 // using `px(latLng)`; the `ui` slot holds ordinary HTML floating over the map.
 import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { fitView, fromScreen, metresPerPixel, toScreen, type LatLng, type Pt, type View } from '../geo'
-import { createMap, type MapAdapter, type Place } from '../maps'
+import { createMap, type MapAdapter, type Place, type Spot } from '../maps'
 import { t } from '../i18n'
 
 const props = defineProps<{ mapsKey: string; initial: View }>()
@@ -41,7 +41,9 @@ const mpp = () => metresPerPixel(view.value.center[0], view.value.zoom)
 function setView(v: View) { adapter.value?.setView(v); sync() }
 function fit(points: LatLng[], maxZoom = 17) { if (points.length && size.value.w) setView(fitView(points, size.value, maxZoom)) }
 function zoomBy(d: number) { setView({ center: view.value.center, zoom: view.value.zoom + d }) }
-const search = (q: string): Promise<Place[]> => adapter.value?.search(q) ?? Promise.resolve([])
+const search = (q: string): Promise<Spot[]> => adapter.value?.search(q) ?? Promise.resolve([])
+const suggest = (q: string): Promise<Place[]> => adapter.value?.suggest(q) ?? Promise.resolve([])
+const nearby = (p: LatLng): Promise<Place[]> => adapter.value?.nearby(p) ?? Promise.resolve([])
 const setType = (m: 'roadmap' | 'satellite') => adapter.value?.setType(m)
 
 // drag follows the pointer from a handle's pointerdown until release and
@@ -60,7 +62,7 @@ function drag(e: PointerEvent, onMove: (at: LatLng) => void, onEnd?: (moved: boo
   window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
 }
 
-defineExpose({ px, at, mpp, setView, fit, search, setType, drag, view, size, adapter })
+defineExpose({ px, at, mpp, setView, fit, search, suggest, nearby, setType, drag, view, size, adapter })
 </script>
 
 <template>

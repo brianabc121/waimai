@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -17,6 +18,15 @@ func (s *Server) storefront(c *gin.Context) {
 	if err != nil {
 		fail(c, err)
 		return
+	}
+	// How the store divides its delivery area is the store's business. Where
+	// the pin decides, customers get no areas at all; where they choose from a
+	// list, they get the list without the outlines.
+	if sf.Branch.ZoneMode == "map" {
+		sf.Zones = []app.Zone{}
+	}
+	for i := range sf.Zones {
+		sf.Zones[i].Polygon, sf.Zones[i].Color = nil, ""
 	}
 	c.JSON(200, sf)
 }
@@ -101,10 +111,23 @@ func (s *Server) createQuote(c *gin.Context) {
 	phone, _ := s.customerPhone(c)
 	q, err := s.App.CreateQuote(c, c.Param("slug"), in, phone)
 	if err != nil {
-		fail(c, err)
+		fail(c, hideZones(err))
 		return
 	}
+	if q.ZoneDistanceM != nil || q.Input.Lat != nil || q.Input.AddressID != nil {
+		// decided by the pin: the customer is not told which area it was
+		q.ZoneID, q.ZoneName, q.ZoneDistanceM = nil, "", nil
+	}
 	c.JSON(200, q)
+}
+
+// hideZones drops what an error says about the store's delivery areas.
+func hideZones(err error) error {
+	var e *app.Error
+	if errors.As(err, &e) && e.Code == "OUT_OF_ZONE" && e.Details != nil {
+		return app.Err(e.Status, e.Code, e.Message)
+	}
+	return err
 }
 
 func (s *Server) placeOrder(c *gin.Context) {
@@ -119,7 +142,7 @@ func (s *Server) placeOrder(c *gin.Context) {
 	}
 	out, err := s.App.PlaceOrder(c, c.Param("slug"), phone, c.GetHeader("Idempotency-Key"), in)
 	if err != nil {
-		fail(c, err)
+		fail(c, hideZones(err))
 		return
 	}
 	c.JSON(200, out)
@@ -128,6 +151,8 @@ func (s *Server) placeOrder(c *gin.Context) {
 // customerView removes store-internal data from an order.
 func customerView(o *app.Order) *app.Order {
 	o.Cash = nil
+	// which delivery area an address fell in is the store's business
+	o.ZoneName, o.ZoneDistanceM = "", nil
 	return o
 }
 
@@ -547,12 +572,71 @@ func (s *Server) locate(c *gin.Context) {
 		fail(c, app.ErrValidation("lat and lng are required"))
 		return
 	}
-	loc, err := s.App.Locate(c, c.Param("slug"), *in.Lat, *in.Lng)
+	terms, err := s.App.DeliveryTermsAt(c, c.Param("slug"), *in.Lat, *in.Lng)
 	if err != nil {
 		fail(c, err)
 		return
 	}
-	c.JSON(200, loc)
+	c.JSON(200, terms)
+}
+
+// ---- the customer's address book ----
+
+func (s *Server) listAddresses(c *gin.Context) {
+	cu, err := s.customer(c)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	list, err := s.App.ListAddresses(c, cu.ID, c.Query("store"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"addresses": list, "limit": app.MaxAddresses})
+}
+
+func (s *Server) saveAddress(c *gin.Context) {
+	cu, err := s.customer(c)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	var id int64
+	if p := c.Param("id"); p != "" {
+		if id, err = strconv.ParseInt(p, 10, 64); err != nil || id <= 0 {
+			fail(c, app.Err(http.StatusNotFound, "ADDRESS_NOT_FOUND", "this address no longer exists"))
+			return
+		}
+	}
+	var in app.AddressInput
+	if !bind(c, &in) {
+		return
+	}
+	ad, err := s.App.SaveAddress(c, cu.ID, id, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, ad)
+}
+
+func (s *Server) deleteAddress(c *gin.Context) {
+	cu, err := s.customer(c)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		fail(c, app.Err(http.StatusNotFound, "ADDRESS_NOT_FOUND", "this address no longer exists"))
+		return
+	}
+	if err := s.App.DeleteAddress(c, cu.ID, id); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
 }
 
 func (s *Server) saveSettings(c *gin.Context) {

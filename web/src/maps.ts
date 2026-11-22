@@ -7,7 +7,18 @@
 import { fromScreen, toScreen, type LatLng, type View } from './geo'
 import { get } from './api'
 
-export interface Place { label: string; at: LatLng }
+// A place offered to the customer. `at` is missing on a typed suggestion until
+// it is chosen: finding it costs a lookup, so `locate` fetches it on demand.
+export interface Place { label: string; detail?: string; at?: LatLng; distance_m?: number; locate?: () => Promise<LatLng | null> }
+// A place whose position is known (every search result).
+export interface Spot extends Place { at: LatLng }
+
+function metresBetween(a: LatLng, b: LatLng): number {
+  const rad = Math.PI / 180, dLat = (b[0] - a[0]) * rad, dLng = (b[1] - a[1]) * rad
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLng / 2) ** 2
+  return 2 * 6371000 * Math.asin(Math.sqrt(h))
+}
+
 export interface MapEvents {
   view(): void
   click(at: LatLng): void
@@ -19,7 +30,11 @@ export interface MapAdapter {
   view(): View
   setView(v: View): void
   setType(t: 'roadmap' | 'satellite'): void
-  search(q: string): Promise<Place[]>
+  search(q: string): Promise<Spot[]>
+  // suggest offers places while the customer types; nearby lists what stands
+  // around a point, nearest first.
+  suggest(q: string): Promise<Place[]>
+  nearby(at: LatLng): Promise<Place[]>
   destroy(): void
 }
 
@@ -72,6 +87,7 @@ async function googleMap(key: string, el: HTMLElement, view: View, ev: MapEvents
     streetViewControl: false, fullscreenControl: false, mapTypeControl: false, zoomControl: true,
   })
   const ll = (e: any): LatLng => [e.latLng.lat(), e.latLng.lng()]
+  let session: any = null
   const subs = [
     map.addListener('bounds_changed', () => ev.view()),
     map.addListener('click', (e: any) => e.latLng && ev.click(ll(e))),
@@ -93,6 +109,56 @@ async function googleMap(key: string, el: HTMLElement, view: View, ev: MapEvents
         const { results } = await new gm.Geocoder().geocode({ address: q, bounds: map.getBounds() })
         return (results ?? []).slice(0, 5).map((r: any) => ({ label: r.formatted_address, at: [r.geometry.location.lat(), r.geometry.location.lng()] as LatLng }))
       } catch { return [] } // ZERO_RESULTS and friends arrive as rejections
+    },
+    // Needs "Places API (New)" on the same key. Without it both fall back to
+    // the geocoder: whole-address search, and one street address for a point.
+    async suggest(q) {
+      const direct = parseLatLng(q)
+      if (direct) return [{ label: q.trim(), at: direct }]
+      try {
+        const lib = await gm.importLibrary('places')
+        session ??= new lib.AutocompleteSessionToken()
+        const c = map.getCenter()
+        const { suggestions } = await lib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: q, sessionToken: session, locationBias: { center: { lat: c.lat(), lng: c.lng() }, radius: 20000 },
+        })
+        return (suggestions ?? []).filter((s: any) => s.placePrediction).slice(0, 6).map((s: any): Place => {
+          const p = s.placePrediction
+          return {
+            label: p.mainText?.text ?? p.text?.text ?? '', detail: p.secondaryText?.text ?? '',
+            async locate() {
+              try {
+                const place = p.toPlace()
+                await place.fetchFields({ fields: ['location'] })
+                session = null // one billing session ends when a suggestion is chosen
+                return place.location ? [place.location.lat(), place.location.lng()] : null
+              } catch { return null }
+            },
+          }
+        })
+      } catch { return (this as MapAdapter).search(q) }
+    },
+    async nearby(at) {
+      const out: Place[] = []
+      try {
+        const lib = await gm.importLibrary('places')
+        const { places } = await lib.Place.searchNearby({
+          fields: ['displayName', 'formattedAddress', 'location'], maxResultCount: 5,
+          locationRestriction: { center: { lat: at[0], lng: at[1] }, radius: 150 },
+          rankPreference: lib.SearchNearbyRankPreference?.DISTANCE,
+        })
+        for (const p of places ?? []) {
+          if (!p.location || !p.displayName) continue
+          const where: LatLng = [p.location.lat(), p.location.lng()]
+          out.push({ label: p.displayName, detail: p.formattedAddress ?? '', at: where, distance_m: Math.round(metresBetween(at, where)) })
+        }
+      } catch { /* Places is not enabled: the street address below still helps */ }
+      try {
+        const { results } = await new gm.Geocoder().geocode({ location: { lat: at[0], lng: at[1] } })
+        const r = (results ?? [])[0]
+        if (r) out.push({ label: r.formatted_address, detail: '', at, distance_m: 0 })
+      } catch { /* nothing known about this spot */ }
+      return out
     },
     destroy() { subs.forEach(s => s.remove()) },
   }
@@ -148,6 +214,25 @@ function stubMap(el: HTMLElement, initial: View, ev: MapEvents): MapAdapter {
     async search(q) {
       const direct = parseLatLng(q)
       return q.trim() ? [{ label: q.trim(), at: direct ?? v.center }] : []
+    },
+    // Made-up places, the same every time, so tests can rely on them.
+    async suggest(q) {
+      const direct = parseLatLng(q)
+      if (direct) return [{ label: q.trim(), at: direct }]
+      const name = q.trim()
+      if (!name) return []
+      return ['Tower', 'Mall', 'Residences'].map((kind, i): Place => {
+        const where: LatLng = [v.center[0] + i * 0.0004, v.center[1] + i * 0.0004]
+        return { label: `${name} ${kind}`, detail: `${i + 1} Stub St`, locate: async () => where }
+      })
+    },
+    async nearby(at) {
+      const spot = `${at[0].toFixed(4)}, ${at[1].toFixed(4)}`
+      return [
+        { label: 'Stub Tower', detail: `1 Stub St · ${spot}`, at: [at[0] + 0.0001, at[1]], distance_m: 11 },
+        { label: 'Stub Mall', detail: `2 Stub St · ${spot}`, at: [at[0], at[1] + 0.0005], distance_m: 54 },
+        { label: `Stub St ${spot}`, detail: '', at, distance_m: 0 },
+      ]
     },
     destroy() {
       el.removeEventListener('pointerdown', down); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)

@@ -1,0 +1,76 @@
+// The customer's address book and what a store says about delivering to a spot.
+import { del, get, post, put } from './api'
+import { extend, money, t } from './i18n'
+
+// What a customer is told about delivery to one spot. Which of the store's
+// areas it falls in is not part of it.
+export interface DeliveryTerms { deliverable: boolean; fee: number; min_order: number; eta_minutes: number | null }
+
+export interface Address {
+  id: number; contact_name: string; title: '' | 'mr' | 'ms'; phone: string
+  place_name: string; place_address: string; lat: number | null; lng: number | null
+  unit: string; note: string; wechat: string; telegram: string
+  label: '' | 'home' | 'work' | 'school'; is_default: boolean; last_used_at: string | null
+  delivery?: DeliveryTerms | null
+}
+export type AddressInput = Omit<Address, 'id' | 'last_used_at' | 'delivery'>
+
+export const listAddresses = (slug?: string) =>
+  get<{ addresses: Address[]; limit: number }>('/customer/addresses' + (slug ? `?store=${encodeURIComponent(slug)}` : ''))
+export const saveAddress = (id: number, a: AddressInput) => id ? put<Address>(`/customer/addresses/${id}`, a) : post<Address>('/customer/addresses', a)
+export const deleteAddress = (id: number) => del(`/customer/addresses/${id}`)
+export const termsAt = (slug: string, lat: number, lng: number) => post<DeliveryTerms>(`/stores/${slug}/locate`, { lat, lng })
+
+// An address this store cannot deliver to cannot be chosen for an order.
+export const usable = (a: Address) => !a.delivery || a.delivery.deliverable
+// Those the store delivers to come first; the server already put the default
+// and the recently used ones ahead.
+export const sorted = (list: Address[]) => [...list].sort((a, b) => Number(usable(b)) - Number(usable(a)))
+
+export const whoLine = (a: Address) => `${a.contact_name}${a.title ? t('ad.title_' + a.title) : ''} ${prettyPhone(a.phone)}`
+export function prettyPhone(p: string): string {
+  const m = p.match(/^\+63(\d{3})(\d{3})(\d{4})$/)
+  return m ? `+63 ${m[1]} ${m[2]} ${m[3]}` : p
+}
+export const termsText = (d: DeliveryTerms, currency?: string) =>
+  d.deliverable ? t('ad.can', { fee: money(d.fee, currency) }) : t('ad.cannot')
+
+extend({
+  'ad.choose': ['选择收货地址', 'Choose a delivery address'], 'ad.mine': ['我的地址', 'My addresses'],
+  'ad.new': ['新增收货地址', 'Add an address'], 'ad.edit': ['修改收货地址', 'Edit address'],
+  'ad.empty': ['还没有保存的地址', 'No saved addresses yet'], 'ad.unit_is': ['门牌号：{unit}', 'Unit: {unit}'],
+  'ad.can': ['可配送 · 配送费 {fee}', 'We deliver here · fee {fee}'], 'ad.cannot': ['不在本店配送范围', 'This store does not deliver here'],
+  'ad.need_pin': ['请在地图上补一个位置', 'Place this address on the map first'],
+  'ad.full': ['最多保存 {n} 个地址，请先删除不用的', 'You can keep {n} addresses. Delete one first.'],
+  'ad.title_mr': ['先生', ' (Mr)'], 'ad.title_ms': ['女士', ' (Ms)'], 'ad.mr': ['先生', 'Mr'], 'ad.ms': ['女士', 'Ms'],
+  'ad.f.name': ['收货人', 'Name'], 'ad.f.name_ph': ['请输入收货人称呼', 'Who receives the order'],
+  'ad.f.phone': ['联系电话', 'Phone'], 'ad.f.phone_ph': ['请输入联系电话', 'Mobile number'],
+  'ad.f.phone_hint': ['默认用登录的手机号，可以改成别人的', 'Your login number by default; change it to order for someone else'],
+  'ad.f.place': ['收货地址', 'Address'], 'ad.f.place_ph': ['在地图上选择收货地址', 'Pick the address on the map'],
+  'ad.f.street_ph': ['街道和大楼名称', 'Street and building'],
+  'ad.f.unit': ['门牌号', 'Unit'], 'ad.f.unit_ph': ['楼层、房号（详细地址）', 'Floor and unit number'],
+  'ad.f.note': ['骑手备注', 'Rider note'], 'ad.f.note_ph': ['（选填）怎么找到你', '(optional) how to find you'],
+  'ad.f.wechat': ['微信号', 'WeChat'], 'ad.f.wechat_ph': ['（选填）电话打不通时联系', '(optional) if the phone is not answered'],
+  'ad.f.telegram': ['Telegram', 'Telegram'], 'ad.f.optional': ['（选填）', '(optional)'],
+  'ad.f.label': ['标签', 'Label'], 'ad.label_work': ['公司', 'Work'], 'ad.label_home': ['家', 'Home'], 'ad.label_school': ['学校', 'School'],
+  'ad.f.default': ['设为默认地址', 'Make this my default address'],
+  'ad.save': ['保存地址', 'Save address'], 'ad.saving': ['保存中…', 'Saving…'], 'ad.delete': ['删除这个地址', 'Delete this address'],
+  'ad.delete_confirm': ['确定删除这个地址？', 'Delete this address?'],
+  'ad.e.name': ['请填写收货人', 'Enter the name'], 'ad.e.phone': ['请输入正确的 +63 手机号，例如 917 555 0123', 'Enter a valid +63 mobile number, e.g. 917 555 0123'],
+  'ad.e.place': ['请选择收货地址', 'Choose the address'], 'ad.e.unit': ['请填写门牌号', 'Enter the unit'],
+  'co.choose_address': ['请选择收货地址', 'Choose a delivery address'], 'co.add_address': ['添加收货地址', 'Add a delivery address'],
+  'co.address_gone': ['这个地址已经不在了，请重新选择', 'That address is gone. Please choose again.'],
+  'pp.title': ['选择位置', 'Choose the location'], 'pp.search': ['搜索大楼、街道或地标', 'Search a building, street or landmark'],
+  'pp.results': ['搜索结果', 'Results'], 'pp.nearby': ['图钉附近的地址', 'Near the pin'], 'pp.done': ['完成', 'Done'],
+  'pp.drag': ['拖动地图，把图钉对准门口', 'Move the map until the pin is on your door'],
+  'pp.none': ['没有找到，换个写法试试，或者直接拖动地图', 'Nothing found. Try other words, or just move the map.'],
+  'pp.looking': ['正在查找…', 'Looking…'], 'pp.metres': ['距图钉 {n} 米', '{n} m from the pin'], 'pp.pin_only': ['就用图钉的位置', 'Use the pin itself'],
+  'pp.can': ['这个位置可以配送', 'We deliver to this spot'], 'pp.terms': ['配送费 {fee} · 起送 {min}', 'Fee {fee} · min. {min}'],
+  'pp.eta': [' · 约 {n} 分钟', ' · ~{n} min'],
+  'pp.cannot': ['这个位置不在本店配送范围', 'This store does not deliver to this spot'],
+  'pp.cannot_hint': ['可以换一个收货位置，或改为到店自取。', 'Choose another spot, or switch to pickup.'],
+  'pp.cannot_keep': ['仍然可以保存这个地址，但这家店的外卖不能选它。', 'You can still save this address, but not order delivery to it from this store.'],
+  'pp.checking': ['正在判断能不能送…', 'Checking delivery…'], 'pp.failed': ['暂时无法判断，请稍后再试', 'Could not check right now, please try again'],
+  'pp.me': ['用我现在的位置', 'Use my current location'], 'pp.me_denied': ['没有拿到定位，请在地图上手动选位置', 'Location is unavailable; please move the map by hand'],
+  'pp.to_pickup': ['改为到店自取', 'Switch to pickup'],
+})

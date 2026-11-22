@@ -360,8 +360,8 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 	if idemKey == "" || len(idemKey) > 100 {
 		return nil, ErrValidation("Idempotency-Key header is required")
 	}
-	if in.CustomerName == "" || len(in.CustomerName) > 80 {
-		return nil, ErrValidation("customer_name is required")
+	if len(in.CustomerName) > 80 {
+		return nil, ErrValidation("customer_name is too long")
 	}
 	if len(in.AddressLine) > 300 || len(in.AddressUnit) > 100 || len(in.AddressNote) > 300 || len(in.Note) > 300 {
 		return nil, ErrValidation("text too long")
@@ -409,8 +409,14 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		if err := json.Unmarshal(payload, &quoted); err != nil {
 			return err
 		}
-		if quoted.ServiceType == "delivery" && in.AddressLine == "" {
-			return ErrValidation("address_line is required for delivery")
+		// A saved address brings the name and the address with it.
+		if quoted.Input.AddressID == nil || quoted.ServiceType != "delivery" {
+			if in.CustomerName == "" {
+				return ErrValidation("customer_name is required")
+			}
+			if quoted.ServiceType == "delivery" && in.AddressLine == "" {
+				return ErrValidation("address_line is required for delivery")
+			}
 		}
 
 		// Re-price against the live menu; anything that moved needs a new confirmation.
@@ -443,22 +449,31 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		if cur.ServiceType == "delivery" && b.ZoneMode == "map" {
 			destLat, destLng = cur.Input.Lat, cur.Input.Lng
 		}
+		// A saved address fills in who and where; the order keeps its own copy.
+		var addressID *int64
+		var contact Address
+		if ad := cur.address; ad != nil {
+			addressID, contact = &ad.ID, *ad
+			in.CustomerName, in.AddressLine, in.AddressUnit, in.AddressNote = ad.ContactName, ad.line(), ad.Unit, ad.Note
+			destLat, destLng = ad.Lat, ad.Lng
+		}
 		var orderID int64
 		err = tx.QueryRow(ctx, `INSERT INTO orders (merchant_id, branch_id, public_no, pickup_code,
 			access_token_hash, token_nonce, service_type, customer_name, customer_phone, zone_id, zone_name,
 			address_line, address_unit, address_note, note, currency, subtotal, packaging_fee, delivery_fee,
 			service_charge, tax_amount, tax_inclusive, tax_rate_bp, discount, total, payment_method, accept_deadline,
 			promotion_id, promotion_name, promotion_name_en, scheduled_for, release_at, dest_lat, dest_lng,
-			zone_distance_m)
+			zone_distance_m, address_id, contact_phone, contact_title, contact_wechat, contact_telegram)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
 				now() + make_interval(mins => $27), NULLIF($28, 0), $29, $30,
-				$31::timestamptz, $31::timestamptz - make_interval(mins => $32), $33, $34, $35)
+				$31::timestamptz, $31::timestamptz - make_interval(mins => $32), $33, $34, $35, $36, $37, $38, $39, $40)
 			RETURNING id`,
 			b.MerchantID, b.ID, publicNo, pickupCode, hashToken(token), nonce, cur.ServiceType, in.CustomerName,
 			phone, cur.ZoneID, cur.ZoneName, in.AddressLine, in.AddressUnit, in.AddressNote, in.Note, b.Currency,
 			t.Subtotal, t.PackagingFee, t.DeliveryFee, t.ServiceCharge, t.TaxAmount, t.TaxInclusive, t.TaxRateBP,
 			t.Discount, t.Total, payMethod, b.AcceptTimeoutMinutes, t.PromotionID, t.PromotionName,
-			t.PromotionNameEn, cur.ScheduledFor, b.PrepMinutes, destLat, destLng, cur.ZoneDistanceM).Scan(&orderID)
+			t.PromotionNameEn, cur.ScheduledFor, b.PrepMinutes, destLat, destLng, cur.ZoneDistanceM,
+			addressID, contact.Phone, contact.Title, contact.Wechat, contact.Telegram).Scan(&orderID)
 		if err != nil {
 			return wrap("insert order", err)
 		}
@@ -468,6 +483,11 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		}
 		if err := touchCustomerSessions(ctx, tx, phone); err != nil {
 			return wrap("extend session", err)
+		}
+		if addressID != nil {
+			if _, err := tx.Exec(ctx, `UPDATE customer_addresses SET last_used_at=now() WHERE id=$1`, *addressID); err != nil {
+				return wrap("address used", err)
+			}
 		}
 		if t.PromotionID != 0 {
 			if err := claimPromotion(ctx, tx, b.ID, t.PromotionID, orderID, phone, t.Discount); err != nil {
