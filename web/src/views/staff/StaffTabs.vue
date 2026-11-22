@@ -8,6 +8,7 @@ import './strings'
   <nav class="stafftabs no-print" data-testid="staff-tabs">
     <router-link to="/merchant/staff" exact-active-class="on" data-tab="list">{{ t('sr.tab.list') }}</router-link>
     <router-link to="/merchant/staff/attendance" active-class="on" data-tab="attendance">{{ t('sr.tab.attendance') }}</router-link>
+    <router-link to="/merchant/staff/kitchen" active-class="on" data-tab="kitchen">{{ t('sr.tab.kitchen') }}</router-link>
   </nav>
 </template>
 

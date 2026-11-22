@@ -350,6 +350,8 @@ func (s *Server) Router() *gin.Engine {
 	auth.GET("/merchant/branches/:bid/attendance", s.attendance)
 	auth.POST("/merchant/branches/:bid/attendance", s.addShift)
 	auth.PATCH("/merchant/branches/:bid/attendance/:id", s.editShift)
+	auth.GET("/merchant/branches/:bid/reports/kitchen", s.kitchenReport)
+	auth.GET("/merchant/branches/:bid/reports/kitchen/:id", s.kitchenDetail)
 	auth.GET("/merchant/branches/:bid/cash-collections", s.listCash)
 	auth.POST("/merchant/cash-collections/:id/reconcile", s.reconcile)
 
