@@ -380,7 +380,7 @@ async function sendReport() {
             :shop="shopPin" :pickup="store.branch.pickup_enabled" @done="picked" @close="showPicker = false" @pickup="toPickup" />
         </div>
       </div>
-      <AddressSheet v-if="showAddresses" manage :slug="mapMode ? slug : undefined" :currency="cur" :shop="shopPin" @close="showAddresses = false" />
+      <AddressSheet v-if="showAddresses" manage :slug="mapMode ? slug : undefined" :currency="cur" :shop="shopPin" :country="store?.branch.country_code" :fields="store?.branch.contact_fields" @close="showAddresses = false" />
 
       <!-- item options (C04/C05) -->
       <div class="sheet-mask" v-if="sheet.item" @click.self="sheet.item = null">

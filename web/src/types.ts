@@ -8,6 +8,8 @@ export interface Branch {
   kitchen_slow_minutes: number; detour_percent: number; detour_meters: number
   lat: number | null; lng: number | null; zone_mode: 'list' | 'map'; zone_tolerance_m: number
   notice: string; intro: string; baskets_enabled: boolean
+  // which of wechat, telegram, line, whatsapp the address form asks customers for
+  contact_fields: string[]
   // where the store is, in words; empty until its location was saved on the map
   country_code: string; country: string; province: string; city: string; district: string; postal_code: string
 }
@@ -67,7 +69,7 @@ export interface Order {
   id: number; branch_id: number; public_no: string; pickup_code: string; service_type: 'delivery' | 'pickup' | 'dine_in'
   customer_name: string; customer_phone: string; zone_name: string; address_line: string; address_unit: string
   // from the saved address: who to call (may differ from the account that ordered), other ways to reach them, a photo of the door
-  contact_phone: string; contact_title: '' | 'mr' | 'ms'; contact_wechat: string; contact_telegram: string; address_photo: boolean
+  contact_phone: string; contact_title: '' | 'mr' | 'ms'; contact_wechat: string; contact_telegram: string; contact_line: string; contact_whatsapp: string; address_photo: boolean
   address_note: string; note: string; currency: string; totals: Totals; payment_method: string
   acceptance_status: string; packing_status: string; fulfillment_status: string; payment_status: string
   display_status: string; close_reason: string; bags: number | null; version: number; manifest_version: number

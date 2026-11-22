@@ -91,6 +91,8 @@ type Order struct {
 	ContactTitle    string `json:"contact_title"`
 	ContactWechat   string `json:"contact_wechat"`
 	ContactTelegram string `json:"contact_telegram"`
+	ContactLine     string `json:"contact_line"`
+	ContactWhatsapp string `json:"contact_whatsapp"`
 	// AddressPhoto says the customer added a photo of the door.
 	AddressPhoto      bool      `json:"address_photo"`
 	AddressLine       string    `json:"address_line"`
@@ -174,7 +176,7 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	o.token_nonce, COALESCE(o.promotion_id, 0), o.promotion_name, o.promotion_name_en, o.scheduled_for, o.release_at,
 	(SELECT b.timezone FROM branches b WHERE b.id = o.branch_id), o.session_id, o.table_name, o.amount_received,
 	o.payment_note, o.dest_lat, o.dest_lng, o.zone_distance_m, o.contact_phone, o.contact_title, o.contact_wechat,
-	o.contact_telegram, EXISTS (SELECT 1 FROM customer_address_photos p WHERE p.address_id = o.address_id)`
+	o.contact_telegram, o.contact_line, o.contact_whatsapp, EXISTS (SELECT 1 FROM customer_address_photos p WHERE p.address_id = o.address_id)`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}}
@@ -187,7 +189,8 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.AcceptDeadline, &o.CreatedAt, &o.AcceptedAt, &o.PackedAt, &o.HandedOffAt, &o.CompletedAt, &o.ClosedAt,
 		&o.tokenNonce, &t.PromotionID, &t.PromotionName, &t.PromotionNameEn, &o.ScheduledFor, &o.ReleaseAt,
 		&o.Timezone, &o.SessionID, &o.TableName, &o.AmountReceived, &o.PaymentNote, &o.DestLat, &o.DestLng,
-		&o.ZoneDistanceM, &o.ContactPhone, &o.ContactTitle, &o.ContactWechat, &o.ContactTelegram, &o.AddressPhoto)
+		&o.ZoneDistanceM, &o.ContactPhone, &o.ContactTitle, &o.ContactWechat, &o.ContactTelegram, &o.ContactLine,
+		&o.ContactWhatsapp, &o.AddressPhoto)
 	if err != nil {
 		return nil, err
 	}
@@ -463,6 +466,7 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		var contact Address
 		if ad := cur.address; ad != nil {
 			addressID, contact = &ad.ID, *ad
+			contact.onlyAsked(b)
 			in.CustomerName, in.AddressLine, in.AddressUnit, in.AddressNote = ad.ContactName, ad.line(), ad.Unit, ad.Note
 			destLat, destLng = ad.Lat, ad.Lng
 		}
@@ -472,17 +476,20 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			address_line, address_unit, address_note, note, currency, subtotal, packaging_fee, delivery_fee,
 			service_charge, tax_amount, tax_inclusive, tax_rate_bp, discount, total, payment_method, accept_deadline,
 			promotion_id, promotion_name, promotion_name_en, scheduled_for, release_at, dest_lat, dest_lng,
-			zone_distance_m, address_id, contact_phone, contact_title, contact_wechat, contact_telegram)
+			zone_distance_m, address_id, contact_phone, contact_title, contact_wechat, contact_telegram,
+			contact_line, contact_whatsapp)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
 				now() + make_interval(mins => $27), NULLIF($28, 0), $29, $30,
-				$31::timestamptz, $31::timestamptz - make_interval(mins => $32), $33, $34, $35, $36, $37, $38, $39, $40)
+				$31::timestamptz, $31::timestamptz - make_interval(mins => $32), $33, $34, $35, $36, $37, $38, $39, $40,
+				$41, $42)
 			RETURNING id`,
 			b.MerchantID, b.ID, publicNo, pickupCode, hashToken(token), nonce, cur.ServiceType, in.CustomerName,
 			phone, cur.ZoneID, cur.ZoneName, in.AddressLine, in.AddressUnit, in.AddressNote, in.Note, b.Currency,
 			t.Subtotal, t.PackagingFee, t.DeliveryFee, t.ServiceCharge, t.TaxAmount, t.TaxInclusive, t.TaxRateBP,
 			t.Discount, t.Total, payMethod, b.AcceptTimeoutMinutes, t.PromotionID, t.PromotionName,
 			t.PromotionNameEn, cur.ScheduledFor, b.PrepMinutes, destLat, destLng, cur.ZoneDistanceM,
-			addressID, contact.Phone, contact.Title, contact.Wechat, contact.Telegram).Scan(&orderID)
+			addressID, contact.Phone, contact.Title, contact.Wechat, contact.Telegram,
+			contact.Line, contact.Whatsapp).Scan(&orderID)
 		if err != nil {
 			return wrap("insert order", err)
 		}

@@ -9,7 +9,7 @@ import { both, money, t, toMajor, toMinor, whenText } from '../../i18n'
 import { useLive } from '../../live'
 import { currentRole, reloadUser, session } from '../../session'
 import type { Order } from '../../types'
-import { contactName, contactPhone } from '../../addresses'
+import { contactApps, contactName, contactPhone } from '../../addresses'
 import { shrink } from '../../photo'
 import { duty, flush, loadDuty, openAppSettings, setDuty, track } from './duty'
 import { native } from './native'
@@ -192,9 +192,8 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
               <a class="btn grow" :href="mapUrl(cur)" target="_blank" rel="noopener" data-act="navigate">{{ t('navigate') }}</a>
               <a class="btn grow" :href="'tel:' + contactPhone(cur)">{{ t('call') }}</a>
             </div>
-            <div v-if="cur.contact_wechat || cur.contact_telegram || cur.address_photo" class="small" data-testid="rider-contact">
-              <span v-if="cur.contact_wechat">{{ t('oc.wechat') }} <b>{{ cur.contact_wechat }}</b>　</span>
-              <span v-if="cur.contact_telegram">{{ t('oc.telegram') }} <b>{{ cur.contact_telegram }}</b>　</span>
+            <div v-if="contactApps(cur).length || cur.address_photo" class="small" data-testid="rider-contact">
+              <span v-for="c in contactApps(cur)" :key="c.field">{{ c.label }} <b>{{ c.value }}</b>　</span>
               <a v-if="cur.address_photo" :href="`/api/v1/rider/tasks/${cur.delivery!.id}/address-photo`" target="_blank" rel="noopener" data-testid="rider-door-photo">{{ t('oc.door_photo') }} ›</a>
             </div>
             <div class="row between"><span class="muted">{{ t('bags') }} {{ cur.bags }} · {{ due(cur) ? t('wk.cod_short') : t('wk.prepaid') }}</span>

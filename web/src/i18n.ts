@@ -199,6 +199,8 @@ const dict: Record<string, [string, string]> = {
   'set.notice': ['门店公告（显示在点餐页店名下方，最多 300 字）', 'Store notice (under the store name on the ordering page, up to 300 characters)'],
   'set.intro': ['商家信息（点餐页“商家”里的介绍，最多 500 字）', 'About the store (shown on the Store tab, up to 500 characters)'],
   'set.baskets': ['允许顾客分购物篮下单', 'Let customers split an order into baskets'],
+  'set.contact_fields': ['收货地址页让顾客填写的联系方式', 'Contact names asked for on the address form'],
+  'set.contact_fields_hint': ['勾选的项目会出现在顾客的“新增收货地址”页（选填），并随订单显示给门店和骑手。都不勾选就不显示。', 'The ticked ones appear on the customer\'s address form (optional) and come with the order for the store and the rider. Tick none and none are shown.'],
   cat_required: ['必选', 'Required'], cat_required_on: ['设为必选', 'Make required'], cat_required_off: ['取消必选', 'Not required'],
   cat_required_hint: ['必选分类：顾客至少要从里面选一样才能下单', 'Required: a customer must choose at least one dish from it'],
 }
