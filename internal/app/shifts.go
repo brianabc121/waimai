@@ -569,3 +569,62 @@ func (a *App) EditShift(ctx context.Context, branchID, shiftID int64, in ShiftIn
 	}
 	return a.loadShift(ctx, shiftID)
 }
+
+// ---- a person's own attendance ----
+
+// MyAttendance is what a person sees of their own shifts in one month.
+type MyAttendance struct {
+	Month    string    `json:"month"`
+	Timezone string    `json:"timezone"`
+	Now      time.Time `json:"now"`
+	// Days and Minutes leave out the shifts a manager struck.
+	Days    int     `json:"days"`
+	Minutes int     `json:"minutes"`
+	Shifts  []Shift `json:"shifts"`
+}
+
+// MyAttendance lists the person's own shifts in a branch they work in, for
+// the month given as 2026-11; the current month of the store when left out.
+// It is read-only, and shows what a manager corrected and why.
+func (a *App) MyAttendance(ctx context.Context, u *User, branchID int64, month string) (*MyAttendance, error) {
+	if u.RoleIn(branchID) == "" {
+		return nil, errNotStaff
+	}
+	b, err := a.BranchByID(ctx, branchID)
+	if err != nil {
+		return nil, err
+	}
+	loc := b.location()
+	now := time.Now()
+	if month == "" {
+		month = now.In(loc).Format("2006-01")
+	}
+	start, err := time.ParseInLocation("2006-01", month, loc)
+	if err != nil {
+		return nil, ErrValidation("month must look like 2026-11")
+	}
+	out := &MyAttendance{Month: month, Timezone: b.Timezone, Now: now}
+	rows, err := a.DB.Query(ctx, `SELECT `+shiftCols+` FROM staff_shifts s LEFT JOIN users e ON e.id = s.edited_by
+		WHERE s.branch_id=$1 AND s.user_id=$2 AND s.started_at >= $3 AND s.started_at < $4 ORDER BY s.started_at DESC, s.id DESC`,
+		branchID, u.ID, start, start.AddDate(0, 1, 0))
+	if err != nil {
+		return nil, err
+	}
+	out.Shifts, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (Shift, error) { return scanShift(r, loc, now) })
+	if err != nil {
+		return nil, err
+	}
+	if out.Shifts == nil {
+		out.Shifts = []Shift{}
+	}
+	days := map[string]bool{}
+	for _, s := range out.Shifts {
+		if s.Voided {
+			continue
+		}
+		days[s.Day] = true
+		out.Minutes += s.Minutes
+	}
+	out.Days = len(days)
+	return out, nil
+}

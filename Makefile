@@ -33,3 +33,4 @@ e2e:
 	node e2e/attendance.cjs
 	node e2e/kitchenreport.cjs
 	node e2e/riderreport.cjs
+	node e2e/staffexport.cjs

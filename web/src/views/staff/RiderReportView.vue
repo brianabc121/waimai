@@ -5,6 +5,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { get } from '../../api'
 import { money, t } from '../../i18n'
 import { session } from '../../session'
+import ExportLink from './ExportLink.vue'
 import PeriodBar from './PeriodBar.vue'
 import StaffTabs from './StaffTabs.vue'
 import { clock, hm, weekday } from './time'
@@ -77,7 +78,7 @@ const dayText = (d: string) => `${d.slice(5)} ${t('weekday.' + weekday(d))}`
 <template>
   <div class="page srp" data-testid="rider-report">
     <StaffTabs />
-    <div class="row wrap" style="margin-bottom:14px"><PeriodBar ref="period" v-model:from="from" v-model:to="to" :tz="tz" /></div>
+    <div class="row wrap" style="margin-bottom:14px"><PeriodBar ref="period" v-model:from="from" v-model:to="to" :tz="tz" /><span class="grow"></span><ExportLink list="reports/riders" :from="from" :to="to" /></div>
     <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
     <div v-if="report && !report.store_set" class="banner warn" style="margin-bottom:12px" data-testid="rr-no-store">{{ t('rr.no_store') }}
       <router-link to="/merchant/delivery-map">{{ t('rr.go_map') }}</router-link></div>

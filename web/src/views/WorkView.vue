@@ -9,6 +9,7 @@ import { currentRole, identities, logout, session, type Identity } from '../sess
 import type { Post } from '../types'
 import WorkRider from './work/WorkRider.vue'
 import WorkStore from './work/WorkStore.vue'
+import MyShifts from './work/MyShifts.vue'
 import { disablePush, enablePush, forgetPush, push, setupWorkbench } from './work/push'
 import { native, platform } from './work/native'
 import { openAppSettings } from './work/duty'
@@ -78,6 +79,7 @@ const standalone = native || window.matchMedia('(display-mode: standalone)').mat
           <div class="row between" style="align-items:flex-start"><span class="muted">{{ t('wk.posts') }}</span>
             <span style="text-align:right" data-testid="my-posts"><span v-for="p in posts" :key="p.kind + (p.station_id ?? '')" class="tag" style="margin:0 0 4px 4px">{{ postName(p) }}</span></span></div>
         </div>
+        <MyShifts />
         <div class="card stack">
           <div class="row between"><span>{{ t('wk.language') }}</span>
             <button class="btn small" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'English' : '中文' }}</button></div>

@@ -6,6 +6,7 @@ import { get } from '../../api'
 import { pick, t } from '../../i18n'
 import { session } from '../../session'
 import type { Post } from '../../types'
+import ExportLink from './ExportLink.vue'
 import StaffTabs from './StaffTabs.vue'
 import { addDays, clock, dayOf, hm, monthStart, weekday } from './time'
 import '../work/strings'
@@ -125,6 +126,8 @@ const pages = computed(() => detail.value ? Math.max(1, Math.ceil(detail.value.i
         <button :class="{ on: preset === 'custom' }" data-preset="custom" @click="preset = 'custom'">{{ t('kr.p.custom') }}</button>
       </span>
       <span v-if="preset === 'custom'" class="custom"><input v-model="from" type="date" name="from" :max="to"> ~ <input v-model="to" type="date" name="to" :min="from" :max="today"></span>
+      <span class="grow"></span>
+      <ExportLink list="reports/kitchen" :from="from" :to="to" />
     </div>
     <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
 

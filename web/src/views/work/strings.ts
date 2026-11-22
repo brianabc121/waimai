@@ -97,4 +97,11 @@ extend({
   'st.e.USERNAME_TAKEN': ['这个登录账号已经有人用了', 'That username is taken'],
   'st.e.FORBIDDEN': ['只有店主能管理店主', 'Only an owner can manage an owner'],
   'st.e.READ_ONLY': ['平台查看模式，只能看不能改', 'Platform view: read-only'],
+  'wk.att.title': ['我的考勤', 'My attendance'], 'wk.att.days': ['出勤', 'Days worked'], 'wk.att.n_days': ['{n} 天', '{n} days'],
+  'wk.att.hours': ['工时（小时:分）', 'Hours (h:mm)'], 'wk.att.show': ['看每一班（{n}）', 'Show shifts ({n})'], 'wk.att.hide': ['收起', 'Hide'],
+  'wk.att.none': ['这个月还没有上班记录', 'No shifts this month'], 'wk.att.now': ['上班中', 'at work'],
+  'wk.att.voided': ['已作废', 'Voided'], 'wk.att.edited': ['店长改过', 'Corrected'], 'wk.att.auto': ['忘记下班，系统代下班', 'Ended by the system'],
+  'wk.att.manager': ['店长', 'A manager'], 'wk.att.why': ['{who} 修改，原因：{why}。', 'Corrected by {who}: {why}. '],
+  'wk.att.was': ['原记录 {from} ~ {to}', 'First recorded as {from} ~ {to}'], 'wk.att.wd': ['{zh}', '{en}'],
+  'wk.att.note': ['只能查看。有出入请找店长修改。', 'Read-only. Ask a manager to correct anything that is wrong.'],
 })

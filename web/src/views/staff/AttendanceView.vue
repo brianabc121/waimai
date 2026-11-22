@@ -7,6 +7,7 @@ import { ApiError, get, patch, post } from '../../api'
 import { pick, t } from '../../i18n'
 import { session } from '../../session'
 import type { Post } from '../../types'
+import ExportLink from './ExportLink.vue'
 import StaffTabs from './StaffTabs.vue'
 import { addDays, addMonths, clock, dayOf, fromInput, hm, hoursInto, metres, monthEnd, monthStart, toInput, weekday } from './time'
 import '../work/strings'
@@ -30,9 +31,10 @@ const error = ref('')
 const notice = ref('')
 const today = computed(() => dayOf(Date.now(), tz.value))
 
+const range = computed(() => !day.value ? ['', ''] : mode.value === 'day' ? [day.value, day.value] : [monthStart(day.value), monthEnd(day.value)])
 async function load() {
   if (!day.value) day.value = today.value
-  const [from, to] = mode.value === 'day' ? [day.value, day.value] : [monthStart(day.value), monthEnd(day.value)]
+  const [from, to] = range.value
   try {
     const d = await get<Attendance>(`/merchant/branches/${bid}/attendance?from=${from}&to=${to}`)
     if (d.timezone !== tz.value) { tz.value = d.timezone }
@@ -149,6 +151,7 @@ function voidShift() {
       <span class="pills"><button :class="{ on: mode === 'day' }" data-mode="day" @click="mode = 'day'">{{ t('att.by_day') }}</button>
         <button :class="{ on: mode === 'month' }" data-mode="month" @click="mode = 'month'">{{ t('att.by_month') }}</button></span>
       <span class="grow"></span>
+      <ExportLink list="attendance" :from="range[0]" :to="range[1]" />
       <button class="btn" data-testid="att-add" @click="add(null)">＋ {{ t('att.add') }}</button>
     </div>
     <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>

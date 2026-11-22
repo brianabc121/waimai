@@ -5,6 +5,7 @@ export interface Branch {
   delivery_enabled: boolean; pickup_enabled: boolean; paused: boolean
   open_time: string; close_time: string; open_now: boolean; notify_sms: boolean
   scheduling_enabled: boolean; prep_minutes: number
+  kitchen_slow_minutes: number; detour_percent: number; detour_meters: number
   lat: number | null; lng: number | null; zone_mode: 'list' | 'map'; zone_tolerance_m: number
 }
 export interface Station { id: number; name: string; name_en: string; active: boolean; sort: number; item_count: number; open_tasks: number }

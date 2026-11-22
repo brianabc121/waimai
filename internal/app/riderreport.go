@@ -16,10 +16,6 @@ import (
 
 const (
 	riderReportDays = 92
-	// A trip is marked as a detour when the rider rode this much more than
-	// planned, both in share and in metres.
-	detourPercent = 30
-	detourMeters  = 1000
 )
 
 // TripOrder is one order a trip carried.
@@ -75,7 +71,8 @@ const tripCols = `t.id, t.rider_id, t.status, t.end_reason, t.started_at, t.left
 	t.order_count, t.delivered_count, t.failed_count, t.actual_distance_m, t.track_points, t.track_gap_s,
 	t.planned_distance_m, t.planned_source, t.planned_path`
 
-func scanTrip(r pgx.CollectableRow, loc *time.Location) (Trip, error) {
+func scanTrip(r pgx.CollectableRow, b *Branch) (Trip, error) {
+	loc := b.location()
 	t := Trip{Items: []TripOrder{}}
 	err := r.Scan(&t.ID, &t.RiderID, &t.Status, &t.EndReason, &t.StartedAt, &t.LeftStoreAt, &t.LastDropAt, &t.ReturnedAt, &t.EndedAt,
 		&t.Orders, &t.Delivered, &t.Failed, &t.ActualM, &t.TrackPoints, &t.GapSeconds, &t.PlannedM, &t.PlannedSource, &t.plannedPath)
@@ -83,12 +80,13 @@ func scanTrip(r pgx.CollectableRow, loc *time.Location) (Trip, error) {
 		return t, err
 	}
 	t.Day = t.StartedAt.In(loc).Format("2006-01-02")
-	t.compare()
+	t.compare(b)
 	return t, nil
 }
 
-// compare works out what the distance ridden is held against.
-func (t *Trip) compare() {
+// compare works out what the distance ridden is held against, and whether
+// the store calls the difference a detour.
+func (t *Trip) compare(b *Branch) {
 	if t.PlannedM == nil {
 		return
 	}
@@ -107,7 +105,7 @@ func (t *Trip) compare() {
 	}
 	over := *t.ActualM - c
 	t.OverM = &over
-	t.Detour = over > detourMeters && over*100 > c*detourPercent
+	t.Detour = over > b.DetourMeters && over*100 > c*b.DetourPercent
 }
 
 // RiderLine is one rider in the summary.
@@ -146,13 +144,13 @@ type RiderReport struct {
 	Riders   []RiderLine `json:"riders"`
 }
 
-func (a *App) tripsIn(ctx context.Context, branchID int64, riderID *int64, loc *time.Location, start, end time.Time) ([]Trip, error) {
+func (a *App) tripsIn(ctx context.Context, b *Branch, riderID *int64, start, end time.Time) ([]Trip, error) {
 	rows, err := a.DB.Query(ctx, `SELECT `+tripCols+` FROM rider_trips t WHERE t.branch_id=$1 AND t.started_at >= $2 AND t.started_at < $3
-		AND ($4::bigint IS NULL OR t.rider_id = $4) AND t.end_reason <> 'empty' ORDER BY t.started_at, t.id`, branchID, start, end, riderID)
+		AND ($4::bigint IS NULL OR t.rider_id = $4) AND t.end_reason <> 'empty' ORDER BY t.started_at, t.id`, b.ID, start, end, riderID)
 	if err != nil {
 		return nil, err
 	}
-	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Trip, error) { return scanTrip(r, loc) })
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Trip, error) { return scanTrip(r, b) })
 }
 
 // RiderReport sums up the trips of every rider in the period.
@@ -166,9 +164,9 @@ func (a *App) RiderReport(ctx context.Context, branchID int64, from, to string) 
 	if err != nil {
 		return nil, err
 	}
-	out := &RiderReport{From: from, To: to, Timezone: b.Timezone, Currency: b.Currency, DetourPercent: detourPercent,
-		DetourMeters: detourMeters, StoreSet: b.Lat != nil && b.Lng != nil}
-	trips, err := a.tripsIn(ctx, branchID, nil, loc, start, end)
+	out := &RiderReport{From: from, To: to, Timezone: b.Timezone, Currency: b.Currency, DetourPercent: b.DetourPercent,
+		DetourMeters: b.DetourMeters, StoreSet: b.Lat != nil && b.Lng != nil}
+	trips, err := a.tripsIn(ctx, b, nil, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +327,7 @@ func (a *App) RiderDetail(ctx context.Context, branchID, riderID int64, from, to
 		return nil, err
 	}
 	out := &RiderDetail{From: from, To: to, Timezone: b.Timezone, Days: []RiderDay{}}
-	if out.Trips, err = a.tripsIn(ctx, branchID, &riderID, loc, start, end); err != nil {
+	if out.Trips, err = a.tripsIn(ctx, b, &riderID, start, end); err != nil {
 		return nil, err
 	}
 	if out.Trips == nil {
@@ -383,7 +381,7 @@ func (a *App) TripDetail(ctx context.Context, branchID, tripID int64) (*TripDeta
 	if err != nil {
 		return nil, err
 	}
-	trips, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Trip, error) { return scanTrip(r, b.location()) })
+	trips, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Trip, error) { return scanTrip(r, b) })
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +391,7 @@ func (a *App) TripDetail(ctx context.Context, branchID, tripID int64) (*TripDeta
 	if err := a.tripOrders(ctx, trips, true); err != nil {
 		return nil, err
 	}
-	out := &TripDetail{Trip: trips[0], Timezone: b.Timezone, PathDays: tripPathDays, DetourPercent: detourPercent, DetourMeters: detourMeters}
+	out := &TripDetail{Trip: trips[0], Timezone: b.Timezone, PathDays: tripPathDays, DetourPercent: b.DetourPercent, DetourMeters: b.DetourMeters}
 	if b.Lat != nil && b.Lng != nil {
 		out.Store = &LatLng{*b.Lat, *b.Lng}
 	}
@@ -412,4 +410,22 @@ func (a *App) TripDetail(ctx context.Context, branchID, tripID int64) (*TripDeta
 	out.ActualPath, out.TrackGaps, out.PlannedPath, out.PlannedOrder = raw(actual), raw(gaps), raw(planned), raw(order)
 	out.PathForgotten = actual == nil && out.TrackPoints > 0
 	return out, nil
+}
+
+// TripsInPeriod lists the trips of every rider in the period with their
+// orders, for the export.
+func (a *App) TripsInPeriod(ctx context.Context, branchID int64, from, to string) ([]Trip, error) {
+	b, err := a.BranchByID(ctx, branchID)
+	if err != nil {
+		return nil, err
+	}
+	start, end, err := dayRange(b.location(), from, to, riderReportDays)
+	if err != nil {
+		return nil, err
+	}
+	trips, err := a.tripsIn(ctx, b, nil, start, end)
+	if err != nil {
+		return nil, err
+	}
+	return trips, a.tripOrders(ctx, trips, false)
 }

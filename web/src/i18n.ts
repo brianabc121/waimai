@@ -136,6 +136,8 @@ const dict: Record<string, [string, string]> = {
   pick_time: ['请选择时间', 'Choose a time'],
   's.scheduled': ['已接单，会按预约时间准备', 'Accepted. It will be prepared for your chosen time.'],
   scheduling_enabled: ['接受预约单', 'Take scheduled orders'], prep_minutes: ['备餐提前量（分钟）', 'Preparation lead time (min)'],
+  'set.slow_minutes': ['一道菜超过几分钟算超时（工作汇总）', 'A dish is slow after (min, work summary)'],
+  'set.detour_percent': ['骑手多走超过百分之几算偏离', 'A trip is a detour beyond (%)'], 'set.detour_km': ['并且多走超过几公里', '...and beyond (km)'],
   kitchen_from: ['后厨开始', 'Kitchen starts'],
   import_excel: ['导入 Excel', 'Import Excel'], download_template: ['下载模板', 'Download template'], upload: ['上传', 'Upload'],
   import_hint: ['按模板填写后上传。新菜品会先存为草稿，同分类同名的菜品会更新价格等信息。规格在导入后到菜品里编辑。', 'Fill in the template and upload it. New dishes are saved as drafts; a dish with the same category and name is updated. Options are edited on the dish afterwards.'],

@@ -366,6 +366,7 @@ func (s *Server) Router() *gin.Engine {
 	// clocking on and off, for everyone who works in a store
 	auth.GET("/work/shift", s.shiftState)
 	auth.POST("/work/shift", s.setShift)
+	auth.GET("/work/attendance", s.myAttendance)
 
 	// rider
 	auth.GET("/rider/tasks", s.riderTasks)

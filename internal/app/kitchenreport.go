@@ -16,10 +16,8 @@ import (
 // account that happens to be signed in there.
 
 const (
-	// kitchenSlowMinutes: a dish that took longer from "start" to "ready" is slow.
-	kitchenSlowMinutes = 15
-	kitchenReportDays  = 92
-	kitchenPageSize    = 50
+	kitchenReportDays = 92
+	kitchenPageSize   = 50
 	// kitchenChartDays is the least number of days the per-day chart shows.
 	kitchenChartDays = 7
 )
@@ -94,7 +92,7 @@ func (a *App) KitchenReport(ctx context.Context, branchID int64, from, to string
 	if err != nil {
 		return nil, err
 	}
-	out := &KitchenReport{From: from, To: to, Timezone: p.branch.Timezone, SlowMinutes: kitchenSlowMinutes}
+	out := &KitchenReport{From: from, To: to, Timezone: p.branch.Timezone, SlowMinutes: p.branch.KitchenSlowMinutes}
 	by := map[int64]*KitchenPerson{}
 	person := func(id int64) *KitchenPerson {
 		if by[id] == nil {
@@ -302,7 +300,7 @@ func (a *App) KitchenDetail(ctx context.Context, branchID, userID int64, from, t
 	if f.Page < 1 {
 		f.Page = 1
 	}
-	out := &KitchenDetail{From: from, To: to, Timezone: p.branch.Timezone, SlowMinutes: kitchenSlowMinutes,
+	out := &KitchenDetail{From: from, To: to, Timezone: p.branch.Timezone, SlowMinutes: p.branch.KitchenSlowMinutes,
 		Page: f.Page, PageSize: kitchenPageSize, Days: []KitchenDay{}, Top: []KitchenCount{}, Stations: []KitchenCount{}, Items: []KitchenDish{}}
 	// $1 branch, $2 and $3 the period, $4 the person
 	mine, packedMine := `oi.ready_by = $4 AND oi.ready_via <> 'board'`, `o.packed_by = $4 AND o.packed_via <> 'board'`
@@ -311,7 +309,7 @@ func (a *App) KitchenDetail(ctx context.Context, branchID, userID int64, from, t
 	}
 	where := `oi.branch_id=$1 AND oi.ready_at >= $2 AND oi.ready_at < $3 AND ` + mine
 	secs := `extract(epoch FROM oi.ready_at - oi.prep_started_at)`
-	slow := fmt.Sprintf(`(oi.prep_started_at IS NOT NULL AND %s > %d)`, secs, kitchenSlowMinutes*60)
+	slow := fmt.Sprintf(`(oi.prep_started_at IS NOT NULL AND %s > %d)`, secs, p.branch.KitchenSlowMinutes*60)
 	args := []any{branchID, p.start, p.end, userID}
 
 	var avg *float64
@@ -448,17 +446,29 @@ func (a *App) KitchenDetail(ctx context.Context, branchID, userID int64, from, t
 	if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM order_items oi WHERE `+filter, args...).Scan(&out.ItemTotal); err != nil {
 		return nil, err
 	}
-	rows, err = a.DB.Query(ctx, `SELECT oi.id, oi.ready_at, oi.name, oi.name_en, oi.options, oi.note, oi.qty, oi.station_id, oi.station_name,
+	items, err := a.kitchenDishes(ctx, filter, secs, slow, args, kitchenPageSize, (f.Page-1)*kitchenPageSize)
+	if err != nil {
+		return nil, err
+	}
+	if items != nil {
+		out.Items = items
+	}
+	return out, nil
+}
+
+// kitchenDishes lists dishes, newest first. where is a condition on order_items oi.
+func (a *App) kitchenDishes(ctx context.Context, where, secs, slow string, args []any, limit, offset int) ([]KitchenDish, error) {
+	rows, err := a.DB.Query(ctx, `SELECT oi.id, oi.ready_at, oi.name, oi.name_en, oi.options, oi.note, oi.qty, oi.station_id, oi.station_name,
 			o.id, o.public_no, o.service_type, o.table_name, o.acceptance_status = 'cancelled', oi.prep_started_at,
 			coalesce(sb.display_name, ''), CASE WHEN oi.prep_started_at IS NOT NULL THEN `+secs+`::int END, `+slow+`,
 			oi.ready_via, coalesce(rb.display_name, ''), oi.undo_count
 		FROM order_items oi JOIN orders o ON o.id = oi.order_id
 			LEFT JOIN users sb ON sb.id = oi.prep_started_by LEFT JOIN users rb ON rb.id = oi.ready_by
-		WHERE `+filter+fmt.Sprintf(` ORDER BY oi.ready_at DESC, oi.id DESC LIMIT %d OFFSET %d`, kitchenPageSize, (f.Page-1)*kitchenPageSize), args...)
+		WHERE `+where+fmt.Sprintf(` ORDER BY oi.ready_at DESC, oi.id DESC LIMIT %d OFFSET %d`, limit, offset), args...)
 	if err != nil {
 		return nil, err
 	}
-	items, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (KitchenDish, error) {
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (KitchenDish, error) {
 		var d KitchenDish
 		var opts []byte
 		err := r.Scan(&d.ID, &d.ReadyAt, &d.Name, &d.NameEn, &opts, &d.Note, &d.Qty, &d.StationID, &d.StationName,
@@ -470,11 +480,19 @@ func (a *App) KitchenDetail(ctx context.Context, branchID, userID int64, from, t
 		d.Options = []LineOption{}
 		return d, json.Unmarshal(opts, &d.Options)
 	})
+}
+
+// kitchenExportMax is the most dishes one export lists.
+const kitchenExportMax = 50000
+
+// KitchenDishes lists every dish made in the period, whoever made it, for the export.
+func (a *App) KitchenDishes(ctx context.Context, branchID int64, from, to string) ([]KitchenDish, error) {
+	p, err := a.kitchenPeriod(ctx, branchID, from, to)
 	if err != nil {
 		return nil, err
 	}
-	if items != nil {
-		out.Items = items
-	}
-	return out, nil
+	secs := `extract(epoch FROM oi.ready_at - oi.prep_started_at)`
+	slow := fmt.Sprintf(`(oi.prep_started_at IS NOT NULL AND %s > %d)`, secs, p.branch.KitchenSlowMinutes*60)
+	return a.kitchenDishes(ctx, `oi.branch_id=$1 AND oi.ready_at >= $2 AND oi.ready_at < $3 AND oi.ready_by IS NOT NULL`, secs, slow,
+		[]any{branchID, p.start, p.end}, kitchenExportMax, 0)
 }

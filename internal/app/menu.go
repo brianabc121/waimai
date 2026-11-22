@@ -403,6 +403,10 @@ type SettingsInput struct {
 	NotifySMS            bool   `json:"notify_sms"`
 	SchedulingEnabled    bool   `json:"scheduling_enabled"`
 	PrepMinutes          int    `json:"prep_minutes"` // 0 = keep the default of 30
+	// 0 keeps what is set for these three.
+	KitchenSlowMinutes int `json:"kitchen_slow_minutes"`
+	DetourPercent      int `json:"detour_percent"`
+	DetourMeters       int `json:"detour_meters"`
 }
 
 var hhmmRe = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
@@ -429,13 +433,24 @@ func (a *App) SaveSettings(ctx context.Context, branchID int64, in SettingsInput
 	if in.PrepMinutes < 5 || in.PrepMinutes > 240 {
 		return nil, ErrValidation("preparation time must be 5 to 240 minutes")
 	}
+	if in.KitchenSlowMinutes != 0 && (in.KitchenSlowMinutes < 1 || in.KitchenSlowMinutes > 120) {
+		return nil, ErrValidation("a slow dish must be 1 to 120 minutes")
+	}
+	if in.DetourPercent != 0 && (in.DetourPercent < 5 || in.DetourPercent > 300) {
+		return nil, ErrValidation("the detour share must be 5% to 300%")
+	}
+	if in.DetourMeters != 0 && (in.DetourMeters < 100 || in.DetourMeters > 20000) {
+		return nil, ErrValidation("the detour distance must be 0.1 to 20 km")
+	}
 	tag, err := a.DB.Exec(ctx, `UPDATE branches SET name=$2, name_en=$3, address=$4, phone=$5, tax_rate_bp=$6,
 		tax_inclusive=$7, service_charge_bp=$8, packaging_fee=$9, min_order_amount=$10, accept_timeout_minutes=$11,
 		delivery_enabled=$12, pickup_enabled=$13, paused=$14, open_time=$15, close_time=$16, notify_sms=$17,
-		scheduling_enabled=$18, prep_minutes=$19 WHERE id=$1`,
+		scheduling_enabled=$18, prep_minutes=$19, kitchen_slow_minutes=coalesce(nullif($20, 0), kitchen_slow_minutes),
+		detour_percent=coalesce(nullif($21, 0), detour_percent), detour_meters=coalesce(nullif($22, 0), detour_meters) WHERE id=$1`,
 		branchID, in.Name, in.NameEn, in.Address, in.Phone, in.TaxRateBP, in.TaxInclusive, in.ServiceChargeBP,
 		in.PackagingFee, in.MinOrderAmount, in.AcceptTimeoutMinutes, in.DeliveryEnabled, in.PickupEnabled,
-		in.Paused, in.OpenTime, in.CloseTime, in.NotifySMS, in.SchedulingEnabled, in.PrepMinutes)
+		in.Paused, in.OpenTime, in.CloseTime, in.NotifySMS, in.SchedulingEnabled, in.PrepMinutes,
+		in.KitchenSlowMinutes, in.DetourPercent, in.DetourMeters)
 	if err != nil {
 		return nil, err
 	}
