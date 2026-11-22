@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"log"
@@ -29,6 +30,7 @@ func main() {
 	must(a.EnsurePlatformAdmin(ctx, "admin", demoPassword))
 	seedStore(ctx, a, "makati", "马卡蒂小馆", "Makati Kitchen", "owner1", true)
 	seedStore(ctx, a, "bgc", "BGC 面馆", "BGC Noodle House", "owner2", false)
+	seedPictures(ctx, a)
 	seedFailedJobs(ctx, a)
 	log.Printf("seed done. Demo password for every account: %s", demoPassword)
 	log.Print("accounts: admin · owner1 cashier1 kitchen1 rider1 rider2 (store makati) · owner2 (store bgc)")
@@ -47,6 +49,62 @@ func seedFailedJobs(ctx context.Context, a *app.App) {
 		_, err := a.DB.Exec(ctx, `INSERT INTO jobs (kind, payload, status, attempts, last_error, finished_at)
 			VALUES ('sms', jsonb_build_object('phone', $1::text, 'message', $2::text), 'failed', 5, $3, now())`,
 			fmt.Sprintf("+6390000001%02d", i), "【马卡蒂小馆】A00"+fmt.Sprint(i+1)+" 商家已接单，正在备餐。The store accepted your order and is preparing it.", reason)
+		must(err)
+	}
+}
+
+// The demo's promo media. The dish photos are files of the website
+// (web/public/demo); where they come from is in CREDITS.md there.
+//
+//go:embed assets
+var assets embed.FS
+
+var dishPictures = map[string]string{
+	"盐酥鸡": "popcorn-chicken", "无盐地瓜条": "sweet-potato-fries", "黄金鸡排": "chicken-cutlet",
+	"卤肉饭": "braised-pork-rice", "牛肉面": "beef-noodle-soup", "今日限量便当": "bento", "双人炸物套餐": "fried-combo",
+	"冰柠檬茶": "iced-lemon-tea", "珍珠奶茶": "bubble-milk-tea", "瓶装水": "bottled-water",
+}
+
+// seedPictures gives the demo stores dish photos, a logo and promo media.
+// It also runs for stores seeded before there were pictures, and only fills
+// in what is empty: a picture the merchant chose is never replaced.
+func seedPictures(ctx context.Context, a *app.App) {
+	for _, slug := range []string{"makati", "bgc"} {
+		var bid int64
+		err := a.DB.QueryRow(ctx, `SELECT id FROM branches WHERE slug=$1 AND deleted_at IS NULL`, slug).Scan(&bid)
+		if err != nil {
+			continue
+		}
+		for name, file := range dishPictures {
+			_, err := a.DB.Exec(ctx, `UPDATE menu_items SET image_url=$3 WHERE branch_id=$1 AND name=$2 AND image_url=''`,
+				bid, name, "/demo/"+file+".jpg")
+			must(err)
+		}
+		_, err = a.DB.Exec(ctx, `UPDATE channel_templates SET published = jsonb_set(published, '{logo_url}', '"/demo/logo.svg"')
+			WHERE branch_id=$1 AND coalesce(published->>'logo_url', '') = ''`, bid)
+		must(err)
+		if slug != "makati" { // the second store shows a page without promo media
+			continue
+		}
+		have, err := a.ListMedia(ctx, bid)
+		must(err)
+		if len(have) > 0 {
+			continue
+		}
+		file := func(name string) []byte {
+			b, err := assets.ReadFile("assets/" + name)
+			must(err)
+			return b
+		}
+		// The pictures are 4:3; the crop takes a 16:9 band out of the middle.
+		band := &app.Crop{X: 0, Y: 0.125, W: 1, H: 0.75}
+		v, err := a.AddMedia(ctx, bid, file("fried-chicken.mp4"), app.MediaInput{Title: strp("现炸出锅")})
+		must(err)
+		_, err = a.SetMediaPoster(ctx, bid, v.ID, file("fried-chicken-cover.jpg"))
+		must(err)
+		_, err = a.AddMedia(ctx, bid, file("beef-noodle-soup.jpg"), app.MediaInput{Title: strp("红烧牛肉面"), Crop: band})
+		must(err)
+		_, err = a.AddMedia(ctx, bid, file("braised-pork-rice.jpg"), app.MediaInput{Title: strp("古早味卤肉饭"), Crop: band})
 		must(err)
 	}
 }

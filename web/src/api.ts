@@ -33,7 +33,7 @@ export const patch = <T = any>(path: string, body: unknown) => api<T>('PATCH', p
 export const del = <T = any>(path: string, body?: unknown) => api<T>('DELETE', path, body)
 
 // upload sends a file as the raw request body (the API reads it with a size cap).
-export async function upload<T = any>(path: string, file: File): Promise<T> {
+export async function upload<T = any>(path: string, file: Blob): Promise<T> {
   let res: Response
   try {
     res = await fetch('/api/v1' + path, { method: 'POST', credentials: 'same-origin',

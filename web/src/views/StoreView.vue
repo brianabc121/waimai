@@ -9,9 +9,11 @@ import { customer, customerLogout, loadCustomer, loginRoute, prettyPhone } from 
 import { termsAt, type DeliveryTerms } from '../addresses'
 import type { Item, Storefront } from '../types'
 import CartPanel from './CartPanel.vue'
+import MediaCarousel from './MediaCarousel.vue'
 import MenuList from './MenuList.vue'
 import StoreReviews from './StoreReviews.vue'
 import './storeStrings'
+import '../media'
 
 // The map and the address book are only downloaded when a customer opens them.
 const PlacePicker = defineAsyncComponent(() => import('./PlacePicker.vue'))
@@ -82,6 +84,8 @@ async function logout() { await customerLogout(); showAccount.value = false }
 const showAddresses = ref(false)
 const shopPin = computed(() => { const b = store.value?.branch; return b && b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng, name: pick(b.name, b.name_en) } : null })
 
+// Promotional pictures and videos; a store without any has no such area.
+const media = computed(() => store.value?.media ?? [])
 const tpl = computed(() => store.value?.templates?.delivery ?? defaultTemplate('delivery'))
 const cur = computed(() => store.value?.branch.currency ?? 'PHP')
 const items = computed(() => new Map((store.value?.categories ?? []).flatMap(c => c.items).map(i => [i.id, i])))
@@ -235,7 +239,10 @@ async function sendReport() {
     </div>
     <div v-else-if="!store" class="section muted">{{ t('loading') }}</div>
     <template v-else>
-      <img v-if="tpl.cover_url" :src="tpl.cover_url" alt="" class="cover" />
+      <img v-if="tpl.cover_url && !media.length" :src="tpl.cover_url" alt="" class="cover" />
+      <div class="hero" :class="{ media: media.length }">
+      <!-- promotional pictures and videos, when the store has any -->
+      <div v-if="media.length" class="hero-media"><MediaCarousel :media="media" /><i class="lip"></i></div>
       <!-- the store card -->
       <header class="shophead">
         <div class="tools">
@@ -289,6 +296,7 @@ async function sendReport() {
           <div ref="marq" class="marq" :class="{ run: scrolls }"><span :style="{ animationDuration: Math.max(8, store.branch.notice.length / 4) + 's' }">{{ store.branch.notice }}<template v-if="scrolls"><i></i>{{ store.branch.notice }}<i></i></template></span></div>
         </div>
       </header>
+      </div>
 
       <nav class="shoptabs">
         <button :class="{ on: tab === 'menu' }" data-tab="menu" @click="tab = 'menu'">{{ t('sf.tab_menu') }}</button>
@@ -507,6 +515,21 @@ async function sendReport() {
 @keyframes marq { to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) { .marq.run span { animation: none; } }
 
+/* With promo media the card stands on the lower edge of the pictures and the
+   buttons lie over them; from tablet width up the pictures sit beside the card. */
+.hero { position: relative; }
+.hero-media { position: relative; --promo-foot: 28px; }
+.hero-media::before { content: ''; position: absolute; inset: 0 0 auto; height: 72px; z-index: 1; pointer-events: none; background: linear-gradient(rgba(0, 0, 0, .45), transparent); }
+.lip { position: absolute; left: 0; right: 0; bottom: -1px; height: 18px; background: #fff; border-radius: 18px 18px 0 0; pointer-events: none; }
+.hero.media .shophead { padding-top: 0; }
+@media (max-width: 767.98px) {
+  .hero.media .tools { position: absolute; top: 8px; left: 12px; right: 10px; z-index: 5; color: #fff; }
+  .hero.media .tools .ico, .hero.media .tools .lang { color: #fff; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5)); }
+  .hero.media .tools .lang { border-color: rgba(255, 255, 255, .85); }
+  .hero.media .tools .ico:hover, .hero.media .tools .ico.on { background: rgba(255, 255, 255, .22); }
+  .hero.media .acct-menu { color: var(--ink); }
+}
+
 /* the three tabs */
 .shoptabs { position: sticky; top: 0; z-index: 15; display: flex; gap: 30px; height: 50px; margin-top: 10px; padding: 0 22px; background: #fff; border-radius: 18px 18px 0 0; }
 .shoptabs button { position: relative; border: 0; background: none; padding: 0 2px; font-size: 16px; color: #666; cursor: pointer; }
@@ -555,6 +578,10 @@ async function sendReport() {
 .sidecart { display: none; }
 @media (min-width: 768px) {
   .shophead { padding: 16px var(--gut) 18px; border-radius: 0; }
+  .hero.media { display: grid; grid-template-columns: min(44%, 460px) minmax(0, 1fr); gap: 0 24px; align-items: start; background: #fff; padding: 16px var(--gut) 18px; }
+  .hero.media .shophead { padding: 0; }
+  .hero-media { --promo-foot: 12px; border-radius: 14px; overflow: hidden; }
+  .hero-media::before, .lip { display: none; }
   .logo { width: 88px; height: 88px; }
   .ident h1 { font-size: 24px; }
   .shoptabs { margin: 12px calc(var(--gut) - 14px) 0; padding: 0 26px; gap: 40px; }
