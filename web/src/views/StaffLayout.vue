@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { get, post } from '../api'
 import { locale, setLocale, t } from '../i18n'
 import { currentRole, logout, session, setAdminView, setBranch } from '../session'
 import { useShell } from '../shell'
+import { storeChats } from '../chat'
 
 const router = useRouter()
 const shell = useShell('store')
@@ -21,6 +22,16 @@ async function toggleShift() {
   if (!shift.value) return
   shift.value = await post<{ on_duty: boolean }>('/work/shift', { on_duty: !shift.value.on_duty, branch_id: session.branchId }).catch(() => shift.value)
 }
+
+// The number on "messages": customers' chat messages nobody at the desk has read.
+const chatUnread = ref(0)
+let chatTimer = 0
+async function countChats() {
+  if (!desk.value || !session.branchId || document.visibilityState !== 'visible') return
+  chatUnread.value = await storeChats(session.branchId, { unread: true }).then(r => r.unread, () => chatUnread.value)
+}
+onMounted(() => { void countChats(); chatTimer = window.setInterval(countChats, 20000) })
+onBeforeUnmount(() => clearInterval(chatTimer))
 
 async function out() { await logout(); session.loaded = true; router.replace('/login') }
 const viewing = computed(() => !!session.user?.is_platform_admin)
@@ -50,6 +61,7 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
         <router-link v-if="desk" to="/merchant/orders">{{ t('orders') }}</router-link>
         <router-link v-if="desk" to="/merchant/tables">{{ t('tables') }}</router-link>
         <router-link v-if="desk || inStore" to="/kitchen">{{ t('kitchen') }}</router-link>
+        <router-link v-if="desk" to="/merchant/messages" data-testid="nav-messages" @click="countChats">{{ t('ch.nav') }}<span v-if="chatUnread" class="navnum" data-testid="nav-chat-unread">{{ chatUnread > 99 ? '99+' : chatUnread }}</span></router-link>
         <router-link v-if="desk || inStore" to="/merchant/menu">{{ t('menu_admin') }}</router-link>
         <router-link v-if="manager" to="/merchant/templates">{{ t('templates') }}</router-link>
         <router-link v-if="manager" to="/merchant/media">{{ t('promo_media') }}</router-link>

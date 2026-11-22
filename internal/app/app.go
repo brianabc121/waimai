@@ -61,6 +61,8 @@ type App struct {
 	// Router plans a rider's round trip on real roads. Without one the
 	// planned route of a trip is a straight-line estimate.
 	Router Router
+	// IM is the chat server (OpenIM). Nil turns chat off.
+	IM IM
 
 	// The four fields above are rebuilt when an administrator saves a key
 	// (settings.go); mu guards them. base is the configuration from the

@@ -18,6 +18,11 @@ import CustomerTabs from './me/CustomerTabs.vue'
 import { isFavorite, loadProfile, rememberStore, setFavorite } from './me/me'
 import '../orders'
 import '../media'
+import { chatEnabled } from '../chat'
+
+// The "contact store" entry shows only where chat is set up.
+const chatOn = ref(false)
+void chatEnabled().then(v => { chatOn.value = v })
 
 // The map and the address book are only downloaded when a customer opens them.
 const PlacePicker = defineAsyncComponent(() => import('./PlacePicker.vue'))
@@ -340,6 +345,9 @@ async function sendReport() {
         <section v-if="store.branch.address || store.branch.phone">
           <template v-if="store.branch.address"><h3>{{ t('address') }}</h3><p>{{ store.branch.address }}</p></template>
           <template v-if="store.branch.phone"><h3>{{ t('phone') }}</h3><p><a :href="'tel:' + store.branch.phone">{{ store.branch.phone }}</a></p></template>
+        </section>
+        <section v-if="chatOn">
+          <router-link class="btn block" data-testid="store-chat" :to="`/chat/${store.branch.slug}`">{{ t('ch.contact_store') }}</router-link>
         </section>
         <section v-if="store.branch.delivery_enabled && store.zones.length">
           <h3>{{ t('zones') }}</h3>

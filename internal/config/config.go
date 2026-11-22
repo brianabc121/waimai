@@ -41,6 +41,18 @@ type Config struct {
 	TwilioAuthToken    string
 	TwilioFrom         string
 	TwilioMessagingSID string
+
+	// Chat goes through an OpenIM server (docs/CHAT_DESIGN.md). An empty
+	// OpenIMAPIURL turns chat off.
+	OpenIMAPIURL  string // reached from this server, e.g. http://openim-server:10002
+	OpenIMSecret  string // OpenIM's share.secret
+	OpenIMAdminID string // OpenIM's administrator account
+	// Where browsers reach OpenIM: a full address or a path on this site.
+	OpenIMPublicWS  string
+	OpenIMPublicAPI string
+	// OpenIMHookKey is part of the address OpenIM calls back, since its
+	// callbacks carry no signature.
+	OpenIMHookKey string
 }
 
 func env(key, def string) string {
@@ -85,6 +97,13 @@ func Load() Config {
 		TwilioAuthToken:    env("TWILIO_AUTH_TOKEN", ""),
 		TwilioFrom:         env("TWILIO_FROM", ""),
 		TwilioMessagingSID: env("TWILIO_MESSAGING_SERVICE_SID", ""),
+
+		OpenIMAPIURL:    strings.TrimRight(env("OPENIM_API_URL", ""), "/"),
+		OpenIMSecret:    env("OPENIM_SECRET", ""),
+		OpenIMAdminID:   env("OPENIM_ADMIN_ID", "imAdmin"),
+		OpenIMPublicWS:  env("OPENIM_PUBLIC_WS", "/im/ws"),
+		OpenIMPublicAPI: strings.TrimRight(env("OPENIM_PUBLIC_API", "/im/api"), "/"),
+		OpenIMHookKey:   env("OPENIM_HOOK_KEY", ""),
 	}
 	// DIRECT_DATABASE_URL (older name: LISTEN_DATABASE_URL) is only needed when
 	// DATABASE_URL goes through a transaction-mode pooler.

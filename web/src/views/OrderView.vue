@@ -14,6 +14,11 @@ import { closedStatus, finished as isFinished, orderAgain, stamp } from '../orde
 import type { Order, OrderReview } from '../types'
 import './storeStrings'
 import TotalsTable from './TotalsTable.vue'
+import { chatEnabled } from '../chat'
+
+// The "contact store" entry shows only where chat is set up.
+const chatOn = ref(false)
+void chatEnabled().then(v => { chatOn.value = v })
 
 // Only customers whose order is on its way download the map.
 const TrackRider = defineAsyncComponent(() => import('./TrackRider.vue'))
@@ -150,6 +155,7 @@ async function copyNo() {
           <button v-if="status === 'pending_acceptance'" class="pill" data-testid="act-cancel" @click="cancel">{{ t('cancel_order') }}</button>
           <button v-if="canAftersale" class="pill" data-testid="act-aftersale" @click="as.open = true">{{ t('as.apply') }}</button>
           <a v-if="onTheWay && order.delivery?.rider_phone" class="pill" data-testid="act-rider" :href="'tel:' + order.delivery.rider_phone">{{ t('od.call_rider') }}</a>
+          <router-link v-if="chatOn && store" class="pill" data-testid="act-chat" :to="`/chat/${store.slug}`">{{ t('ch.contact_store') }}</router-link>
           <a v-if="store?.phone" class="pill" data-testid="act-store" :href="'tel:' + store.phone">{{ t('od.call_store') }}</a>
           <button class="pill brand" data-testid="act-again" :disabled="againBusy" @click="again">{{ t('ol.again') }}</button>
         </div>
