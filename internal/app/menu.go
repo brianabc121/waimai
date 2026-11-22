@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"net/http"
 	"regexp"
 	"strings"
@@ -367,10 +368,41 @@ func (a *App) ReorderZones(ctx context.Context, branchID int64, ids []int64) err
 	})
 }
 
+// Region is where a point is, in words, as the map's geocoder tells it.
+type Region struct {
+	CountryCode string `json:"country_code"`
+	Country     string `json:"country"`
+	Province    string `json:"province"`
+	City        string `json:"city"`
+	District    string `json:"district"`
+	PostalCode  string `json:"postal_code"`
+}
+
 type LocationInput struct {
 	Lat     float64 `json:"lat"`
 	Lng     float64 `json:"lng"`
 	Address string  `json:"address"`
+	// Region is what the merchant's map made of the point. Without it the
+	// stored one is kept while the store stays put, and dropped when it moves.
+	Region *Region `json:"region"`
+}
+
+// regionStaysM: a location saved without a region this close to the old one
+// keeps the old one's region.
+const regionStaysM = 50
+
+func (r *Region) clean() error {
+	r.CountryCode = strings.ToUpper(strings.TrimSpace(r.CountryCode))
+	if r.CountryCode != "" && (len(r.CountryCode) != 2 || strings.Trim(r.CountryCode, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") != "") {
+		return ErrValidation("country_code must be two letters")
+	}
+	for _, f := range []*string{&r.Country, &r.Province, &r.City, &r.District, &r.PostalCode} {
+		*f = strings.TrimSpace(*f)
+		if len(*f) > 120 {
+			return ErrValidation("region name is too long")
+		}
+	}
+	return nil
 }
 
 // SaveLocation sets where the store is. Zone outlines do not move with it.
@@ -382,8 +414,25 @@ func (a *App) SaveLocation(ctx context.Context, branchID int64, in LocationInput
 	if len(in.Address) > 300 {
 		return nil, ErrValidation("address is too long")
 	}
-	tag, err := a.DB.Exec(ctx, `UPDATE branches SET lat=$2, lng=$3, address=CASE WHEN $4 = '' THEN address ELSE $4 END
-		WHERE id=$1`, branchID, in.Lat, in.Lng, in.Address)
+	old, err := a.BranchByID(ctx, branchID)
+	if err != nil {
+		return nil, err
+	}
+	reg := Region{}
+	if in.Region != nil {
+		reg = *in.Region
+		if err := reg.clean(); err != nil {
+			return nil, err
+		}
+	} else if at := old.latLng(); at != nil {
+		if p := newPlanar(*at).pt(LatLng{in.Lat, in.Lng}); math.Hypot(p.x, p.y) <= regionStaysM {
+			reg = Region{old.CountryCode, old.Country, old.Province, old.City, old.District, old.PostalCode}
+		}
+	}
+	tag, err := a.DB.Exec(ctx, `UPDATE branches SET lat=$2, lng=$3, address=CASE WHEN $4 = '' THEN address ELSE $4 END,
+		country_code=$5, country=$6, province=$7, city=$8, district=$9, postal_code=$10
+		WHERE id=$1`, branchID, in.Lat, in.Lng, in.Address,
+		reg.CountryCode, reg.Country, reg.Province, reg.City, reg.District, reg.PostalCode)
 	if err != nil {
 		return nil, err
 	}

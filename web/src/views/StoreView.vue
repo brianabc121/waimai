@@ -80,7 +80,7 @@ async function account() {
 }
 async function logout() { await customerLogout(); showAccount.value = false }
 const showAddresses = ref(false)
-const shopPin = computed(() => { const b = store.value?.branch; return b && b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng, name: pick(b.name, b.name_en) } : null })
+const shopPin = computed(() => { const b = store.value?.branch; return b && b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng, name: pick(b.name, b.name_en), country: b.country_code } : null })
 
 const tpl = computed(() => store.value?.templates?.delivery ?? defaultTemplate('delivery'))
 const cur = computed(() => store.value?.branch.currency ?? 'PHP')
@@ -239,11 +239,7 @@ async function sendReport() {
       <!-- the store card -->
       <header class="shophead">
         <div class="tools">
-          <div class="seg light" v-if="store.branch.delivery_enabled && store.branch.pickup_enabled">
-            <button :class="{ on: cart.service === 'delivery' }" @click="cart.service = 'delivery'">{{ t('delivery') }}</button>
-            <button :class="{ on: cart.service === 'pickup' }" @click="cart.service = 'pickup'">{{ t('pickup') }}</button>
-          </div>
-          <span v-else class="bold">{{ t(cart.service) }}</span>
+          <!-- delivery or pickup is chosen at checkout -->
           <span class="grow"></span>
           <button class="ico" :class="{ on: searching }" :aria-label="t('sf.search')" data-testid="search-toggle" @click="toggleSearch">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg></button>

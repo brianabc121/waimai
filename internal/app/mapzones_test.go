@@ -40,6 +40,29 @@ func TestMapZones(t *testing.T) {
 	if b.Lat == nil || *b.Lat != store[0] || b.Address != "1 Map St" || b.ZoneMode != "list" || b.ZoneToleranceM != 200 {
 		t.Fatalf("branch after location: %+v", b)
 	}
+	// The region read off the map is kept with the location: it stays while
+	// the store stays, and goes when the store moves without a new one.
+	_, err = a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: store[0], Lng: store[1], Region: &app.Region{CountryCode: "PHL"}})
+	wantCode(t, err, "VALIDATION")
+	b, err = a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: store[0], Lng: store[1],
+		Region: &app.Region{CountryCode: "ph", Country: "Philippines", Province: "Metro Manila", City: " Makati ", District: "Bel-Air", PostalCode: "1209"}})
+	noErr(t, err)
+	if b.CountryCode != "PH" || b.Country != "Philippines" || b.Province != "Metro Manila" || b.City != "Makati" || b.District != "Bel-Air" || b.PostalCode != "1209" || b.Address != "1 Map St" {
+		t.Fatalf("region after location: %+v", b)
+	}
+	b, err = a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: store[0], Lng: store[1]})
+	noErr(t, err)
+	if b.CountryCode != "PH" || b.City != "Makati" {
+		t.Fatalf("region lost though the store did not move: %+v", b)
+	}
+	moved := m(5000, 5000)
+	b, err = a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: moved[0], Lng: moved[1]})
+	noErr(t, err)
+	if b.CountryCode != "" || b.City != "" {
+		t.Fatalf("stale region kept after the store moved: %+v", b)
+	}
+	_, err = a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: store[0], Lng: store[1]})
+	noErr(t, err)
 	_, err = a.SaveZoneMode(ctx, s.branchID, app.ZoneModeInput{ZoneMode: "map", ZoneToleranceM: 200})
 	wantCode(t, err, "MAP_NOT_READY") // the only zone has no outline yet
 

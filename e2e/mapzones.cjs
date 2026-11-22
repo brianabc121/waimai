@@ -67,6 +67,8 @@ await page.fill(tid('loc-address'), '123 Ayala Ave, Makati')
 await page.click(tid('save-location'))
 await mode('browse')
 expect(await page.textContent(tid('store-latlng')), '14.55470, 121.02440', 'saved store location')
+expect(await page.textContent(tid('store-region')), 'Philippines · Metro Manila · Makati · Stub District (1200)', 'the region read off the map is saved with the location')
+expect((await own('GET', `/merchant/branches/${bid}/menu`)).branch.country_code, 'PH', 'the store knows its country')
 step('the owner places the store on the map')
 
 // Reload: the map opens centred on the store at street level (about 4.6 m per pixel).
@@ -281,6 +283,13 @@ await cust.click(tid('deliver-to')) // "can you deliver to me?"
 await cust.waitForSelector(tid('picker'))
 await result('in')
 expect(await cust.locator(tid('picker') + ' svg polygon, ' + tid('picker') + ' svg circle.zone').count(), 0, 'no zone outlines on the customer map')
+// typed searches stay in the store's country, near the store, wherever the map is
+await goTo('40.7624, -73.9738')
+await result('out')
+await cust.fill(tid('pin-search'), 'trump tower')
+await cust.locator(`${tid('pin-place')}:has-text("Stub St, PH")`).first().waitFor()
+await cust.locator(tid('pin-place')).first().click()
+await result('in')
 await goTo('14.70, 121.20')
 await result('out')
 expect(await cust.isDisabled(tid('pin-confirm')), true, 'out of range cannot be confirmed')

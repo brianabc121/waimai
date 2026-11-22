@@ -7,7 +7,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { termsAt, type DeliveryTerms } from '../addresses'
 import { money, t } from '../i18n'
-import { mapsKey, type Place } from '../maps'
+import { mapsKey, storeScope, type Place } from '../maps'
 import type { LatLng, View } from '../geo'
 import MapCanvas from './MapCanvas.vue'
 
@@ -17,7 +17,7 @@ const props = defineProps<{
   // the store whose delivery is asked about; without one nothing is said about delivery
   slug?: string; currency?: string
   // where to start: a saved pin, else the store, else wherever the map opens
-  start?: { lat: number; lng: number } | null; name?: string; shop?: { lat: number; lng: number; name: string } | null
+  start?: { lat: number; lng: number } | null; name?: string; shop?: { lat: number; lng: number; name: string; country?: string } | null
   // embedded: shown beside a form, with no header of its own
   embedded?: boolean; pickup?: boolean
   // keepable: an out-of-range spot may still be chosen (for the address book)
@@ -42,6 +42,15 @@ let settleTimer = 0, typeTimer = 0, seq = 0, listSeq = 0
 
 onMounted(async () => { key.value = await mapsKey() })
 onBeforeUnmount(() => { clearTimeout(settleTimer); clearTimeout(typeTimer) })
+
+// Searches stay in the store's country and look near the store first: nobody
+// orders from a store in Manila to an address in New York.
+async function mapReady() {
+  moved()
+  if (!props.shop || !map.value) return
+  const s = await storeScope(props.shop, p => map.value?.resolve(p) ?? Promise.resolve(null))
+  map.value?.scope(s)
+}
 
 // Every time the map comes to rest, the pin is somewhere new.
 function moved() {
@@ -136,7 +145,7 @@ const state = computed(() => checking.value || !terms.value ? 'checking' : terms
 <template>
   <div class="ppick" :class="{ embedded }" data-testid="picker">
     <div v-if="!embedded" class="pp-head"><button class="pp-back" :aria-label="t('back')" data-testid="pin-back" @click="emit('close')">‹</button><b>{{ t('pp.title') }}</b></div>
-    <MapCanvas v-if="key" ref="map" class="pp-map" :maps-key="key" :initial="initial" data-testid="pin-map" @ready="moved">
+    <MapCanvas v-if="key" ref="map" class="pp-map" :maps-key="key" :initial="initial" data-testid="pin-map" @ready="mapReady">
       <template #default="{ px }">
         <g v-if="shop" :transform="`translate(${px([shop.lat, shop.lng]).x} ${px([shop.lat, shop.lng]).y})`">
           <path d="M0 0C-3 -9 -11 -13 -11 -22A11 11 0 1 1 11 -22C11 -13 3 -9 0 0Z" fill="#d9480f" stroke="#fff" stroke-width="2" />

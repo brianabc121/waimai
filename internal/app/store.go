@@ -39,6 +39,14 @@ type Branch struct {
 	// Lat/Lng is where the store is, set on the delivery map page.
 	Lat *float64 `json:"lat"`
 	Lng *float64 `json:"lng"`
+	// Where that is in words, read off the map when the location is saved.
+	// CountryCode is ISO 3166-1 alpha-2; all are empty until then.
+	CountryCode string `json:"country_code"`
+	Country     string `json:"country"`
+	Province    string `json:"province"`
+	City        string `json:"city"`
+	District    string `json:"district"`
+	PostalCode  string `json:"postal_code"`
 	// ZoneMode is "list" (the customer picks a zone by name) or "map" (the
 	// customer drops a pin and matchZone decides).
 	ZoneMode       string `json:"zone_mode"`
@@ -132,7 +140,7 @@ const branchCols = `id, merchant_id, slug, name, name_en, address, phone, timezo
 	tax_inclusive, service_charge_bp, packaging_fee, min_order_amount, accept_timeout_minutes,
 	delivery_enabled, pickup_enabled, paused, open_time, close_time, notify_sms, scheduling_enabled, prep_minutes,
 	lat, lng, zone_mode, zone_tolerance_m, kitchen_slow_minutes, detour_percent, detour_meters,
-	notice, intro, baskets_enabled,
+	notice, intro, baskets_enabled, country_code, country, province, city, district, postal_code,
 	(SELECT m.status = 'suspended' FROM merchants m WHERE m.id = branches.merchant_id)`
 
 func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
@@ -142,7 +150,7 @@ func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime, &b.NotifySMS,
 		&b.SchedulingEnabled, &b.PrepMinutes, &b.Lat, &b.Lng, &b.ZoneMode, &b.ZoneToleranceM,
 		&b.KitchenSlowMinutes, &b.DetourPercent, &b.DetourMeters, &b.Notice, &b.Intro, &b.BasketsEnabled,
-		&b.Suspended)
+		&b.CountryCode, &b.Country, &b.Province, &b.City, &b.District, &b.PostalCode, &b.Suspended)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, ErrNotFound

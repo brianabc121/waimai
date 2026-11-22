@@ -74,8 +74,11 @@ await page.locator(`${tid('account-phone')}:has-text("${pretty}")`).waitFor()
 step('a wrong code is refused; the right one logs in and comes back to checkout')
 
 // ---- the address book ----
-// With no address yet, checkout opens the form for a new one. The phone is the login number.
+// With no address yet, checkout asks for one. The phone is the login number.
 page.on('dialog', d => d.accept())
+await page.waitForSelector('.co[data-ready]')
+await page.locator(tid('service-toggle') + ' .on:has-text("配送")').waitFor()
+await page.click(tid('checkout-address') + '[data-empty]')
 await page.waitForSelector(tid('address-form'))
 if ((await page.inputValue(tid('af-phone'))) !== local) throw new Error('a new address should start with the login number')
 await page.click(tid('af-save'))

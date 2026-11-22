@@ -73,7 +73,7 @@ function fitAll() {
   const ptsAll = [...drawn.value.flatMap(z => z.polygon), ...(store.value ? [store.value] : [])]
   if (ptsAll.length > 1) map.value?.fit(ptsAll, 16)
 }
-function onReady() { mapReady.value = true; fitAll() }
+function onReady() { mapReady.value = true; fitAll(); void fillRegion() }
 
 async function run<T>(fn: () => Promise<T>): Promise<T | undefined> {
   error.value = ''
@@ -422,10 +422,27 @@ function startLocation() {
 const round6 = (v: number) => Math.round(v * 1e6) / 1e6
 function setPin(at: LatLng) { loc.lat = round6(at[0]); loc.lng = round6(at[1]) }
 const movedM = computed(() => store.value ? geo.dist(pl().to(store.value), pl().to(pin.value)) : 0)
+// With the location goes what the map says about it: country, province, city,
+// district and postcode. The customer's address search is kept to that country.
 async function saveLocation() {
-  const b = await run(() => put<Branch>(`/merchant/branches/${bid}/location`, { lat: pin.value[0], lng: pin.value[1], address: loc.address }))
+  const region = await map.value!.resolve(pin.value)
+  const b = await run(() => put<Branch>(`/merchant/branches/${bid}/location`, { lat: pin.value[0], lng: pin.value[1], address: loc.address, region: region ?? undefined }))
   if (b) { branch.value = b; mode.value = 'browse'; notice.value = t('mz.saved') }
 }
+// A store whose location was saved before this was read off the map (or while
+// the map could not tell) gets it when the page is opened.
+const resolving = ref(false)
+async function fillRegion() {
+  const b = branch.value
+  if (!b || !store.value || b.country_code || readOnly.value || resolving.value) return
+  resolving.value = true
+  try {
+    const region = await map.value?.resolve(store.value)
+    if (region) branch.value = await put<Branch>(`/merchant/branches/${bid}/location`, { lat: store.value[0], lng: store.value[1], address: '', region })
+  } catch { /* stays unknown; the line under the address says so */ }
+  resolving.value = false
+}
+const regionText = computed(() => { const b = branch.value; return b ? [b.country, b.province, b.city, b.district].filter(Boolean).join(' · ') + (b.postal_code ? ` (${b.postal_code})` : '') : '' })
 
 // ---- search ----
 const q = ref(''), hits = ref<Place[] | null>(null)
@@ -716,6 +733,9 @@ async function fbSave() {
         <section>
           <div class="row between"><h2>{{ t('mz.store') }}</h2><button v-if="!readOnly" class="btn small" @click="startLocation">{{ t('mz.change_loc') }}</button></div>
           <dl class="kv"><dt>{{ t('address') }}</dt><dd>{{ branch.address || '—' }}</dd>
+            <template v-if="store"><dt>{{ t('mz.region') }}</dt>
+              <dd v-if="branch.country_code" data-testid="store-region">{{ regionText }}</dd>
+              <dd v-else class="muted" data-testid="store-region-unknown">{{ t(resolving ? 'mz.region_wait' : 'mz.region_unknown') }} <button v-if="!resolving && !readOnly" class="btn link" @click="fillRegion">{{ t('retry') }}</button></dd></template>
             <dt>{{ t('mz.latlng') }}</dt><dd data-testid="store-latlng">{{ store ? store[0].toFixed(5) + ', ' + store[1].toFixed(5) : t('mz.not_set') }}</dd></dl>
         </section>
         <section>

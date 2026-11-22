@@ -13,6 +13,42 @@ export interface Place { label: string; detail?: string; at?: LatLng; distance_m
 // A place whose position is known (every search result).
 export interface Spot extends Place { at: LatLng }
 
+// Where a point is, in words. country_code is ISO 3166-1 alpha-2 ("PH").
+export interface Region { country_code: string; country: string; province: string; city: string; district: string; postal_code: string }
+// What typed searches are kept to: one country, and near one point first.
+export interface Scope { country?: string; near?: LatLng }
+
+// regionOf reads a geocoder's answer for a point (most exact result first).
+function regionOf(results: any[]): Region | null {
+  const part = (...types: string[]) => {
+    for (const ty of types) for (const r of results) for (const c of r.address_components ?? []) if (c.types?.includes(ty)) return c
+    return null
+  }
+  const country = part('country')
+  if (!country) return null
+  const name = (...types: string[]) => part(...types)?.long_name ?? ''
+  return {
+    country_code: String(country.short_name ?? '').toUpperCase(), country: country.long_name ?? '',
+    province: name('administrative_area_level_1'),
+    city: name('locality', 'postal_town', 'administrative_area_level_2'),
+    district: name('sublocality_level_1', 'sublocality', 'neighborhood', 'administrative_area_level_3'),
+    postal_code: name('postal_code'),
+  }
+}
+
+// storeScope is the scope for a customer of one store. A store whose country
+// was never read off the map (saved before that was done) is looked up once.
+const countries = new Map<string, string>()
+export async function storeScope(shop: { lat: number; lng: number; country?: string }, resolve: (at: LatLng) => Promise<Region | null>): Promise<Scope> {
+  const near: LatLng = [shop.lat, shop.lng], k = near.join()
+  let country = shop.country || countries.get(k) || ''
+  if (!country) {
+    country = (await resolve(near).catch(() => null))?.country_code ?? ''
+    if (country) countries.set(k, country)
+  }
+  return { country: country || undefined, near }
+}
+
 function metresBetween(a: LatLng, b: LatLng): number {
   const rad = Math.PI / 180, dLat = (b[0] - a[0]) * rad, dLng = (b[1] - a[1]) * rad
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLng / 2) ** 2
@@ -65,6 +101,11 @@ export interface MapAdapter {
   // around a point, nearest first.
   suggest(q: string): Promise<Place[]>
   nearby(at: LatLng): Promise<Place[]>
+  // scope keeps search and suggest to one country and puts places near a point
+  // first (a customer's address is in the store's country, near the store);
+  // null lifts it. resolve says where a point is, in words.
+  scope(s: Scope | null): void
+  resolve(at: LatLng): Promise<Region | null>
   destroy(): void
 }
 
@@ -117,7 +158,7 @@ async function googleMap(key: string, el: HTMLElement, view: View, ev: MapEvents
     streetViewControl: false, fullscreenControl: false, mapTypeControl: false, zoomControl: true,
   })
   const ll = (e: any): LatLng => [e.latLng.lat(), e.latLng.lng()]
-  let session: any = null
+  let session: any = null, scope: Scope | null = null
   const now = (): View => {
     const c = map.getCenter()
     return c ? { center: [c.lat(), c.lng()], zoom: map.getZoom() ?? view.zoom } : view
@@ -178,7 +219,9 @@ async function googleMap(key: string, el: HTMLElement, view: View, ev: MapEvents
       const direct = parseLatLng(q)
       if (direct) return [{ label: q.trim(), at: direct }]
       try {
-        const { results } = await new gm.Geocoder().geocode({ address: q, bounds: map.getBounds() })
+        const req: any = { address: q, bounds: map.getBounds() }
+        if (scope?.country) { req.componentRestrictions = { country: scope.country }; req.region = scope.country.toLowerCase() }
+        const { results } = await new gm.Geocoder().geocode(req)
         return (results ?? []).slice(0, 5).map((r: any) => ({ label: r.formatted_address, at: [r.geometry.location.lat(), r.geometry.location.lng()] as LatLng }))
       } catch { return [] } // ZERO_RESULTS and friends arrive as rejections
     },
@@ -190,10 +233,11 @@ async function googleMap(key: string, el: HTMLElement, view: View, ev: MapEvents
       try {
         const lib = await gm.importLibrary('places')
         session ??= new lib.AutocompleteSessionToken()
-        const c = map.getCenter()
-        const { suggestions } = await lib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-          input: q, sessionToken: session, locationBias: { center: { lat: c.lat(), lng: c.lng() }, radius: 20000 },
-        })
+        const c = map.getCenter(), near = scope?.near ?? [c.lat(), c.lng()]
+        const req: any = { input: q, sessionToken: session, locationBias: { center: { lat: near[0], lng: near[1] }, radius: scope?.near ? 50000 : 20000 } }
+        // Without this "trump tower" typed in Manila finds the one in New York.
+        if (scope?.country) { req.includedRegionCodes = [scope.country.toLowerCase()]; req.region = scope.country.toLowerCase() }
+        const { suggestions } = await lib.AutocompleteSuggestion.fetchAutocompleteSuggestions(req)
         return (suggestions ?? []).filter((s: any) => s.placePrediction).slice(0, 6).map((s: any): Place => {
           const p = s.placePrediction
           return {
@@ -232,6 +276,14 @@ async function googleMap(key: string, el: HTMLElement, view: View, ev: MapEvents
       } catch { /* nothing known about this spot */ }
       return out
     },
+    scope(s) { scope = s },
+    async resolve(at) {
+      try {
+        // English names, so that what is stored does not depend on the browser's language.
+        const { results } = await new gm.Geocoder().geocode({ location: { lat: at[0], lng: at[1] }, language: 'en' })
+        return regionOf(results ?? [])
+      } catch { return null }
+    },
     destroy() { subs.forEach(s => s.remove()); overlay.setMap(null) },
   }
 }
@@ -240,6 +292,7 @@ async function googleMap(key: string, el: HTMLElement, view: View, ev: MapEvents
 
 function stubMap(el: HTMLElement, initial: View, ev: MapEvents): MapAdapter {
   let v: View = { center: initial.center, zoom: Math.round(initial.zoom) }
+  let scope: Scope | null = null
   const size = () => ({ w: el.clientWidth, h: el.clientHeight })
   const at = (e: MouseEvent): LatLng => {
     const r = el.getBoundingClientRect()
@@ -298,9 +351,11 @@ function stubMap(el: HTMLElement, initial: View, ev: MapEvents): MapAdapter {
       if (direct) return [{ label: q.trim(), at: direct }]
       const name = q.trim()
       if (!name) return []
+      // Scoped: around the point given, in the country given. Otherwise around the map's middle.
+      const base = scope?.near ?? v.center, tail = scope?.country ? `, ${scope.country}` : ''
       return ['Tower', 'Mall', 'Residences'].map((kind, i): Place => {
-        const where: LatLng = [v.center[0] + i * 0.0004, v.center[1] + i * 0.0004]
-        return { label: `${name} ${kind}`, detail: `${i + 1} Stub St`, locate: async () => where }
+        const where: LatLng = [base[0] + i * 0.0004, base[1] + i * 0.0004]
+        return { label: `${name} ${kind}`, detail: `${i + 1} Stub St${tail}`, locate: async () => where }
       })
     },
     async nearby(at) {
@@ -310,6 +365,13 @@ function stubMap(el: HTMLElement, initial: View, ev: MapEvents): MapAdapter {
         { label: 'Stub Mall', detail: `2 Stub St · ${spot}`, at: [at[0], at[1] + 0.0005], distance_m: 54 },
         { label: `Stub St ${spot}`, detail: '', at, distance_m: 0 },
       ]
+    },
+    scope(s) { scope = s },
+    // Two made-up answers: the Philippines, and North America.
+    async resolve(at) {
+      if (at[0] > 4 && at[0] < 22 && at[1] > 116 && at[1] < 127) return { country_code: 'PH', country: 'Philippines', province: 'Metro Manila', city: 'Makati', district: 'Stub District', postal_code: '1200' }
+      if (at[0] > 24 && at[0] < 50 && at[1] > -125 && at[1] < -66) return { country_code: 'US', country: 'United States', province: 'New York', city: 'New York', district: '', postal_code: '10022' }
+      return null
     },
     destroy() {
       el.removeEventListener('pointerdown', down); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
