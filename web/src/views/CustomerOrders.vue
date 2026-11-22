@@ -8,6 +8,7 @@ import { loadCustomer, loginRoute } from '../customer'
 import { locale, money, pick, setLocale, t } from '../i18n'
 import { cardStatus, closedStatus, finished, orderAgain, stamp } from '../orders'
 import type { OrderCard } from '../types'
+import CustomerTabs from './me/CustomerTabs.vue'
 
 const router = useRouter()
 type Tab = 'all' | 'active' | 'review' | 'aftersale'
@@ -131,6 +132,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
         <span v-else class="muted small">{{ t('ol.end') }}</span>
       </div>
     </main>
+    <CustomerTabs active="orders" />
   </div>
 </template>
 

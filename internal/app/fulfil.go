@@ -587,6 +587,9 @@ func (a *App) RiderDeliver(ctx context.Context, taskID, riderID, collected int64
 		if err := tripDrop(ctx, tx, o.ID, "delivered"); err != nil {
 			return err
 		}
+		if err := a.tellOrder(ctx, tx, o.ID, "订单已送达，欢迎评价", "Your order was delivered. Tell us how it was."); err != nil {
+			return err
+		}
 		if err := audit(ctx, tx, o.BranchID, o.ID, Actor{Type: "rider", ID: riderID}, "delivery.delivered",
 			map[string]any{"amount_due": o.Total, "amount_collected": collected}); err != nil {
 			return err

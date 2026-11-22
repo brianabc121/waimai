@@ -38,8 +38,8 @@ var customerMessages = map[string][2]string{
 	"cancelled":        {"订单已取消", "Your order was cancelled"},
 }
 
-// notifyCustomer enqueues a status SMS in the caller's transaction when the
-// branch has customer notifications switched on. The message is only sent if
+// notifyCustomer leaves a message in the customer's message box and, when the
+// branch has customer notifications switched on, enqueues a status SMS. The message is only sent if
 // the business change commits.
 func (a *App) notifyCustomer(ctx context.Context, tx pgx.Tx, orderID int64, event string) error {
 	text, ok := customerMessages[event]
@@ -49,10 +49,22 @@ func (a *App) notifyCustomer(ctx context.Context, tx pgx.Tx, orderID int64, even
 	var enabled bool
 	var store, phone, publicNo, pickupCode string
 	var nonce []byte
-	if err := tx.QueryRow(ctx, `SELECT b.notify_sms, b.name, o.customer_phone, o.public_no, o.pickup_code, o.token_nonce
-		FROM orders o JOIN branches b ON b.id = o.branch_id WHERE o.id=$1`, orderID).
-		Scan(&enabled, &store, &phone, &publicNo, &pickupCode, &nonce); err != nil {
+	var customerID *int64
+	if err := tx.QueryRow(ctx, `SELECT b.notify_sms, b.name, o.customer_phone, o.public_no, o.pickup_code, o.token_nonce,
+		o.customer_id FROM orders o JOIN branches b ON b.id = o.branch_id WHERE o.id=$1`, orderID).
+		Scan(&enabled, &store, &phone, &publicNo, &pickupCode, &nonce, &customerID); err != nil {
 		return err
+	}
+	// The customer's message box gets every update, whether or not the store texts.
+	if customerID != nil {
+		m := Message{Kind: "order", Title: text[0], TitleEn: text[1], Body: store + " · " + publicNo, Link: "/o/" + a.orderToken(nonce)}
+		m.BodyEn = m.Body
+		if event == "ready_for_pickup" {
+			m.Body, m.BodyEn = m.Body+" · 取餐号 "+pickupCode, m.BodyEn+" · pickup code "+pickupCode
+		}
+		if err := tell(ctx, tx, *customerID, m); err != nil {
+			return err
+		}
 	}
 	if !enabled {
 		return nil

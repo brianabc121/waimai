@@ -290,6 +290,7 @@ func (s *Server) Router() *gin.Engine {
 	api.POST("/stores/:slug/reports", s.limit(s.reportLimit), s.reportStore)
 	api.GET("/customer/orders/:token/review", s.orderReview)
 	api.POST("/customer/orders/:token/review", s.limit(s.publicWrites), s.submitReview)
+	s.meRoutes(api)
 
 	// dine-in guests: scanned table code or paired tablet
 	api.POST("/table-sessions/exchange", s.limit(s.tableLimit), s.exchangeTableCode)
@@ -414,6 +415,7 @@ func (s *Server) Router() *gin.Engine {
 	// platform admin
 	admin := auth.Group("/admin", requireAdmin)
 	s.adminRoutes(admin)
+	s.meAdminRoutes(admin)
 
 	s.static(r)
 	return r
