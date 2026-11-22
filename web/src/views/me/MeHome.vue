@@ -4,10 +4,10 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginRoute } from '../../customer'
-import { money, pick, promoLabel, t } from '../../i18n'
+import { money, pick, t } from '../../i18n'
 import AddressSheet from '../AddressSheet.vue'
 import CustomerTabs from './CustomerTabs.vue'
-import { avatarUrl, displayName, homeStore, loadProfile, me, myOffers, plain, type StoreOffers } from './me'
+import { avatarUrl, displayName, homeStore, loadProfile, me, myOffers, offerParts, plain, type StoreOffers } from './me'
 
 const router = useRouter()
 const ready = ref(false)
@@ -49,31 +49,37 @@ async function share() {
   } catch { /* closed without sharing */ }
 }
 
-const entries = computed(() => [
-  { key: 'favorites', to: '/me/favorites', icon: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z' },
-  { key: 'support', to: '/me/support', open: true, icon: 'M5 13v-1a7 7 0 0 1 14 0v1M5 13h2.5v5H6a1 1 0 0 1-1-1zM19 13h-2.5v5H18a1 1 0 0 0 1-1zM16.5 18c0 1.7-1.5 2.5-3.5 2.5' },
-  { key: 'reviews', to: '/me/reviews', icon: 'M5 20V5h9M5 20h14v-8M9 10h4M9 14h6M15.5 9.5l5-5 1.5 1.5-5 5-2 .5z' },
-  { key: 'messages', to: '/me/messages', dot: !!profile.value && profile.value.unread + profile.value.chat_unread > 0, icon: 'M4.5 6.5A2.5 2.5 0 0 1 7 4h10a2.5 2.5 0 0 1 2.5 2.5v7A2.5 2.5 0 0 1 17 16h-5l-4.5 4v-4H7a2.5 2.5 0 0 1-2.5-2.5zM8.5 10h.01M12 10h.01M15.5 10h.01' },
-  { key: 'apply', to: '/me/apply', icon: 'M6 21V4M6 5h11l-2 3.5 2 3.5H6M4 21h5' },
-  { key: 'addresses', icon: 'M12 13a2.6 2.6 0 1 0 0-5.200001 2.6 2.6 0 0 0 0 5.2zM12 20.5s6-5.4 6-10a6 6 0 0 0-12 0c0 4.6 6 10 6 10z' },
+interface Entry { key: string; to?: string; open?: boolean; dot?: boolean; icon: string }
+// what is used most, as large icons
+const common = computed<Entry[]>(() => [
+  { key: 'addresses', icon: 'M12 13a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2zM12 21s6.5-5.8 6.5-10.6a6.5 6.5 0 0 0-13 0C5.5 15.2 12 21 12 21z' },
+  { key: 'favorites', to: '/me/favorites', icon: 'M12 20s-7.5-4.6-7.5-10.100A4.3 4.3 0 0 1 12 7.200a4.3 4.3 0 0 1 7.5 2.700C19.5 15.4 12 20 12 20z' },
+  { key: 'messages', to: '/me/messages', dot: !!profile.value && profile.value.unread + profile.value.chat_unread > 0, icon: 'M4.5 6.500A2.5 2.5 0 0 1 7 4h10a2.5 2.5 0 0 1 2.5 2.500v7A2.5 2.5 0 0 1 17 16h-5l-4.5 4v-4H7a2.5 2.5 0 0 1-2.5-2.500zM8.5 10h.01M12 10h.01M15.5 10h.01' },
+  { key: 'support', to: '/me/support', open: true, icon: 'M5 13v-1a7 7 0 0 1 14 0v1M5 13h2.500v5H6a1 1 0 0 1-1-1zM19 13h-2.500v5H18a1 1 0 0 0 1-1zM16.5 18c0 1.7-1.5 2.5-3.5 2.5' },
+])
+// the rest, as rows
+const more = computed<Entry[]>(() => [
+  { key: 'reviews', to: '/me/reviews', icon: 'M19 12v5.500a2 2 0 0 1-2 2H6.500a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2H14M8 10h4M8 14h3M14.5 13.500l6-6-2-2-6 6-.5 2.500z' },
+  { key: 'feedback', to: '/me/feedback', icon: 'M4 6.500h16v11H4zM4.5 7l7.5 6 7.5-6' },
+  { key: 'help', to: '/me/help', open: true, icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.500a2.5 2.5 0 1 1 3.7 2.200c-.8.5-1.2 1-1.2 1.900M12 16.800h.01' },
   { key: 'about', to: '/me/about', open: true, icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5.500M12 7.800h.01' },
-  { key: 'feedback', to: '/me/feedback', icon: 'M4.5 5.500h15v11h-9l-4 3.500v-3.500h-2zM8.5 9.500h7M8.5 12.500h4.5' },
-  { key: 'help', to: '/me/help', open: true, icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.500a2.5 2.5 0 1 1 3.7 2.200c-.800.5-1.2 1-1.2 1.900M12 16.800h.01' },
+  { key: 'apply', to: '/me/apply', icon: 'M5 10.500V19h14v-8.500M3.5 7 5 4h14l1.5 3v1a2.2 2.2 0 0 1-4.250.8 2.2 2.2 0 0 1-4.250 0 2.2 2.2 0 0 1-4.250 0A2.2 2.2 0 0 1 3.5 8zM9.5 19v-4.500h5V19' },
 ])
 </script>
 
 <template>
-  <div class="phone mehome" :data-ready="ready || null">
+  <div class="phone mehome warm" :data-ready="ready || null">
     <header class="hero">
       <div class="tools">
+        <h1>{{ t('me.me') }}</h1>
         <button :aria-label="t('me.settings')" data-testid="me-settings" @click="go('/me/profile')">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M12 3.500l1.5 2.2 2.6-.500 1 2.5 2.5 1-.500 2.6 2.2 1.5-2.2 1.5.5 2.6-2.5 1-1 2.5-2.6-.500L12 21.500l-1.5-2.2-2.6.5-1-2.5-2.5-1 .500-2.600L2.5 12.200l2.2-1.5-.500-2.6 2.5-1 1-2.5 2.6.500z" transform="translate(-.3 -.5)" /></svg></button>
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M12 3.500l1.5 2.2 2.6-.5 1 2.5 2.5 1-.5 2.6 2.2 1.5-2.2 1.5.5 2.6-2.5 1-1 2.5-2.6-.500L12 21.500l-1.5-2.2-2.6.5-1-2.5-2.5-1 .5-2.600L2.5 12.200l2.2-1.5-.5-2.6 2.5-1 1-2.5 2.6.500z" transform="translate(-.3 -.5)" /></svg></button>
         <button :aria-label="t('me.share')" data-testid="me-share" @click="share">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="18" cy="5" r="2.6" /><circle cx="6" cy="12" r="2.6" /><circle cx="18" cy="19" r="2.6" /><path d="m8.3 10.7 7.4-4.400M8.3 13.300l7.4 4.4" /></svg></button>
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="18" cy="5" r="2.6" /><circle cx="6" cy="12" r="2.6" /><circle cx="18" cy="19" r="2.6" /><path d="m8.3 10.7 7.4-4.400M8.3 13.300l7.4 4.4" /></svg></button>
       </div>
       <button class="who" data-testid="me-who" @click="go('/me/profile')">
         <img v-if="profile && avatarUrl(profile)" :src="avatarUrl(profile)" alt="" class="avatar" data-testid="me-avatar" />
-        <span v-else class="avatar ph"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="9" r="4" /><path d="M4 21c1.3-4 4.3-6 8-6s6.7 2 8 6" /></svg></span>
+        <span v-else class="avatar ph"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="9" r="4" /><path d="M4.5 20.500c1.2-3.7 4-5.5 7.5-5.500s6.3 1.8 7.5 5.500z" stroke-linejoin="round" /></svg></span>
         <span v-if="profile" class="names">
           <b data-testid="me-name">{{ displayName(profile) }}</b>
           <span data-testid="me-member">{{ t('me.member_no', { no: profile.member_no }) }}</span>
@@ -82,40 +88,55 @@ const entries = computed(() => [
           <b data-testid="me-login">{{ t('me.login') }}</b>
           <span>{{ t('me.login_hint') }}</span>
         </span>
+        <svg class="chev" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg>
       </button>
     </header>
 
     <div class="body">
-      <button class="strip" data-testid="me-offer-strip" @click="go('/me/coupons')">
-        <span class="badge">{{ t('me.offer_strip', { n: offerCount }) }}</span>
-        <span class="grow">{{ t('me.offer_strip_hint') }}</span>
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg>
-      </button>
-
-      <div class="card stats">
-        <button data-testid="me-balance" @click="go('/me/wallet/balance')"><b>{{ plain(wallet.balance) }}</b><span>{{ t('me.balance') }}({{ symbol }})</span></button>
-        <button data-testid="me-coupons" @click="go('/me/coupons')"><b>{{ offerCount }}</b><span>{{ t('me.coupons') }}</span></button>
-        <button data-testid="me-bonus" @click="go('/me/wallet/bonus')"><b>{{ plain(wallet.bonus) }}</b><span>{{ t('me.bonus') }}({{ symbol }})</span></button>
+      <div class="stats">
+        <button data-testid="me-balance" @click="go('/me/wallet/balance')"><b>{{ symbol }}{{ plain(wallet.balance) }}</b><span>{{ t('me.balance') }}</span></button>
+        <button class="hot" data-testid="me-coupons" @click="go('/me/coupons')"><b>{{ offerCount }}</b><span>{{ t('me.coupons') }}</span></button>
+        <button data-testid="me-bonus" @click="go('/me/wallet/bonus')"><b>{{ symbol }}{{ plain(wallet.bonus) }}</b><span>{{ t('me.bonus') }}</span></button>
       </div>
 
-      <div class="card offers">
+      <section class="offers">
         <div class="row between"><h2>{{ t('me.my_offers') }}</h2>
           <button class="more" @click="go('/me/coupons')">{{ t('me.more') }}
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg></button></div>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg></button></div>
+        <p class="sub">{{ t('me.offer_strip_hint') }}</p>
         <div v-if="!firstOffers.length" class="none">{{ t('me.no_offers') }}</div>
-        <router-link v-for="x in firstOffers" :key="x.p.id" :to="`/s/${x.o.store.slug}`" class="offer">
-          <b>{{ promoLabel(x.p, x.o.currency) }}</b>
-          <span class="small muted">{{ pick(x.o.store.name, x.o.store.name_en) }}</span>
-        </router-link>
-      </div>
+        <div v-else class="tickets">
+          <router-link v-for="x in firstOffers" :key="x.p.id" :to="`/s/${x.o.store.slug}`" class="ticket" :class="{ ship: x.p.kind === 'free_delivery' }" data-testid="me-offer">
+            <b>{{ offerParts(x.p, x.o.currency).gives }}</b>
+            <svg v-if="x.p.kind === 'free_delivery'" viewBox="0 0 28 24" width="36" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6.500h9.500v10M18.5 9.500h4l3 3.500v3.500h-2M9 16.500h6M2.5 9.500h5M4.5 12.500h4" /><circle cx="12" cy="17.5" r="1.9" /><circle cx="21" cy="17.5" r="1.9" /></svg>
+            <svg v-else viewBox="0 0 28 24" width="34" height="29" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h21v3.500a2.5 2.5 0 0 0 0 5V18h-21v-3.500a2.5 2.5 0 0 0 0-5z" /><path d="M10 6.500v11" stroke-dasharray="1.6 2.2" /><path d="m15.5 15 4.5-6M15.8 9.600h.01M19.7 14.400h.01" /></svg>
+            <span>{{ offerParts(x.p, x.o.currency).when }}</span>
+            <small>{{ pick(x.o.store.name, x.o.store.name_en) }}</small>
+          </router-link>
+        </div>
+      </section>
 
-      <div class="card grid">
-        <button v-for="e in entries" :key="e.key" :data-testid="'me-' + e.key" @click="e.to ? go(e.to, e.open) : addresses()">
-          <span class="ic"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path :d="e.icon" /></svg>
-            <i v-if="e.dot" class="dot" data-testid="me-unread"></i></span>
-          <span>{{ t('me.' + e.key) }}</span>
-        </button>
-      </div>
+      <section>
+        <h2>{{ t('me.common') }}</h2>
+        <div class="panel common">
+          <button v-for="e in common" :key="e.key" :data-testid="'me-' + e.key" @click="e.to ? go(e.to, e.open) : addresses()">
+            <span class="ic"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path :d="e.icon" /></svg>
+              <i v-if="e.dot" class="dot" data-testid="me-unread"></i></span>
+            <span>{{ t('me.' + e.key) }}</span>
+          </button>
+        </div>
+      </section>
+
+      <section>
+        <h2>{{ t('me.more_services') }}</h2>
+        <div class="panel rows">
+          <button v-for="e in more" :key="e.key" :data-testid="'me-' + e.key" @click="go(e.to!, e.open)">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path :d="e.icon" /></svg>
+            <span>{{ t('me.' + e.key) }}</span>
+            <svg class="chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg>
+          </button>
+        </div>
+      </section>
     </div>
 
     <AddressSheet v-if="showAddresses" manage :slug="home?.slug" :currency="home?.currency" @close="showAddresses = false" />
@@ -125,35 +146,54 @@ const entries = computed(() => [
 </template>
 
 <style scoped>
-.mehome { background: #f4f4f4; padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 20px); }
-.hero { padding: 10px 16px 64px; color: var(--ink);
-  background: radial-gradient(120% 90% at 0% 0%, var(--brand-soft) 0%, transparent 60%), linear-gradient(180deg, #fff7ef 0%, #f4f4f4 100%); }
-.tools { display: flex; justify-content: flex-end; gap: 4px; }
-.tools button { width: 42px; height: 42px; border: 0; background: none; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--ink); }
-.who { display: flex; align-items: center; gap: 14px; width: 100%; border: 0; background: none; padding: 8px 6px 0; text-align: left; cursor: pointer; }
-.avatar { width: 76px; height: 76px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; background: #fff; flex: none; box-shadow: 0 2px 8px rgba(0, 0, 0, .08); }
-.avatar.ph { display: grid; place-items: center; color: #b8bec7; }
-.names { display: grid; gap: 4px; min-width: 0; }
-.names b { font-size: 21px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.names span { font-size: 13px; font-weight: 600; color: #4b5563; }
+.mehome { padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 24px); }
+.hero { padding: 10px 16px 84px; color: #fff; border-radius: 0 0 50% 50% / 0 0 26px 26px;
+  background: radial-gradient(90% 70% at 70% 0%, rgba(255, 160, 120, .28) 0%, transparent 60%), linear-gradient(180deg, var(--red-deep) 0%, #b23a2a 100%); }
+.tools { display: flex; align-items: center; gap: 6px; }
+.tools h1 { flex: 1; font-size: 22px; font-weight: 800; letter-spacing: 1px; padding-left: 2px; }
+.tools button { width: 42px; height: 42px; border: 0; background: none; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: #fff; }
+.who { display: flex; align-items: center; gap: 14px; width: 100%; border: 0; background: none; color: #fff; padding: 14px 2px 0; text-align: left; cursor: pointer; }
+.avatar { width: 68px; height: 68px; border-radius: 50%; object-fit: cover; background: #fbeed3; flex: none; }
+.avatar.ph { display: grid; place-items: center; color: var(--ink); }
+.names { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.names b { font-size: 23px; font-weight: 800; letter-spacing: .5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.names span { font-size: 14px; opacity: .92; }
+.who .chev { flex: none; }
 
-.body { margin-top: -50px; padding: 0 12px; display: grid; gap: 12px; }
-.strip { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; padding: 10px 14px 24px; margin-bottom: -26px; border-radius: 16px 16px 0 0; cursor: pointer; text-align: left;
-  color: #fff; font-size: 14px; background: linear-gradient(90deg, var(--brand) 0%, #f08c3a 60%, #f7c35f 100%); }
-.strip .badge { background: #fff; color: var(--brand-dark); font-weight: 700; padding: 2px 10px; border-radius: 6px; white-space: nowrap; }
-.strip .grow { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card { border: 0; border-radius: 16px; position: relative; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); padding: 18px 6px; }
-.stats button { border: 0; background: none; display: grid; gap: 2px; justify-items: center; cursor: pointer; }
-.stats b { font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.stats span { color: #5b6470; font-size: 14px; }
-.offers h2 { font-size: 18px; }
-.more { border: 0; background: none; display: flex; align-items: center; gap: 2px; font-size: 13px; cursor: pointer; }
-.none { text-align: center; color: #7d8794; font-size: 13px; padding: 26px 0 20px; }
-.offer { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--brand-soft); color: var(--brand-dark); }
-.grid { display: grid; grid-template-columns: repeat(4, 1fr); row-gap: 18px; padding: 20px 4px; }
-.grid button { border: 0; background: none; display: grid; gap: 6px; justify-items: center; cursor: pointer; font-size: 14px; color: #2b3138; padding: 0; }
-.grid .ic { position: relative; display: grid; color: #2b3138; }
-.dot { position: absolute; top: -2px; right: -4px; width: 10px; height: 10px; border-radius: 50%; background: #e5352b; border: 1.5px solid #fff; }
+.body { margin-top: -62px; padding: 0 14px; display: grid; gap: 22px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); padding: 14px 0; background: var(--paper); border-radius: 18px; box-shadow: 0 6px 18px rgba(90, 40, 15, .12); margin: 0 -2px; }
+.stats button { border: 0; background: none; display: grid; gap: 2px; justify-items: center; cursor: pointer; color: var(--ink); border-left: 1px solid var(--line); padding: 2px 4px; min-width: 0; }
+.stats button:first-child { border-left: 0; }
+.stats b { font-size: 25px; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.stats .hot b { color: var(--red); }
+.stats span { font-size: 15px; }
+section { display: grid; gap: 10px; min-width: 0; }
+h2 { font-size: 21px; font-weight: 800; }
+.more { border: 0; background: none; display: flex; align-items: center; gap: 2px; font-size: 15px; font-weight: 700; color: var(--red); cursor: pointer; padding: 0; }
+.sub { color: var(--muted); font-size: 14.500px; margin-top: -6px; }
+.none { text-align: center; color: var(--muted); font-size: 13.500px; padding: 22px 0; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; }
+.tickets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ticket { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 6px; align-items: center; padding: 12px 14px 10px; border-radius: 14px; background: linear-gradient(135deg, #fdeae4, #f9dcd6); border: 1px solid #f1cfc6; color: var(--red); }
+.ticket.ship { background: linear-gradient(135deg, #fdf1d6, #fbe3ad); border-color: #f0d9a0; }
+.ticket b { font-size: 22px; font-weight: 900; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ticket svg { color: var(--red); opacity: .85; }
+.ticket.ship svg { color: #b9781e; }
+.ticket span { grid-column: 1 / -1; color: var(--ink); opacity: .78; font-size: 14.500px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ticket small { grid-column: 1 / -1; margin-top: 7px; padding-top: 7px; border-top: 1px dashed rgba(120, 60, 30, .35); color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel { background: var(--paper); border-radius: 18px; }
+.common { display: grid; grid-template-columns: repeat(4, 1fr); padding: 14px 6px; }
+.common button { border: 0; background: none; border-radius: 14px; display: grid; gap: 6px; justify-items: center; cursor: pointer; font-size: 14.500px; color: var(--ink); padding: 10px 0; min-width: 0; }
+.common button:hover, .common button:active { background: var(--gold-soft); }
+.common .ic { position: relative; display: grid; color: var(--red); }
+.dot { position: absolute; top: -1px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background: #e5352b; border: 1.500px solid var(--paper); }
+.rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 4px 14px; }
+.rows button { border: 0; background: none; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 6px 0 10px; cursor: pointer; color: var(--ink); font-size: 16px; text-align: left; min-width: 0; border-top: 1px solid var(--line); }
+.rows button:nth-child(-n+2) { border-top: 0; }
+.rows button:nth-child(even) { box-shadow: -1px 0 0 var(--line); padding-left: 18px; }
+.rows button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.rows button > svg:first-child { color: var(--red); flex: none; }
+.rows button span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rows .chev { flex: none; color: var(--ink); }
+@media (max-width: 370px) { .rows button { font-size: 15px; gap: 8px; padding-left: 4px; } .rows button:nth-child(even) { padding-left: 10px; } .ticket b { font-size: 19px; } }
 @media (min-width: 768px) { .mehome { max-width: 620px; } }
 </style>

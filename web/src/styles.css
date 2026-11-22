@@ -363,3 +363,11 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
 
 /* the unread number beside a navigation entry */
 .navnum { margin-left: 8px; display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #e5352b; color: #fff; font-size: 11px; font-weight: 700; }
+
+/* The customer's warm look (order list, marketplace): deep red, cream and gold. */
+.warm {
+  --brand: #a02c20; --brand-dark: #86231a; --brand-soft: #f8e3b2;
+  --red: #a02c20; --red-deep: #8f251b; --gold: #f4cf73; --gold-soft: #fbe7b3; --paper: #fffaf2;
+  --ink: #3b1f14; --muted: #7b6657; --line: #e6d8c4; --bg: #f8efe1; --card: #fffaf2;
+  background: var(--bg); color: var(--ink);
+}

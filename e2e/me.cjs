@@ -66,7 +66,7 @@ await page.goto(BASE + '/me')
 await page.waitForSelector(tid('me-name'))
 expect(/^0\d{3} \*\*\* \d{4}$/.test(await page.textContent(tid('me-name'))), 'without a nickname the masked number stands in')
 const memberNo = (await page.textContent(tid('me-member'))).match(/M-\d{8}/)[0]
-expect((await page.textContent(tid('me-balance'))).trim().startsWith('0'), 'a new account holds nothing')
+expect((await page.textContent(tid('me-balance'))).trim().replace(/^\D+/, '').startsWith('0'), 'a new account holds nothing')
 step(`the page shows who is logged in (${memberNo}) and an empty wallet`)
 
 // ---- profile and settings ----
@@ -171,7 +171,7 @@ await admin.waitForSelector(tid('ac-adjust-form'), { state: 'detached' })
 await admin.locator(tid('ac-balance'), { hasText: '93' }).waitFor()
 await shot('me-admin-customers', admin)
 await page.goto(BASE + '/me')
-await page.locator(tid('me-balance') + ' b', { hasText: /^93$/ }).waitFor()
+await page.locator(tid('me-balance') + ' b', { hasText: /^\D*93$/ }).waitFor()
 await page.waitForSelector('.mehome[data-ready]')
 await shot('me1-home')
 await page.click(tid('me-balance'))
