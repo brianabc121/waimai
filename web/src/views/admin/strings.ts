@@ -3,6 +3,21 @@
 import { extend } from '../../i18n'
 
 extend({
+  'ad.mall': ['商城', 'Marketplace'],
+  'adm.intro': ['商城首页按顾客的位置列出能送到的店。这里管顶部的活动图、分类，以及哪些店在商城里展示。', 'The marketplace lists the stores that deliver to where the customer is. Manage its banners, its categories and which stores show.'],
+  'adm.open': ['打开商城', 'Open the marketplace'],
+  'adm.banners': ['活动图', 'Banners'], 'adm.banners_hint': ['最多 5 张，按排序从小到大轮播。没有图片的用主题色显示。', 'Up to 5, shown in order. One without a picture is drawn in the theme colour.'],
+  'adm.banner_new': ['新增活动图', 'New banner'], 'adm.banner_delete': ['删除活动图“{name}”？', 'Delete the banner "{name}"?'],
+  'adm.picture': ['图片', 'Picture'], 'adm.no_picture': ['无图片', 'No picture'], 'adm.no_picture_btn': ['去掉图片', 'Remove picture'], 'adm.upload': ['上传图片', 'Upload picture'],
+  'adm.b_title': ['标题', 'Title'], 'adm.b_sub': ['副标题', 'Subtitle'], 'adm.link': ['点击后去', 'Leads to'],
+  'adm.link_store': ['点击后进这家店', 'Leads to this store'], 'adm.link_url': ['或者去这个网址', 'Or to this address'], 'adm.sort': ['排序', 'Order'],
+  'adm.cats': ['分类', 'Categories'], 'adm.cats_hint': ['顾客按这些分类找店，商家每家店最多选 2 个。可以改名字、图标和顺序，或者停用。', 'Customers browse by these; a store picks up to two. Rename, reorder or switch them off.'],
+  'adm.icon': ['图标', 'Icon'],
+  'adm.stores': ['店铺', 'Stores'], 'adm.stores_hint': ['新店默认在商城里展示。下架以后顾客在商城里看不到，但店铺链接仍然可以下单。', 'New stores show by default. A store taken off is not listed, though its own link still works.'],
+  'adm.find': ['搜索店名、链接、城市', 'Search name, link or city'], 'adm.store': ['店铺', 'Store'], 'adm.city': ['城市', 'City'],
+  'adm.hide': ['下架', 'Take off'], 'adm.unhide': ['恢复展示', 'Put back'],
+  'adm.st_shown': ['展示中', 'Listed'], 'adm.st_hidden': ['平台已下架', 'Taken off'], 'adm.st_off': ['商家关闭了展示', 'Opted out'], 'adm.st_suspended': ['商户已暂停', 'Merchant suspended'],
+  'adm.st_no_location': ['没有店铺位置', 'No location'], 'adm.st_no_zones': ['没画配送范围', 'No delivery area'],
   'ad.title': ['平台管理后台', 'Platform admin'], 'ad.product': ['外卖点餐系统', 'Waimai'],
   'ad.g_monitor': ['监控', 'Monitoring'], 'ad.g_merchants': ['商家', 'Merchants'], 'ad.g_system': ['系统', 'System'],
   'ad.dashboard': ['总览', 'Overview'], 'ad.api': ['API 监控', 'API'], 'ad.worker': ['Worker 和任务', 'Worker & jobs'],

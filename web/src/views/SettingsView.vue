@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { get, patch, post, put } from '../api'
-import { both, money, t, toMajor, toMinor } from '../i18n'
+import { both, extend, money, pick, t, toMajor, toMinor } from '../i18n'
 import { session } from '../session'
 import { CONTACT_FIELDS } from '../addresses'
 import type { Branch, Station, Zone } from '../types'
@@ -18,7 +18,35 @@ const s = reactive({ name: '', name_en: '', address: '', phone: '', tax: 12, tax
   kitchen_slow_minutes: 15, detour_percent: 30, detour_km: 1, notice: '', intro: '', baskets_enabled: true, contact_fields: [] as string[] })
 const st = reactive({ id: 0, name: '', name_en: '', active: true })
 
+// ---- how the store shows in the marketplace ----
+interface Listing { listed: boolean; hidden: boolean; tagline: string; category_ids: number[]
+  categories: { id: number; name: string; name_en: string; icon: string }[]; has_location: boolean; has_zones: boolean; has_logo: boolean; has_cover: boolean }
+const listing = ref<Listing | null>(null)
+const ml = reactive({ listed: true, tagline: '', category_ids: [] as number[] })
+const mallSaved = ref(false), mallError = ref('')
+function setListing(l: Listing) { listing.value = l; Object.assign(ml, { listed: l.listed, tagline: l.tagline, category_ids: [...l.category_ids] }) }
+function toggleCat(id: number) {
+  if (ml.category_ids.includes(id)) ml.category_ids = ml.category_ids.filter(x => x !== id)
+  else if (ml.category_ids.length < 2) ml.category_ids = [...ml.category_ids, id]
+}
+async function saveListing() {
+  mallError.value = ''; mallSaved.value = false
+  try { setListing(await put(`/merchant/branches/${bid}/mall`, ml)); mallSaved.value = true } catch (e) { mallError.value = (e as Error).message }
+}
+extend({
+  'mls.title': ['商城展示', 'Marketplace'], 'mls.hint': ['顾客在商城首页按自己的位置看到能送到的店。这里决定你的店在不在里面、显示什么。', 'Customers see the stores that deliver to them on the marketplace home page. Decide here whether yours is there and what it says.'],
+  'mls.listed': ['在商城里展示', 'Show in the marketplace'], 'mls.listed_hint': ['关掉以后，顾客仍然可以用店铺链接直接下单', 'When off, customers can still order through the store link'],
+  'mls.cats': ['店铺分类（最多选 2 个）', 'Categories (up to 2)'], 'mls.tagline': ['一句话介绍', 'Tagline'], 'mls.tagline_ph': ['例如：现煮牛肉面，每天现熬汤头', 'For example: beef noodles, broth made daily'],
+  'mls.hidden': ['平台已把这家店从商城下架。有疑问请联系平台。', 'The platform has taken this store off the marketplace. Contact the platform if you have questions.'],
+  'mls.no_location': ['还没有设置店铺位置，商城里不会出现。', 'The store has no location yet, so it does not appear.'],
+  'mls.no_zones': ['还没有画配送范围，商城里只会出现在“可自取”里。', 'No delivery area is drawn yet, so the store only shows under pickup.'],
+  'mls.no_logo': ['还没有店铺头像，建议上传。', 'There is no store logo yet. Uploading one is recommended.'],
+  'mls.no_cover': ['还没有封面图，电脑和 iPad 上的店铺卡会是空的。', 'There is no cover picture, so the card is empty on a computer or tablet.'],
+  'mls.fix_map': ['去配送地图', 'Delivery map'], 'mls.fix_tpl': ['去店铺装修', 'Store design'], 'mls.preview': ['看看商城', 'Open the marketplace'],
+})
+
 async function load() {
+  if (!listing.value) void get(`/merchant/branches/${bid}/mall`).then(setListing).catch(() => null)
   const m = await get(`/merchant/branches/${bid}/menu`)
   const b: Branch = m.branch
   branch.value = b; zones.value = m.zones; stations.value = m.stations
@@ -103,6 +131,30 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
       <label class="field"><span>{{ t('set.notice') }}</span><textarea name="notice" v-model="s.notice" rows="2" maxlength="300"></textarea></label>
       <label class="field"><span>{{ t('set.intro') }}</span><textarea name="intro" v-model="s.intro" rows="3" maxlength="500"></textarea></label>
       <button class="btn primary">{{ t('save') }}</button>
+    </form>
+
+    <form v-if="listing" class="card stack" data-testid="mall-listing" @submit.prevent="saveListing">
+      <h2>{{ t('mls.title') }}</h2>
+      <p class="muted small">{{ t('mls.hint') }}</p>
+      <div v-if="listing.hidden" class="banner bad" data-testid="mall-listing-hidden">{{ t('mls.hidden') }}</div>
+      <div v-if="!listing.has_location" class="banner warn small">{{ t('mls.no_location') }} <router-link to="/merchant/delivery-map">{{ t('mls.fix_map') }}</router-link></div>
+      <div v-else-if="!listing.has_zones" class="banner warn small">{{ t('mls.no_zones') }} <router-link to="/merchant/delivery-map">{{ t('mls.fix_map') }}</router-link></div>
+      <div v-if="!listing.has_logo || !listing.has_cover" class="banner warn small">{{ t(listing.has_logo ? 'mls.no_cover' : 'mls.no_logo') }} <router-link to="/merchant/templates">{{ t('mls.fix_tpl') }}</router-link></div>
+      <label class="check"><input type="checkbox" v-model="ml.listed" data-testid="mall-listed" />{{ t('mls.listed') }} <span class="muted small">{{ t('mls.listed_hint') }}</span></label>
+      <div>
+        <div class="muted small" style="margin-bottom:6px">{{ t('mls.cats') }}</div>
+        <div class="row wrap" style="gap:8px">
+          <button v-for="c in listing.categories" :key="c.id" type="button" class="btn small" :class="{ primary: ml.category_ids.includes(c.id) }"
+            :disabled="!ml.category_ids.includes(c.id) && ml.category_ids.length >= 2" data-testid="mall-cat" @click="toggleCat(c.id)">{{ c.icon }} {{ pick(c.name, c.name_en) }}</button>
+        </div>
+      </div>
+      <label class="field" style="margin:0"><span>{{ t('mls.tagline') }}</span><input v-model="ml.tagline" maxlength="40" :placeholder="t('mls.tagline_ph')" data-testid="mall-tagline" /></label>
+      <div v-if="mallError" class="banner bad small">{{ mallError }}</div>
+      <div class="row" style="gap:10px;align-items:center">
+        <button class="btn primary" data-testid="mall-listing-save">{{ t('save') }}</button>
+        <a class="btn" href="/" target="_blank" rel="noopener">{{ t('mls.preview') }}</a>
+        <span v-if="mallSaved" class="tag ok" data-testid="mall-listing-saved">{{ t('saved') }}</span>
+      </div>
     </form>
 
     <div class="card stack">

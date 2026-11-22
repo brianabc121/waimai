@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ApiError, get, post } from '../api'
 import { addLine, linePrice, useCart } from '../cart'
 import { locale, money, pick, promoLabel, setLocale, t } from '../i18n'
+import '../mall'
 import { defaultTemplate, themeVars } from '../theme'
 import { customer, customerLogout, loadCustomer, loginRoute, prettyPhone } from '../customer'
 import { termsAt, type DeliveryTerms } from '../addresses'
@@ -264,7 +265,9 @@ async function sendReport() {
       <!-- the store card -->
       <header class="shophead">
         <div class="tools">
-          <!-- delivery or pickup is chosen at checkout -->
+          <!-- back to the marketplace; delivery or pickup is chosen at checkout -->
+          <router-link to="/" class="ico" :aria-label="t('ml.back_mall')" :title="t('ml.back_mall')" data-testid="back-mall">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 5-7 7 7 7" /></svg></router-link>
           <span class="grow"></span>
           <button class="ico" :class="{ on: searching }" :aria-label="t('sf.search')" data-testid="search-toggle" @click="toggleSearch">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg></button>

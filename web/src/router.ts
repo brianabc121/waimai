@@ -4,7 +4,7 @@ import { homeFor, loadSession } from './session'
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/login' },
+    { path: '/', component: () => import('./views/mall/MallHome.vue') },
     { path: '/s/:slug', component: () => import('./views/StoreView.vue'), props: true },
     { path: '/s/:slug/checkout', component: () => import('./views/CheckoutView.vue'), props: true },
     { path: '/orders', component: () => import('./views/CustomerOrders.vue') },
@@ -60,6 +60,7 @@ export const router = createRouter({
         { path: 'merchants/:id', component: () => import('./views/admin/AdminMerchantDetail.vue'), props: true, meta: { title: 'ad.merchants' } },
         { path: 'items', component: () => import('./views/admin/AdminItems.vue'), meta: { title: 'ad.items' } },
         { path: 'customers', component: () => import('./views/admin/AdminCustomers.vue'), meta: { title: 'ad.customers' } },
+        { path: 'mall', component: () => import('./views/admin/AdminMall.vue'), meta: { title: 'ad.mall' } },
         { path: 'worker', component: () => import('./views/admin/AdminWorker.vue'), meta: { title: 'ad.worker' } },
         { path: 'settings', component: () => import('./views/admin/AdminSettings.vue'), meta: { title: 'ad.settings' } },
         { path: 'audit', component: () => import('./views/admin/AdminAudit.vue'), meta: { title: 'ad.audit' } },

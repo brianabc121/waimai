@@ -124,6 +124,22 @@ export function parseLatLng(q: string): LatLng | null {
   return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? [lat, lng] : null
 }
 
+// placeName names a point where there is no map on the page: the street or
+// building the geocoder knows there. '' when it knows nothing.
+export async function placeName(key: string, at: LatLng): Promise<string> {
+  if (!key) return ''
+  if (key === 'stub') return `Stub St ${at[0].toFixed(4)}, ${at[1].toFixed(4)}`
+  try {
+    const gm = await loadGoogle(key)
+    const { results } = await new gm.Geocoder().geocode({ location: { lat: at[0], lng: at[1] } })
+    const list: any[] = results ?? []
+    // A named building reads better than a plus code or a bare street number.
+    const best = list.find(r => (r.types ?? []).some((ty: string) => ['premise', 'point_of_interest', 'establishment', 'subpremise'].includes(ty)))
+      ?? list.find(r => !(r.types ?? []).includes('plus_code')) ?? list[0]
+    return best ? String(best.formatted_address ?? '').split(',').slice(0, 2).join(',').trim() : ''
+  } catch { return '' }
+}
+
 export function createMap(key: string, el: HTMLElement, view: View, ev: MapEvents): Promise<MapAdapter> {
   return key === 'stub' ? Promise.resolve(stubMap(el, view, ev)) : googleMap(key, el, view, ev)
 }
