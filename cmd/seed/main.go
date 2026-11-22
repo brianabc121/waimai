@@ -31,6 +31,7 @@ func main() {
 	seedStore(ctx, a, "makati", "马卡蒂小馆", "Makati Kitchen", "owner1", true)
 	seedStore(ctx, a, "bgc", "BGC 面馆", "BGC Noodle House", "owner2", false)
 	seedPictures(ctx, a)
+	seedMall(ctx, a)
 	seedFailedJobs(ctx, a)
 	log.Printf("seed done. Demo password for every account: %s", demoPassword)
 	log.Print("accounts: admin · owner1 cashier1 kitchen1 rider1 rider2 (store makati) · owner2 (store bgc)")

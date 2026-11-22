@@ -8,6 +8,7 @@ import { cart } from '../cart'
 import { customer } from '../customer'
 import { DIALS, dialOf, e164, phoneOk as validPhone, splitPhone } from '../dial'
 import { t } from '../i18n'
+import { mallSpot } from '../mall'
 import { mapsKey } from '../maps'
 import { shrink } from '../photo'
 import PlacePicker, { type Picked } from './PlacePicker.vue'
@@ -41,9 +42,10 @@ const terms = ref<DeliveryTerms | null>(a?.delivery ?? null)
 if (!a) {
   f.contact_name = cart.name; f.unit = cart.addressUnit; f.note = cart.addressNote
 }
-// A new address starts from the spot looked up on the store page, if any.
+// A new address starts from the spot looked up on the store page, if any,
+// else from where the marketplace found the customer.
 const start = computed(() => f.lat != null && f.lng != null ? { lat: f.lat, lng: f.lng }
-  : !a && cart.lat != null && cart.lng != null ? { lat: cart.lat, lng: cart.lng } : null)
+  : !a && cart.lat != null && cart.lng != null ? { lat: cart.lat, lng: cart.lng } : !a ? mallSpot() : null)
 
 // null until it is known whether there is a map to pick on
 const hasMap = ref<boolean | null>(null)

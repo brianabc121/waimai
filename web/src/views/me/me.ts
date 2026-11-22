@@ -54,14 +54,14 @@ export const sendApplication = (a: Record<string, string>) => post<Application>(
 export const walletEntries = (account: string) => get<{ entries: WalletEntry[] }>(`/customer/wallet/${account}`).then(r => r.entries)
 export const platformInfo = () => get<PlatformInfo>('/platform/info')
 
-// ---- the store "home" goes back to ----
+// ---- "home" is the marketplace; the last store is still remembered ----
 // The last store the customer looked at on this device.
 export interface HomeStore { slug: string; name: string; currency: string }
 export function homeStore(): HomeStore | null {
   try { const h = JSON.parse(localStorage.getItem('home_store') || 'null'); return h && typeof h.slug === 'string' ? h : null } catch { return null }
 }
 export function rememberStore(h: HomeStore) { localStorage.setItem('home_store', JSON.stringify(h)) }
-export const homePath = () => { const h = homeStore(); return h ? `/s/${h.slug}` : '/me/favorites' }
+export const homePath = () => '/'
 
 // +639175550123 -> 0917 *** 0123: what stands in for a name nobody has set.
 export function maskedPhone(p: string): string {
