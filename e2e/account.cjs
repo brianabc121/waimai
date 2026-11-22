@@ -91,7 +91,7 @@ step('the first address is added at checkout and the order is priced for it')
 // A second address is chosen as soon as it is saved; the book lists both.
 await page.click(tid('checkout-address'))
 await page.waitForSelector(tid('address-sheet'))
-if (await page.locator(tid('address-row')).count() !== 1) throw new Error('the book should list one address')
+await page.waitForFunction(() => document.querySelectorAll('[data-testid=address-row]').length === 1)
 await page.click(tid('address-new'))
 await addAddress(page, { name: '李小红', unit: '8B' })
 await page.locator(`${tid('checkout-address')}:has-text("8B")`).waitFor()

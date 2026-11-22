@@ -78,7 +78,7 @@ export interface Bill { session_id: number; table_id: number; table_name: string
 export interface TableAccess { slug: string; store_name: string; table_name: string; mode: 'qr' | 'ipad' }
 export interface BatchLine { item_id: number; qty: number; option_ids: number[]; note: string }
 export interface Quote { id: string; currency: string; service_type: string; zone_name: string; zone_distance_m: number | null; scheduled_for: string | null; totals: Totals; expires_at: string
-  lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string }[] }
+  lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string; basket?: number }[] }
 export interface ImportRow {
   line: number; category: string; name: string; name_en: string; description: string; price: number; station: string
   action: string; old_price?: number; errors: string[]
