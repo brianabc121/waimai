@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>考勤和工作汇总 · 原型</title>
+<link rel="stylesheet" href="../map-prototype/map.css">
+<link rel="stylesheet" href="../rider-prototype/rider.css">
+<link rel="stylesheet" href="report.css">
+</head>
+<body>
+<!-- 原型：商家端“员工”下的考勤、店内工作汇总、骑手工作汇总。数据都是示意，底图不是真的 Google 地图。方案见 ../STAFF_REPORT_DESIGN.md -->
+
+<!-- ============ 1 考勤 · 按天 ============ -->
+<section id="att-day" style="padding-bottom:28px">
+  <div class="pc">
+    <div class="pc-nav"><b>马卡蒂小馆</b><span>订单</span><span>桌台</span><span>后厨</span><span>菜单</span><span>模板</span><span>优惠</span><span>核款</span><span>配送地图</span><span>骑手</span><span class="on">员工</span><span>设置</span><span class="me">陈店长 ▾</span></div>
+    <div class="pc-body">
+      <div class="subnav"><span>员工名单</span><span class="on">考勤</span><span>店内工作汇总</span><span>骑手工作汇总</span></div>
+      <div class="bar">
+        <div class="datepick"><span>‹</span><span>2026-11-21 周六</span><span>›</span></div><a class="btn">今天</a>
+        <div class="pills"><span class="on">按天</span><span>按月</span></div>
+        <span class="sp"></span><a class="btn">＋ 补一条记录</a><a class="btn">导出 Excel</a>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="l">今天上过班</div><div class="v">6<small>人 / 在职 7 人</small></div><div class="d">没来：小周（没有打卡记录）</div></div>
+        <div class="kpi"><div class="l">现在在岗</div><div class="v">4<small>人</small></div><div class="d">店内 2 · 骑手 2</div></div>
+        <div class="kpi"><div class="l">今天合计工时</div><div class="v">31.6<small>小时</small></div><div class="d">截至 14:10，在岗的还在累计</div></div>
+        <div class="kpi warn"><div class="l">需要你处理</div><div class="v">2<small>条</small></div><div class="d">忘记下班 1 · 打卡位置不在店里 1</div></div>
+      </div>
+      <table class="staff">
+        <tr><th style="width:15%">员工</th><th style="width:8%">上班</th><th style="width:8%">下班</th><th style="width:9%" class="num">工时</th>
+          <th style="width:27%"><div class="tl-axis"><span>8</span><span>12</span><span>16</span><span>20</span><span>24</span></div></th><th style="width:12%">打卡位置</th><th>状态</th><th style="width:7%"></th></tr>
+        <tr><td><span class="av" style="background:#b45309">赵</span><b>赵姐</b><div class="sub" style="margin-left:44px;margin-top:-6px">打包台 · 饮品</div></td><td class="num" style="text-align:left">08:05</td><td><span class="tag ok">在岗</span></td><td class="num">6:05</td>
+          <td><div class="tl"><i class="now" style="left:0.5%;width:38%"></i><b style="left:38.5%"></b></div></td><td>店内</td><td><span class="ok-t">正常</span></td><td class="right"><a class="btn small">改</a></td></tr>
+        <tr><td><span class="av" style="background:#1d4ed8">张</span><b>小张</b><div class="sub" style="margin-left:44px;margin-top:-6px">油炸炉 · 炒菜</div></td><td>09:58</td><td><span class="tag ok">在岗</span></td><td class="num">4:12</td>
+          <td><div class="tl"><i class="now" style="left:12.3%;width:26.2%"></i><b style="left:38.5%"></b></div></td><td>店内</td><td><span class="ok-t">正常</span></td><td class="right"><a class="btn small">改</a></td></tr>
+        <tr><td><span class="av" style="background:#18794e">李</span><b>小李</b><div class="sub" style="margin-left:44px;margin-top:-6px">骑手</div></td><td>10:02</td><td><span class="tag ok">在岗</span></td><td class="num">4:08</td>
+          <td><div class="tl"><i class="rd" style="left:12.7%;width:25.8%"></i><b style="left:38.5%"></b></div></td><td>店内</td><td><span class="ok-t">正常</span> <span class="muted small">3 趟 · 7 单</span></td><td class="right"><a class="btn small">改</a></td></tr>
+        <tr><td><span class="av" style="background:#7c3aed">王</span><b>小王</b><div class="sub" style="margin-left:44px;margin-top:-6px">打包台 · 骑手</div></td><td>10:30<div class="sub">13:20 再上班</div></td><td>12:45<div class="sub"><span class="tag ok">在岗</span></div></td><td class="num">3:05<div class="sub">2 段</div></td>
+          <td><div class="tl"><i style="left:15.6%;width:14.1%"></i><i class="rd" style="left:33.3%;width:5.2%"></i><b style="left:38.5%"></b></div></td><td>店内</td><td><span class="ok-t">正常</span> <span class="muted small">中间休息 35 分钟</span></td><td class="right"><a class="btn small">改</a></td></tr>
+        <tr><td><span class="av" style="background:#0e7490">刘</span><b>阿刘</b><div class="sub" style="margin-left:44px;margin-top:-6px">油炸炉 · 炒菜</div></td><td>昨天 21:40</td><td>09:40<div class="sub">系统代下班</div></td><td class="num"><span class="warn-t">12:00</span></td>
+          <td><div class="tl"><i class="auto" style="left:0;width:10.4%"></i><b style="left:38.5%"></b></div></td><td>店内</td><td><span class="tag warn">忘记下班</span> <span class="muted small">最后一次操作 昨天 23:06</span></td><td class="right"><a class="btn small primary">改</a></td></tr>
+        <tr><td><span class="av" style="background:#be185d">周</span><b>小周</b><div class="sub" style="margin-left:44px;margin-top:-6px">骑手</div></td><td class="muted">没打卡</td><td class="muted">—</td><td class="num muted">—</td>
+          <td><div class="tl"><b style="left:38.5%"></b></div></td><td class="muted">—</td><td class="muted">今天没有记录</td><td class="right"><a class="btn small">补</a></td></tr>
+        <tr><td><span class="av" style="background:#d9480f">陈</span><b>陈店长</b><div class="sub" style="margin-left:44px;margin-top:-6px">店主</div></td><td>09:15</td><td><span class="tag ok">在岗</span></td><td class="num">4:55</td>
+          <td><div class="tl"><i class="now" style="left:7.8%;width:30.7%"></i><b style="left:38.5%"></b></div></td><td><span class="warn-t">离店 1.8 公里</span></td><td><span class="tag warn">不在店里打的卡</span></td><td class="right"><a class="btn small">改</a></td></tr>
+      </table>
+      <div class="legend"><span><i style="background:#7fb89b"></i>店内身份</span><span><i style="background:#f0a172"></i>骑手身份</span><span><i style="background:repeating-linear-gradient(45deg,#e9b9b3,#e9b9b3 4px,#f6dcd9 4px,#f6dcd9 8px)"></i>系统代下班，工时待确认</span><span>竖线是现在 14:10</span></div>
+    </div>
+  </div>
+  <div class="caption">考勤 · 按天：谁几点上班、几点下班、干了多久，哪几条需要店长处理</div>
+</section>
+
+<!-- ============ 2 考勤 · 按月 + 修改 ============ -->
+<section id="att-month" style="padding-bottom:28px">
+  <div class="pc">
+    <div class="pc-nav"><b>马卡蒂小馆</b><span>订单</span><span>桌台</span><span>后厨</span><span>菜单</span><span>模板</span><span>优惠</span><span>核款</span><span>配送地图</span><span>骑手</span><span class="on">员工</span><span>设置</span><span class="me">陈店长 ▾</span></div>
+    <div class="pc-body" style="padding-right:444px;min-height:600px">
+      <div class="subnav"><span>员工名单</span><span class="on">考勤</span><span>店内工作汇总</span><span>骑手工作汇总</span></div>
+      <div class="bar">
+        <div class="datepick"><span>‹</span><span>2026 年 11 月</span><span>›</span></div>
+        <div class="pills"><span>按天</span><span class="on">按月</span></div>
+        <span class="sp"></span><a class="btn">导出 Excel</a>
+      </div>
+      <table class="month" id="month"></table>
+      <div class="legend"><span><i style="background:#e6f6ed"></i>格子里是当天工时（小时）</span><span><i style="background:#c9ecd8"></i>超过 10 小时</span><span><i style="background:var(--warn-soft)"></i>待处理</span><span><i style="background:var(--info-soft)"></i>店长改过</span></div>
+    </div>
+    <div class="drawer">
+      <div class="row between"><h2>修改考勤 · 阿刘</h2><span class="muted">✕</span></div>
+      <div class="muted small">11 月 20 日（周五）这一班</div>
+      <div class="old"><b>原始记录（保留，不会被覆盖）</b><span>上班 21:40 · 手机 App · 店内</span><span>下班 次日 09:40 · <span class="warn-t">系统代下班</span>（连续 12 小时没下班）</span><span class="muted">这一班里他最后一次操作是 23:06 “炸春卷 做好了”</span></div>
+      <div class="two"><label class="f"><span>上班时间</span><input value="11-20 21:40"></label><label class="f"><span>下班时间</span><input value="11-20 23:10" style="border-color:var(--brand)"></label></div>
+      <div class="banner info">改完后这一班算 1 小时 30 分（原来 12 小时）</div>
+      <label class="f"><span>修改原因（必填，员工自己也能看到）</span><textarea>忘记点下班，按最后一道菜的时间算</textarea></label>
+      <div class="foot"><a class="btn link danger-t" style="color:var(--bad)">作废这一班</a><span class="sp"></span><a class="btn">取消</a><a class="btn primary">保存修改</a></div>
+    </div>
+  </div>
+  <div class="caption">考勤 · 按月：一人一行、一天一格。点格子修改，要填原因，原始记录保留</div>
+</section>
+
+<!-- ============ 3 店内员工工作汇总 ============ -->
+<section id="kitchen" style="padding-bottom:28px">
+  <div class="pc">
+    <div class="pc-nav"><b>马卡蒂小馆</b><span>订单</span><span>桌台</span><span>后厨</span><span>菜单</span><span>模板</span><span>优惠</span><span>核款</span><span>配送地图</span><span>骑手</span><span class="on">员工</span><span>设置</span><span class="me">陈店长 ▾</span></div>
+    <div class="pc-body">
+      <div class="subnav"><span>员工名单</span><span>考勤</span><span class="on">店内工作汇总</span><span>骑手工作汇总</span></div>
+      <div class="bar">
+        <div class="datepick"><span>‹</span><span>2026-11-21 周六</span><span>›</span></div>
+        <div class="pills"><span class="on">今天</span><span>昨天</span><span>近 7 天</span><span>本月</span><span>自选</span></div>
+        <span class="sp"></span><a class="btn">导出 Excel</a>
+      </div>
+      <div class="split">
+        <div class="people">
+          <div class="hd"><span>全店今天做了 214 份</span><span>份数 ▾</span></div>
+          <div class="p on"><span class="av" style="background:#1d4ed8">张</span><div><div class="n">小张</div><div class="s">油炸炉 · 炒菜</div></div><div class="c">86<small>份</small></div></div>
+          <div class="p"><span class="av" style="background:#0e7490">刘</span><div><div class="n">阿刘</div><div class="s">油炸炉 · 炒菜</div></div><div class="c">0<small>今天没上班</small></div></div>
+          <div class="p"><span class="av" style="background:#b45309">赵</span><div><div class="n">赵姐</div><div class="s">饮品 · 打包台</div></div><div class="c">47<small>份 · 打包 31 单</small></div></div>
+          <div class="p"><span class="av" style="background:#7c3aed">王</span><div><div class="n">小王</div><div class="s">打包台</div></div><div class="c">0<small>打包 22 单</small></div></div>
+          <div class="p"><span class="av" style="background:#d9480f">陈</span><div><div class="n">陈店长</div><div class="s">没有岗位</div></div><div class="c">9<small>份</small></div></div>
+          <div class="p"><span class="av" style="background:#6b7280">屏</span><div><div class="n">后厨大屏</div><div class="s">在大屏上点的，分不清是谁</div></div><div class="c">72<small>份</small></div></div>
+        </div>
+        <div>
+          <div class="kpis five">
+            <div class="kpi"><div class="l">做好的菜</div><div class="v">86<small>份</small></div><div class="d">61 道 · 来自 38 单</div></div>
+            <div class="kpi"><div class="l">平均出菜</div><div class="v">6:40</div><div class="d">从“开始做”到“做好了”</div></div>
+            <div class="kpi"><div class="l">超过 15 分钟</div><div class="v">5<small>份</small></div><div class="d">占 6%</div></div>
+            <div class="kpi"><div class="l">做好后又撤回</div><div class="v">1<small>次</small></div><div class="d">不重复计数</div></div>
+            <div class="kpi"><div class="l">在岗时长</div><div class="v">4:12</div><div class="d">每小时 20 份</div></div>
+          </div>
+          <div class="cols">
+            <div class="box"><h2>每天做了多少份<span>近 7 天，点柱子看那一天</span></h2>
+              <div class="bars"><div style="height:68%"><em>92</em></div><div style="height:74%"><em>101</em></div><div style="height:0"><em>休</em></div><div style="height:81%"><em>110</em></div><div style="height:88%"><em>119</em></div><div style="height:100%"><em>136</em></div><div class="on" style="height:63%"><em>86</em></div></div>
+              <div class="barx"><span>15 日</span><span>16 日</span><span>17 日</span><span>18 日</span><span>19 日</span><span>20 日</span><span><b>今天</b></span></div>
+            </div>
+            <div class="box"><h2>做得最多的菜<span>今天</span></h2>
+              <div class="hbar"><span>炸鸡翅</span><div class="t"><i style="width:100%"></i></div><b>24</b></div>
+              <div class="hbar"><span>扬州炒饭</span><div class="t"><i style="width:75%"></i></div><b>18</b></div>
+              <div class="hbar"><span>蒜蓉空心菜</span><div class="t"><i style="width:54%"></i></div><b>13</b></div>
+              <div class="hbar"><span>干炒牛河</span><div class="t"><i style="width:46%"></i></div><b>11</b></div>
+              <div class="hbar"><span>其他 6 样</span><div class="t"><i style="width:83%;background:#d6d9de"></i></div><b>20</b></div>
+              <div class="muted small" style="margin-top:8px">按工作台：油炸炉 35 份 · 炒菜 51 份</div>
+            </div>
+          </div>
+          <div class="box" style="padding:0;margin:0">
+            <div class="row between" style="padding:12px 16px"><h2 style="margin:0">明细<span>今天 61 道，最新的在上面</span></h2><div class="row"><div class="pills"><span class="on">全部</span><span>油炸炉</span><span>炒菜</span><span>只看超时</span></div></div></div>
+            <table class="staff" style="border:0;border-top:1px solid var(--line);border-radius:0">
+              <tr><th style="width:9%">做好时间</th><th style="width:25%">菜</th><th class="num" style="width:7%">份数</th><th style="width:10%">工作台</th><th style="width:19%">订单</th><th class="num" style="width:10%">用时</th><th>在哪点的</th></tr>
+              <tr><td class="num" style="text-align:left">14:06</td><td><b>炸鸡翅</b></td><td class="num">2</td><td><span class="post st">油炸炉</span></td><td>A-0131 外卖</td><td class="num">7:12</td><td class="muted">手机工作台</td></tr>
+              <tr><td>14:03</td><td><b>蒜蓉空心菜</b><div class="sub">备注：少油，不要辣</div></td><td class="num">1</td><td><span class="post st">炒菜</span></td><td>A-0131 外卖</td><td class="num">4:35</td><td class="muted">手机工作台</td></tr>
+              <tr><td>13:58</td><td><b>扬州炒饭</b></td><td class="num">2</td><td><span class="post st">炒菜</span></td><td>A-0130 自取</td><td class="num">6:02</td><td class="muted">手机工作台</td></tr>
+              <tr><td>13:51</td><td><b>炸春卷</b></td><td class="num">1</td><td><span class="post st">油炸炉</span></td><td>6 号桌 堂食</td><td class="num"><span class="bad-t">17:40</span></td><td class="muted">后厨大屏（小张登录）</td></tr>
+              <tr><td>13:44</td><td><b>干炒牛河</b> <span class="tag">订单后来取消了</span></td><td class="num">1</td><td><span class="post st">炒菜</span></td><td>A-0128 外卖</td><td class="num">5:20</td><td class="muted">手机工作台</td></tr>
+              <tr><td>13:40</td><td><b>炸鸡翅</b></td><td class="num">3</td><td><span class="post st">油炸炉</span></td><td>A-0127 外卖</td><td class="num muted">没点开始</td><td class="muted">手机工作台</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="caption">店内工作汇总：左边选人，右边看他每天做了多少份菜和每一道的明细</div>
+</section>
+
+<!-- ============ 4 骑手工作汇总 ============ -->
+<section id="rider" style="padding-bottom:28px">
+  <div class="pc">
+    <div class="pc-nav"><b>马卡蒂小馆</b><span>订单</span><span>桌台</span><span>后厨</span><span>菜单</span><span>模板</span><span>优惠</span><span>核款</span><span>配送地图</span><span>骑手</span><span class="on">员工</span><span>设置</span><span class="me">陈店长 ▾</span></div>
+    <div class="pc-body">
+      <div class="subnav"><span>员工名单</span><span>考勤</span><span>店内工作汇总</span><span class="on">骑手工作汇总</span></div>
+      <div class="bar">
+        <div class="datepick"><span>‹</span><span>2026-11-21 周六</span><span>›</span></div>
+        <div class="pills"><span class="on">今天</span><span>昨天</span><span>近 7 天</span><span>本月</span><span>自选</span></div>
+        <span class="sp"></span><a class="btn">导出 Excel</a>
+      </div>
+      <table class="staff" style="margin-bottom:16px">
+        <tr><th style="width:16%">骑手</th><th class="num">在岗</th><th class="num">出车</th><th class="num">送达</th><th class="num">异常</th><th class="num">平均每趟</th><th class="num">实际里程</th><th class="num">推荐里程</th><th class="num">多走</th><th class="num">代收现金</th></tr>
+        <tr class="sel"><td><span class="av" style="background:#18794e">李</span><b>小李</b></td><td class="num">4:08</td><td class="num"><b>3</b> 趟</td><td class="num"><b>7</b> 单</td><td class="num">0</td><td class="num">2.3 单</td><td class="num"><b>19.6</b> 公里</td><td class="num">17.2 公里</td><td class="num"><span class="warn-t">+14%</span></td><td class="num">₱1,862</td></tr>
+        <tr><td><span class="av" style="background:#7c3aed">王</span><b>小王</b></td><td class="num">0:50</td><td class="num"><b>1</b> 趟</td><td class="num"><b>2</b> 单</td><td class="num">0</td><td class="num">2.0 单</td><td class="num"><b>4.1</b> 公里</td><td class="num">3.9 公里</td><td class="num">+5%</td><td class="num">₱486</td></tr>
+        <tr class="offr"><td><span class="av" style="background:#be185d">周</span><b>小周</b></td><td class="num">—</td><td class="num">0 趟</td><td class="num">0 单</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+        <tr><td><b style="margin-left:44px">合计</b></td><td class="num">4:58</td><td class="num"><b>4</b> 趟</td><td class="num"><b>9</b> 单</td><td class="num">0</td><td class="num">2.3 单</td><td class="num"><b>23.7</b> 公里</td><td class="num">21.1 公里</td><td class="num">+12%</td><td class="num">₱2,348</td></tr>
+      </table>
+      <div class="row between" style="margin-bottom:10px"><h2>小李 · 今天的 3 趟<span class="muted" style="font-weight:400;font-size:12.5px;margin-left:8px">一趟 = 从店里取餐出发，到回到店里</span></h2></div>
+      <div class="trip">
+        <div class="no">第 3 趟<div class="s"><span class="tag ok">在路上</span></div></div>
+        <div><div class="t">13:48 出发 · 还没回店</div><div class="s">已出去 22 分钟</div></div>
+        <div class="stops"><span class="stop"><i>1</i>A-0129 已送达</span><span class="stop" style="color:var(--muted)"><i style="background:#9ca3af">2</i>A-0131 配送中</span></div>
+        <div class="km"><b>2.4</b> 公里（进行中）<div class="s">推荐 5.6 公里</div></div>
+        <a class="btn small">看路线</a>
+      </div>
+      <div class="trip on">
+        <div class="no">第 2 趟</div>
+        <div><div class="t">11:42 出发 · 12:31 回店</div><div class="s">用时 49 分钟</div></div>
+        <div class="stops"><span class="stop"><i>1</i>A-0121</span><span class="stop"><i>2</i>A-0120</span><span class="stop"><i>3</i>A-0119</span><div class="s" style="width:100%;color:var(--warn)">实际送的顺序和推荐的不一样</div></div>
+        <div class="km"><b>8.1</b> 公里 <span class="warn-t">+19%</span><div class="s">推荐 6.8 公里 · 多走 1.3 公里</div></div>
+        <a class="btn small primary">看路线</a>
+      </div>
+      <div class="trip">
+        <div class="no">第 1 趟</div>
+        <div><div class="t">10:26 出发 · 11:05 回店</div><div class="s">用时 39 分钟</div></div>
+        <div class="stops"><span class="stop"><i>1</i>A-0114</span><span class="stop"><i>2</i>A-0115</span></div>
+        <div class="km"><b>5.1</b> 公里 <span class="muted">+6%</span><div class="s">推荐 4.8 公里</div></div>
+        <a class="btn small">看路线</a>
+      </div>
+      <p class="muted small" style="margin-top:10px">推荐里程是出发时系统按当时这几单算出的最短骑行路线（含回店）。多走不超过 30% 且不超过 1 公里的不标黄。里程只做参考，系统不会据此扣钱。</p>
+    </div>
+  </div>
+  <div class="caption">骑手工作汇总：每天送了几单、出了几趟车、每趟带几单、走了多少公里</div>
+</section>
+
+<!-- ============ 5 一趟的路线图 ============ -->
+<section id="route" style="padding-bottom:28px">
+  <div class="pc">
+    <div class="pc-nav"><b>马卡蒂小馆</b><span>订单</span><span>桌台</span><span>后厨</span><span>菜单</span><span>模板</span><span>优惠</span><span>核款</span><span>配送地图</span><span>骑手</span><span class="on">员工</span><span>设置</span><span class="me">陈店长 ▾</span></div>
+    <div class="crumb"><a class="btn small">‹ 返回</a><b style="font-size:16px">小李 · 11 月 21 日 · 第 2 趟</b><span class="muted">11:42 出发 · 12:31 回店 · 3 单</span><span style="margin-left:auto" class="row"><a class="btn small">‹ 上一趟</a><a class="btn small">下一趟 ›</a></span></div>
+    <div class="routewrap">
+      <div class="map"><svg id="rmap"></svg>
+        <div class="float mtype"><span>地图</span><span>卫星</span></div>
+        <div class="float zoom" style="bottom:92px"><span>+</span><span>−</span></div>
+        <div class="play"><span>▶</span><span class="num">12:12</span><div class="tr"><i></i><b></b></div><span class="num muted">12:31</span><span class="muted">拖动看他当时在哪</span></div>
+        <div class="attrib">示意底图 · 正式版是 Google 地图</div>
+      </div>
+      <div class="panel">
+        <section>
+          <h2 style="margin-bottom:4px">两条路线</h2>
+          <div class="lg"><span class="ck" style="background:#1d4ed8"></span><span class="ln" style="border-color:#1d4ed8;border-top-style:dashed"></span><span>系统推荐路线</span><b>6.8 公里</b></div>
+          <div class="lg"><span class="ck"></span><span class="ln" style="border-color:#d9480f"></span><span>实际走过的路线</span><b>8.1 公里</b></div>
+          <div class="cmp"><div><b class="warn-t">+1.3 公里</b><span>多走</span></div><div><b class="warn-t">+19%</b><span>比推荐</span></div><div><b>49 分钟</b><span>推荐约 34 分钟</span></div></div>
+        </section>
+        <section>
+          <h2 style="margin-bottom:8px">送餐顺序</h2>
+          <div class="seq"><span class="muted">推荐</span><div class="stops"><span class="stop"><i style="background:#1d4ed8">1</i>A-0119</span><span class="stop"><i style="background:#1d4ed8">2</i>A-0120</span><span class="stop"><i style="background:#1d4ed8">3</i>A-0121</span></div>
+            <span class="muted">实际</span><div class="stops"><span class="stop"><i style="background:#d9480f">1</i>A-0121</span><span class="stop"><i style="background:#d9480f">2</i>A-0120</span><span class="stop"><i style="background:#d9480f">3</i>A-0119</span></div></div>
+          <div class="banner warn" style="margin-top:9px">顺序和推荐的不同。A-0121 是预约 12:00 的单，先送它是合理的。</div>
+        </section>
+        <section>
+          <h2 style="margin-bottom:8px">这一趟的经过</h2>
+          <div class="evt"><span class="tm">11:42</span><span class="dt"></span><span class="tx"><b>取餐出发</b> · 3 单一起取</span></div>
+          <div class="evt"><span class="tm">11:57</span><span class="dt"></span><span class="tx"><b>A-0121 送达</b> · Legazpi St · 2.6 公里</span></div>
+          <div class="evt"><span class="tm">12:09</span><span class="dt"></span><span class="tx"><b>A-0120 送达</b> · 代收 ₱486</span></div>
+          <div class="evt"><span class="tm">12:13</span><span class="dt"></span><span class="tx"><span class="warn-t">轨迹中断 3 分钟</span> · 这一段按直线估算</span></div>
+          <div class="evt"><span class="tm">12:21</span><span class="dt"></span><span class="tx"><b>A-0119 送达</b> · 拍了照</span></div>
+          <div class="evt"><span class="tm">12:31</span><span class="dt"></span><span class="tx"><b>回到店里</b> · 进入店铺 100 米范围</span></div>
+        </section>
+        <section style="border:0"><div class="muted small">轨迹来自骑手手机上班期间上报的位置，共 186 个点。中断的一段用虚线画，里程按直线算，会比真实的少。</div></section>
+      </div>
+    </div>
+  </div>
+  <div class="caption">一趟的路线图：蓝色虚线是系统推荐，橙色实线是他实际走的，旁边是里程对比和经过</div>
+</section>
+
+<script src="../map-prototype/map.js"></script>
+<script>
+// 月视图：示意数据
+(function () {
+  var t = document.getElementById('month'), days = 30, wd = ['日','一','二','三','四','五','六'];
+  var h = '<tr><th style="width:92px;text-align:left;padding-left:10px">员工</th>';
+  for (var d = 1; d <= days; d++) { var w = (d % 7); h += '<th class="' + (w === 0 || w === 1 ? 'we' : '') + '">' + d + '</th>'; }
+  h += '<th style="width:54px">天数</th><th style="width:62px">工时</th></tr>';
+  var people = [['赵姐', 3, 9.5], ['小张', 2, 8.5], ['阿刘', 5, 8], ['小李', 4, 8], ['小王', 6, 6.5], ['小周', 1, 7], ['陈店长', 0, 10.5]];
+  var r = rng(11);
+  people.forEach(function (p, i) {
+    var row = '<tr><td class="name">' + p[0] + '</td>', n = 0, sum = 0;
+    for (var d = 1; d <= days; d++) {
+      var cls = 'f', txt = '';
+      if (d <= 21) {
+        var off = (d + p[1]) % 7 === 0, v = Math.round((p[2] + (r() - 0.5) * 2.4) * 2) / 2;
+        if (d === 21) { v = [6.5, 4, 0, 4, 3, 0, 5][i]; off = v === 0; }
+        if (off) { txt = d === 21 ? '' : '休'; cls = ''; }
+        else { txt = v; cls = v > 10 ? 'h2' : 'h'; n++; sum += v; }
+        if (p[0] === '阿刘' && d === 20) { txt = '12'; cls = 'x sel'; sum += 12 - v; }
+        if (p[0] === '小周' && d === 14) { cls = 'e'; }
+        if (p[0] === '小李' && d === 9) { txt = '?'; cls = 'x'; }
+      }
+      row += '<td class="' + cls + '">' + txt + '</td>';
+    }
+    row += '<td class="sum">' + n + '</td><td class="sum">' + sum.toFixed(1) + '</td></tr>';
+    h += row;
+  });
+  t.innerHTML = h;
+})();
+
+// 路线图：路线画在街区网格上（网格和底图一样转了 20 度）
+(function () {
+  var svg = document.getElementById('rmap'); baseMap(svg, '290 120 640 500');
+  var a = -20 * Math.PI / 180, cx = 500, cy = 360;
+  function R(p) { var x = p[0] - cx, y = p[1] - cy; return [cx + x * Math.cos(a) - y * Math.sin(a), cy + x * Math.sin(a) + y * Math.cos(a)]; }
+  function path(pts) { return 'M' + pts.map(R).map(function (p) { return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join('L'); }
+  var S = [496, 372], A = [682, 310], B = [744, 496], C = [558, 558];
+  // 推荐：店 → A → B → C → 店
+  var rec = [S, [620, 372], [620, 310], A, [744, 310], B, [744, 558], C, [496, 558], S];
+  // 实际：店 → C → B → A → 店，中间绕了一段
+  var act = [[500, 376], [500, 438], [438, 438], [438, 562], [562, 562], [562, 500], [650, 500]];
+  var gap = [[650, 500], [748, 500], [748, 438]];
+  var act2 = [[748, 438], [686, 438], [686, 314], [686, 252], [500, 252], [500, 368]];
+  function jit(pts) { var r = rng(5), o = []; for (var i = 0; i < pts.length - 1; i++) { var p = pts[i], q = pts[i + 1], n = Math.max(1, Math.round(Math.hypot(q[0] - p[0], q[1] - p[1]) / 16)); for (var k = 0; k < n; k++) o.push([p[0] + (q[0] - p[0]) * k / n + (r() - .5) * 5, p[1] + (q[1] - p[1]) * k / n + (r() - .5) * 5]); } o.push(pts[pts.length - 1]); return o; }
+  svg.appendChild(el('circle', { cx: R(S)[0], cy: R(S)[1], r: 26, fill: '#d9480f', 'fill-opacity': .1, stroke: '#d9480f', 'stroke-opacity': .5, 'stroke-dasharray': '3 3' }));
+  svg.appendChild(el('path', { d: path(rec), stroke: '#fff', 'stroke-width': 8, fill: 'none', 'stroke-linejoin': 'round', 'stroke-opacity': .8 }));
+  svg.appendChild(el('path', { d: path(rec), stroke: '#1d4ed8', 'stroke-width': 4.5, fill: 'none', 'stroke-dasharray': '10 6', 'stroke-linejoin': 'round' }));
+  [jit(act), jit(act2)].forEach(function (p) {
+    svg.appendChild(el('path', { d: path(p), stroke: '#fff', 'stroke-width': 7.5, fill: 'none', 'stroke-linejoin': 'round' }));
+    svg.appendChild(el('path', { d: path(p), stroke: '#d9480f', 'stroke-width': 4.5, fill: 'none', 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+  });
+  svg.appendChild(el('path', { d: path([gap[0], gap[2]]), stroke: '#d9480f', 'stroke-width': 3, fill: 'none', 'stroke-dasharray': '2 6', 'stroke-linecap': 'round' }));
+  function pin(p, label, color, sub) {
+    var q = R(p), g = el('g', { transform: 'translate(' + q[0] + ' ' + q[1] + ')' });
+    g.appendChild(el('path', { d: 'M0 0C-3 -8 -11 -12 -11 -21A11 11 0 1 1 11 -21C11 -12 3 -8 0 0Z', fill: color, stroke: '#fff', 'stroke-width': 1.5 }));
+    g.appendChild(el('text', { x: 0, y: -17, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, fill: '#fff' }, label));
+    if (sub) g.appendChild(el('text', { x: 15, y: -17, 'font-size': 11, 'font-weight': 700, fill: '#1f2328', stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke' }, sub));
+    svg.appendChild(g);
+  }
+  pin(S, '店', '#d9480f', '马卡蒂小馆');
+  pin(A, '3', '#1f2328', 'A-0119 · 12:21');
+  pin(B, '2', '#1f2328', 'A-0120 · 12:09');
+  pin(C, '1', '#1f2328', 'A-0121 · 11:57');
+  var m = R([690, 478]);
+  svg.appendChild(el('text', { x: m[0] - 70, y: m[1] + 4, 'font-size': 10.5, fill: '#b45309', stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke', 'font-weight': 600 }, '轨迹中断 3 分钟'));
+  // 回放位置
+  var cur = R([686, 380]);
+  svg.appendChild(el('circle', { cx: cur[0], cy: cur[1], r: 9, fill: '#fff', stroke: '#d9480f', 'stroke-width': 3 }));
+  svg.appendChild(el('circle', { cx: cur[0], cy: cur[1], r: 3.5, fill: '#d9480f' }));
+})();
+</script>
+</body>
+</html>
