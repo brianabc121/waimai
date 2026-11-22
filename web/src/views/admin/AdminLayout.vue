@@ -32,6 +32,7 @@ async function out() { await logout(); session.loaded = true; router.replace('/l
       <div class="grp">{{ t('ad.g_merchants') }}</div>
       <router-link to="/admin/merchants">{{ t('ad.merchants') }}</router-link>
       <router-link to="/admin/items">{{ t('ad.items') }}</router-link>
+      <router-link to="/admin/customers">{{ t('ad.customers') }}</router-link>
       <div class="grp">{{ t('ad.g_system') }}</div>
       <router-link to="/admin/settings">{{ t('ad.settings') }}</router-link>
       <router-link to="/admin/audit">{{ t('ad.audit') }}</router-link>

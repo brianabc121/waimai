@@ -3,6 +3,7 @@
   --ink: #1f2328; --muted: #6b7280; --line: #e5e7eb; --bg: #f6f6f4; --card: #fff;
   --ok: #18794e; --ok-soft: #e6f6ed; --warn: #b45309; --warn-soft: #fff4d6; --bad: #b42318; --bad-soft: #fdecea;
   --info: #1d4ed8; --info-soft: #e8efff;
+  --tabbar-h: 54px; /* the customer's bottom navigation */
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
 }
 * { box-sizing: border-box; }

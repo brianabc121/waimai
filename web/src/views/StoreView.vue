@@ -12,6 +12,8 @@ import CartPanel from './CartPanel.vue'
 import MenuList from './MenuList.vue'
 import StoreReviews from './StoreReviews.vue'
 import './storeStrings'
+import CustomerTabs from './me/CustomerTabs.vue'
+import { isFavorite, loadProfile, rememberStore, setFavorite } from './me/me'
 
 // The map and the address book are only downloaded when a customer opens them.
 const PlacePicker = defineAsyncComponent(() => import('./PlacePicker.vue'))
@@ -32,6 +34,10 @@ async function load() {
     const s = await get<Storefront>(`/stores/${props.slug}`)
     store.value = s
     document.title = pick(s.branch.name, s.branch.name_en)
+    // "Home" in the bottom navigation comes back to the store last looked at.
+    rememberStore({ slug: props.slug, name: pick(s.branch.name, s.branch.name_en), currency: s.branch.currency })
+    void isFavorite(props.slug).then(on => { favorite.value = on }).catch(() => null)
+    void loadProfile()
     // Fall back to a service the store actually offers.
     if (cart.service === 'delivery' && !s.branch.delivery_enabled) cart.service = 'pickup'
     if (cart.service === 'pickup' && !s.branch.pickup_enabled) cart.service = 'delivery'
@@ -80,6 +86,17 @@ async function account() {
 }
 async function logout() { await customerLogout(); showAccount.value = false }
 const showAddresses = ref(false)
+// Keeping the store among the customer's favourites needs an account.
+const favorite = ref(false)
+async function toggleFavorite() {
+  if (!(await loadCustomer())) { router.push(loginRoute(`/s/${props.slug}`, props.slug)); return }
+  try {
+    await setFavorite(props.slug, !favorite.value)
+    favorite.value = !favorite.value
+    toast.value = t(favorite.value ? 'mf.fav_on' : 'mf.fav_off')
+    setTimeout(() => { toast.value = '' }, 2000)
+  } catch { /* stays as it was */ }
+}
 const shopPin = computed(() => { const b = store.value?.branch; return b && b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng, name: pick(b.name, b.name_en), country: b.country_code } : null })
 
 const tpl = computed(() => store.value?.templates?.delivery ?? defaultTemplate('delivery'))
@@ -243,6 +260,8 @@ async function sendReport() {
           <span class="grow"></span>
           <button class="ico" :class="{ on: searching }" :aria-label="t('sf.search')" data-testid="search-toggle" @click="toggleSearch">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg></button>
+          <button class="ico" :class="{ fav: favorite }" :aria-label="t(favorite ? 'mf.faved' : 'mf.fav')" :aria-pressed="favorite" data-testid="favorite" @click="toggleFavorite">
+            <svg viewBox="0 0 24 24" width="24" height="24" :fill="favorite ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.500l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.900z" /></svg></button>
           <button class="ico" :aria-label="t('sf.share')" data-testid="share" @click="share">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="18" cy="5" r="2.6" /><circle cx="6" cy="12" r="2.6" /><circle cx="18" cy="19" r="2.6" /><path d="m8.3 10.7 7.4-4.4M8.3 13.3l7.4 4.4" /></svg></button>
           <div class="acct">
@@ -251,6 +270,7 @@ async function sendReport() {
             <div v-if="showAccount && customer.verified" class="acct-menu" data-testid="account-menu">
               <div class="small muted">{{ t('sf.logged_in') }}</div>
               <div class="bold">{{ prettyPhone(customer.phone) }}</div>
+              <router-link to="/me" class="btn small block" data-testid="my-center">{{ t('me.me') }}</router-link>
               <button class="btn small block" data-testid="my-addresses" @click="showAddresses = true; showAccount = false">{{ t('ad.mine') }}</button>
               <button class="btn small block" data-testid="logout" @click="logout">{{ t('sf.logout') }}</button>
             </div>
@@ -451,6 +471,7 @@ async function sendReport() {
       </div>
 
       <div v-if="toast" class="toast">{{ toast }}</div>
+      <CustomerTabs active="home" class="shoptabbar" />
     </template>
   </div>
 </template>
@@ -465,6 +486,16 @@ async function sendReport() {
 .ico { width: 38px; height: 38px; border: 0; background: none; color: var(--ink); border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
 .ico:hover, .ico.on { background: #f2f2f2; }
 .ico.in { color: var(--brand); }
+.ico.fav { color: var(--star); }
+/* on a phone the customer's navigation lies under the cart bar */
+.shoptabbar { display: none; }
+@media (max-width: 767.98px) {
+  .shoptabbar { display: block; }
+  .shop { --tabs: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); padding-bottom: calc(96px + var(--tabs)); }
+  .shop .bottombar.cartbar { bottom: var(--tabbar-h); }
+  .shop .cartmask { padding-bottom: calc(76px + var(--tabs)); }
+  .shop .toast { bottom: calc(96px + var(--tabs)); }
+}
 .pickersheet { height: 94vh; max-height: 94vh; overflow: hidden; }
 @media (min-width: 768px) { .pickersheet { height: min(720px, 90vh); max-width: 620px; } }
 .acct { position: relative; }
