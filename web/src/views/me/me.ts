@@ -2,7 +2,7 @@
 import { reactive } from 'vue'
 import { del, get, post, put, upload } from '../../api'
 import { customer, loadCustomer } from '../../customer'
-import { extend, locale, t } from '../../i18n'
+import { extend, locale, money, t } from '../../i18n'
 import type { Promotion } from '../../types'
 
 export interface Wallet { currency: string; balance: number; bonus: number }
@@ -92,6 +92,7 @@ extend({
   'me.favorites': ['我的收藏', 'Favourites'], 'me.support': ['我的客服', 'Support'], 'me.reviews': ['我的评价', 'My reviews'],
   'me.messages': ['我的消息', 'Messages'], 'me.apply': ['商家入驻', 'Open a store'], 'me.addresses': ['收货地址', 'Addresses'],
   'me.about': ['关于我们', 'About us'], 'me.feedback': ['意见反馈', 'Feedback'], 'me.help': ['账号疑问', 'Account help'],
+  'me.common': ['常用服务', 'Everyday'], 'me.more_services': ['更多服务', 'More'],
   'me.need_login': ['请先登录', 'Please log in first'],
   // profile and settings
   'mp.title': ['个人资料和设置', 'Profile and settings'], 'mp.avatar': ['头像', 'Picture'], 'mp.change': ['更换', 'Change'], 'mp.remove': ['移除', 'Remove'],
@@ -108,6 +109,8 @@ extend({
   // offers
   'mo.title': ['我的优惠', 'My offers'], 'mo.hint': ['下面是你常去的店铺正在进行的优惠。满足条件时下单会自动使用最划算的一个，不用领取。',
     'These are the offers running at your stores. The best one that applies is used by itself at checkout.'],
+  'mo.auto': ['符合条件时，结算自动用最划算的优惠', 'The best offer applies by itself at checkout'], 'mo.no_claim': ['无需领取', 'Nothing to claim'],
+  'mo.valid': ['有效期：{d}', 'Valid: {d}'], 'mo.no_end': ['未设截止日期', 'no end date'], 'mo.over': ['满 {amt} 可用', 'Over {amt}'], 'mo.any': ['无门槛', 'No minimum'],
   'mo.use': ['去使用', 'Order'], 'mo.until': ['{d} 前有效', 'Until {d}'], 'mo.daily': ['每天 {a}–{b}', 'Daily {a}–{b}'],
   'mo.delivery_only': ['仅外卖', 'Delivery only'], 'mo.pickup_only': ['仅自取', 'Pickup only'],
   // favourites
@@ -162,3 +165,14 @@ extend({
   'mh.q6': ['余额和奖励金怎么用？', 'How do I use my balance and rewards?'], 'mh.a6': ['目前只做记录：余额由平台记入（例如退款），奖励金由活动发放，都还不能在下单时使用。接入线上支付后开通。',
     'For now they are only recorded: the platform adds to the balance (refunds, for example) and rewards come from campaigns. Neither can be spent on an order until online payment is available.'],
 })
+
+// An offer in two parts: what it gives ("减 ₱20") and when it applies ("满 ₱200 可用").
+export function offerParts(p: Promotion, currency: string): { gives: string; when: string } {
+  const zh = locale.value === 'zh'
+  let gives = zh ? '免配送费' : 'Free delivery'
+  if (p.kind === 'amount_off') gives = zh ? `减 ${money(p.value, currency)}` : `${money(p.value, currency)} off`
+  else if (p.kind === 'percent_off') gives = zh ? `${(100 - p.value / 100) / 10} 折` : `${p.value / 100}% off`
+  let when = p.threshold > 0 ? t('mo.over', { amt: money(p.threshold, currency) }) : t('mo.any')
+  if (p.kind === 'percent_off' && p.max_discount) when += zh ? `，最多减 ${money(p.max_discount, currency)}` : `, up to ${money(p.max_discount, currency)}`
+  return { gives, when }
+}
