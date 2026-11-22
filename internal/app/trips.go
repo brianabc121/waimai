@@ -449,6 +449,12 @@ func advanceTrip(ctx context.Context, tx pgx.Tx, id int64, now time.Time) error 
 		}
 	}
 
+	if status != "loading" && store != nil {
+		if err := planStraight(ctx, tx, id, *store); err != nil {
+			return err
+		}
+	}
+
 	// The track runs to the end of the trip, not to the last fix received.
 	if ended != nil {
 		kept := fixes[:0:0]
@@ -468,6 +474,10 @@ func advanceTrip(ctx context.Context, tx pgx.Tx, id int64, now time.Time) error 
 	}
 	var distance *int
 	var path, gaps []byte
+	// The trip starts at the store, wherever the first fix came from.
+	if store != nil && len(fixes) > 0 && fixes[0].At.After(started) {
+		fixes = append([]trackPoint{{*store, started}}, fixes...)
+	}
 	tr := buildTrack(fixes)
 	if tr.Fixes > 0 {
 		distance = &tr.DistanceM
@@ -488,5 +498,107 @@ func advanceTrip(ctx context.Context, tx pgx.Tx, id int64, now time.Time) error 
 func (a *App) forgetOldTripPaths(ctx context.Context) error {
 	_, err := a.DB.Exec(ctx, `UPDATE rider_trips SET actual_path=NULL, track_gaps=NULL, planned_path=NULL
 		WHERE ended_at < now() - make_interval(days => $1) AND (actual_path IS NOT NULL OR planned_path IS NOT NULL)`, tripPathDays)
+	return err
+}
+
+// ---- the route the system would take ----
+
+// bestRound orders the stops of a round trip from the store and back so that
+// the straight-line distance is shortest. Up to eight stops every order is
+// tried; beyond that the nearest stop is taken next.
+func bestRound(store LatLng, stops []LatLng) ([]int, float64) {
+	n := len(stops)
+	length := func(order []int) float64 {
+		d, at := 0.0, store
+		for _, i := range order {
+			d += metresBetween(at, stops[i])
+			at = stops[i]
+		}
+		return d + metresBetween(at, store)
+	}
+	order := make([]int, n)
+	for i := range order {
+		order[i] = i
+	}
+	if n > 8 {
+		used := make([]bool, n)
+		at := store
+		for k := 0; k < n; k++ {
+			best := -1
+			for i := range stops {
+				if !used[i] && (best < 0 || metresBetween(at, stops[i]) < metresBetween(at, stops[best])) {
+					best = i
+				}
+			}
+			used[best], order[k], at = true, best, stops[best]
+		}
+		return order, length(order)
+	}
+	best, bestLen := append([]int(nil), order...), length(order)
+	var permute func(k int)
+	permute = func(k int) {
+		if k == n {
+			if l := length(order); l < bestLen-0.5 {
+				bestLen = l
+				copy(best, order)
+			}
+			return
+		}
+		for i := k; i < n; i++ {
+			order[k], order[i] = order[i], order[k]
+			permute(k + 1)
+			order[k], order[i] = order[i], order[k]
+		}
+	}
+	permute(0)
+	return best, bestLen
+}
+
+// planStraight fills in the planned route of a trip that has none yet, as
+// straight lines from the store through the drops and back. It is worked out
+// once, when the rider has left. A trip with an order that has no position on
+// the map gets no planned route.
+func planStraight(ctx context.Context, tx pgx.Tx, tripID int64, store LatLng) error {
+	var source string
+	if err := tx.QueryRow(ctx, `SELECT planned_source FROM rider_trips WHERE id=$1`, tripID).Scan(&source); err != nil || source != "" {
+		return err
+	}
+	rows, err := tx.Query(ctx, `SELECT o.id, o.dest_lat, o.dest_lng FROM rider_trip_orders x JOIN orders o ON o.id = x.order_id
+		WHERE x.trip_id=$1 AND x.outcome <> 'removed' ORDER BY x.id`, tripID)
+	if err != nil {
+		return err
+	}
+	var ids []int64
+	var stops []LatLng
+	missing := false
+	for rows.Next() {
+		var id int64
+		var lat, lng *float64
+		if err := rows.Scan(&id, &lat, &lng); err != nil {
+			rows.Close()
+			return err
+		}
+		if lat == nil || lng == nil {
+			missing = true
+			continue
+		}
+		ids, stops = append(ids, id), append(stops, LatLng{*lat, *lng})
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil || missing || len(stops) == 0 {
+		return err
+	}
+	order, dist := bestRound(store, stops)
+	path := [][2]float64{{store[0], store[1]}}
+	planned := make([]int64, len(order))
+	for k, i := range order {
+		planned[k] = ids[i]
+		path = append(path, [2]float64{stops[i][0], stops[i][1]})
+	}
+	path = append(path, [2]float64{store[0], store[1]})
+	pj, _ := json.Marshal(path)
+	oj, _ := json.Marshal(planned)
+	_, err = tx.Exec(ctx, `UPDATE rider_trips SET planned_distance_m=$2, planned_path=$3, planned_order=$4, planned_source='straight'
+		WHERE id=$1`, tripID, int(math.Round(dist)), pj, oj)
 	return err
 }

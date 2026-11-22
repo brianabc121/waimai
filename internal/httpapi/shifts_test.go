@@ -87,3 +87,26 @@ func TestKitchenReportOverHTTP(t *testing.T) {
 	owner.want(422, "VALIDATION", "GET", page+"/0"+period+"&station=x", nil)
 	login(t, newFixture(t).owner).want(404, "NOT_FOUND", "GET", page+period, nil)
 }
+
+func TestRiderReportOverHTTP(t *testing.T) {
+	f := newFixture(t)
+	owner, cashier := login(t, f.owner), login(t, f.cashier)
+	today := time.Now().In(time.FixedZone("", 8*3600)).Format("2006-01-02")
+	page := fmt.Sprintf("/merchant/branches/%d/reports/riders", f.branchID)
+	period := "?from=" + today + "&to=" + today
+
+	cashier.want(403, "FORBIDDEN", "GET", page+period, nil)
+	cashier.want(403, "FORBIDDEN", "GET", fmt.Sprintf("%s/%d%s", page, f.riderID, period), nil)
+	cashier.want(403, "FORBIDDEN", "GET", fmt.Sprintf("/merchant/branches/%d/trips/1", f.branchID), nil)
+	owner.want(422, "VALIDATION", "GET", page, nil)
+	out := owner.want(200, "", "GET", page+period, nil)
+	if out["detour_percent"] != float64(30) || out["store_set"] != false || len(out["riders"].([]any)) != 1 {
+		t.Fatalf("report: %v", out)
+	}
+	d := owner.want(200, "", "GET", fmt.Sprintf("%s/%d%s", page, f.riderID, period), nil)
+	if len(d["trips"].([]any)) != 0 || len(d["days"].([]any)) != 0 {
+		t.Fatalf("detail: %v", d)
+	}
+	owner.want(404, "NOT_FOUND", "GET", fmt.Sprintf("/merchant/branches/%d/trips/987654321", f.branchID), nil)
+	login(t, newFixture(t).owner).want(404, "NOT_FOUND", "GET", page+period, nil)
+}
