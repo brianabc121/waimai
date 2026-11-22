@@ -14,6 +14,7 @@ import (
 type fakeIM struct {
 	users map[string]string
 	read  []string
+	sent  []string
 }
 
 func (f *fakeIM) EnsureUser(_ context.Context, id, nick string) error { f.users[id] = nick; return nil }
@@ -22,6 +23,10 @@ func (f *fakeIM) UserToken(_ context.Context, id string) (string, error) {
 }
 func (f *fakeIM) MarkRead(_ context.Context, id, peer string) error {
 	f.read = append(f.read, id+">"+peer)
+	return nil
+}
+func (f *fakeIM) SendText(_ context.Context, from, to, text, ex string) error {
+	f.sent = append(f.sent, from+">"+to+":"+ex)
 	return nil
 }
 func (f *fakeIM) Check(context.Context) error { return nil }
@@ -243,4 +248,175 @@ func TestChatOverHTTP(t *testing.T) {
 	// without a chat server nothing can sign in
 	a.IM = nil
 	cust.want(503, "CHAT_OFF", "POST", "/customer/chats/login", nil)
+}
+
+// card plays a picture or an order card through both callbacks, like say.
+func card(t *testing.T, from, to string, c map[string]any, uid int64) string {
+	t.Helper()
+	msgSeq++
+	data, _ := json.Marshal(c)
+	content, _ := json.Marshal(map[string]string{"data": string(data)})
+	body := map[string]any{"sendID": from, "recvID": to, "contentType": 110, "sessionType": 1, "content": string(content),
+		"serverMsgID": fmt.Sprintf("c-%d-%d", time.Now().UnixNano(), msgSeq), "sendTime": time.Now().UnixMilli()}
+	if uid != 0 {
+		body["ex"] = fmt.Sprintf(`{"uid":%d}`, uid)
+	}
+	st, out := hook(t, "hook-key", "callbackBeforeSendSingleMsgCommand", body)
+	if st != 200 {
+		t.Fatalf("before hook: %d %v", st, out)
+	}
+	if out["nextCode"].(float64) != 0 {
+		return out["errMsg"].(string)
+	}
+	if st, out := hook(t, "hook-key", "callbackAfterSendSingleMsgCommand", body); st != 200 {
+		t.Fatalf("after hook: %d %v", st, out)
+	}
+	return ""
+}
+
+// raw posts a body as it is (an uploaded picture) and returns the status and the answer.
+func raw(t *testing.T, c *client, path string, body []byte) (int, map[string]any) {
+	t.Helper()
+	req, _ := http.NewRequest("POST", server.URL+"/api/v1"+path, bytes.NewReader(body))
+	req.Header.Set("X-Requested-With", "test")
+	req.Header.Set("X-Forwarded-For", c.ip)
+	for k, v := range c.cookies {
+		req.AddCookie(&http.Cookie{Name: k, Value: v})
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	out := map[string]any{}
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	return resp.StatusCode, out
+}
+
+// Pictures, order cards, quick replies and the closed store's own answer.
+func TestChatCards(t *testing.T) {
+	f := newFixture(t)
+	im := &fakeIM{users: map[string]string{}}
+	a.IM = im
+	t.Cleanup(func() { a.IM = nil })
+	cust, other, admin := verifiedCustomer(t), verifiedCustomer(t), adminClient(t)
+	owner, cashier, kitchen := login(t, f.owner), login(t, f.cashier), login(t, f.kitchen)
+	bid := fmt.Sprint(f.branchID)
+	id := func(c *client) int64 { return int64(c.want(200, "", "GET", "/customer/me", nil)["id"].(float64)) }
+	custID, otherID := id(cust), id(other)
+	cIM, oIM, bIM := fmt.Sprintf("c_%d", custID), fmt.Sprintf("c_%d", otherID), "b_"+bid
+	ownerID := int64(owner.want(200, "", "GET", "/auth/me", nil)["id"].(float64))
+	jpeg := append([]byte{0xFF, 0xD8, 0xFF, 0xE0}, make([]byte, 400)...)
+
+	// a picture is uploaded first, then sent by its token
+	if st, _ := raw(t, cust, "/customer/chats/"+f.slug+"/images", []byte("GIF89a")); st != 422 {
+		t.Fatalf("not a JPEG: %d", st)
+	}
+	st, up := raw(t, cust, "/customer/chats/"+f.slug+"/images", jpeg)
+	if st != 200 || up["token"] == "" {
+		t.Fatalf("upload: %d %v", st, up)
+	}
+	token := up["token"].(string)
+	if why := card(t, oIM, bIM, map[string]any{"t": "image", "token": token}, 0); why != "VALIDATION" {
+		t.Fatalf("somebody else's picture: %q", why)
+	}
+	if why := card(t, cIM, bIM, map[string]any{"t": "image", "token": "nope"}, 0); why != "VALIDATION" {
+		t.Fatalf("a picture that was never uploaded: %q", why)
+	}
+	if why := card(t, cIM, bIM, map[string]any{"t": "poll"}, 0); why != "VALIDATION" {
+		t.Fatalf("an unknown card: %q", why)
+	}
+	if why := card(t, cIM, bIM, map[string]any{"t": "image", "token": token}, 0); why != "" {
+		t.Fatalf("the picture: %q", why)
+	}
+	req, _ := http.NewRequest("GET", server.URL+"/api/v1/chat-images/"+token, nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil || resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "image/jpeg" {
+		t.Fatalf("the picture is served: %v %v", resp, err)
+	}
+	resp.Body.Close()
+	row := list(owner.want(200, "", "GET", "/merchant/branches/"+bid+"/chats", nil), "chats")[0].(map[string]any)
+	if row["last_kind"] != "image" || row["last_text"] != "" {
+		t.Fatalf("the list says a picture came: %v", row)
+	}
+
+	// the store's side uploads to the conversation with that customer
+	kitchen.want(403, "FORBIDDEN", "GET", "/merchant/branches/"+bid+"/chat-setup", nil)
+	if st, _ := raw(t, kitchen, fmt.Sprintf("/merchant/branches/%s/chats/%d/images", bid, custID), jpeg); st != 403 {
+		t.Fatalf("the kitchen cannot upload: %d", st)
+	}
+	st, up = raw(t, cashier, fmt.Sprintf("/merchant/branches/%s/chats/%d/images", bid, custID), jpeg)
+	if st != 200 {
+		t.Fatalf("store upload: %d %v", st, up)
+	}
+	if why := card(t, bIM, cIM, map[string]any{"t": "image", "token": up["token"]}, ownerID); why != "" {
+		t.Fatalf("the store's picture: %q", why)
+	}
+
+	// an order card: only an order this customer placed with this store
+	orderID, orderToken := f.order(t, cust)
+	otherOrder, _ := f.order(t, other)
+	if why := card(t, cIM, bIM, map[string]any{"t": "order", "order": otherOrder}, 0); why != "VALIDATION" {
+		t.Fatalf("somebody else's order: %q", why)
+	}
+	if why := card(t, cIM, bIM, map[string]any{"t": "order", "order": orderID}, 0); why != "" {
+		t.Fatalf("the order card: %q", why)
+	}
+	chat := cust.want(200, "", "GET", "/customer/chats/"+f.slug, nil)
+	orders := list(chat, "orders")
+	if len(orders) != 1 || orders[0].(map[string]any)["token"] != orderToken {
+		t.Fatalf("the customer's orders with the store, with their links: %v", orders)
+	}
+	sc := owner.want(200, "", "GET", fmt.Sprintf("/merchant/branches/%s/chats/%d", bid, custID), nil)
+	if o := list(sc, "orders"); len(o) != 1 || o[0].(map[string]any)["token"] != nil {
+		t.Fatalf("the store sees the order without the customer's link: %v", o)
+	}
+	ac := admin.want(200, "", "GET", fmt.Sprintf("/admin/chats/%d", int64(chat["thread_id"].(float64))), nil)
+	msgs := list(ac, "messages")
+	if len(msgs) != 3 || msgs[0].(map[string]any)["body"] != "/api/v1/chat-images/"+token || msgs[2].(map[string]any)["order_no"] == "" {
+		t.Fatalf("the platform sees the picture and the order: %v", msgs)
+	}
+
+	// "message the customer" on the order desk
+	if got := owner.want(200, "", "GET", fmt.Sprintf("/merchant/branches/%s/chat-order/%d", bid, orderID), nil); int64(got["customer_id"].(float64)) != custID {
+		t.Fatalf("the order's customer: %v", got)
+	}
+	owner.want(404, "NOT_FOUND", "GET", "/merchant/branches/"+bid+"/chat-order/999999", nil)
+
+	// quick replies: the desk keeps them
+	q := cashier.want(200, "", "POST", "/merchant/branches/"+bid+"/chat-quick-replies", map[string]any{"body": "  on its way  "})
+	cashier.want(422, "VALIDATION", "POST", "/merchant/branches/"+bid+"/chat-quick-replies", map[string]any{"body": " "})
+	su := owner.want(200, "", "GET", "/merchant/branches/"+bid+"/chat-setup", nil)
+	if qs := list(su, "quick_replies"); len(qs) != 1 || qs[0].(map[string]any)["body"] != "on its way" || su["auto_reply_on"] != true {
+		t.Fatalf("setup: %v", su)
+	}
+	cashier.want(200, "", "DELETE", fmt.Sprintf("/merchant/branches/%s/chat-quick-replies/%d", bid, int64(q["id"].(float64))), nil)
+
+	// a closed store answers by itself, once in a while; an open one does not
+	if len(im.sent) != 0 {
+		t.Fatalf("an open store does not answer by itself: %v", im.sent)
+	}
+	cashier.want(403, "FORBIDDEN", "PUT", "/merchant/branches/"+bid+"/chat-auto-reply", map[string]any{"on": true, "text": "x"})
+	owner.want(200, "", "PUT", "/merchant/branches/"+bid+"/chat-auto-reply", map[string]any{"on": true, "text": "back at nine"})
+	if _, err := a.DB.Exec(context.Background(), `UPDATE branches SET paused=true WHERE id=$1`, f.branchID); err != nil {
+		t.Fatal(err)
+	}
+	say(t, cIM, bIM, "anyone there?", 0)
+	say(t, cIM, bIM, "hello?", 0)
+	if len(im.sent) != 1 || im.sent[0] != bIM+">"+cIM+`:{"auto":true}` {
+		t.Fatalf("one automatic answer: %v", im.sent)
+	}
+	// that answer comes back through the callbacks without a member of staff
+	msgSeq++
+	content, _ := json.Marshal(map[string]string{"content": "back at nine"})
+	body := map[string]any{"sendID": bIM, "recvID": cIM, "contentType": 101, "sessionType": 1, "content": string(content),
+		"serverMsgID": fmt.Sprintf("auto-%d", msgSeq), "sendTime": time.Now().UnixMilli(), "ex": `{"auto":true}`}
+	if _, out := hook(t, "hook-key", "callbackBeforeSendSingleMsgCommand", body); out["nextCode"].(float64) != 0 {
+		t.Fatalf("the automatic answer is let through: %v", out)
+	}
+	owner.want(200, "", "PUT", "/merchant/branches/"+bid+"/chat-auto-reply", map[string]any{"on": false, "text": ""})
+	say(t, oIM, bIM, "hi", 0)
+	if len(im.sent) != 1 {
+		t.Fatalf("switched off: %v", im.sent)
+	}
 }

@@ -25,6 +25,8 @@ type IM interface {
 	// MarkRead marks everything in the conversation between userID and peer
 	// as read by userID; the server then tells peer's screens.
 	MarkRead(ctx context.Context, userID, peer string) error
+	// SendText sends a text for an account; ex travels with the message.
+	SendText(ctx context.Context, from, to, text, ex string) error
 	// Check reports whether the server answers.
 	Check(ctx context.Context) error
 }
@@ -209,6 +211,14 @@ func (o *OpenIM) MarkRead(ctx context.Context, userID, peer string) error {
 	}
 	return o.admin(ctx, "/msg/mark_conversation_as_read", map[string]any{
 		"userID": userID, "conversationID": id, "hasReadSeq": seq.MaxSeq, "seqs": []int64{},
+	}, nil)
+}
+
+func (o *OpenIM) SendText(ctx context.Context, from, to, text, ex string) error {
+	return o.admin(ctx, "/msg/send_msg", map[string]any{
+		"sendID": from, "recvID": to, "senderPlatformID": imPlatformWeb,
+		"content": map[string]any{"content": text}, "contentType": 101, "sessionType": 1,
+		"isOnlineOnly": false, "notOfflinePush": false, "ex": ex,
 	}, nil)
 }
 

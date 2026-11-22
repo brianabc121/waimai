@@ -39,7 +39,12 @@ const (
 )
 
 // OpenIM's message types that this system lets through.
-const imText = 101
+// OpenIM's numbers for a text and for a message whose content is this
+// system's own (a picture or an order card, see chatCard).
+const (
+	imText   = 101
+	imCustom = 110
+)
 
 func customerIM(id int64) string { return "c_" + strconv.FormatInt(id, 10) }
 func branchIM(id int64) string   { return "b_" + strconv.FormatInt(id, 10) }
@@ -300,11 +305,14 @@ type ChatOrder struct {
 	Currency  string    `json:"currency"`
 	CreatedAt time.Time `json:"created_at"`
 	Open      bool      `json:"open"`
+	// Token opens the order's page; only the customer's side gets it.
+	Token string `json:"token,omitempty"`
+	nonce []byte
 }
 
 func chatOrders(ctx context.Context, q Querier, branchID, customerID int64, limit int) ([]ChatOrder, error) {
 	rows, err := q.Query(ctx, `SELECT id, public_no, acceptance_status, fulfillment_status, service_type, total, currency, created_at,
-			closed_at IS NULL AND acceptance_status IN ('pending','accepted')
+			closed_at IS NULL AND acceptance_status IN ('pending','accepted'), token_nonce
 		FROM orders WHERE branch_id=$1 AND customer_id=$2 AND channel <> 'dine_in' ORDER BY id DESC LIMIT $3`, branchID, customerID, limit)
 	if err != nil {
 		return nil, err
@@ -314,7 +322,7 @@ func chatOrders(ctx context.Context, q Querier, branchID, customerID int64, limi
 	for rows.Next() {
 		var o ChatOrder
 		var acc, ful string
-		if err := rows.Scan(&o.ID, &o.PublicNo, &acc, &ful, &o.Service, &o.Total, &o.Currency, &o.CreatedAt, &o.Open); err != nil {
+		if err := rows.Scan(&o.ID, &o.PublicNo, &acc, &ful, &o.Service, &o.Total, &o.Currency, &o.CreatedAt, &o.Open, &o.nonce); err != nil {
 			return nil, err
 		}
 		o.Status = DisplayStatus(acc, ful)
@@ -337,6 +345,8 @@ type CustomerChat struct {
 	Muted       bool       `json:"muted"`   // the platform stopped this customer from writing
 	ThreadID    int64      `json:"thread_id"`
 	PeerReadAt  *time.Time `json:"peer_read_at"`
+	// the customer's orders here: what an order card shows, and what can be sent as one
+	Orders []ChatOrder `json:"orders"`
 }
 
 func (a *App) CustomerChat(ctx context.Context, customerID int64, slug string) (*CustomerChat, error) {
@@ -351,6 +361,12 @@ func (a *App) CustomerChat(ctx context.Context, customerID int64, slug string) (
 	}
 	if err := a.DB.QueryRow(ctx, `SELECT chat_muted_at IS NOT NULL FROM customers WHERE id=$1`, customerID).Scan(&out.Muted); err != nil {
 		return nil, err
+	}
+	if out.Orders, err = chatOrders(ctx, a.DB, b.ID, customerID, chatOrdersShown); err != nil {
+		return nil, err
+	}
+	for i := range out.Orders {
+		out.Orders[i].Token = a.orderToken(out.Orders[i].nonce)
 	}
 	// the store may never have opened its chat: its account must exist to be written to
 	if err := a.storeAccount(ctx, b.ID); err != nil {
@@ -401,7 +417,7 @@ func (a *App) StoreChatWith(ctx context.Context, branchID, customerID int64) (*S
 	if err := a.customerAccount(ctx, customerID); err != nil {
 		return nil, err
 	}
-	if out.Orders, err = chatOrders(ctx, a.DB, branchID, customerID, 5); err != nil {
+	if out.Orders, err = chatOrders(ctx, a.DB, branchID, customerID, chatOrdersShown); err != nil {
 		return nil, err
 	}
 	for _, o := range out.Orders {
@@ -460,7 +476,9 @@ type chatMsg struct {
 	branchID   int64
 	staffID    int64
 	kind       string
-	body       string
+	body       string // the text; a picture's token
+	orderID    int64
+	auto       bool // the store's own answer while closed, sent by this system
 }
 
 // read works out who is writing to whom and what. Only a customer and a store
@@ -494,15 +512,33 @@ func (h *ChatHook) read() (*chatMsg, error) {
 		if utf8.RuneCountInString(m.body) > chatTextMax {
 			return nil, ErrValidation(fmt.Sprintf("a message can have %d characters at most", chatTextMax))
 		}
+	case imCustom:
+		// {"data": "<chatCard as JSON>"}: a picture uploaded here before, or an order
+		var c struct {
+			Data string `json:"data"`
+		}
+		var card chatCard
+		if json.Unmarshal([]byte(h.Content), &c) != nil || json.Unmarshal([]byte(c.Data), &card) != nil {
+			return nil, ErrValidation("unreadable message")
+		}
+		switch {
+		case card.T == "image" && card.Token != "":
+			m.kind, m.body = "image", card.Token
+		case card.T == "order" && card.Order > 0:
+			m.kind, m.orderID = "order", card.Order
+		default:
+			return nil, ErrValidation("this kind of message is not supported")
+		}
 	default:
 		return nil, ErrValidation("this kind of message is not supported")
 	}
 	if m.sender == "store" {
 		var ex struct {
-			UID int64 `json:"uid"`
+			UID  int64 `json:"uid"`
+			Auto bool  `json:"auto"`
 		}
 		_ = json.Unmarshal([]byte(h.Ex), &ex)
-		m.staffID = ex.UID
+		m.staffID, m.auto = ex.UID, ex.Auto && ex.UID == 0 && m.kind == "text"
 	}
 	return m, nil
 }
@@ -541,7 +577,7 @@ func (a *App) ChatBeforeSend(ctx context.Context, h ChatHook) error {
 				return Err(http.StatusTooManyRequests, "CHAT_TOO_MANY", "too many new conversations today")
 			}
 		}
-	} else {
+	} else if !m.auto {
 		// the browser says which member of staff is writing; it must be one of this store's desk
 		var ok bool
 		if err := a.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM user_branch_roles r JOIN users u ON u.id=r.user_id
@@ -561,6 +597,25 @@ func (a *App) ChatBeforeSend(ctx context.Context, h ChatHook) error {
 				return errChatNoOrder
 			}
 		}
+	}
+	// a picture must be one this side uploaded for this conversation, an
+	// order one this customer placed with this store
+	var ok bool
+	switch m.kind {
+	case "image":
+		err = a.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM chat_images WHERE token=$1 AND branch_id=$2 AND customer_id=$3 AND sender=$4)`,
+			m.body, m.branchID, m.customerID, m.sender).Scan(&ok)
+	case "order":
+		err = a.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM orders WHERE id=$1 AND branch_id=$2 AND customer_id=$3)`,
+			m.orderID, m.branchID, m.customerID).Scan(&ok)
+	default:
+		ok = true
+	}
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrValidation("the picture or the order does not belong to this conversation")
 	}
 	var recent int
 	if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM chat_messages m JOIN chat_threads t ON t.id=m.thread_id
@@ -599,7 +654,8 @@ func (a *App) ChatAfterSend(ctx context.Context, h ChatHook) error {
 	if h.SendTime > 0 {
 		at = time.UnixMilli(h.SendTime)
 	}
-	return a.inTx(ctx, func(tx pgx.Tx) error {
+	var fresh bool // false: a callback that was repeated
+	err = a.inTx(ctx, func(tx pgx.Tx) error {
 		var threadID int64
 		err := tx.QueryRow(ctx, `INSERT INTO chat_threads (customer_id, branch_id, last_at) VALUES ($1,$2,$3)
 			ON CONFLICT (customer_id, branch_id) DO UPDATE SET customer_id=EXCLUDED.customer_id RETURNING id`,
@@ -611,11 +667,16 @@ func (a *App) ChatAfterSend(ctx context.Context, h ChatHook) error {
 		if m.sender == "store" && m.staffID != 0 {
 			staff = &m.staffID
 		}
-		tag, err := tx.Exec(ctx, `INSERT INTO chat_messages (thread_id, sender, staff_user_id, kind, body, im_msg_id, sent_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (im_msg_id) DO NOTHING`, threadID, m.sender, staff, m.kind, m.body, h.ServerMsgID, at)
+		var order *int64
+		if m.orderID != 0 {
+			order = &m.orderID
+		}
+		tag, err := tx.Exec(ctx, `INSERT INTO chat_messages (thread_id, sender, staff_user_id, kind, body, order_id, im_msg_id, sent_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (im_msg_id) DO NOTHING`, threadID, m.sender, staff, m.kind, m.body, order, h.ServerMsgID, at)
 		if err != nil || tag.RowsAffected() == 0 {
 			return err
 		}
+		fresh = true
 		// The sender has, by writing, read what came before. The other side
 		// may have the conversation open and have read this message before
 		// this callback arrived: then it does not count as unread.
@@ -631,6 +692,10 @@ func (a *App) ChatAfterSend(ctx context.Context, h ChatHook) error {
 		}
 		return notify(ctx, tx, Event{BranchID: m.branchID})
 	})
+	if err == nil && fresh && m.sender == "customer" {
+		a.chatAutoReply(ctx, m.branchID, m.customerID)
+	}
+	return err
 }
 
 // ---- the platform ----
@@ -712,12 +777,13 @@ func (a *App) AdminChats(ctx context.Context, f ChatFilter) (*AdminChatList, err
 
 // ChatLine is one message of this system's copy.
 type ChatLine struct {
-	ID     int64     `json:"id"`
-	Sender string    `json:"sender"`
-	Staff  string    `json:"staff,omitempty"`
-	Kind   string    `json:"kind"`
-	Body   string    `json:"body"`
-	SentAt time.Time `json:"sent_at"`
+	ID      int64     `json:"id"`
+	Sender  string    `json:"sender"`
+	Staff   string    `json:"staff,omitempty"`
+	Kind    string    `json:"kind"`
+	Body    string    `json:"body"`     // the text; the address of a picture
+	OrderNo string    `json:"order_no"` // of an order card
+	SentAt  time.Time `json:"sent_at"`
 }
 
 type AdminChat struct {
@@ -747,8 +813,9 @@ func (a *App) AdminChat(ctx context.Context, actor AdminActor, id, before int64)
 	if before <= 0 {
 		before = 1 << 62
 	}
-	rows, err := a.DB.Query(ctx, `SELECT m.id, m.sender, COALESCE(NULLIF(u.display_name,''), u.username, ''), m.kind, m.body, m.sent_at
-		FROM chat_messages m LEFT JOIN users u ON u.id=m.staff_user_id
+	rows, err := a.DB.Query(ctx, `SELECT m.id, m.sender, COALESCE(NULLIF(u.display_name,''), u.username, ''), m.kind, m.body,
+			COALESCE(o.public_no, ''), m.sent_at
+		FROM chat_messages m LEFT JOIN users u ON u.id=m.staff_user_id LEFT JOIN orders o ON o.id=m.order_id
 		WHERE m.thread_id=$1 AND m.id < $2 ORDER BY m.id DESC LIMIT $3`, id, before, adminChatPage)
 	if err != nil {
 		return nil, err
@@ -756,8 +823,11 @@ func (a *App) AdminChat(ctx context.Context, actor AdminActor, id, before int64)
 	defer rows.Close()
 	for rows.Next() {
 		var l ChatLine
-		if err := rows.Scan(&l.ID, &l.Sender, &l.Staff, &l.Kind, &l.Body, &l.SentAt); err != nil {
+		if err := rows.Scan(&l.ID, &l.Sender, &l.Staff, &l.Kind, &l.Body, &l.OrderNo, &l.SentAt); err != nil {
 			return nil, err
+		}
+		if l.Kind == "image" {
+			l.Body = chatImagePath + l.Body
 		}
 		out.Messages = append(out.Messages, l)
 	}

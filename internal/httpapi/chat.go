@@ -3,6 +3,7 @@ package httpapi
 import (
 	"crypto/subtle"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -23,6 +24,8 @@ func (s *Server) chatRoutes(r *gin.Engine, api *gin.RouterGroup) {
 	api.POST("/customer/chats/login", w, s.customerChatLogin)
 	api.GET("/customer/chats/:slug", s.customerChat)
 	api.POST("/customer/chats/:slug/read", w, s.customerChatRead)
+	api.POST("/customer/chats/:slug/images", w, s.customerChatImage)
+	api.GET("/chat-images/:token", s.chatImage)
 
 	// OpenIM calls back here from inside the private network. Its callbacks
 	// are not signed, so the address carries a key.
@@ -34,6 +37,12 @@ func (s *Server) chatAdminRoutes(auth, admin *gin.RouterGroup) {
 	auth.POST("/merchant/branches/:bid/chats/login", s.storeChatLogin)
 	auth.GET("/merchant/branches/:bid/chats/:cid", s.storeChat)
 	auth.POST("/merchant/branches/:bid/chats/:cid/read", s.storeChatRead)
+	auth.POST("/merchant/branches/:bid/chats/:cid/images", s.storeChatImage)
+	auth.GET("/merchant/branches/:bid/chat-order/:oid", s.chatOrderCustomer)
+	auth.GET("/merchant/branches/:bid/chat-setup", s.chatSetup)
+	auth.POST("/merchant/branches/:bid/chat-quick-replies", s.addQuickReply)
+	auth.DELETE("/merchant/branches/:bid/chat-quick-replies/:id", s.deleteQuickReply)
+	auth.PUT("/merchant/branches/:bid/chat-auto-reply", s.setChatAutoReply)
 
 	admin.GET("/chats", s.adminChats)
 	admin.GET("/chats/:id", s.adminChat)
@@ -220,5 +229,110 @@ func (s *Server) chatHook(c *gin.Context) {
 			return
 		}
 		hookOK(c)
+	}
+}
+
+// ---- pictures, quick replies, the automatic answer ----
+
+// pictureBody reads an uploaded JPEG (the browser has shrunk it).
+func pictureBody(c *gin.Context) ([]byte, bool) {
+	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, app.ImageMaxBytes+1))
+	if err != nil || len(body) > app.ImageMaxBytes {
+		fail(c, app.Err(http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", "the picture is larger than 1 MB"))
+		return nil, false
+	}
+	return body, true
+}
+
+func (s *Server) customerChatImage(c *gin.Context) {
+	cu, ok := s.me(c)
+	if !ok {
+		return
+	}
+	if body, ok := pictureBody(c); ok {
+		token, err := s.App.CustomerChatImage(c, cu.ID, c.Param("slug"), body)
+		reply(c, gin.H{"token": token}, err)
+	}
+}
+
+func (s *Server) storeChatImage(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	cid, ok := idParam(c, "cid")
+	if !ok {
+		return
+	}
+	if body, ok := pictureBody(c); ok {
+		token, err := s.App.AddChatImage(c, "store", bid, cid, body)
+		reply(c, gin.H{"token": token}, err)
+	}
+}
+
+func (s *Server) chatImage(c *gin.Context) {
+	image, err := s.App.ChatImage(c, c.Param("token"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.Header("Cache-Control", "private, max-age=31536000, immutable")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Data(200, "image/jpeg", image)
+}
+
+func (s *Server) chatSetup(c *gin.Context) {
+	if bid, ok := branchScope(c, deskRoles); ok {
+		v, err := s.App.ChatSetup(c, bid)
+		reply(c, v, err)
+	}
+}
+
+func (s *Server) addQuickReply(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	var in struct {
+		Body string `json:"body"`
+	}
+	if bind(c, &in) {
+		v, err := s.App.AddQuickReply(c, bid, in.Body)
+		reply(c, v, err)
+	}
+}
+
+func (s *Server) deleteQuickReply(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	if id, ok := idParam(c, "id"); ok {
+		reply(c, gin.H{"ok": true}, s.App.DeleteQuickReply(c, bid, id))
+	}
+}
+
+func (s *Server) setChatAutoReply(c *gin.Context) {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
+		return
+	}
+	var in struct {
+		On   bool   `json:"on"`
+		Text string `json:"text"`
+	}
+	if bind(c, &in) {
+		reply(c, gin.H{"ok": true}, s.App.SetChatAutoReply(c, bid, in.On, in.Text))
+	}
+}
+
+func (s *Server) chatOrderCustomer(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	if oid, ok := idParam(c, "oid"); ok {
+		id, err := s.App.ChatCustomerOfOrder(c, bid, oid)
+		reply(c, gin.H{"customer_id": id}, err)
 	}
 }

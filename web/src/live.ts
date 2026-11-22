@@ -34,7 +34,8 @@ export function useLive(url: () => string | null, refresh: () => Promise<void> |
     if (!u || stopped || es) return
     es = new EventSource('/api/v1' + u, { withCredentials: true })
     es.addEventListener('ready', () => { online.value = true; void run(); schedule() })
-    es.addEventListener('refresh', () => void run())
+    // the hint is also passed on to whatever else on the page counts things (the unread chats in the navigation)
+    es.addEventListener('refresh', () => { void run(); window.dispatchEvent(new Event('live-refresh')) })
     es.onerror = () => {
       online.value = false
       schedule()
