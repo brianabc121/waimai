@@ -114,6 +114,13 @@ await app.waitForSelector('[data-testid=duty][data-on=true]')
 // The emulator hands out a position only when it changes, so nudge it until one arrives.
 let lat = 14.5547
 const first = await until('first position on the server', async () => { fix(lat += 0.0003, 121.0244); await sleep(3000); const r = await wang(); return r?.lat != null && r })
+  .catch(async e => {
+    // Say what the app itself knows before giving up.
+    console.error('duty card:', await duty.getAttribute('data-geo'), '|', await app.locator('[data-testid=geo-text]').innerText().catch(() => ''))
+    console.error('points kept on the phone:', await app.evaluate(() => localStorage.getItem('work-points')))
+    console.error('server:', JSON.stringify(await wang()))
+    throw e
+  })
 if (Math.abs(first.lat - 14.555) > 0.01 || Math.abs(first.lng - 121.0244) > 0.01) throw new Error('position: ' + JSON.stringify(first))
 await app.waitForSelector('[data-testid=duty][data-geo=ok]')
 await shot('a03-on-duty')
