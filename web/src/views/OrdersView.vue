@@ -50,6 +50,8 @@ async function load() {
 }
 const { online, refreshNow } = useLive(() => `/merchant/branches/${bid}/events`, load)
 
+// Orders split into baskets show which basket each dish goes in.
+const baskets = (o: Order) => o.items.some(i => i.basket > 1)
 const km = (m: number) => m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`
 function riderLabel(r: RiderInfo) {
   const parts = [r.display_name, !r.on_duty ? t('st.now.off_duty') : r.contact === 'lost' ? t('rd.lost') : r.contact === 'none' ? t('rd.no_position') : t('st.now.on_duty')]
@@ -169,7 +171,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
 
           <div class="stack" style="border-top:1px solid var(--line);padding-top:10px">
             <div v-for="it in selected.items" :key="it.id" class="row top between">
-              <div class="grow"><b>{{ it.qty }} ×</b> {{ both(it.name, it.name_en) }}
+              <div class="grow"><span v-if="baskets(selected)" class="tag info" style="margin-right:4px">{{ t('basket_short', { n: it.basket }) }}</span><b>{{ it.qty }} ×</b> {{ both(it.name, it.name_en) }}
                 <div class="muted small" v-if="it.options.length">{{ it.options.map(o => both(o.name, o.name_en)).join(' · ') }}</div>
                 <div class="small" v-if="it.note" style="color:var(--warn)">{{ t('note') }}: {{ it.note }}</div></div>
               <span class="tag" v-if="selected.acceptance_status === 'accepted'" :class="it.prep_status === 'ready' ? 'ok' : ''">{{ t('i.' + it.prep_status) }}</span>

@@ -36,6 +36,8 @@ const { online, lastSync, refreshNow } = useLive(() => `/merchant/branches/${bid
 // A table's bill stays open for the whole meal: dishes already at the table drop off the screen.
 const live = (o: Order) => o.items.filter(i => i.prep_status !== 'cancelled' && !i.served_at)
 const dine = (o: Order) => o.service_type === 'dine_in'
+// Orders split into baskets show which basket each dish goes in.
+const baskets = (o: Order) => o.items.some(i => i.basket > 1)
 const cancelled = computed(() => orders.value.filter(o => o.acceptance_status === 'cancelled'))
 const open = (i: OrderItem) => i.needs_prep && (i.prep_status === 'pending' || i.prep_status === 'preparing')
 const cooking = computed(() => orders.value.filter(o => o.acceptance_status === 'accepted' && (dine(o) ? live(o).some(open) : o.packing_status === 'waiting_items')))
@@ -121,7 +123,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
           <div v-if="o.note" class="banner warn small">{{ t('order_note') }}: {{ o.note }}</div>
           <div v-for="it in lines(o)" :key="it.id" class="kline" :class="it.prep_status">
             <div class="grow">
-              <div class="kname">{{ it.qty }} × {{ both(it.name, it.name_en) }}<span v-if="dine(o)" class="small muted" style="font-weight:400"> · {{ t('batch_n', { n: it.batch_seq }) }}</span></div>
+              <div class="kname"><span v-if="baskets(o)" class="tag info" style="margin-right:4px;vertical-align:middle">{{ t('basket_short', { n: it.basket }) }}</span>{{ it.qty }} × {{ both(it.name, it.name_en) }}<span v-if="dine(o)" class="small muted" style="font-weight:400"> · {{ t('batch_n', { n: it.batch_seq }) }}</span></div>
               <div class="small" v-if="stations.length && it.needs_prep">
                 <span class="tag" :class="it.station_id === null ? 'warn' : 'info'">{{ it.station_name || t('unassigned') }}</span>
                 <select v-if="open(it)" class="mv" :value="it.station_id ?? ''" :title="t('move_to')" :aria-label="t('move_to')" @change="move(it, $event)">

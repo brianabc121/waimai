@@ -59,6 +59,8 @@ func must(err error) {
 
 func intp(v int) *int { return &v }
 
+func strp(v string) *string { return &v }
+
 func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string, full bool) {
 	m, err := a.CreateMerchant(ctx, app.NewMerchant{
 		MerchantName: name, BranchName: name, BranchNameEn: nameEn, Slug: slug,
@@ -79,6 +81,8 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 		AcceptTimeoutMinutes: 10, DeliveryEnabled: true, PickupEnabled: true,
 		OpenTime: "00:00", CloseTime: "00:00", NotifySMS: true,
 		SchedulingEnabled: true, PrepMinutes: 30,
+		Notice: strp("有任何问题请联系门店，我们会第一时间为您解决。满 ₱500 免配送费，欢迎下单评价！"),
+		Intro:  strp(name + "，现点现做的台式小吃和饮品。"),
 	})
 	must(err)
 

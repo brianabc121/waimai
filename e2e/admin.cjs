@@ -95,7 +95,7 @@ step('a new merchant is created with its store and owner, and can be found by it
 
 const cust = await open({ width: 420, height: 800 })
 await cust.goto(`${BASE}/s/${SLUG}`)
-await cust.waitForSelector('.topbar')
+await cust.waitForSelector('.shophead')
 step('the new store link works for customers')
 
 // ---- accounts ----

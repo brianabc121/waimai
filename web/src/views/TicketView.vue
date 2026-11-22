@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { get } from '../api'
 import { both, money, t, whenText } from '../i18n'
 import type { Order } from '../types'
@@ -11,6 +11,9 @@ const props = defineProps<{ id: string }>()
 const o = ref<Order | null>(null)
 onMounted(async () => { o.value = await get<Order>(`/merchant/orders/${props.id}`) })
 const print = () => window.print()
+// An order split into baskets is printed basket by basket.
+const multi = computed(() => !!o.value?.items.some(i => i.basket > 1))
+const sorted = computed(() => [...(o.value?.items ?? [])].sort((a, b) => a.basket - b.basket || a.id - b.id))
 </script>
 
 <template>
@@ -24,7 +27,8 @@ const print = () => window.print()
     <p v-else>{{ t('pickup_code') }}: <b>{{ o.pickup_code }}</b></p>
     <p v-if="o.note"><b>{{ t('order_note') }}: {{ o.note }}</b></p>
     <hr />
-    <div v-for="it in o.items" :key="it.id" class="line">
+    <div v-for="(it, i) in sorted" :key="it.id" class="line">
+      <p v-if="multi && (i === 0 || sorted[i - 1].basket !== it.basket)" class="bk"><b>—— {{ t('basket_n', { n: it.basket }) }} ——</b></p>
       <div><b>{{ it.qty }} × {{ both(it.name, it.name_en) }}</b><span>{{ money(it.line_total, o.currency) }}</span></div>
       <small v-if="it.options.length">{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</small>
       <small v-if="it.note">{{ t('note') }}: {{ it.note }}</small>
@@ -38,6 +42,7 @@ const print = () => window.print()
 <style scoped>
 .ticket { width: 80mm; max-width: 100%; margin: 0 auto; padding: 8px; background: #fff; font-size: 13px; }
 .ticket p { margin: 4px 0; }
+.ticket .bk { text-align: center; margin: 6px 0 2px; }
 .line { margin: 6px 0; } .line > div { display: flex; justify-content: space-between; gap: 8px; }
 .line small { display: block; }
 hr { border: 0; border-top: 1px dashed #000; margin: 8px 0; }

@@ -32,6 +32,7 @@ type Server struct {
 	Metrics *app.Metrics
 
 	publicWrites *limiter // quotes, orders
+	reportLimit  *limiter // reports against a store
 	otpLimit     *limiter
 	loginLimit   *limiter
 	// Guests at the tables usually share the restaurant's one public address,
@@ -42,6 +43,7 @@ type Server struct {
 func NewServer(a *app.App, cfg config.Config, hub *Hub) *Server {
 	return &Server{App: a, Cfg: cfg, Hub: hub,
 		publicWrites: newLimiter(60, 30),
+		reportLimit:  newLimiter(3, 3),
 		otpLimit:     newLimiter(6, 6),
 		loginLimit:   newLimiter(10, 10),
 		tableLimit:   newLimiter(600, 200),
@@ -269,6 +271,10 @@ func (s *Server) Router() *gin.Engine {
 	api.POST("/customer/orders/:token/cancel", s.limit(s.publicWrites), s.customerCancel)
 	api.GET("/customer/orders/:token/events", s.customerEvents)
 	api.GET("/customer/orders/:token/tracking", s.customerTracking)
+	api.GET("/stores/:slug/reviews", s.storeReviews)
+	api.POST("/stores/:slug/reports", s.limit(s.reportLimit), s.reportStore)
+	api.GET("/customer/orders/:token/review", s.orderReview)
+	api.POST("/customer/orders/:token/review", s.limit(s.publicWrites), s.submitReview)
 
 	// dine-in guests: scanned table code or paired tablet
 	api.POST("/table-sessions/exchange", s.limit(s.tableLimit), s.exchangeTableCode)

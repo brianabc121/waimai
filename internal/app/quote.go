@@ -17,6 +17,8 @@ type QuoteLineInput struct {
 	Qty       int     `json:"qty"`
 	OptionIDs []int64 `json:"option_ids"`
 	Note      string  `json:"note"`
+	// Basket is 1 to 4; 0 means the first.
+	Basket int `json:"basket,omitempty"`
 }
 
 type QuoteInput struct {
@@ -49,6 +51,9 @@ type QuoteLine struct {
 	Options   []LineOption `json:"options"`
 	Note      string       `json:"note"`
 	NeedsPrep bool         `json:"needs_prep"`
+	Basket    int          `json:"basket"`
+	// CategoryID is only used while pricing, to check required categories.
+	CategoryID int64 `json:"-"`
 }
 
 type Quote struct {
@@ -144,7 +149,15 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 	if err != nil {
 		return nil, err
 	}
+	if !b.BasketsEnabled {
+		for i := range lines {
+			lines[i].Basket = 1
+		}
+	}
 	quote.Lines = lines
+	if err := checkRequired(ctx, q, b.ID, in.ServiceType, lines); err != nil {
+		return nil, err
+	}
 	if subtotal < minOrder {
 		return nil, ErrD(http.StatusUnprocessableEntity, "BELOW_MINIMUM", "order is below the minimum amount",
 			map[string]any{"minimum": minOrder, "subtotal": subtotal})
@@ -207,6 +220,50 @@ func (a *App) Locate(ctx context.Context, slug string, lat, lng float64) (*Locat
 	return locate(ctx, a.DB, b, LatLng{lat, lng})
 }
 
+const maxBaskets = 4
+
+// checkRequired refuses a cart that has nothing from a required category.
+// A required category with nothing on sale right now is not enforced.
+func checkRequired(ctx context.Context, q Querier, branchID int64, service string, lines []QuoteLine) error {
+	rows, err := q.Query(ctx, `SELECT c.id, c.name, c.name_en FROM menu_categories c
+		WHERE c.branch_id=$1 AND c.required AND NOT c.archived AND EXISTS (
+			SELECT 1 FROM menu_items i WHERE i.category_id = c.id AND NOT i.archived AND i.published AND NOT i.sold_out
+				AND (i.stock_qty IS NULL OR i.stock_qty > 0)
+				AND CASE $2 WHEN 'delivery' THEN i.delivery_available ELSE i.pickup_available END)
+		ORDER BY c.sort, c.id`, branchID, service)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	have := map[int64]bool{}
+	for _, l := range lines {
+		have[l.CategoryID] = true
+	}
+	type missing struct {
+		ID     int64  `json:"id"`
+		Name   string `json:"name"`
+		NameEn string `json:"name_en"`
+	}
+	var miss []missing
+	for rows.Next() {
+		var m missing
+		if err := rows.Scan(&m.ID, &m.Name, &m.NameEn); err != nil {
+			return err
+		}
+		if !have[m.ID] {
+			miss = append(miss, m)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(miss) > 0 {
+		return ErrD(http.StatusUnprocessableEntity, "REQUIRED_MISSING", "choose something from every required category",
+			map[string]any{"categories": miss})
+	}
+	return nil
+}
+
 // priceLines validates cart lines against the live menu and prices them. It is
 // shared by delivery/pickup quotes and dine-in batches.
 func priceLines(ctx context.Context, q Querier, branchID int64, service string, in []QuoteLineInput) ([]QuoteLine, int64, error) {
@@ -236,6 +293,9 @@ func priceLines(ctx context.Context, q Querier, branchID int64, service string, 
 		if len(line.Note) > 200 {
 			return nil, 0, ErrValidation("note too long")
 		}
+		if line.Basket < 0 || line.Basket > maxBaskets {
+			return nil, 0, ErrValidation("basket must be between 1 and 4")
+		}
 		it, ok := byID[line.ItemID]
 		if !ok || !it.available(service) {
 			unavailable = append(unavailable, line.ItemID)
@@ -247,7 +307,7 @@ func priceLines(ctx context.Context, q Querier, branchID int64, service string, 
 			continue
 		}
 		ql := QuoteLine{ItemID: it.ID, Name: it.Name, NameEn: it.NameEn, Qty: line.Qty, Note: line.Note,
-			NeedsPrep: it.NeedsPrep, Options: []LineOption{}}
+			NeedsPrep: it.NeedsPrep, Options: []LineOption{}, Basket: max(1, line.Basket), CategoryID: it.CategoryID}
 		unit := it.Price
 		chosen := map[int64]bool{}
 		for _, id := range line.OptionIDs {
@@ -327,7 +387,7 @@ func sameQuote(old, cur *Quote) bool {
 	}
 	for i := range old.Lines {
 		if old.Lines[i].UnitPrice != cur.Lines[i].UnitPrice || old.Lines[i].Qty != cur.Lines[i].Qty ||
-			old.Lines[i].ItemID != cur.Lines[i].ItemID {
+			old.Lines[i].ItemID != cur.Lines[i].ItemID || old.Lines[i].Basket != cur.Lines[i].Basket {
 			return false
 		}
 	}

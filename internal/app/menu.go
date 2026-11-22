@@ -46,6 +46,8 @@ type CategoryInput struct {
 	Name   string `json:"name"`
 	NameEn string `json:"name_en"`
 	Sort   int    `json:"sort"`
+	// Required is left as it is when nil.
+	Required *bool `json:"required"`
 }
 
 // SaveCategory creates (id == 0) or updates a category.
@@ -55,11 +57,11 @@ func (a *App) SaveCategory(ctx context.Context, branchID, id int64, in CategoryI
 	}
 	var err error
 	if id == 0 {
-		err = a.DB.QueryRow(ctx, `INSERT INTO menu_categories (branch_id, name, name_en, sort) VALUES ($1,$2,$3,$4)
-			RETURNING id`, branchID, in.Name, in.NameEn, in.Sort).Scan(&id)
+		err = a.DB.QueryRow(ctx, `INSERT INTO menu_categories (branch_id, name, name_en, sort, required)
+			VALUES ($1,$2,$3,$4,coalesce($5, false)) RETURNING id`, branchID, in.Name, in.NameEn, in.Sort, in.Required).Scan(&id)
 	} else {
-		err = a.DB.QueryRow(ctx, `UPDATE menu_categories SET name=$3, name_en=$4, sort=$5
-			WHERE id=$1 AND branch_id=$2 AND NOT archived RETURNING id`, id, branchID, in.Name, in.NameEn, in.Sort).Scan(&id)
+		err = a.DB.QueryRow(ctx, `UPDATE menu_categories SET name=$3, name_en=$4, sort=$5, required=coalesce($6, required)
+			WHERE id=$1 AND branch_id=$2 AND NOT archived RETURNING id`, id, branchID, in.Name, in.NameEn, in.Sort, in.Required).Scan(&id)
 	}
 	if isNoRows(err) {
 		return 0, ErrNotFound
@@ -407,6 +409,10 @@ type SettingsInput struct {
 	KitchenSlowMinutes int `json:"kitchen_slow_minutes"`
 	DetourPercent      int `json:"detour_percent"`
 	DetourMeters       int `json:"detour_meters"`
+	// The store page's notice, introduction and baskets; nil keeps what is set.
+	Notice         *string `json:"notice"`
+	Intro          *string `json:"intro"`
+	BasketsEnabled *bool   `json:"baskets_enabled"`
 }
 
 var hhmmRe = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
@@ -442,15 +448,27 @@ func (a *App) SaveSettings(ctx context.Context, branchID int64, in SettingsInput
 	if in.DetourMeters != 0 && (in.DetourMeters < 100 || in.DetourMeters > 20000) {
 		return nil, ErrValidation("the detour distance must be 0.1 to 20 km")
 	}
+	for _, t := range []*string{in.Notice, in.Intro} {
+		if t != nil {
+			*t = strings.TrimSpace(*t)
+		}
+	}
+	if in.Notice != nil && len([]rune(*in.Notice)) > 300 {
+		return nil, ErrValidation("the notice must be at most 300 characters")
+	}
+	if in.Intro != nil && len([]rune(*in.Intro)) > 500 {
+		return nil, ErrValidation("the introduction must be at most 500 characters")
+	}
 	tag, err := a.DB.Exec(ctx, `UPDATE branches SET name=$2, name_en=$3, address=$4, phone=$5, tax_rate_bp=$6,
 		tax_inclusive=$7, service_charge_bp=$8, packaging_fee=$9, min_order_amount=$10, accept_timeout_minutes=$11,
 		delivery_enabled=$12, pickup_enabled=$13, paused=$14, open_time=$15, close_time=$16, notify_sms=$17,
 		scheduling_enabled=$18, prep_minutes=$19, kitchen_slow_minutes=coalesce(nullif($20, 0), kitchen_slow_minutes),
-		detour_percent=coalesce(nullif($21, 0), detour_percent), detour_meters=coalesce(nullif($22, 0), detour_meters) WHERE id=$1`,
+		detour_percent=coalesce(nullif($21, 0), detour_percent), detour_meters=coalesce(nullif($22, 0), detour_meters),
+		notice=coalesce($23, notice), intro=coalesce($24, intro), baskets_enabled=coalesce($25, baskets_enabled) WHERE id=$1`,
 		branchID, in.Name, in.NameEn, in.Address, in.Phone, in.TaxRateBP, in.TaxInclusive, in.ServiceChargeBP,
 		in.PackagingFee, in.MinOrderAmount, in.AcceptTimeoutMinutes, in.DeliveryEnabled, in.PickupEnabled,
 		in.Paused, in.OpenTime, in.CloseTime, in.NotifySMS, in.SchedulingEnabled, in.PrepMinutes,
-		in.KitchenSlowMinutes, in.DetourPercent, in.DetourMeters)
+		in.KitchenSlowMinutes, in.DetourPercent, in.DetourMeters, in.Notice, in.Intro, in.BasketsEnabled)
 	if err != nil {
 		return nil, err
 	}

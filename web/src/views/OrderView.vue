@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref } from 'vue'
+import { computed, defineAsyncComponent, reactive, ref, watch } from 'vue'
 import { ApiError, get, post } from '../api'
 import { locale, money, pick, reasonText, setLocale, t, whenText } from '../i18n'
 import { useLive } from '../live'
-import type { Order } from '../types'
+import type { Order, OrderReview } from '../types'
+import './storeStrings'
 import TotalsTable from './TotalsTable.vue'
 
 // Only customers whose order is on its way download the map.
@@ -33,6 +34,27 @@ const stepIndex = computed(() => {
   return steps.value.indexOf(s === 'rider_arrived' ? 'out_for_delivery' : s === 'scheduled' ? 'preparing' : s)
 })
 const closed = computed(() => ['rejected', 'cancelled', 'delivery_failed'].includes(order.value?.display_status ?? ''))
+
+// An order split into baskets is listed basket by basket.
+const multi = computed(() => !!order.value?.items.some(i => i.basket > 1))
+const sorted = computed(() => [...(order.value?.items ?? [])].sort((a, b) => a.basket - b.basket || a.id - b.id))
+
+// ---- the review of a finished order ----
+const review = ref<OrderReview | null>(null)
+const rv = reactive({ rating: 0, taste: 0, packaging: 0, delivery: 0, comment: '', busy: false, error: '' })
+const finished = computed(() => ['delivered', 'picked_up'].includes(order.value?.display_status ?? ''))
+watch(finished, async on => { if (on) review.value = await get<OrderReview>(`/customer/orders/${props.token}/review`).catch(() => null) }, { immediate: true })
+const scores = computed(() => ['rating', 'taste', 'packaging', ...(order.value?.service_type === 'delivery' ? ['delivery'] : [])] as ('rating' | 'taste' | 'packaging' | 'delivery')[])
+const scoreLabel = { rating: 'rv.overall', taste: 'sf.taste', packaging: 'sf.packaging', delivery: 'sf.delivery_score' }
+async function submitReview() {
+  if (scores.value.some(k => !rv[k])) { rv.error = t('rv.pick_all'); return }
+  rv.busy = true; rv.error = ''
+  try {
+    review.value = await post<OrderReview>(`/customer/orders/${props.token}/review`,
+      { rating: rv.rating, taste: rv.taste, packaging: rv.packaging, delivery: rv.delivery, comment: rv.comment })
+  } catch (e) { rv.error = (e as Error).message }
+  rv.busy = false
+}
 
 async function cancel() {
   if (!confirm(t('cancel_confirm'))) return
@@ -78,17 +100,36 @@ async function cancel() {
         </div>
 
         <TrackRider v-if="order.delivery && ['out_for_delivery', 'rider_arrived'].includes(order.display_status)" :token="token" />
+
+        <form v-if="review?.can_review" class="card stack" data-testid="review-form" @submit.prevent="submitReview">
+          <h2>{{ t('rv.title') }}</h2>
+          <div v-if="rv.error" class="banner bad">{{ rv.error }}</div>
+          <div v-for="k in scores" :key="k" class="row between" :data-score="k">
+            <span>{{ t(scoreLabel[k]) }}</span>
+            <span class="starpick"><button v-for="n in 5" :key="n" type="button" :class="{ on: n <= rv[k] }" :aria-label="`${n}`" @click="rv[k] = n">★</button></span>
+          </div>
+          <textarea v-model="rv.comment" rows="3" maxlength="500" :placeholder="t('rv.comment_ph')"></textarea>
+          <button class="btn primary block" :disabled="rv.busy">{{ t('rv.submit') }}</button>
+        </form>
+        <div v-else-if="review?.review" class="card stack" data-testid="review-done">
+          <div class="row between"><h2>{{ t('rv.done') }}</h2><span class="starpick static"><i v-for="n in 5" :key="n" :class="{ on: n <= review.review.rating }">★</i></span></div>
+          <p v-if="review.review.comment" style="white-space:pre-wrap;margin:0">{{ review.review.comment }}</p>
+          <p class="muted small" style="margin:0">{{ t('rv.shown_as', { name: review.review.display_name }) }}</p>
+        </div>
         </div>
 
         <div class="card stack side">
           <h2>{{ t('order_summary') }}</h2>
           <div v-if="order.service_type === 'delivery'" class="muted small">{{ order.zone_name }} · {{ order.address_line }} {{ order.address_unit }}</div>
-          <div v-for="it in order.items" :key="it.id" class="row top between">
+          <template v-for="(it, i) in sorted" :key="it.id">
+          <div v-if="multi && (i === 0 || sorted[i - 1].basket !== it.basket)" class="muted small bold" data-testid="basket-head">{{ t('basket_n', { n: it.basket }) }}</div>
+          <div class="row top between">
             <div class="grow"><b>{{ it.qty }} ×</b> {{ pick(it.name, it.name_en) }}
               <div class="muted small" v-if="it.options.length">{{ it.options.map(o => pick(o.name, o.name_en)).join(' · ') }}</div>
               <div class="muted small" v-if="it.note">{{ t('note') }}: {{ it.note }}</div></div>
             <span class="price">{{ money(it.line_total, order.currency) }}</span>
           </div>
+          </template>
           <TotalsTable :totals="order.totals" :currency="order.currency" :delivery="order.service_type === 'delivery'" />
         </div>
         </div>
@@ -102,5 +143,8 @@ async function cancel() {
 .step { display: flex; align-items: center; gap: 10px; color: var(--muted); }
 .step .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--line); flex: none; }
 .step.done { color: var(--ink); } .step.done .dot { background: var(--ok); }
+.starpick button, .starpick i { border: 0; background: none; padding: 0 3px; font-size: 26px; line-height: 1; color: #d5d8dd; cursor: pointer; font-style: normal; }
+.starpick.static i { font-size: 18px; cursor: default; padding: 0 1px; }
+.starpick .on { color: #f5a623; }
 .step.cur { font-weight: 700; } .step.cur .dot { background: var(--brand); box-shadow: 0 0 0 4px var(--brand-soft); }
 </style>

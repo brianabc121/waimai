@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { get, patch, post, upload } from '../api'
+import { get, patch, post, put, upload } from '../api'
 import { both, importError, money, t } from '../i18n'
 import { currentRole, session } from '../session'
 import type { Category, Item, MenuImport, Station } from '../types'
@@ -41,6 +41,10 @@ async function newCategory() {
   const en = prompt(t('name_en')) ?? ''
   await run(() => post(`/merchant/branches/${bid}/categories`, { name, name_en: en, sort: cats.value.length }))
 }
+
+// A required category: every delivery or pickup order must contain something from it.
+const setRequired = (c: Category) => run(() => put(`/merchant/branches/${bid}/categories/${c.id}`,
+  { name: c.name, name_en: c.name_en, sort: c.sort, required: !c.required }))
 
 // ---- Excel import: upload, wait for the background parse, review, confirm ----
 const imp = reactive<{ open: boolean; busy: boolean; error: string; data: MenuImport | null; done: string }>({ open: false, busy: false, error: '', data: null, done: '' })
@@ -93,8 +97,11 @@ async function saved() { form.open = false; await load() }
     <div v-if="error" class="banner bad">{{ error }}</div>
 
     <div v-for="c in cats" :key="c.id" class="card" style="padding:0;overflow:auto">
-      <div class="row between" style="padding:10px 12px"><h2>{{ both(c.name, c.name_en) }}</h2>
-        <button v-if="manager" class="btn small" @click="edit(null, c.id)">+ {{ t('new_item') }}</button></div>
+      <div class="row between wrap" style="padding:10px 12px"><h2>{{ both(c.name, c.name_en) }}
+          <span v-if="c.required" class="tag brand" :title="t('cat_required_hint')" data-testid="cat-required">{{ t('cat_required') }}</span></h2>
+        <div class="row" v-if="manager">
+          <button class="btn small" :title="t('cat_required_hint')" data-testid="toggle-required" @click="setRequired(c)">{{ c.required ? t('cat_required_off') : t('cat_required_on') }}</button>
+          <button class="btn small" @click="edit(null, c.id)">+ {{ t('new_item') }}</button></div></div>
       <table class="data">
         <tbody>
           <tr v-for="it in c.items" :key="it.id">
