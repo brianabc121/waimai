@@ -4,6 +4,7 @@
 // beside the menu.
 // Usage: BASE_URL=http://localhost:8080 node e2e/responsive.cjs   (needs seed data and OTP_DEV_ECHO=true)
 const { chromium } = require('playwright')
+const { customerLogin } = require('./lib.cjs')
 const { mkdirSync } = require('node:fs')
 
 ;(async () => {
@@ -52,8 +53,19 @@ async function fits(page, what) {
 const visible = (page, sel) => page.locator(sel).first().isVisible()
 
 // ---- customer ----
+// The login page, before anyone is logged in.
 for (const size of Object.keys(SIZES)) {
   const c = await open(size)
+  await c.goto(BASE + '/account/login?store=makati&next=/s/makati/checkout')
+  await c.waitForSelector('[data-testid=login-phone]')
+  await fits(c, `login ${size}`)
+  await shot(c, `v00-login-${size}`)
+  await c.context().close()
+}
+// One login serves the three sizes: only its cookie is carried over, not the cart.
+let loggedIn
+for (const size of Object.keys(SIZES)) {
+  const c = await open(size, loggedIn)
   await c.goto(BASE + '/s/makati')
   await c.waitForSelector('.item')
   await fits(c, `store ${size}`)
@@ -76,7 +88,7 @@ for (const size of Object.keys(SIZES)) {
     await c.locator('[data-testid=side-cart] :text("盐酥鸡")').waitFor()
     await c.click('[data-testid=go-checkout]')
   } else await c.click('.bottombar .btn.primary')
-  await c.waitForURL('**/checkout')
+  await customerLogin(c)
   await c.waitForSelector('.totals')
   await fits(c, `checkout ${size}`)
   // on a computer the summary and the button stand beside the form
@@ -84,6 +96,7 @@ for (const size of Object.keys(SIZES)) {
   const btn = await c.locator('.bottombar .btn.primary').boundingBox()
   if ((btn.x > form.x + form.width) !== (size === 'pc')) throw new Error(`checkout ${size}: the order button is in the wrong place`)
   await shot(c, `v02-checkout-${size}`)
+  loggedIn = { cookies: await c.context().cookies(), origins: [] }
   await c.context().close()
 }
 step('customer: menu, options and checkout fit a computer, a tablet and a phone; a computer orders from the cart beside the menu')

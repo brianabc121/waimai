@@ -3,6 +3,7 @@
 // and a report that reaches the platform back office.
 // Usage: BASE_URL=http://localhost:8080 node e2e/storefront.cjs   (needs seed data and OTP_DEV_ECHO=true)
 const { chromium } = require('playwright')
+const { customerLogin } = require('./lib.cjs')
 const { mkdirSync } = require('node:fs')
 
 ;(async () => {
@@ -103,13 +104,8 @@ expect(await text(cust, `${tid('cart-subtotal')} b`), '₱258', 'all baskets')
 expect(await text(cust, tid('cart-total')), '₱258', 'cart bar total')
 await shot(cust, 'sf1-cart')
 await cust.click('.cartbar .btn.primary')
-await cust.waitForURL('**/checkout')
+await customerLogin(cust)
 await cust.fill('input[autocomplete=name]', '陈小姐')
-await cust.fill('input[type=tel]', '+63917' + String(Date.now()).slice(-7))
-await cust.click('button:has-text("发送验证码")')
-await cust.waitForSelector('input[autocomplete=one-time-code]')
-await cust.click('button:has-text("验证"):not(:has-text("发送"))')
-await cust.waitForSelector('.banner.ok')
 await cust.locator('.bottombar .btn.primary').click()
 await cust.waitForURL('**/o/**')
 await cust.waitForSelector(tid('status'))

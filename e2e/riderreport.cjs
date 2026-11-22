@@ -7,6 +7,7 @@
 //        (needs seed data and the API started with GOOGLE_MAPS_API_KEY=stub; with
 //        GOOGLE_ROUTES_API_KEY=stub as well, the planned route is a road route)
 const { chromium } = require('playwright')
+const { customerLogin } = require('./lib.cjs')
 const { mkdirSync } = require('node:fs')
 
 ;(async () => {
@@ -95,14 +96,9 @@ try {
     await cust.click(tid('pin-confirm'))
     await cust.waitForSelector(tid('picker'), { state: 'detached' })
     await cust.click('.bottombar .btn.primary')
-    await cust.waitForURL('**/checkout')
+    await customerLogin(cust)
     await cust.fill('input[autocomplete=name]', name)
     await cust.fill('input[autocomplete=street-address]', name + ' St')
-    await cust.fill('input[type=tel]', '+63918' + String(Date.now()).slice(-7))
-    await cust.click('button:has-text("发送验证码")')
-    await cust.waitForSelector('input[autocomplete=one-time-code]')
-    await cust.click('button:has-text("验证"):not(:has-text("发送"))')
-    await cust.waitForSelector('.banner.ok')
     await cust.locator('.bottombar .btn.primary').click()
     await cust.waitForURL('**/o/**')
     await cust.waitForFunction(() => document.querySelector('[data-testid=status]')?.textContent?.includes('等待商家接单'))

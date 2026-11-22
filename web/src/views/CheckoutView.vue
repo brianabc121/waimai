@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError, get, newKey, post } from '../api'
 import { clearLines, quoteItems, useCart } from '../cart'
+import { customer, loadCustomer, loginRoute, prettyPhone } from '../customer'
 import { money, pick, t, whenText } from '../i18n'
 import type { Quote, Storefront } from '../types'
 import TotalsTable from './TotalsTable.vue'
@@ -28,14 +29,6 @@ async function loadStore() {
   store.value = await get<Storefront>(`/stores/${props.slug}`).catch(() => null)
   if (scheduled.value && !slots.value.includes(scheduled.value)) scheduled.value = ''
 }
-
-// phone verification
-const verified = ref(false)
-const phone = ref(localStorage.getItem('phone') || '')
-const code = ref('')
-const codeSent = ref(false)
-const devCode = ref('')
-const otpError = ref('')
 
 // The idempotency key belongs to one confirmed quote. It is kept across a
 // reload so that a retry after a timeout finds the original order.
@@ -84,34 +77,15 @@ async function requote() {
   }
 }
 
+// Ordering needs an account: without one, log in first and come back here.
+const toLogin = () => router.replace(loginRoute(`/s/${props.slug}/checkout`, props.slug))
 onMounted(async () => {
-  const s = await get('/customer/session').catch(() => ({ verified: false }))
-  verified.value = s.verified
-  if (s.phone) phone.value = s.phone
+  if (!(await loadCustomer(true))) { toLogin(); return }
   await loadStore()
   await requote()
 })
 
-async function sendCode() {
-  otpError.value = ''
-  try {
-    const r = await post('/otp/request', { phone: phone.value })
-    codeSent.value = true
-    devCode.value = r.dev_code ?? ''
-    if (r.dev_code) code.value = r.dev_code
-    localStorage.setItem('phone', phone.value)
-  } catch (e) { otpError.value = (e as Error).message }
-}
-
-async function verify() {
-  otpError.value = ''
-  try {
-    await post('/otp/verify', { phone: phone.value, code: code.value })
-    verified.value = true
-  } catch (e) { otpError.value = (e as Error).message }
-}
-
-const ready = computed(() => !!quote.value && verified.value && cart.name.trim() !== ''
+const ready = computed(() => !!quote.value && customer.verified && cart.name.trim() !== ''
   && (cart.service === 'pickup' || cart.addressLine.trim() !== ''))
 
 async function submit() {
@@ -133,7 +107,8 @@ async function submit() {
       await requote()
       notice.value = t('amount_changed')
     } else if (e instanceof ApiError && e.code === 'PHONE_NOT_VERIFIED') {
-      verified.value = false
+      customer.verified = false
+      toLogin()
     } else {
       // On a network error the key is kept, so pressing again is a safe retry.
       error.value = describe(e)
@@ -170,18 +145,8 @@ async function submit() {
         </select>
       </div>
 
-      <div class="card stack">
-        <h2>{{ t('verify_phone') }}</h2>
-        <div v-if="verified" class="banner ok">{{ t('verified_as') }} {{ phone }}</div>
-        <template v-else>
-          <p class="muted small">{{ t('verify_hint') }}</p>
-          <div class="row"><input v-model="phone" type="tel" inputmode="tel" :placeholder="t('phone_number')" autocomplete="tel" />
-            <button class="btn" @click="sendCode" :disabled="phone.length < 7">{{ t('send_code') }}</button></div>
-          <div class="row" v-if="codeSent"><input v-model="code" inputmode="numeric" maxlength="6" :placeholder="t('code')" autocomplete="one-time-code" />
-            <button class="btn primary" @click="verify" :disabled="code.length !== 6">{{ t('verify') }}</button></div>
-          <div v-if="devCode" class="banner info small">{{ t('dev_code') }}: {{ devCode }}</div>
-          <div v-if="otpError" class="banner bad">{{ otpError }}</div>
-        </template>
+      <div class="card row between" v-if="customer.verified" data-testid="account-phone">
+        <span class="muted">{{ t('phone_number') }}</span><span>{{ prettyPhone(customer.phone) }}</span>
       </div>
 
       </div>

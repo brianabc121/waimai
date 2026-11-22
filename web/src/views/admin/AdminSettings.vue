@@ -13,10 +13,12 @@ interface Setting {
 interface View {
   items: Setting[]
   active: { maps: string; routes: string; web_push: boolean; app_push: boolean; sms: string }
+  otp_sent_today?: number
   weak_secret: boolean
 }
 
 const view = ref<View | null>(null)
+const otpToday = ref<number | null>(null)
 const draft = reactive<Record<string, string>>({})
 const error = ref('')
 const failed = ref('') // the group whose save was refused
@@ -27,6 +29,7 @@ type Group = typeof groups[number]
 
 function take(v: View) {
   view.value = v
+  if (v.otp_sent_today != null) otpToday.value = v.otp_sent_today
   for (const s of v.items) draft[s.key] = s.secret ? '' : s.value
 }
 onMounted(async () => {
@@ -93,6 +96,7 @@ function state(g: Group): { on: boolean; text: string } {
           <div><h2>{{ t('ad.set.g.' + g) }}</h2><div class="small muted">{{ t('ad.set.g.' + g + '_hint') }}</div></div>
           <span class="tag" :class="state(g).on ? 'ok' : ''" data-testid="state">{{ state(g).text }}</span>
         </div>
+        <div v-if="g === 'sms' && otpToday != null" class="small muted" data-testid="otp-today" style="margin-bottom:8px">{{ t('ad.set.otp_today', { n: otpToday }) }}</div>
         <div v-if="failed === g" class="banner bad" data-testid="set-error">{{ error }}</div>
         <div v-if="saved === g" class="banner ok" data-testid="set-saved">{{ t('ad.set.saved') }}</div>
         <div v-for="s in shown(g)" :key="s.key" class="set-row" :data-key="s.key">

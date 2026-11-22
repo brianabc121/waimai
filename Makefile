@@ -37,3 +37,4 @@ e2e:
 	node e2e/settings.cjs
 	node e2e/responsive.cjs
 	node e2e/storefront.cjs
+	node e2e/account.cjs

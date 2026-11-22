@@ -462,6 +462,13 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		if err != nil {
 			return wrap("insert order", err)
 		}
+		if _, err := tx.Exec(ctx, `UPDATE orders o SET customer_id = c.id FROM customers c WHERE o.id=$1 AND c.phone=$2`,
+			orderID, phone); err != nil {
+			return wrap("link customer", err)
+		}
+		if err := touchCustomerSessions(ctx, tx, phone); err != nil {
+			return wrap("extend session", err)
+		}
 		if t.PromotionID != 0 {
 			if err := claimPromotion(ctx, tx, b.ID, t.PromotionID, orderID, phone, t.Discount); err != nil {
 				return err

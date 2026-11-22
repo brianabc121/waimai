@@ -224,6 +224,38 @@ func TestCustomerMustVerifyPhone(t *testing.T) {
 	}
 }
 
+func TestCustomerAccount(t *testing.T) {
+	f := newFixture(t)
+	anon := newClient(t)
+	if s := anon.want(200, "", "GET", "/customer/session", nil); s["verified"] != false {
+		t.Fatalf("anonymous session: %v", s)
+	}
+	anon.want(422, "PHONE_INVALID", "POST", "/otp/request", map[string]string{"phone": "+8613800138000"})
+
+	cust := verifiedCustomer(t)
+	s := cust.want(200, "", "GET", "/customer/session", nil)
+	if s["verified"] != true || s["customer_id"].(float64) == 0 {
+		t.Fatalf("session: %v", s)
+	}
+	// an order belongs to the account that placed it
+	id, _ := f.order(t, cust)
+	var owner int64
+	if err := a.DB.QueryRow(context.Background(), `SELECT COALESCE(customer_id, 0) FROM orders WHERE id=$1`, id).Scan(&owner); err != nil {
+		t.Fatal(err)
+	}
+	if float64(owner) != s["customer_id"].(float64) {
+		t.Fatalf("order belongs to customer %d, session is %v", owner, s["customer_id"])
+	}
+	cust.want(200, "", "POST", "/customer/logout", nil)
+	if s := cust.want(200, "", "GET", "/customer/session", nil); s["verified"] != false {
+		t.Fatalf("after logout: %v", s)
+	}
+	q := cust.want(200, "", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+		"zone_id": f.zoneID, "items": []map[string]any{{"item_id": f.itemID, "qty": 1}}})
+	cust.want(403, "PHONE_NOT_VERIFIED", "POST", "/stores/"+f.slug+"/orders", map[string]any{"quote_id": q["id"],
+		"customer_name": "Ann", "address_line": "1 Main"}, "Idempotency-Key", uniq("key"))
+}
+
 func TestTenantIsolationAndRoles(t *testing.T) {
 	f1, f2 := newFixture(t), newFixture(t)
 	cust := verifiedCustomer(t)

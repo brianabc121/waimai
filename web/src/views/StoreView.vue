@@ -5,6 +5,7 @@ import { ApiError, get, post } from '../api'
 import { addLine, linePrice, useCart } from '../cart'
 import { locale, money, pick, promoLabel, setLocale, t } from '../i18n'
 import { defaultTemplate, themeVars } from '../theme'
+import { customer, customerLogout, loadCustomer, loginRoute, prettyPhone } from '../customer'
 import type { Item, Located, Storefront } from '../types'
 import CartPanel from './CartPanel.vue'
 import MenuList from './MenuList.vue'
@@ -39,6 +40,7 @@ async function load() {
   }
 }
 onMounted(load)
+onMounted(() => { void loadCustomer() })
 
 // In map mode the delivery area follows the saved pin; areas may have been
 // redrawn since the last visit, so the server is asked again.
@@ -56,10 +58,21 @@ async function relocate(s: Storefront) {
 }
 function pickerClosed() { showPicker.value = false; if (store.value) relocate(store.value) }
 function toPickup() { cart.service = 'pickup'; showPicker.value = false }
-function checkout() {
+async function checkout() {
   if (cart.service === 'delivery' && mapMode.value && !zone.value) { showPicker.value = true; return }
-  router.push(`/s/${props.slug}/checkout`)
+  const to = `/s/${props.slug}/checkout`
+  // Ordering needs an account; the cart is kept while the customer logs in.
+  if (!(await loadCustomer())) router.push(loginRoute(to, props.slug))
+  else router.push(to)
 }
+
+// The account button: log in, or see who is logged in and log out.
+const showAccount = ref(false)
+async function account() {
+  if (await loadCustomer()) showAccount.value = !showAccount.value
+  else router.push(loginRoute(`/s/${props.slug}`, props.slug))
+}
+async function logout() { await customerLogout(); showAccount.value = false }
 
 const tpl = computed(() => store.value?.templates?.delivery ?? defaultTemplate('delivery'))
 const cur = computed(() => store.value?.branch.currency ?? 'PHP')
@@ -228,6 +241,15 @@ async function sendReport() {
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg></button>
           <button class="ico" :aria-label="t('sf.share')" data-testid="share" @click="share">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="18" cy="5" r="2.6" /><circle cx="6" cy="12" r="2.6" /><circle cx="18" cy="19" r="2.6" /><path d="m8.3 10.7 7.4-4.4M8.3 13.3l7.4 4.4" /></svg></button>
+          <div class="acct">
+            <button class="ico" :class="{ on: showAccount, in: customer.verified }" :aria-label="t('sf.account')" data-testid="account" @click="account">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4" /></svg></button>
+            <div v-if="showAccount && customer.verified" class="acct-menu" data-testid="account-menu">
+              <div class="small muted">{{ t('sf.logged_in') }}</div>
+              <div class="bold">{{ prettyPhone(customer.phone) }}</div>
+              <button class="btn small block" data-testid="logout" @click="logout">{{ t('sf.logout') }}</button>
+            </div>
+          </div>
           <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
         </div>
         <div class="ident">
@@ -442,6 +464,9 @@ async function sendReport() {
 .tools .seg.light button { padding: 5px 14px; font-size: 14px; }
 .ico { width: 38px; height: 38px; border: 0; background: none; color: var(--ink); border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
 .ico:hover, .ico.on { background: #f2f2f2; }
+.ico.in { color: var(--brand); }
+.acct { position: relative; }
+.acct-menu { position: absolute; right: 0; top: 44px; z-index: 30; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .14); padding: 12px; width: 200px; display: grid; gap: 6px; }
 .lang { color: var(--muted); margin-left: 4px; }
 .ident { display: flex; gap: 12px; align-items: flex-start; }
 .logo { width: 76px; height: 76px; border-radius: 10px; border: 1px solid #ececec; object-fit: cover; flex: none; background: #fff; }

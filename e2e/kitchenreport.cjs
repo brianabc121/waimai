@@ -3,6 +3,7 @@
 // owner reads who made what under Staff > In-store work.
 // Usage: BASE_URL=http://localhost:8080 node e2e/kitchenreport.cjs   (needs seed data)
 const { chromium } = require('playwright')
+const { customerLogin } = require('./lib.cjs')
 const { mkdirSync } = require('node:fs')
 
 ;(async () => {
@@ -65,14 +66,9 @@ await cust.click('.item:has-text("无盐地瓜条") .stepper button.fill')
 await cust.click('.item:has-text("无盐地瓜条") .stepper button.fill')
 await cust.click('.item:has-text("卤肉饭") .stepper button.fill')
 await cust.click('.bottombar .btn.primary')
-await cust.waitForURL('**/checkout')
+await customerLogin(cust)
 await cust.fill('input[autocomplete=name]', '陈先生')
 await cust.fill('input[autocomplete=street-address]', '8 Ayala Ave')
-await cust.fill('input[type=tel]', '+63918' + String(Date.now()).slice(-7))
-await cust.click('button:has-text("发送验证码")')
-await cust.waitForSelector('input[autocomplete=one-time-code]')
-await cust.click('button:has-text("验证"):not(:has-text("发送"))')
-await cust.waitForSelector('.banner.ok')
 await cust.locator('.bottombar .btn.primary').click()
 await cust.waitForURL('**/o/**')
 await cust.waitForFunction(() => document.querySelector('[data-testid=status]')?.textContent?.includes('等待商家接单'))
