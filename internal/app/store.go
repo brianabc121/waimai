@@ -57,6 +57,9 @@ type Branch struct {
 	Intro  string `json:"intro"`
 	// BasketsEnabled lets a customer split one order into baskets.
 	BasketsEnabled bool `json:"baskets_enabled"`
+	// ContactFields are the other ways to reach a customer that the address
+	// form asks for here (see ContactFields); none unless the store set them.
+	ContactFields []string `json:"contact_fields"`
 	// Suspended is set by the platform on the whole merchant. Customers cannot
 	// order; staff can still sign in and finish the orders already in progress.
 	Suspended bool `json:"suspended"`
@@ -141,7 +144,7 @@ const branchCols = `id, merchant_id, slug, name, name_en, address, phone, timezo
 	tax_inclusive, service_charge_bp, packaging_fee, min_order_amount, accept_timeout_minutes,
 	delivery_enabled, pickup_enabled, paused, open_time, close_time, notify_sms, scheduling_enabled, prep_minutes,
 	lat, lng, zone_mode, zone_tolerance_m, kitchen_slow_minutes, detour_percent, detour_meters,
-	notice, intro, baskets_enabled, country_code, country, province, city, district, postal_code,
+	notice, intro, baskets_enabled, country_code, country, province, city, district, postal_code, contact_fields,
 	(SELECT m.status = 'suspended' FROM merchants m WHERE m.id = branches.merchant_id)`
 
 func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
@@ -151,7 +154,7 @@ func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime, &b.NotifySMS,
 		&b.SchedulingEnabled, &b.PrepMinutes, &b.Lat, &b.Lng, &b.ZoneMode, &b.ZoneToleranceM,
 		&b.KitchenSlowMinutes, &b.DetourPercent, &b.DetourMeters, &b.Notice, &b.Intro, &b.BasketsEnabled,
-		&b.CountryCode, &b.Country, &b.Province, &b.City, &b.District, &b.PostalCode, &b.Suspended)
+		&b.CountryCode, &b.Country, &b.Province, &b.City, &b.District, &b.PostalCode, &b.ContactFields, &b.Suspended)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, ErrNotFound

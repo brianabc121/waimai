@@ -141,6 +141,8 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 		SchedulingEnabled: true, PrepMinutes: 30,
 		Notice: strp("有任何问题请联系门店，我们会第一时间为您解决。满 ₱500 免配送费，欢迎下单评价！"),
 		Intro:  strp(name + "，现点现做的台式小吃和饮品。"),
+		// the address form asks for these two besides the phone
+		ContactFields: &[]string{"wechat", "telegram"},
 	})
 	must(err)
 

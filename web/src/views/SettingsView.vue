@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { get, patch, post, put } from '../api'
 import { both, money, t, toMajor, toMinor } from '../i18n'
 import { session } from '../session'
+import { CONTACT_FIELDS } from '../addresses'
 import type { Branch, Station, Zone } from '../types'
 
 const bid = session.branchId!
@@ -14,7 +15,7 @@ const saved = ref(false)
 
 const s = reactive({ name: '', name_en: '', address: '', phone: '', tax: 12, tax_inclusive: true, service: 0, packaging: 0,
   min_order: 0, accept_timeout_minutes: 10, delivery_enabled: true, pickup_enabled: true, paused: false, open_time: '00:00', close_time: '00:00', notify_sms: true, scheduling_enabled: false, prep_minutes: 30,
-  kitchen_slow_minutes: 15, detour_percent: 30, detour_km: 1, notice: '', intro: '', baskets_enabled: true })
+  kitchen_slow_minutes: 15, detour_percent: 30, detour_km: 1, notice: '', intro: '', baskets_enabled: true, contact_fields: [] as string[] })
 const st = reactive({ id: 0, name: '', name_en: '', active: true })
 
 async function load() {
@@ -27,7 +28,7 @@ async function load() {
     paused: b.paused, open_time: b.open_time, close_time: b.close_time, notify_sms: b.notify_sms,
     scheduling_enabled: b.scheduling_enabled, prep_minutes: b.prep_minutes,
     kitchen_slow_minutes: b.kitchen_slow_minutes, detour_percent: b.detour_percent, detour_km: b.detour_meters / 1000,
-    notice: b.notice, intro: b.intro, baskets_enabled: b.baskets_enabled })
+    notice: b.notice, intro: b.intro, baskets_enabled: b.baskets_enabled, contact_fields: [...(b.contact_fields ?? [])] })
 }
 onMounted(load)
 
@@ -43,7 +44,7 @@ const saveSettings = () => run(() => put(`/merchant/branches/${bid}/settings`, {
   paused: s.paused, open_time: s.open_time, close_time: s.close_time, notify_sms: s.notify_sms,
   scheduling_enabled: s.scheduling_enabled, prep_minutes: s.prep_minutes,
   kitchen_slow_minutes: s.kitchen_slow_minutes, detour_percent: s.detour_percent, detour_meters: Math.round(s.detour_km * 1000),
-  notice: s.notice, intro: s.intro, baskets_enabled: s.baskets_enabled }))
+  notice: s.notice, intro: s.intro, baskets_enabled: s.baskets_enabled, contact_fields: s.contact_fields }))
 
 function editStation(x: Station | null) {
   Object.assign(st, x ? { id: x.id, name: x.name, name_en: x.name_en, active: x.active } : { id: 0, name: '', name_en: '', active: true })
@@ -92,6 +93,13 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
         <label class="check"><input type="checkbox" v-model="s.scheduling_enabled" />{{ t('scheduling_enabled') }}</label>
         <label class="check"><input type="checkbox" name="baskets_enabled" v-model="s.baskets_enabled" />{{ t('set.baskets') }}</label>
       </div>
+      <fieldset class="contact-fields" data-testid="contact-fields">
+        <legend>{{ t('set.contact_fields') }}</legend>
+        <p class="muted small">{{ t('set.contact_fields_hint') }}</p>
+        <div class="row wrap">
+          <label v-for="f in CONTACT_FIELDS" :key="f" class="check"><input type="checkbox" name="contact_fields" :value="f" v-model="s.contact_fields" />{{ t('ad.f.' + f) }}</label>
+        </div>
+      </fieldset>
       <label class="field"><span>{{ t('set.notice') }}</span><textarea name="notice" v-model="s.notice" rows="2" maxlength="300"></textarea></label>
       <label class="field"><span>{{ t('set.intro') }}</span><textarea name="intro" v-model="s.intro" rows="3" maxlength="500"></textarea></label>
       <button class="btn primary">{{ t('save') }}</button>
@@ -133,4 +141,7 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
 
 <style scoped>
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.contact-fields { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 2px; margin: 0 0 12px; }
+.contact-fields legend { font-weight: 600; padding: 0 6px; }
+.contact-fields .row { gap: 4px 22px; margin-top: 8px; }
 </style>

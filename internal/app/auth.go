@@ -331,6 +331,23 @@ func normalizeCustomerPhone(p string) (string, error) {
 	return "+" + customerCountryCode + local, nil
 }
 
+var contactPhoneRe = regexp.MustCompile(`^\+[1-9][0-9]{6,14}$`)
+
+// normalizeContactPhone is for the number a rider calls at an address. It
+// need not be in the country customers log in from: a number written with
+// another country's code (+86 138 0013 8000) is kept as it is. Anything else
+// is read as a number of the login country.
+func normalizeContactPhone(p string) (string, error) {
+	p = strings.NewReplacer(" ", "", "-", "", "(", "", ")", "").Replace(p)
+	if strings.HasPrefix(p, "+") && !strings.HasPrefix(p, "+"+customerCountryCode) {
+		if !contactPhoneRe.MatchString(p) {
+			return "", Err(http.StatusUnprocessableEntity, "PHONE_INVALID", "enter a valid phone number with its country code")
+		}
+		return p, nil
+	}
+	return normalizeCustomerPhone(p)
+}
+
 func (a *App) otpHash(phone, code string) []byte {
 	m := hmac.New(sha256.New, a.Secret)
 	m.Write([]byte("otp:" + phone + ":" + code))

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -30,6 +31,8 @@ type Address struct {
 	Note     string   `json:"note"`
 	Wechat   string   `json:"wechat"`
 	Telegram string   `json:"telegram"`
+	Line     string   `json:"line"`
+	Whatsapp string   `json:"whatsapp"`
 	// Label is "", "home", "work" or "school".
 	Label      string     `json:"label"`
 	IsDefault  bool       `json:"is_default"`
@@ -73,12 +76,12 @@ func (a *App) DeliveryTermsAt(ctx context.Context, slug string, lat, lng float64
 }
 
 const addressCols = `id, contact_name, title, phone, place_name, place_address, lat, lng, unit, note, wechat, telegram,
-	label, is_default, last_used_at, photo_at`
+	label, is_default, last_used_at, photo_at, line, whatsapp`
 
 func scanAddress(row pgx.Row) (*Address, error) {
 	var a Address
 	err := row.Scan(&a.ID, &a.ContactName, &a.Title, &a.Phone, &a.PlaceName, &a.PlaceAddress, &a.Lat, &a.Lng, &a.Unit,
-		&a.Note, &a.Wechat, &a.Telegram, &a.Label, &a.IsDefault, &a.LastUsedAt, &a.PhotoAt)
+		&a.Note, &a.Wechat, &a.Telegram, &a.Label, &a.IsDefault, &a.LastUsedAt, &a.PhotoAt, &a.Line, &a.Whatsapp)
 	return &a, err
 }
 
@@ -145,15 +148,17 @@ type AddressInput struct {
 	Note         string   `json:"note"`
 	Wechat       string   `json:"wechat"`
 	Telegram     string   `json:"telegram"`
+	Line         string   `json:"line"`
+	Whatsapp     string   `json:"whatsapp"`
 	Label        string   `json:"label"`
 	IsDefault    bool     `json:"is_default"`
 }
 
 func (in *AddressInput) check() error {
-	for _, f := range []*string{&in.ContactName, &in.PlaceName, &in.PlaceAddress, &in.Unit, &in.Note, &in.Wechat, &in.Telegram} {
+	for _, f := range []*string{&in.ContactName, &in.PlaceName, &in.PlaceAddress, &in.Unit, &in.Note, &in.Wechat, &in.Telegram, &in.Line, &in.Whatsapp} {
 		*f = strings.TrimSpace(*f)
 	}
-	phone, err := normalizeCustomerPhone(in.Phone)
+	phone, err := normalizeContactPhone(in.Phone)
 	if err != nil {
 		return err
 	}
@@ -172,8 +177,8 @@ func (in *AddressInput) check() error {
 		return ErrValidation("unit is required (at most 100 characters)")
 	case n(in.Note) > 300:
 		return ErrValidation("note is too long")
-	case n(in.Wechat) > 64 || n(in.Telegram) > 64:
-		return ErrValidation("wechat and telegram are at most 64 characters")
+	case n(in.Wechat) > 64 || n(in.Telegram) > 64 || n(in.Line) > 64 || n(in.Whatsapp) > 64:
+		return ErrValidation("wechat, telegram, line and whatsapp are at most 64 characters")
 	case in.Label != "" && in.Label != "home" && in.Label != "work" && in.Label != "school":
 		return ErrValidation("label must be home, work or school")
 	case (in.Lat == nil) != (in.Lng == nil):
@@ -214,18 +219,18 @@ func (a *App) SaveAddress(ctx context.Context, customerID, id int64, in AddressI
 		var err error
 		if id == 0 {
 			out, err = scanAddress(tx.QueryRow(ctx, `INSERT INTO customer_addresses (customer_id, contact_name, title, phone,
-				place_name, place_address, lat, lng, unit, note, wechat, telegram, label, is_default)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING `+addressCols,
+				place_name, place_address, lat, lng, unit, note, wechat, telegram, label, is_default, line, whatsapp)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING `+addressCols,
 				customerID, in.ContactName, in.Title, in.Phone, in.PlaceName, in.PlaceAddress, in.Lat, in.Lng, in.Unit,
-				in.Note, in.Wechat, in.Telegram, in.Label, def))
+				in.Note, in.Wechat, in.Telegram, in.Label, def, in.Line, in.Whatsapp))
 			return err
 		}
 		out, err = scanAddress(tx.QueryRow(ctx, `UPDATE customer_addresses SET contact_name=$3, title=$4, phone=$5,
 			place_name=$6, place_address=$7, lat=$8, lng=$9, unit=$10, note=$11, wechat=$12, telegram=$13, label=$14,
-			is_default=$15, updated_at=now()
+			is_default=$15, line=$16, whatsapp=$17, updated_at=now()
 			WHERE id=$2 AND customer_id=$1 AND deleted_at IS NULL RETURNING `+addressCols,
 			customerID, id, in.ContactName, in.Title, in.Phone, in.PlaceName, in.PlaceAddress, in.Lat, in.Lng, in.Unit,
-			in.Note, in.Wechat, in.Telegram, in.Label, def))
+			in.Note, in.Wechat, in.Telegram, in.Label, def, in.Line, in.Whatsapp))
 		if isNoRows(err) {
 			return errAddressNotFound
 		}
@@ -346,4 +351,21 @@ func (ad *Address) line() string {
 		return ad.PlaceName
 	}
 	return ad.PlaceName + ", " + ad.PlaceAddress
+}
+
+// ContactFields are the other ways to reach a customer that a store may ask
+// for on the address form, in the order they are shown.
+var ContactFields = []string{"wechat", "telegram", "line", "whatsapp"}
+
+// onlyAsked blanks the contact names the store does not ask for, so an order
+// carries no more about the customer than the store wanted to know.
+func (ad *Address) onlyAsked(b *Branch) {
+	for _, f := range []struct {
+		name  string
+		value *string
+	}{{"wechat", &ad.Wechat}, {"telegram", &ad.Telegram}, {"line", &ad.Line}, {"whatsapp", &ad.Whatsapp}} {
+		if !slices.Contains(b.ContactFields, f.name) {
+			*f.value = ""
+		}
+	}
 }
