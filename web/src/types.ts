@@ -35,7 +35,11 @@ export interface Template { layout: 'list' | 'featured' | 'grid'; theme_color: s
 export type Channel = 'delivery' | 'qr' | 'ipad'
 export interface ChannelTemplate { channel: Channel; published: Template; draft: Template | null; published_at: string | null }
 export interface Storefront { branch: Branch; zones: Zone[]; categories: Category[]; promotions: Promotion[]; slots: string[]; templates: Record<Channel, Template>
-  sales: number; rating: ReviewSummary }
+  sales: number; rating: ReviewSummary; media?: PromoMedia[] }
+export interface Crop { x: number; y: number; w: number; h: number }
+// A promotional picture, GIF or video at the top of the store page.
+export interface PromoMedia { id: number; kind: 'image' | 'gif' | 'video'; url: string; poster_url: string; title: string
+  crop: Crop; trim_start: number; trim_end: number; active: boolean; size: number; created_at: string }
 export interface ReviewSummary { count: number; average: number; taste: number; packaging: number; delivery: number }
 export interface Review { id: number; display_name: string; rating: number; taste: number; packaging: number; delivery: number | null
   comment: string; created_at: string; items: { name: string; name_en: string }[] }
