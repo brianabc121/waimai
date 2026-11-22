@@ -184,6 +184,73 @@
   </div>
 </section>
 
+<!-- ?s=admin ：平台后台所有会话 -->
+<section data-s="admin" class="desk">
+  <div class="win">
+    <div class="side">
+      <div class="brand">平台后台</div>
+      <a>总览</a><a>商户</a><a>商品</a><a>顾客服务</a><a class="on">所有会话</a><a>API 监控</a><a>Worker</a><a>密钥设置</a><a>操作记录</a>
+    </div>
+    <div class="clist wide">
+      <div class="search">搜索店名、顾客手机号、订单号、聊天内容</div>
+      <div class="filters"><span class="chip on">全部 1,284</span><span class="chip">被举报 2</span><span class="chip">今天</span><span class="chip">全部门店 ▾</span></div>
+      <div class="conv on">
+        <div class="ava a1">阿</div>
+        <div class="grow"><div class="row between"><b>阿明海南鸡饭 ↔ 林先生 8821</b><span class="tiny muted">14:31</span></div>
+          <div class="last">顾客：送到这个门口就行</div>
+          <span class="tag warn">#A1042 备餐中</span> <span class="tag">6 条</span></div>
+      </div>
+      <div class="conv">
+        <div class="ava a2">川</div>
+        <div class="grow"><div class="row between"><b>川味小馆 ↔ 黄女士 2290</b><span class="tiny muted">14:12</span></div>
+          <div class="last">商家：不好意思，今天水煮鱼卖完了</div>
+          <span class="tag bad">顾客举报：态度恶劣</span> <span class="tag">23 条</span></div>
+      </div>
+      <div class="conv">
+        <div class="ava a1">阿</div>
+        <div class="grow"><div class="row between"><b>阿明海南鸡饭 ↔ 陈小姐 0375</b><span class="tiny muted">14:20</span></div>
+          <div class="last">顾客：请问今天有白斩鸡吗？</div>
+          <span class="tag">1 条</span></div>
+      </div>
+      <div class="conv">
+        <div class="ava a3">甜</div>
+        <div class="grow"><div class="row between"><b>甜心糖水铺 ↔ 吴先生 7714</b><span class="tiny muted">13:48</span></div>
+          <div class="last">商家：[图片]</div>
+          <span class="tag ok">#T0311 已送达</span> <span class="tag">9 条</span></div>
+      </div>
+      <div class="conv">
+        <div class="ava a2">川</div>
+        <div class="grow"><div class="row between"><b>川味小馆 ↔ 郑先生 5061</b><span class="tiny muted">昨天</span></div>
+          <div class="last">顾客：好的谢谢</div>
+          <span class="tag">4 条</span></div>
+      </div>
+    </div>
+    <div class="cpane">
+      <div class="chead"><b>阿明海南鸡饭 ↔ 林先生 8821</b><span class="tag">只读</span><span class="more small muted">导出 · 打开订单 · 打开门店</span></div>
+      <div class="chat">
+        <div class="day">2026-11-22 14:28</div>
+        <div class="ocard"><div class="row between"><b>订单 #A1042</b><span class="tag warn">备餐中</span></div>
+          <div class="small muted">海南鸡饭（鸡腿）× 1、冬瓜茶 × 1 · S$ 12.50</div></div>
+        <div class="msg"><div class="ava c1 sm">林</div><div class="bub">你好，鸡腿可以换成鸡胸吗？不要辣椒酱<em class="dk">顾客 · 14:28</em></div></div>
+        <div class="msg me"><div class="bub">可以的，马上帮你改<em>门店 · 小芳 · 14:29</em></div></div>
+        <div class="msg"><div class="ava c1 sm">林</div><div class="bub img"><div class="pic">📷<span>门口照片</span></div></div></div>
+        <div class="msg"><div class="ava c1 sm">林</div><div class="bub">送到这个门口就行<em class="dk">顾客 · 14:31</em></div></div>
+      </div>
+      <div class="ronly">平台只能查看，不能代替任何一方发消息。每次打开会话都会记进“操作记录”。</div>
+    </div>
+    <div class="info">
+      <h4>门店</h4><div>阿明海南鸡饭</div><div class="muted small">商户：阿明餐饮</div>
+      <h4>顾客</h4><div>林先生</div><div class="muted small">+65 9123 8821</div>
+      <h4>这个会话</h4>
+      <div class="small">开始于 2026-10-03</div><div class="small">共 6 条消息，1 张图片</div><div class="small">举报 0 次</div>
+      <h4>处理</h4>
+      <div class="lnk bad">禁言这位顾客</div>
+      <div class="lnk bad">关闭这家店的聊天功能</div>
+    </div>
+  </div>
+  <div class="caption wide"><b>⑧ 平台后台“所有会话”</b>：能看到全平台每一个聊天，可以按门店、顾客、订单号、内容搜索，被举报的单独筛出来。只读。</div>
+</section>
+
 <script>
   var s = new URLSearchParams(location.search).get('s') || 'customer';
   document.querySelectorAll('section').forEach(function (el) { el.hidden = el.dataset.s !== s; });
