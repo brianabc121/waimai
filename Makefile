@@ -30,3 +30,4 @@ e2e:
 	node e2e/mapzones.cjs
 	node e2e/staff.cjs
 	node e2e/duty.cjs
+	node e2e/attendance.cjs

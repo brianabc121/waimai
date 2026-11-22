@@ -118,6 +118,10 @@ func (a *App) inTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
 type Actor struct {
 	Type string // customer, staff, rider, system
 	ID   int64
+	// Via is where a kitchen action was tapped: "work" is the person's own
+	// workbench, "board" the shared kitchen screen, "" unknown. Only what is
+	// done on the workbench is certain to be this person's own work.
+	Via string
 }
 
 func audit(ctx context.Context, tx pgx.Tx, branchID, orderID int64, actor Actor, action string, detail any) error {

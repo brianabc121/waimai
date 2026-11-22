@@ -172,11 +172,12 @@ func (a *App) Logout(ctx context.Context, token string) error {
 			return err
 		}
 		var mine bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM rider_status WHERE user_id=$1 AND on_duty AND duty_session=$2)`,
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM rider_status WHERE user_id=$1 AND on_duty AND duty_session=$2)
+			OR EXISTS (SELECT 1 FROM staff_shifts WHERE user_id=$1 AND ended_at IS NULL AND NOT voided AND session=$2)`,
 			userID, th).Scan(&mine); err != nil || !mine {
 			return err
 		}
-		if err := setDuty(ctx, tx, userID, false, nil); err != nil {
+		if err := clockOff(ctx, tx, userID, "logout", time.Now(), nil); err != nil {
 			return err
 		}
 		branches, err := riderBranches(ctx, tx, userID)

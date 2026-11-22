@@ -4,6 +4,7 @@ import { ApiError, del, get, patch, post } from '../api'
 import { pick, t } from '../i18n'
 import { currentRole, session } from '../session'
 import type { Post, StaffMember, Station } from '../types'
+import StaffTabs from './staff/StaffTabs.vue'
 import './work/strings'
 
 const bid = session.branchId!
@@ -52,8 +53,10 @@ const nowText = (m: StaffMember) => {
   const parts = []
   if (m.open_tasks) parts.push(t('st.now.tasks', { n: m.open_tasks }))
   if (m.active_deliveries) parts.push(t('st.now.deliveries', { n: m.active_deliveries }))
-  const rider = m.posts.some(p => p.kind === 'rider')
-  return (rider ? t(m.on_duty ? 'st.now.on_duty' : 'st.now.off_duty') + ' · ' : '') + (parts.join(' / ') || t('st.now.idle'))
+  // Everyone clocks on now, not only riders. Someone with back-office access
+  // and no post is not expected to.
+  const clocks = m.posts.length > 0 || m.on_duty
+  return (clocks ? t(m.on_duty ? 'st.now.on_duty' : 'st.now.off_duty') + ' · ' : '') + (parts.join(' / ') || t('st.now.idle'))
 }
 const colors = ['#d9480f', '#1d4ed8', '#18794e', '#7c3aed', '#b45309', '#0e7490', '#be185d']
 // Owners are managed by owners only.
@@ -99,6 +102,7 @@ const resetPw = () => act(() => post(`/merchant/branches/${bid}/staff/${f.id}/pa
 
 <template>
   <div class="page staffpage">
+    <StaffTabs />
     <div class="row between wrap" style="margin-bottom:12px">
       <h1 style="font-size:20px">{{ t('staff') }} <span class="muted small" style="font-weight:400">{{ t('st.count', { a: active.length, d: counts.off }) }}</span></h1>
       <span class="row">

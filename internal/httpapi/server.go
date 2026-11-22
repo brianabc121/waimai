@@ -97,7 +97,12 @@ func currentUser(c *gin.Context) *app.User {
 }
 
 func staffActor(c *gin.Context) app.Actor {
-	return app.Actor{Type: "staff", ID: currentUser(c).ID}
+	a := app.Actor{Type: "staff", ID: currentUser(c).ID}
+	// The workbench and the kitchen screen say which of them is asking.
+	if via := c.Query("via"); via == "work" || via == "board" {
+		a.Via = via
+	}
+	return a
 }
 
 var (
@@ -342,6 +347,9 @@ func (s *Server) Router() *gin.Engine {
 	auth.PATCH("/merchant/branches/:bid/staff/:id", s.patchStaff)
 	auth.DELETE("/merchant/branches/:bid/staff/:id", s.deleteStaff)
 	auth.POST("/merchant/branches/:bid/staff/:id/password", s.resetStaffPassword)
+	auth.GET("/merchant/branches/:bid/attendance", s.attendance)
+	auth.POST("/merchant/branches/:bid/attendance", s.addShift)
+	auth.PATCH("/merchant/branches/:bid/attendance/:id", s.editShift)
 	auth.GET("/merchant/branches/:bid/cash-collections", s.listCash)
 	auth.POST("/merchant/cash-collections/:id/reconcile", s.reconcile)
 
@@ -349,6 +357,10 @@ func (s *Server) Router() *gin.Engine {
 	auth.GET("/kitchen/branches/:bid/board", s.kitchenBoard)
 	auth.POST("/kitchen/items/:id/:action", s.itemAction)
 	auth.POST("/kitchen/orders/:id/pack", s.packOrder)
+
+	// clocking on and off, for everyone who works in a store
+	auth.GET("/work/shift", s.shiftState)
+	auth.POST("/work/shift", s.setShift)
 
 	// rider
 	auth.GET("/rider/tasks", s.riderTasks)

@@ -359,8 +359,35 @@ func (a *App) SetItemStatus(ctx context.Context, orderID, itemID int64, action s
 		default:
 			return ErrValidation("unknown action")
 		}
-		if _, err := tx.Exec(ctx, `UPDATE order_items SET prep_status=$2 WHERE id=$1`, itemID, next); err != nil {
+		// Who did it and when, for the work summary. A dish taken back no
+		// longer counts for anyone until it is marked ready again.
+		var who *int64
+		if actor.ID != 0 {
+			who = &actor.ID
+		}
+		var set string
+		switch action {
+		case "start":
+			set = `, prep_started_at=now(), prep_started_by=$3`
+		case "ready":
+			set = `, ready_at=now(), ready_by=$3, ready_via=$4`
+		default:
+			set = `, ready_at=NULL, ready_by=NULL, ready_via='', undo_count=undo_count+1`
+		}
+		args := []any{itemID, next}
+		if action != "undo" {
+			args = append(args, who)
+		}
+		if action == "ready" {
+			args = append(args, actor.Via)
+		}
+		if _, err := tx.Exec(ctx, `UPDATE order_items SET prep_status=$2`+set+` WHERE id=$1`, args...); err != nil {
 			return err
+		}
+		if action != "undo" && actor.Type == "staff" && actor.Via == "work" {
+			if err := autoClockOn(ctx, tx, actor.ID, o.BranchID); err != nil {
+				return err
+			}
 		}
 		// Undo invalidates any packing check made against the old list.
 		manifestInc := 0
@@ -407,9 +434,19 @@ func (a *App) Pack(ctx context.Context, orderID int64, bags, manifestVersion int
 		if o.ServiceType == "pickup" {
 			next = "awaiting_pickup"
 		}
-		if _, err := tx.Exec(ctx, `UPDATE orders SET packing_status='packed', bags=$2, packed_at=now(),
-			fulfillment_status=$3, version=version+1, updated_at=now() WHERE id=$1`, o.ID, bags, next); err != nil {
+		var who *int64
+		if actor.ID != 0 {
+			who = &actor.ID
+		}
+		if _, err := tx.Exec(ctx, `UPDATE orders SET packing_status='packed', bags=$2, packed_at=now(), packed_by=$4,
+			packed_via=$5, fulfillment_status=$3, version=version+1, updated_at=now() WHERE id=$1`,
+			o.ID, bags, next, who, actor.Via); err != nil {
 			return err
+		}
+		if actor.Type == "staff" && actor.Via == "work" {
+			if err := autoClockOn(ctx, tx, actor.ID, o.BranchID); err != nil {
+				return err
+			}
 		}
 		if err := audit(ctx, tx, o.BranchID, o.ID, actor, "order.packed", map[string]any{"bags": bags}); err != nil {
 			return err
@@ -477,8 +514,15 @@ func (a *App) riderCommand(ctx context.Context, taskID, riderID int64, fn func(t
 }
 
 func (a *App) RiderPickup(ctx context.Context, taskID, riderID int64) (*Order, error) {
-	return a.riderCommand(ctx, taskID, riderID, func(tx pgx.Tx, o *lockedOrder, _ string) error {
-		return a.handoff(ctx, tx, o, Actor{Type: "rider", ID: riderID})
+	return a.riderCommand(ctx, taskID, riderID, func(tx pgx.Tx, o *lockedOrder, status string) error {
+		if err := a.handoff(ctx, tx, o, Actor{Type: "rider", ID: riderID}); err != nil {
+			return err
+		}
+		// A rider who sets off without clocking on is at work all the same.
+		if status == "assigned" {
+			return autoClockOn(ctx, tx, riderID, o.BranchID)
+		}
+		return nil
 	})
 }
 
