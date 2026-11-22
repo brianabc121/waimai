@@ -43,7 +43,6 @@ const api = (page, path) => page.evaluate(async (path) => (await fetch('/api/v1'
 const cust = await open({ width: 390, height: 844 })
 await cust.goto(BASE + '/s/makati')
 await cust.waitForSelector('.item')
-await cust.selectOption('select', { index: 1 })
 await cust.click('.item:has-text("瓶装水") .stepper button.fill')
 await cust.click('.bottombar .btn.primary')
 await customerLogin(cust, null, { name: '李小红' })

@@ -68,7 +68,6 @@ await shot(cust, 't1-storefront-new-layout')
 step('publishing delivery changed the storefront and left the table channels alone')
 
 // the same menu and cart under the new layout
-await cust.selectOption('select', { index: 1 })
 await cust.click('.item:has-text("冰柠檬茶") .stepper button.fill')
 await cust.click('.item:has-text("盐酥鸡") button')
 await cust.click('.sheet label.opt:has-text("中辣")')

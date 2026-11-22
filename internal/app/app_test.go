@@ -94,6 +94,10 @@ func newStore(t *testing.T, taxInclusive bool) *store {
 		Owner: app.NewUser{Username: s.ownerName, Password: "password1", DisplayName: "Owner"}})
 	noErr(t, err)
 	s.branchID = m.BranchID
+	// Most tests here price a delivery by a zone named in the request, as a
+	// platform without a map does; the tests of the map switch to "map".
+	_, err = a.DB.Exec(ctx, `UPDATE branches SET zone_mode='list' WHERE id=$1`, s.branchID)
+	noErr(t, err)
 	_, err = a.SaveSettings(ctx, s.branchID, app.SettingsInput{Name: "T", TaxRateBP: 1200, TaxInclusive: taxInclusive,
 		ServiceChargeBP: 500, PackagingFee: 1000, AcceptTimeoutMinutes: 10, DeliveryEnabled: true, PickupEnabled: true,
 		OpenTime: "00:00", CloseTime: "00:00"})

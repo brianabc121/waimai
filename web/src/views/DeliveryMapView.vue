@@ -73,7 +73,7 @@ function fitAll() {
   const ptsAll = [...drawn.value.flatMap(z => z.polygon), ...(store.value ? [store.value] : [])]
   if (ptsAll.length > 1) map.value?.fit(ptsAll, 16)
 }
-function onReady() { mapReady.value = true; fitAll() }
+function onReady() { mapReady.value = true; fitAll(); void fillRegion() }
 
 async function run<T>(fn: () => Promise<T>): Promise<T | undefined> {
   error.value = ''
@@ -405,11 +405,6 @@ function dropRow(i: number) {
   reorder(ids)
 }
 const tol = ref(200)
-async function setMode(m: 'list' | 'map') {
-  if (readOnly.value || branch.value?.zone_mode === m) return
-  const b = await run(() => put<Branch>(`/merchant/branches/${bid}/zone-mode`, { zone_mode: m, zone_tolerance_m: branch.value!.zone_tolerance_m }))
-  if (b) branch.value = b
-}
 
 // ---- store location ----
 const loc = reactive({ lat: 0, lng: 0, address: '' })
@@ -422,10 +417,27 @@ function startLocation() {
 const round6 = (v: number) => Math.round(v * 1e6) / 1e6
 function setPin(at: LatLng) { loc.lat = round6(at[0]); loc.lng = round6(at[1]) }
 const movedM = computed(() => store.value ? geo.dist(pl().to(store.value), pl().to(pin.value)) : 0)
+// With the location goes what the map says about it: country, province, city,
+// district and postcode. The customer's address search is kept to that country.
 async function saveLocation() {
-  const b = await run(() => put<Branch>(`/merchant/branches/${bid}/location`, { lat: pin.value[0], lng: pin.value[1], address: loc.address }))
+  const region = await map.value!.resolve(pin.value)
+  const b = await run(() => put<Branch>(`/merchant/branches/${bid}/location`, { lat: pin.value[0], lng: pin.value[1], address: loc.address, region: region ?? undefined }))
   if (b) { branch.value = b; mode.value = 'browse'; notice.value = t('mz.saved') }
 }
+// A store whose location was saved before this was read off the map (or while
+// the map could not tell) gets it when the page is opened.
+const resolving = ref(false)
+async function fillRegion() {
+  const b = branch.value
+  if (!b || !store.value || b.country_code || readOnly.value || resolving.value) return
+  resolving.value = true
+  try {
+    const region = await map.value?.resolve(store.value)
+    if (region) branch.value = await put<Branch>(`/merchant/branches/${bid}/location`, { lat: store.value[0], lng: store.value[1], address: '', region })
+  } catch { /* stays unknown; the line under the address says so */ }
+  resolving.value = false
+}
+const regionText = computed(() => { const b = branch.value; return b ? [b.country, b.province, b.city, b.district].filter(Boolean).join(' · ') + (b.postal_code ? ` (${b.postal_code})` : '') : '' })
 
 // ---- search ----
 const q = ref(''), hits = ref<Place[] | null>(null)
@@ -475,7 +487,7 @@ async function undoClose() {
   if (await run(async () => { await putPolygon(zoneById(u.id), u.polygon); return true })) { undo = null; canUndo.value = false; notice.value = '' }
 }
 async function saveTolerance() {
-  const b = await run(() => put<Branch>(`/merchant/branches/${bid}/zone-mode`, { zone_mode: branch.value!.zone_mode, zone_tolerance_m: Math.round(Number(tol.value) || 0) }))
+  const b = await run(() => put<Branch>(`/merchant/branches/${bid}/zone-mode`, { zone_mode: 'map', zone_tolerance_m: Math.round(Number(tol.value) || 0) }))
   if (b) { branch.value = b; notice.value = t('mz.saved') }
 }
 
@@ -716,6 +728,9 @@ async function fbSave() {
         <section>
           <div class="row between"><h2>{{ t('mz.store') }}</h2><button v-if="!readOnly" class="btn small" @click="startLocation">{{ t('mz.change_loc') }}</button></div>
           <dl class="kv"><dt>{{ t('address') }}</dt><dd>{{ branch.address || '—' }}</dd>
+            <template v-if="store"><dt>{{ t('mz.region') }}</dt>
+              <dd v-if="branch.country_code" data-testid="store-region">{{ regionText }}</dd>
+              <dd v-else class="muted" data-testid="store-region-unknown">{{ t(resolving ? 'mz.region_wait' : 'mz.region_unknown') }} <button v-if="!resolving && !readOnly" class="btn link" @click="fillRegion">{{ t('retry') }}</button></dd></template>
             <dt>{{ t('mz.latlng') }}</dt><dd data-testid="store-latlng">{{ store ? store[0].toFixed(5) + ', ' + store[1].toFixed(5) : t('mz.not_set') }}</dd></dl>
         </section>
         <section>
@@ -737,9 +752,8 @@ async function fbSave() {
         </section>
         <section>
           <h2>{{ t('mz.how') }}</h2>
-          <div class="seg"><button :class="{ on: branch.zone_mode === 'map' }" :disabled="readOnly" data-testid="mode-map" @click="setMode('map')">{{ t('mz.mode_map') }}</button>
-            <button :class="{ on: branch.zone_mode === 'list' }" :disabled="readOnly" data-testid="mode-list" @click="setMode('list')">{{ t('mz.mode_list') }}</button></div>
-          <p class="small muted" style="margin-top:8px">{{ t(branch.zone_mode === 'map' ? 'mz.mode_map_hint' : 'mz.mode_list_hint') }}</p>
+          <p class="small muted">{{ t('mz.mode_map_hint') }}</p>
+          <div v-if="!store || !drawn.some(z => z.active)" class="banner warn" style="margin-top:8px" data-testid="no-delivery-yet">{{ t('mz.no_delivery_yet') }}</div>
           <div class="row between" style="margin-top:10px"><span>{{ t('mz.tolerance') }}</span>
             <span class="row" style="gap:6px"><b>{{ t('mz.metres', { n: branch.zone_tolerance_m }) }}</b><button class="btn small" data-testid="open-gaps" @click="openGaps">{{ t('mz.view') }}</button></span></div>
           <p class="small muted" style="margin-top:4px">{{ branch.zone_tolerance_m ? t('mz.tolerance_hint', { n: branch.zone_tolerance_m }) : t('mz.tolerance_zero') }}</p>

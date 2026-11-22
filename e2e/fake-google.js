@@ -120,6 +120,36 @@
     }
   }
 
-  class Geocoder { geocode() { return Promise.reject(new Error('ZERO_RESULTS')) } }
-  window.google = { maps: { Map, OverlayView, LatLng, Point, Geocoder, importLibrary: () => Promise.reject(new Error('no library')) } }
+  // What was asked is kept in window.__fakeAsked, for tests to look at.
+  //   - a point (reverse geocoding) is always somewhere in Makati;
+  //   - an address is found only when window.__fakeGeocodes is set, as one
+  //     result in the country asked for;
+  //   - the Places library exists only when window.__fakePlaces is set.
+  const asked = window.__fakeAsked = { geocode: [], suggest: [] }
+  const comp = (long_name, short_name, ...types) => ({ long_name, short_name, types })
+  class Geocoder {
+    geocode(req) {
+      asked.geocode.push(req)
+      if (req.location) return Promise.resolve({ results: [{
+        formatted_address: '123 Ayala Ave, Makati, Metro Manila, Philippines',
+        address_components: [comp('Bel-Air', 'Bel-Air', 'sublocality_level_1', 'sublocality'), comp('Makati', 'Makati', 'locality'),
+          comp('Metro Manila', 'NCR', 'administrative_area_level_1'), comp('Philippines', 'PH', 'country'), comp('1209', '1209', 'postal_code')],
+      }] })
+      if (!window.__fakeGeocodes) return Promise.reject(new Error('ZERO_RESULTS'))
+      const where = req.componentRestrictions?.country ?? 'anywhere'
+      return Promise.resolve({ results: [{ formatted_address: `${req.address}, ${where}`, geometry: { location: new LatLng(14.5601, 121.0253) } }] })
+    }
+  }
+  const places = {
+    AutocompleteSessionToken: class {},
+    AutocompleteSuggestion: { fetchAutocompleteSuggestions(req) {
+      asked.suggest.push(req)
+      const where = (req.includedRegionCodes ?? ['anywhere']).join()
+      return Promise.resolve({ suggestions: [{ placePrediction: { mainText: { text: req.input }, secondaryText: { text: `Places, ${where}` },
+        toPlace: () => ({ location: new LatLng(14.5601, 121.0253), fetchFields: () => Promise.resolve() }) } }] })
+    } },
+    Place: { searchNearby: () => Promise.resolve({ places: [] }) },
+  }
+  const importLibrary = name => name === 'places' && window.__fakePlaces ? Promise.resolve(places) : Promise.reject(new Error('no library'))
+  window.google = { maps: { Map, OverlayView, LatLng, Point, Geocoder, importLibrary } }
 })()

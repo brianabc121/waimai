@@ -61,7 +61,6 @@ expect(await people.locator('[data-person=rider1]').count(), 0, 'riders are not 
 const cust = await open({ width: 390, height: 844 })
 await cust.goto(BASE + '/s/makati')
 await cust.waitForSelector('.item')
-await cust.selectOption('select', { index: 1 })
 await cust.click('.item:has-text("无盐地瓜条") .stepper button.fill')
 await cust.click('.item:has-text("无盐地瓜条") .stepper button.fill')
 await cust.click('.item:has-text("卤肉饭") .stepper button.fill')

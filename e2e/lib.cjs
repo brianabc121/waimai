@@ -4,8 +4,9 @@
 // not logged in lands on the login page: this logs in with a fresh number (the
 // code fills itself in when the API runs with OTP_DEV_ECHO=true) and waits for
 // the checkout page. Someone already logged in goes straight to checkout.
-// A delivery goes to a saved address; a customer who has none is shown the
-// form for a new one, which is filled in here (address: { name, unit, at }).
+// A delivery goes to a saved address; a customer who has none adds one, which
+// is filled in here (address: { name, unit, at }). { pickup: true } chooses
+// "pick up at the store" on the checkout page instead.
 async function customerLogin(page, phone, address) {
   await page.waitForURL(u => u.pathname === '/account/login' || u.pathname.endsWith('/checkout'))
   if (new URL(page.url()).pathname === '/account/login') {
@@ -14,12 +15,30 @@ async function customerLogin(page, phone, address) {
     await page.click('[data-testid=login-send]')
   }
   await page.waitForURL(u => u.pathname.endsWith('/checkout'))
-  const form = page.locator('[data-testid=address-form]')
-  await form.or(page.locator('.totals')).first().waitFor()
-  if (await form.isVisible()) {
+  await page.waitForSelector('.co[data-ready]')
+  if (address && address.pickup) {
+    if (!(await page.locator('[data-testid=checkout-pickup]').count())) await page.click('[data-testid=service-pickup]')
+    await page.waitForSelector('[data-testid=checkout-pickup]')
+    return
+  }
+  // The form opens by itself where delivery is all the store offers; otherwise
+  // "add a delivery address" on the page leads to it.
+  const form = page.locator('[data-testid=address-form]'), empty = page.locator('[data-testid=checkout-address][data-empty]')
+  if (await form.isVisible() || await empty.count()) {
+    if (!(await form.isVisible())) await empty.click()
     await addAddress(page, address || {})
     await page.waitForSelector('.totals')
   }
+  await pickZone(page)
+}
+
+// A store whose customers pick their delivery area by name asks for it on the
+// checkout page: take the first one, unless one is chosen already.
+async function pickZone(page) {
+  const zone = page.locator('[data-testid=checkout-zone]')
+  if (!(await zone.count()) || await zone.evaluate(el => el.selectedIndex > 0)) return
+  await zone.selectOption({ index: 1 })
+  await page.waitForSelector('[data-testid=delivery-fee]')
 }
 
 // addAddress fills the open "new address" form and saves it. at is "lat, lng"
@@ -53,4 +72,4 @@ async function addAddress(page, { name = '李小红', unit = '12F', at, wechat, 
   await page.waitForSelector(tid('address-form'), { state: 'detached' })
 }
 
-module.exports = { customerLogin, addAddress }
+module.exports = { customerLogin, addAddress, pickZone }

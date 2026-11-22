@@ -4,7 +4,7 @@
 // `ui` slot holds ordinary HTML floating over the map.
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { fitView, metresPerPixel, world, type LatLng, type Pt, type View } from '../geo'
-import { createMap, CURSORS, layerOf, type Layer, type MapAdapter, type Place, type Spot } from '../maps'
+import { createMap, CURSORS, layerOf, type Layer, type MapAdapter, type Place, type Region, type Scope, type Spot } from '../maps'
 import { t } from '../i18n'
 
 // cursor: 'pen' while drawing, 'pin' while placing, 'pointer', or '' for the map's own.
@@ -59,6 +59,8 @@ function zoomBy(d: number) { setView({ center: view.value.center, zoom: view.val
 const search = (q: string): Promise<Spot[]> => adapter.value?.search(q) ?? Promise.resolve([])
 const suggest = (q: string): Promise<Place[]> => adapter.value?.suggest(q) ?? Promise.resolve([])
 const nearby = (p: LatLng): Promise<Place[]> => adapter.value?.nearby(p) ?? Promise.resolve([])
+const scope = (s: Scope | null) => adapter.value?.scope(s)
+const resolve = (p: LatLng): Promise<Region | null> => adapter.value?.resolve(p) ?? Promise.resolve(null)
 const setType = (m: 'roadmap' | 'satellite') => adapter.value?.setType(m)
 
 // drag follows the pointer from a handle's pointerdown until release and
@@ -81,7 +83,7 @@ function drag(e: PointerEvent, onMove: (at: LatLng) => void, onEnd?: (moved: boo
   window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
 }
 
-defineExpose({ px, at, mpp, setView, fit, search, suggest, nearby, setType, drag, view, size, adapter })
+defineExpose({ px, at, mpp, setView, fit, search, suggest, nearby, scope, resolve, setType, drag, view, size, adapter })
 </script>
 
 <template>

@@ -4,7 +4,7 @@
 // Usage: BASE_URL=http://localhost:8080 node e2e/account.cjs   (needs seed data and OTP_DEV_ECHO=true)
 const { chromium } = require('playwright')
 const { mkdirSync } = require('node:fs')
-const { addAddress } = require('./lib.cjs')
+const { addAddress, pickZone } = require('./lib.cjs')
 
 ;(async () => {
 
@@ -27,7 +27,6 @@ const pretty = `+63 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`
 // Browsing and filling the cart need no account.
 await page.goto(BASE + '/s/makati')
 await page.waitForSelector('.item')
-await page.selectOption('select', { index: 1 })
 await page.click('.item:has-text("瓶装水") .stepper button.fill')
 await page.click('.bottombar .btn.primary')
 await page.waitForURL(u => u.pathname === '/account/login')
@@ -74,8 +73,11 @@ await page.locator(`${tid('account-phone')}:has-text("${pretty}")`).waitFor()
 step('a wrong code is refused; the right one logs in and comes back to checkout')
 
 // ---- the address book ----
-// With no address yet, checkout opens the form for a new one. The phone is the login number.
+// With no address yet, checkout asks for one. The phone is the login number.
 page.on('dialog', d => d.accept())
+await page.waitForSelector('.co[data-ready]')
+await page.locator(tid('service-toggle') + ' .on:has-text("配送")').waitFor()
+await page.click(tid('checkout-address') + '[data-empty]')
 await page.waitForSelector(tid('address-form'))
 if ((await page.inputValue(tid('af-phone'))) !== local) throw new Error('a new address should start with the login number')
 await page.click(tid('af-save'))
@@ -120,6 +122,7 @@ await page.waitForSelector('.totals')
 step('addresses can be added, chosen, changed and deleted from checkout')
 
 // The order goes to the chosen address.
+await pickZone(page)
 await page.locator('.bottombar .btn.primary').click()
 await page.waitForURL('**/o/**')
 await page.locator('text=12F').first().waitFor()

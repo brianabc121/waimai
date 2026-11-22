@@ -47,14 +47,27 @@ const own = async (method, url, data) => {
 const me = await own('GET', '/auth/me')
 const bid = me.roles[0].branch_id
 const STORE = [14.5547, 121.0244]
-await own('PUT', `/merchant/branches/${bid}/location`, { lat: STORE[0], lng: STORE[1], address: '123 Ayala Ave, Makati' })
+// an empty region: as a store saved before regions were read off the map
+await own('PUT', `/merchant/branches/${bid}/location`, { lat: STORE[0], lng: STORE[1], address: '123 Ayala Ave, Makati', region: {} })
 const NAME = '谷歌测试区'
 const CORNERS = [[14.5580, 121.0260], [14.5580, 121.0300], [14.5550, 121.0300], [14.5550, 121.0260]]
-for (const z of (await own('GET', `/merchant/branches/${bid}/menu`)).zones) if (z.name.startsWith('谷歌测试')) await own('DELETE', `/merchant/branches/${bid}/zones/${z.id}`)
+// Only this test's zone is drawn on the map while it runs; the others get their outlines back at the end.
+const others = []
+for (const z of (await own('GET', `/merchant/branches/${bid}/menu`)).zones) {
+  if (z.name.startsWith('谷歌测试')) await own('DELETE', `/merchant/branches/${bid}/zones/${z.id}`)
+  else if (z.polygon.length) { others.push(z); await own('PUT', `/merchant/branches/${bid}/zones/${z.id}`, { ...z, polygon: null }) }
+}
 await own('POST', `/merchant/branches/${bid}/zones`, { name: NAME, name_en: 'Google test', fee: 1000, min_order: 0, active: true, sort: 99, polygon: CORNERS, color: '#7c3aed', eta_minutes: null })
 
 await page.goto(BASE + '/merchant/delivery-map')
 await mode('browse')
+// The location above was saved without a region (as before this was stored):
+// opening the page reads it off the map and saves it.
+await page.locator(`${tid('store-region')}:has-text("Philippines · Metro Manila · Makati · Bel-Air (1209)")`).waitFor()
+const saved = (await own('GET', `/merchant/branches/${bid}/menu`)).branch
+expect([saved.country_code, saved.country, saved.province, saved.city, saved.district, saved.postal_code].join('|'), 'PH|Philippines|Metro Manila|Makati|Bel-Air|1209', 'region saved with the store')
+expect(await page.evaluate(() => window.__fakeAsked.geocode.at(-1).language), 'en', 'the region is asked for in English')
+step('a store saved without a region gets country, province, city, district and postcode from the map')
 await page.waitForSelector('.fake-pane .mapc-layer g[data-zone] polygon')
 step('the drawing layer is mounted inside the map\'s own pane')
 
@@ -166,7 +179,38 @@ await mode('location')
 expect(/^url\(.*\) 16 30, crosshair$/.test(await cursor()), true, 'a pin while placing the store')
 await page.click(tid('tool-browse'))
 
+// ---- the customer's address search stays in the store's country ----
+const slug = saved.slug
+try {
+  const cust = await ctx.newPage()
+  cust.on('pageerror', e => errors.push(`pageerror: ${e.message}`))
+  await cust.setViewportSize({ width: 390, height: 844 })
+  await cust.goto(`${BASE}/s/${slug}`)
+  await cust.click(tid('deliver-to'))
+  await cust.waitForSelector(tid('picker'))
+  await cust.waitForSelector(tid('pin-result'))
+  const c = await cust.evaluate(() => { const c = window.__fakeMaps.at(-1).getCenter(); return [c.lat(), c.lng()] })
+  close(c[0], STORE[0], 'the customer map opens on the store (lat)', 0.0001); close(c[1], STORE[1], 'the customer map opens on the store (lng)', 0.0001)
+  // Without the Places library the search is the geocoder's.
+  await cust.evaluate(() => { window.__fakeGeocodes = true })
+  await cust.fill(tid('pin-search'), 'trump tower')
+  await cust.locator(`${tid('pin-place')}:has-text("trump tower, PH")`).waitFor()
+  const g = await cust.evaluate(() => { const r = window.__fakeAsked.geocode.filter(x => x.address).at(-1); return { country: r.componentRestrictions?.country, region: r.region } })
+  expect(g.country + '/' + g.region, 'PH/ph', 'the geocoder is kept to the store\'s country')
+  // With it, suggestions are.
+  await cust.evaluate(() => { window.__fakePlaces = true })
+  await cust.fill(tid('pin-search'), 'trump towers')
+  await cust.locator(`${tid('pin-place')}:has-text("Places, ph")`).waitFor()
+  const s = await cust.evaluate(() => { const r = window.__fakeAsked.suggest.at(-1); return { codes: r.includedRegionCodes, bias: r.locationBias } })
+  expect(s.codes.join(), 'ph', 'suggestions are kept to the store\'s country')
+  close(s.bias.center.lat, STORE[0], 'suggestions look near the store first (lat)', 0.0001); close(s.bias.center.lng, STORE[1], 'suggestions look near the store first (lng)', 0.0001)
+  expect(await cust.locator(tid('picker') + ' svg polygon').count(), 0, 'no zone outlines on the customer map')
+  await cust.close()
+  step('a customer searching "trump tower" is only offered places in the store\'s country, near the store')
+} finally { /* nothing to put back */ }
+
 await own('DELETE', `/merchant/branches/${bid}/zones/${zone.id}`)
+for (const z of others) await own('PUT', `/merchant/branches/${bid}/zones/${z.id}`, z)
 if (errors.length) throw new Error('browser errors:\n' + errors.join('\n'))
 await browser.close()
 console.log('mapgoogle: all steps passed')
