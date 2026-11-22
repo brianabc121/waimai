@@ -5,7 +5,7 @@ import { both, minutesSince, money, reasonText, t, whenText } from '../i18n'
 import { useLive } from '../live'
 import { session } from '../session'
 import type { Order, RiderInfo } from '../types'
-import { contactName, contactPhone } from '../addresses'
+import { contactApps, contactName, contactPhone } from '../addresses'
 import './work/strings'
 import TotalsTable from './TotalsTable.vue'
 
@@ -163,10 +163,8 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <div class="muted small">{{ t('customer') }}</div>
             <div data-testid="order-contact">{{ contactName(selected) }} · <a :href="'tel:' + contactPhone(selected)">{{ contactPhone(selected) }}</a>
               <span v-if="selected.contact_phone && selected.contact_phone !== selected.customer_phone" class="small muted"> · {{ t('oc.ordered_by') }} {{ selected.customer_phone }}</span></div>
-            <div v-if="selected.contact_wechat || selected.contact_telegram" class="small" data-testid="order-im">
-              <span v-if="selected.contact_wechat">{{ t('oc.wechat') }} <b>{{ selected.contact_wechat }}</b></span>
-              <span v-if="selected.contact_wechat && selected.contact_telegram"> · </span>
-              <span v-if="selected.contact_telegram">{{ t('oc.telegram') }} <b>{{ selected.contact_telegram }}</b></span></div>
+            <div v-if="contactApps(selected).length" class="small" data-testid="order-im">
+              <span v-for="(c, i) in contactApps(selected)" :key="c.field"><template v-if="i"> · </template>{{ c.label }} <b>{{ c.value }}</b></span></div>
             <div v-if="selected.service_type === 'delivery'">{{ selected.zone_name }} · {{ selected.address_line }} {{ selected.address_unit }}
               <span v-if="selected.zone_distance_m" class="tag warn" data-testid="outside-zone">{{ t('outside_zone', { n: selected.zone_distance_m }) }}</span>
               <a v-if="selected.dest_lat != null" class="small" target="_blank" rel="noopener" :href="`https://www.google.com/maps/search/?api=1&query=${selected.dest_lat},${selected.dest_lng}`">{{ t('view_on_map') }}</a></div>

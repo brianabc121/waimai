@@ -23,8 +23,4 @@ export function loginRoute(next: string, slug?: string) {
   return { path: '/account/login', query: { next, ...(slug ? { store: slug } : {}) } }
 }
 
-// +639175550123 -> +63 917 555 0123
-export function prettyPhone(p: string): string {
-  const m = p.match(/^\+63(\d{3})(\d{3})(\d{4})$/)
-  return m ? `+63 ${m[1]} ${m[2]} ${m[3]}` : p
-}
+export { prettyPhone } from './dial'

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"math"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -496,6 +497,8 @@ type SettingsInput struct {
 	Notice         *string `json:"notice"`
 	Intro          *string `json:"intro"`
 	BasketsEnabled *bool   `json:"baskets_enabled"`
+	// Which of ContactFields the address form asks for; nil keeps what is set.
+	ContactFields *[]string `json:"contact_fields"`
 }
 
 var hhmmRe = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
@@ -542,16 +545,32 @@ func (a *App) SaveSettings(ctx context.Context, branchID int64, in SettingsInput
 	if in.Intro != nil && len([]rune(*in.Intro)) > 500 {
 		return nil, ErrValidation("the introduction must be at most 500 characters")
 	}
+	var contactFields any
+	if in.ContactFields != nil {
+		asked := []string{}
+		for _, f := range ContactFields {
+			if slices.Contains(*in.ContactFields, f) {
+				asked = append(asked, f)
+			}
+		}
+		for _, f := range *in.ContactFields {
+			if !slices.Contains(ContactFields, f) {
+				return nil, ErrValidation("contact_fields can hold wechat, telegram, line and whatsapp")
+			}
+		}
+		contactFields = asked
+	}
 	tag, err := a.DB.Exec(ctx, `UPDATE branches SET name=$2, name_en=$3, address=$4, phone=$5, tax_rate_bp=$6,
 		tax_inclusive=$7, service_charge_bp=$8, packaging_fee=$9, min_order_amount=$10, accept_timeout_minutes=$11,
 		delivery_enabled=$12, pickup_enabled=$13, paused=$14, open_time=$15, close_time=$16, notify_sms=$17,
 		scheduling_enabled=$18, prep_minutes=$19, kitchen_slow_minutes=coalesce(nullif($20, 0), kitchen_slow_minutes),
 		detour_percent=coalesce(nullif($21, 0), detour_percent), detour_meters=coalesce(nullif($22, 0), detour_meters),
-		notice=coalesce($23, notice), intro=coalesce($24, intro), baskets_enabled=coalesce($25, baskets_enabled) WHERE id=$1`,
+		notice=coalesce($23, notice), intro=coalesce($24, intro), baskets_enabled=coalesce($25, baskets_enabled),
+		contact_fields=coalesce($26::text[], contact_fields) WHERE id=$1`,
 		branchID, in.Name, in.NameEn, in.Address, in.Phone, in.TaxRateBP, in.TaxInclusive, in.ServiceChargeBP,
 		in.PackagingFee, in.MinOrderAmount, in.AcceptTimeoutMinutes, in.DeliveryEnabled, in.PickupEnabled,
 		in.Paused, in.OpenTime, in.CloseTime, in.NotifySMS, in.SchedulingEnabled, in.PrepMinutes,
-		in.KitchenSlowMinutes, in.DetourPercent, in.DetourMeters, in.Notice, in.Intro, in.BasketsEnabled)
+		in.KitchenSlowMinutes, in.DetourPercent, in.DetourMeters, in.Notice, in.Intro, in.BasketsEnabled, contactFields)
 	if err != nil {
 		return nil, err
 	}
