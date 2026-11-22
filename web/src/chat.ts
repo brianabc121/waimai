@@ -17,9 +17,9 @@ export interface ChatThread {
 export interface ChatOrder { id: number; public_no: string; status: string; service_type: string; total: number; currency: string; created_at: string; open: boolean; token?: string }
 export interface CustomerChat {
   branch_id: number; slug: string; store_name: string; store_name_en: string; phone: string; open_now: boolean; open_time: string
-  peer: string; enabled: boolean; muted: boolean; thread_id: number; peer_read_at: string | null; orders: ChatOrder[]
+  peer: string; enabled: boolean; muted: boolean; thread_id: number; peer_read_at: string | null; orders: ChatOrder[]; quiet: boolean
 }
-export interface StoreChat extends ChatThread { phone_masked: string; orders: ChatOrder[]; order_count: number }
+export interface StoreChat extends ChatThread { phone_masked: string; orders: ChatOrder[]; order_count: number; blocked: boolean }
 
 // One message as the pages show it.
 export interface ChatMsg {
@@ -47,6 +47,9 @@ export const addQuickReply = (bid: number, body: string) => post<QuickReply>(`/m
 export const deleteQuickReply = (bid: number, id: number) => del(`/merchant/branches/${bid}/chat-quick-replies/${id}`)
 export const setAutoReply = (bid: number, on: boolean, text: string) => put(`/merchant/branches/${bid}/chat-auto-reply`, { on, text })
 export const chatCustomerOfOrder = (bid: number, orderId: number) => get<{ customer_id: number }>(`/merchant/branches/${bid}/chat-order/${orderId}`)
+export const customerChatQuiet = (slug: string, quiet: boolean) => post(`/customer/chats/${slug}/quiet`, { quiet })
+export const customerChatHide = (slug: string) => post(`/customer/chats/${slug}/hide`)
+export const storeChatBlock = (bid: number, customerId: number, blocked: boolean) => post(`/merchant/branches/${bid}/chats/${customerId}/block`, { blocked })
 export const storeChatRead = (bid: number, customerId: number) => post(`/merchant/branches/${bid}/chats/${customerId}/read`)
 
 // chatOn says whether this installation has chat at all (the entry points hide without it).
@@ -249,6 +252,7 @@ extend({
   'ch.err_CHAT_OFF': ['聊天功能暂时没有开通', 'Chat is not available yet'],
   'ch.err_CHAT_MUTED': ['你暂时不能发消息，如有疑问请联系平台客服', 'You cannot send messages for now. Contact support if this is a mistake.'],
   'ch.err_CHAT_CLOSED': ['暂时无法联系这家店，请打电话', 'This store cannot be messaged right now. Please call.'],
+  'ch.err_CHAT_BLOCKED': ['暂时无法联系这家店，请打电话', 'This store cannot be messaged right now. Please call.'],
   'ch.err_CHAT_NO_ORDER': ['只能主动联系 7 天内在本店下过单的顾客', 'You can only write first to customers who ordered in the last 7 days'],
   'ch.err_CHAT_TOO_FAST': ['发得太快了，请稍等一下', 'Too many messages. Wait a moment.'],
   'ch.err_CHAT_TOO_MANY': ['今天新开的聊天太多了，明天再试', 'Too many new chats today. Try again tomorrow.'],
@@ -268,6 +272,17 @@ extend({
   'ch.add': ['添加', 'Add'],
   'ch.q1': ['您好，已经收到您的消息，马上为您处理。', 'Hello, we got your message and are on it.'], 'ch.q2': ['您的餐正在制作中，请稍等。', 'Your order is being prepared.'],
   'ch.q3': ['骑手已经出发，很快送到。', 'The rider is on the way.'], 'ch.q4': ['不好意思让您久等了。', 'Sorry to keep you waiting.'],
+  'ch.more': ['更多', 'More'], 'ch.push_ask': ['开启提醒，商家回复时通知你', 'Turn on reminders to hear when the store answers'], 'ch.push_on': ['开启', 'Turn on'],
+  'ch.push_denied': ['浏览器不允许这个网站发通知，要在浏览器设置里打开', 'This browser blocks notifications from this site. Allow them in its settings.'],
+  'ch.push_ask_desk': ['开启新消息提醒（页面关了也能收到）', 'Turn on reminders for new messages (even with the page closed)'], 'ch.push_is_on': ['新消息提醒已开启', 'Reminders are on'], 'ch.push_off': ['关闭', 'Turn off'],
+  'ch.quiet': ['不再提醒这家店的消息', 'No reminders about this store'], 'ch.unquiet': ['恢复这家店的消息提醒', 'Remind me about this store again'], 'ch.quiet_on': ['已关闭这家店的消息提醒', 'Reminders about this store are off'],
+  'ch.report_store': ['举报这个商家', 'Report this store'], 'ch.report_customer': ['举报这位顾客', 'Report this customer'], 'ch.reported': ['举报已提交，平台会查看这个聊天', 'Report sent. The platform will look at this chat.'],
+  'ch.hide': ['删除这个聊天', 'Remove this chat'], 'ch.hide_confirm': ['只在你这边不再显示，商家那边还在。对方再发消息时会重新出现。确定吗？', 'It disappears on your side only, and comes back when the store writes again. Continue?'],
+  'ch.block': ['拉黑这位顾客', 'Block this customer'], 'ch.unblock': ['取消拉黑', 'Unblock'], 'ch.block_confirm': ['拉黑后这位顾客不能再给本店发消息，下单不受影响。确定吗？', 'This customer will not be able to message the store; ordering is not affected. Continue?'],
+  'ch.blocked_note': ['已拉黑：这位顾客不能给本店发消息。', 'Blocked: this customer cannot message the store.'],
+  'ch.rp_harassment': ['骚扰', 'Harassment'], 'ch.rp_spam': ['广告或刷屏', 'Advertising or spam'], 'ch.rp_fraud': ['欺诈', 'Fraud'], 'ch.rp_abuse': ['辱骂或不当内容', 'Abuse or improper content'], 'ch.rp_other': ['其他', 'Other'],
+  'ch.rp_detail': ['补充说明（选“其他”时必填）', 'Details (needed for "Other")'], 'ch.rp_note': ['提交后平台会查看这个聊天的内容。', 'The platform will read this chat after you send the report.'], 'ch.rp_send': ['提交举报', 'Send report'],
+  'ch.img_gone': ['图片已过期', 'Picture expired'],
   // the store's side
   'ch.nav': ['消息', 'Messages'], 'ch.search': ['搜索顾客、手机尾号、订单号', 'Search name, phone ending, order no.'],
   'ch.f_all': ['全部', 'All'], 'ch.f_unread': ['未读', 'Unread'], 'ch.f_active': ['进行中订单', 'Open orders'],

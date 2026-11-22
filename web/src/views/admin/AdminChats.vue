@@ -24,34 +24,38 @@ extend({
   'ax.mute_confirm': ['禁言后，这位顾客在所有店铺都不能发消息。确定吗？', 'This customer will not be able to write to any store. Continue?'],
   'ax.close_confirm': ['关闭后，顾客和这家店都不能再互相发消息。确定吗？', 'Customers and this store will not be able to message each other. Continue?'],
   'ax.from_customer': ['顾客', 'Customer'], 'ax.from_store': ['门店', 'Store'], 'ax.earlier': ['查看更早的消息', 'Earlier messages'],
+  'ax.reported': ['被举报', 'Reported'], 'ax.n_reports': ['{n} 条举报', '{n} reports'], 'ax.blocked': ['门店已拉黑', 'Blocked by store'],
+  'ax.reports': ['举报', 'Reports'], 'ax.by_customer': ['顾客举报门店', 'Customer reported the store'], 'ax.by_store': ['门店举报顾客', 'Store reported the customer'],
+  'ax.resolve': ['标记为已处理', 'Mark as dealt with'], 'ax.resolved': ['已处理 {d}', 'Dealt with {d}'], 'ax.img_gone': ['图片已过期', 'Picture expired'],
   'ax.image': ['[图片]', '[Picture]'], 'ax.order': ['[订单]', '[Order]'], 'ax.you': ['', ''],
 })
 
 interface Tag { id: number; public_no: string; status: string }
 interface Row {
   id: number; branch_id: number; slug: string; store_name: string; merchant: string; customer_id: number; customer: string; phone: string; phone_tail: string
-  last_kind: string; last_text: string; last_sender: string; last_at: string; count: number; order: Tag | null; muted: boolean; chat_enabled: boolean
+  last_kind: string; last_text: string; last_sender: string; last_at: string; count: number; order: Tag | null; muted: boolean; chat_enabled: boolean; reports: number; blocked: boolean
 }
+interface Report { id: number; reported_by: 'customer' | 'store'; staff?: string; reason: string; detail: string; created_at: string; resolved_at: string | null }
 interface Line { id: number; sender: 'customer' | 'store' | 'system'; staff?: string; kind: string; body: string; order_no: string; sent_at: string }
 interface Order { id: number; public_no: string; status: string; total: number; currency: string; created_at: string }
-interface Detail extends Row { started_at: string; messages: Line[]; orders: Order[] }
+interface Detail extends Row { started_at: string; messages: Line[]; orders: Order[]; report_list: Report[] }
 
 const SIZE = 30
 const route = useRoute(), router = useRouter()
-const ask = reactive({ q: '', today: false, branch_id: 0, page: 1 })
-const list = ref<{ chats: Row[]; total: number; today: number } | null>(null)
+const ask = reactive({ q: '', today: false, reported: false, branch_id: 0, page: 1 })
+const list = ref<{ chats: Row[]; total: number; today: number; reported: number } | null>(null)
 const stores = ref<{ id: number; name: string }[]>([])
 const error = ref('')
 const selectedId = computed(() => Number(route.query.id) || 0)
 const detail = ref<Detail | null>(null), more = ref(false)
 
 async function load() {
-  try { list.value = await get('/admin/chats' + qs({ q: ask.q, today: ask.today ? 1 : '', branch_id: ask.branch_id || '', page: ask.page, page_size: SIZE })) }
+  try { list.value = await get('/admin/chats' + qs({ q: ask.q, today: ask.today ? 1 : '', reported: ask.reported ? 1 : '', branch_id: ask.branch_id || '', page: ask.page, page_size: SIZE })) }
   catch (e) { error.value = (e as Error).message }
 }
 let typing = 0
 watch(() => ask.q, () => { clearTimeout(typing); typing = window.setTimeout(() => { ask.page = 1; void load() }, 300) })
-watch(() => [ask.today, ask.branch_id], () => { ask.page = 1; void load() })
+watch(() => [ask.today, ask.reported, ask.branch_id], () => { ask.page = 1; void load() })
 
 async function open(id: number) {
   detail.value = null
@@ -74,6 +78,10 @@ async function mute() {
   if (!d.muted && !confirm(t('ax.mute_confirm'))) return
   await post(`/admin/chat-customers/${d.customer_id}/mute`, { muted: !d.muted }).then(() => { d.muted = !d.muted }, e => { error.value = e.message })
 }
+async function resolve() {
+  const d = detail.value!
+  await post(`/admin/chats/${d.id}/reports/resolve`).then(async () => { await open(d.id); void load() }, e => { error.value = e.message })
+}
 async function toggleStore() {
   const d = detail.value!
   if (d.chat_enabled && !confirm(t('ax.close_confirm'))) return
@@ -95,6 +103,7 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
       <div class="ax-filters">
         <button :class="{ on: !ask.today }" @click="ask.today = false">{{ t('ax.all') }}<template v-if="list"> {{ list.total }}</template></button>
         <button :class="{ on: ask.today }" data-testid="ax-today" @click="ask.today = !ask.today">{{ t('ax.today') }}<template v-if="list"> {{ list.today }}</template></button>
+        <button v-if="list && (list.reported || ask.reported)" :class="{ on: ask.reported }" class="rep" data-testid="ax-reported" @click="ask.reported = !ask.reported">{{ t('ax.reported') }} {{ list.reported }}</button>
         <select v-model.number="ask.branch_id" data-testid="ax-store">
           <option :value="0">{{ t('ax.all_stores') }}</option>
           <option v-for="s in stores" :key="s.id" :value="s.id">{{ s.name }}</option>
@@ -110,6 +119,8 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
           <span class="row" style="gap:6px">
             <span v-if="r.order" class="tag warn">#{{ r.order.public_no }} {{ t('s.' + r.order.status) }}</span>
             <span class="tag">{{ t('ax.n_msgs', { n: r.count }) }}</span>
+            <span v-if="r.reports" class="tag bad" data-testid="ax-row-reports">{{ t('ax.n_reports', { n: r.reports }) }}</span>
+            <span v-if="r.blocked" class="tag">{{ t('ax.blocked') }}</span>
             <span v-if="r.muted" class="tag bad">{{ t('ax.muted') }}</span><span v-if="!r.chat_enabled" class="tag bad">{{ t('ax.store_off') }}</span>
           </span>
         </span>
@@ -128,7 +139,7 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
           <button v-if="more" class="btn link small" style="align-self:center" data-testid="ax-earlier" @click="earlier">{{ t('ax.earlier') }}</button>
           <div v-for="m in detail.messages" :key="m.id" class="ax-msg" :class="m.sender" data-testid="ax-msg" :data-sender="m.sender">
             <div class="bub"><span v-if="m.kind === 'text' || m.kind === 'system'">{{ m.body }}</span>
-              <a v-else-if="m.kind === 'image'" :href="m.body" target="_blank" rel="noopener" data-testid="ax-image"><img :src="m.body" alt="" /></a>
+              <a v-else-if="m.kind === 'image'" :href="m.body" target="_blank" rel="noopener" data-testid="ax-image"><img :src="m.body" alt="" @error="m.kind = 'system'; m.body = t('ax.img_gone')" /></a>
               <span v-else data-testid="ax-order">{{ t('ax.order') }} #{{ m.order_no }}</span>
               <em>{{ m.sender === 'store' ? t('ax.from_store') + ' · ' + (m.staff || t('ch.auto')) : t('ax.from_customer') }} · {{ fmtDateTime(m.sent_at) }}</em></div>
           </div>
@@ -149,6 +160,15 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
       <h4>{{ t('ax.orders') }}</h4>
       <div v-for="o in detail.orders" :key="o.id" class="small">#{{ o.public_no }} · {{ fmtDate(o.created_at) }} · {{ money(o.total, o.currency) }} · {{ t('s.' + o.status) }}</div>
       <div v-if="!detail.orders.length" class="small muted">—</div>
+      <template v-if="detail.report_list.length">
+        <h4>{{ t('ax.reports') }}</h4>
+        <div v-for="r in detail.report_list" :key="r.id" class="ax-rep" :class="{ open: !r.resolved_at }" data-testid="ax-report">
+          <b>{{ t(r.reported_by === 'customer' ? 'ax.by_customer' : 'ax.by_store') }}<template v-if="r.staff"> · {{ r.staff }}</template></b>
+          <span>{{ t('ch.rp_' + r.reason) }}<template v-if="r.detail">：{{ r.detail }}</template></span>
+          <span class="small muted">{{ fmtDateTime(r.created_at) }}<template v-if="r.resolved_at"> · {{ t('ax.resolved', { d: fmtDate(r.resolved_at) }) }}</template></span>
+        </div>
+        <button v-if="detail.reports" class="btn small" style="justify-self:start" data-testid="ax-resolve" @click="resolve">{{ t('ax.resolve') }}</button>
+      </template>
       <h4>{{ t('ax.actions') }}</h4>
       <button class="btn link bad" data-testid="ax-mute" :data-on="detail.muted || null" @click="mute">{{ t(detail.muted ? 'ax.unmute' : 'ax.mute') }}</button>
       <button class="btn link bad" data-testid="ax-store-toggle" @click="toggleStore">{{ t(detail.chat_enabled ? 'ax.close_store' : 'ax.open_store') }}</button>
@@ -182,6 +202,8 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
 .ax-info { border-left: 1px solid var(--line); padding: 4px 16px 16px; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
 .ax-info h4 { margin: 12px 0 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
 .ax-info .lnk { color: var(--brand); font-size: 13px; } .ax-info .btn.bad { color: var(--bad); justify-self: start; padding: 0; min-height: 28px; }
+.ax-rep { display: grid; gap: 2px; font-size: 13px; border-left: 3px solid var(--line); padding-left: 8px; overflow-wrap: anywhere; } .ax-rep.open { border-color: var(--bad, #b42318); }
+.ax-filters button.rep { color: var(--bad, #b42318); border-color: #f1b8b2; }
 .tag.bad { background: var(--bad-soft, #fdecea); color: var(--bad, #b42318); }
 @media (max-width: 1199px) { .axc { grid-template-columns: 320px minmax(0, 1fr); } .ax-info { display: none; } }
 @media (max-width: 767px) {

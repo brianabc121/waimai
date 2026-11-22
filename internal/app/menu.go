@@ -657,7 +657,7 @@ func (a *App) ExpirePendingOrders(ctx context.Context) (int, error) {
 // Cleanup removes expired sessions, verification codes, quotes and old
 // idempotency records.
 func (a *App) Cleanup(ctx context.Context) error {
-	for _, q := range []string{
+	for _, q := range append([]string{
 		`DELETE FROM sessions WHERE expires_at < now()`,
 		`DELETE FROM customer_sessions WHERE expires_at < now()`,
 		`DELETE FROM phone_verifications WHERE created_at < now() - interval '1 day'`,
@@ -674,7 +674,7 @@ func (a *App) Cleanup(ctx context.Context) error {
 		`DELETE FROM customer_address_photos p USING customer_addresses ad
 			WHERE ad.id = p.address_id AND ad.deleted_at < now() - interval '30 days'`,
 		purgeUnusedImages,
-	} {
+	}, chatCleanup...) {
 		if _, err := a.DB.Exec(ctx, q); err != nil {
 			return err
 		}

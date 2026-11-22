@@ -59,6 +59,7 @@ export interface Overview {
   worker: { state: Health; online: number; failing_tasks: string[] }
   db: { state: Health; ping_ms: number; in_use: number; max: number }
   queue: { state: Health; pending: number; failed: number; oldest_wait_seconds: number }
+  chat: { on: boolean; state: Health; error?: string }
   day: ApiTotals; orders_today: number; stores_open: number; stores_total: number
   hour: ApiPoint[]; errors: ApiError[]
 }

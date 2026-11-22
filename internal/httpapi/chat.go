@@ -26,6 +26,11 @@ func (s *Server) chatRoutes(r *gin.Engine, api *gin.RouterGroup) {
 	api.POST("/customer/chats/:slug/read", w, s.customerChatRead)
 	api.POST("/customer/chats/:slug/images", w, s.customerChatImage)
 	api.GET("/chat-images/:token", s.chatImage)
+	api.POST("/customer/chats/:slug/quiet", w, s.customerChatQuiet)
+	api.POST("/customer/chats/:slug/hide", w, s.customerChatHide)
+	api.POST("/customer/chats/:slug/report", w, s.customerChatReport)
+	api.POST("/customer/devices", w, s.customerDevice)
+	api.DELETE("/customer/devices/:id", w, s.customerDeviceRemove)
 
 	// OpenIM calls back here from inside the private network. Its callbacks
 	// are not signed, so the address carries a key.
@@ -44,7 +49,11 @@ func (s *Server) chatAdminRoutes(auth, admin *gin.RouterGroup) {
 	auth.DELETE("/merchant/branches/:bid/chat-quick-replies/:id", s.deleteQuickReply)
 	auth.PUT("/merchant/branches/:bid/chat-auto-reply", s.setChatAutoReply)
 
+	auth.POST("/merchant/branches/:bid/chats/:cid/block", s.storeChatBlock)
+	auth.POST("/merchant/branches/:bid/chats/:cid/report", s.storeChatReport)
+
 	admin.GET("/chats", s.adminChats)
+	admin.POST("/chats/:id/reports/resolve", s.adminChatResolve)
 	admin.GET("/chats/:id", s.adminChat)
 	admin.POST("/chat-customers/:id/mute", s.adminChatMute)
 	admin.POST("/chat-stores/:id", s.adminStoreChat)
@@ -134,11 +143,112 @@ func (s *Server) storeChatRead(c *gin.Context) {
 	}
 }
 
+// ---- reminders, blocks and reports (internal/app/chat_alerts.go) ----
+
+func (s *Server) customerDevice(c *gin.Context) {
+	cu, ok := s.me(c)
+	var in struct {
+		Token string `json:"token"`
+	}
+	if !ok || !bind(c, &in) {
+		return
+	}
+	id, err := s.App.AddCustomerDevice(c, cu.ID, in.Token)
+	reply(c, gin.H{"id": id}, err)
+}
+
+func (s *Server) customerDeviceRemove(c *gin.Context) {
+	cu, ok := s.me(c)
+	if !ok {
+		return
+	}
+	if id, ok := idParam(c, "id"); ok {
+		reply(c, gin.H{"ok": true}, s.App.RemoveCustomerDevice(c, cu.ID, id))
+	}
+}
+
+// customerChatOf finds the store a customer's chat route is about.
+func (s *Server) customerChatOf(c *gin.Context) (customerID, branchID int64, ok bool) {
+	cu, ok := s.me(c)
+	if !ok {
+		return 0, 0, false
+	}
+	bid, err := s.App.ChatBranch(c, c.Param("slug"))
+	if err != nil {
+		fail(c, err)
+		return 0, 0, false
+	}
+	return cu.ID, bid, true
+}
+
+func (s *Server) customerChatQuiet(c *gin.Context) {
+	var in struct {
+		Quiet bool `json:"quiet"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	if cid, bid, ok := s.customerChatOf(c); ok {
+		reply(c, gin.H{"ok": true}, s.App.SetChatQuiet(c, cid, bid, in.Quiet))
+	}
+}
+
+func (s *Server) customerChatHide(c *gin.Context) {
+	if cid, bid, ok := s.customerChatOf(c); ok {
+		reply(c, gin.H{"ok": true}, s.App.HideChat(c, cid, bid))
+	}
+}
+
+type chatReportIn struct {
+	Reason string `json:"reason"`
+	Detail string `json:"detail"`
+}
+
+func (s *Server) customerChatReport(c *gin.Context) {
+	var in chatReportIn
+	if !bind(c, &in) {
+		return
+	}
+	if cid, bid, ok := s.customerChatOf(c); ok {
+		reply(c, gin.H{"ok": true}, s.App.ReportChat(c, "customer", bid, cid, 0, in.Reason, in.Detail))
+	}
+}
+
+func (s *Server) storeChatBlock(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	var in struct {
+		Blocked bool `json:"blocked"`
+	}
+	if !ok || !bind(c, &in) {
+		return
+	}
+	if cid, ok := idParam(c, "cid"); ok {
+		reply(c, gin.H{"ok": true}, s.App.BlockChatCustomer(c, bid, cid, currentUser(c).ID, in.Blocked))
+	}
+}
+
+func (s *Server) storeChatReport(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	var in chatReportIn
+	if !ok || !bind(c, &in) {
+		return
+	}
+	if cid, ok := idParam(c, "cid"); ok {
+		reply(c, gin.H{"ok": true}, s.App.ReportChat(c, "store", bid, cid, currentUser(c).ID, in.Reason, in.Detail))
+	}
+}
+
+func (s *Server) adminChatResolve(c *gin.Context) {
+	if id, ok := idParam(c, "id"); ok {
+		reply(c, gin.H{"ok": true}, s.App.AdminResolveChatReports(c, adminActor(c), id))
+	}
+}
+
 // ---- platform ----
 
 func (s *Server) adminChats(c *gin.Context) {
 	l, err := s.App.AdminChats(c, app.ChatFilter{Q: c.Query("q"), Today: c.Query("today") == "1",
-		BranchID: queryInt(c, "branch_id"), Page: queryPage(c)})
+		Reported: c.Query("reported") == "1", BranchID: queryInt(c, "branch_id"), Page: queryPage(c)})
 	reply(c, l, err)
 }
 

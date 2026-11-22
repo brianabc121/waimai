@@ -46,6 +46,9 @@ const cards = computed(() => {
     { key: 'queue', name: t('ad.h.queue_name'), to: '/admin/worker', state: v.queue.state,
       why: dbDown ? t('ad.h.unknown') : v.queue.oldest_wait_seconds >= 60 ? t('ad.oldest_wait', { t: wait(v.queue.oldest_wait_seconds) })
         : v.queue.failed ? t('ad.h.queue_failed', { n: v.queue.failed }) : t('ad.none_waiting') },
+    // only on an installation that has chat
+    ...(v.chat?.on ? [{ key: 'chat', name: t('ad.h.chat_name'), to: '/admin/chats', state: v.chat.state,
+      why: v.chat.state === 'ok' ? t('ad.h.chat_ok') : t('ad.h.chat_down') }] : []),
   ]
 })
 const dayRate = computed(() => (o.value && o.value.day.requests ? o.value.day.c5 / o.value.day.requests : 0))
