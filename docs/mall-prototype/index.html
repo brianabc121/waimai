@@ -48,8 +48,9 @@ function cardv(s) {
 }
 var CATS = [['🍽️','全部'],['🍜','中餐'],['🍗','快餐'],['🍱','便当简餐'],['🧋','饮品'],['🍢','小吃'],['🍰','甜点'],['🥗','轻食']];
 function cats(on) { return '<div class="cats">' + CATS.map(function (c, i) { return '<div class="cat' + (i === on ? ' on' : '') + '"><i>' + c[0] + '</i>' + c[1] + '</div>'; }).join('') + '</div>'; }
-function topbar(region, flat, q) {
-  return '<div class="top' + (flat ? ' flat' : '') + '"><div class="loc"><span class="lgm">外卖商城</span><span class="sub">📍 ' + region + '</span></div>' +
+var MSG = '<span class="msg"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 3.5V17A2.5 2.5 0 0 1 4 14.5z"/><path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01"/></svg><i>3</i></span>';
+function topbar(name, flat, q) {
+  return '<div class="top' + (flat ? ' flat' : '') + '"><div class="loc"><span class="tgt">◎</span><span class="ell">' + name + '</span><span class="go">›</span>' + MSG + '</div>' +
     '<div class="search">🔍 ' + (q ? '<span class="q">' + q + '</span><span style="margin-left:auto">ⓧ</span>' : '搜索店铺或菜品<b>搜索</b>') + '</div></div>';
 }
 var ICON = {
@@ -61,41 +62,52 @@ var TABS = '<div class="tabs"><div class="on">' + ICON.home + '首页</div><div>
 function sorts(on) { return '<div class="sorts">' + ['综合','距离近','评分高','配送费低'].map(function (t, i) { return '<span class="s' + (i === on ? ' on' : '') + '">' + t + '</span>'; }).join('') + '<span class="gap"></span><span class="s">筛选 ▾</span></div>'; }
 function banner(cls) { return '<div class="banner ' + (cls || '') + '"><h3>新店开业 · 免配送费</h3><p>炸鸡研究所，本周下单免配送费</p><div class="dots"><i class="on"></i><i></i><i></i></div><img src="' + IMG + 'fried-combo.jpg"></div>'; }
 function phone(body, cap) { return '<div><div class="phone">' + body + '</div><div class="caption">' + cap + '</div></div>'; }
-var HERE = 'Makati · Philippines';
+var HERE = 'Trump Tower at Century City';
 
 function home() {
   var again = '<div class="again">' + [S[0], S[1], S[3], S[4]].map(function (s) { return '<div><img src="' + IMG + s.img + '"><div class="ell">' + s.n + '</div></div>'; }).join('') + '</div>';
   var a = topbar(HERE) + '<div class="scroll">' + banner() + cats(0) + '<div class="sec">常点的店</div>' + again +
-    '<div class="sec">附近的店 <span>共 6 家 · 都能送到你现在的位置</span></div>' + sorts(0) + shop(S[0]) + shop(S[1]) + '</div>' + TABS;
+    '<div class="sec">附近的店 <span>共 6 家 · 都能送到这个位置</span></div>' + sorts(0) + shop(S[0]) + shop(S[1]) + '</div>' + TABS;
   var b = topbar(HERE, true) + '<div class="scroll">' + sorts(1) + shop(S[1], {nocart:1}) + shop(S[2]) + shop(S[4]) + shop(S[5]) +
     '<div class="sec">附近可自取 <span>不送到这里，可以到店取</span></div>' + shop(S[6]) + '</div>' + TABS;
   var c = topbar(HERE, true, '牛肉面') + '<div class="scroll"><div class="small muted">找到 2 家店有“牛肉面”</div>' + shop(S[0], {dishes:1, nocart:1}) +
     shop({ n:'台北便当', c:'', img:'bento.jpg', star:'4.7', sold:355, fee:59, min:180, eta:35, km:'2.4', tags:[], d:[['beef-noodle-soup.jpg','台式牛肉面','₱240']] }, {dishes:1}) + '</div>' + TABS;
   return '<div class="phones">' +
-    phone(a, '<b>商城首页</b>：不用选地址，自动定位后直接列出附近能送到的店') +
+    phone(a, '<b>商城首页</b>：左上角是自动定位到的位置，点一下可以换；右上角是消息') +
     phone(b, '<b>往下滑</b>：可以排序和筛选，休息中的店排在后面，送不到但能自取的单独一栏') +
     phone(c, '<b>搜索</b>：按店名或菜名搜，结果也只在附近能送到的店里找') + '</div>';
 }
 
 function loc() {
-  var a = '<div class="top"><div class="loc"><span class="lgm">外卖商城</span></div></div>' +
-    '<div class="scroll"><div class="empty" style="padding-top:70px"><div class="ic">📍</div><h3>正在找你附近的店…</h3><p>需要用一下你现在的位置，只用来判断你在哪个国家和地区、哪些店能送到</p></div></div>' + TABS +
-    '<div class="dim"></div><div class="sysdlg"><b>“外卖商城”想使用你的位置</b><p>用来显示你附近的商家</p><div><span>不允许</span><span class="ok">允许</span></div></div>';
-  var b = '<div class="top flat"><div class="loc"><span class="lgm">外卖商城</span></div></div>' +
-    '<div style="padding:12px 12px 0"><div class="notice">没有拿到你的位置。先选一个城市，看开在那里的店。<div class="row" style="margin-top:8px"><span class="btn primary sm">重新定位</span><span class="small">或在浏览器设置里允许定位</span></div></div></div>' +
-    '<div class="crumb"><b>Philippines</b> ▾ <span>›</span> <b>Metro Manila</b></div>' +
-    '<div class="cols"><div class="l"><div class="on">Makati</div><div>Taguig</div><div>Pasay</div><div>Manila</div><div>Quezon City</div><div>Mandaluyong</div><div>Pasig</div></div>' +
-    '<div class="r"><div class="on">全部 Makati <span>12 家店</span></div><div>Poblacion <span>5 家店</span></div><div>Bel-Air <span>3 家店</span></div><div>San Lorenzo <span>2 家店</span></div><div>Legazpi Village <span>2 家店</span></div>' +
-    '<div style="border:0;display:block"><div class="notice info" style="margin-top:6px">只列有店的城市。按城市看的时候不显示配送费，下单选了收货地址才知道能不能送。</div></div></div></div>';
-  var c = topbar('Pasay · Philippines', true) + '<div class="scroll"><div class="empty"><div class="ic">🛵</div><h3>你附近暂时没有能送到的店</h3><p>可以看看同城能到店自取的店</p>' +
-    '<div class="row" style="justify-content:center"><span class="btn sm">↻ 重新定位</span></div></div>' +
-    '<div class="sec">同城可自取 <span>Pasay · 到店取</span></div>' + shop(S[6]) +
+  var bg = topbar(HERE) + '<div class="scroll">' + banner() + cats(0) + '</div>' + TABS;
+  var a = bg + '<div class="dim"></div><div class="sheet"><h2>送到哪里<span>×</span></h2>' +
+    '<div class="inp">🔍 搜索大楼、小区、街道</div>' +
+    '<div class="gps"><span class="rd on" style="flex:none;width:18px;height:18px;border-radius:50%;border:5px solid var(--brand);margin:0"></span><div style="flex:1;min-width:0"><div>当前位置（自动定位）</div><div style="font-weight:400;color:var(--muted);font-size:12.5px">Trump Tower at Century City, Makati</div></div><span style="color:var(--brand)">↻ 重新定位</span></div>' +
+    '<div class="lbl">我的收货地址</div>' +
+    '<div class="adr"><span class="rd"></span><div class="grow"><b><span class="tag brand">家</span> Trump Tower at Century City</b><small>40 楼 4001 · 陈先生</small></div></div>' +
+    '<div class="adr"><span class="rd"></span><div class="grow"><b><span class="tag brand">公司</span> Ayala Tower One</b><small>12 楼 1203 · 陈先生</small></div></div>' +
+    '<div class="adr"><span class="rd"></span><div class="grow"><b>One Rockwell East Tower</b><small>大堂前台 · Brian</small></div></div>' +
+    '<div class="gps" style="color:var(--ink);border:0">🗺️ 在地图上选位置<span>›</span></div>' +
+    '<div class="gps" style="color:var(--ink);border:0;padding-top:4px">🏙️ 按城市逛逛<span>Philippines · Makati ›</span></div></div>';
+  var b = topbar('选择位置') + '<div class="scroll">' + banner() + '</div>' + TABS + '<div class="dim"></div><div class="sheet"><h2>送到哪里<span>×</span></h2>' +
+    '<div class="notice" style="margin-bottom:10px">没有拿到你的定位。请搜索地址，或选一个已保存的地址。</div>' +
+    '<div class="inp">🔍 搜索大楼、小区、街道</div>' +
+    '<div class="gps">◎ 重新定位<span>需要允许定位</span></div>' +
+    '<div class="lbl">我的收货地址</div>' +
+    '<div class="adr"><span class="rd"></span><div class="grow"><b><span class="tag brand">家</span> Trump Tower at Century City</b><small>40 楼 4001 · 陈先生</small></div></div>' +
+    '<div class="adr"><span class="rd"></span><div class="grow"><b><span class="tag brand">公司</span> Ayala Tower One</b><small>12 楼 1203 · 陈先生</small></div></div>' +
+    '<div class="adr"><span class="rd"></span><div class="grow"><b>One Rockwell East Tower</b><small>大堂前台 · Brian</small></div></div>' +
+    '<div class="gps" style="color:var(--ink);border:0">🗺️ 在地图上选位置<span>›</span></div>' +
+    '<div class="gps" style="color:var(--ink);border:0;padding-top:4px">🏙️ 按城市逛逛<span>Philippines · Makati ›</span></div></div>';
+  var c = topbar('2658 Tramo St, Pasay', true) + '<div class="scroll"><div class="empty"><div class="ic">🛵</div><h3>这个位置暂时没有能送到的店</h3><p>可以换个地址，或者看看附近能自取的店</p>' +
+    '<div class="row" style="justify-content:center"><span class="btn primary sm">换个地址</span><span class="btn sm">按城市逛逛</span></div></div>' +
+    '<div class="sec">附近可自取 <span>到店取</span></div>' + shop(S[6]) +
     shop({ n:'帕赛烧腊', c:'', img:'braised-pork-rice.jpg', star:'4.6', sold:210, km:'1.4', pickup:1, tags:['满 ₱300 减 ₱30'] }) +
     '<div class="small muted" style="text-align:center;margin-top:6px">想在这里开店？<span style="color:var(--brand)">商家入驻 ›</span></div></div>' + TABS;
   return '<div class="phones">' +
-    phone(a, '<b>第一次打开</b>：浏览器问一次能不能用位置，允许后自动判断国家和地区') +
-    phone(b, '<b>不允许定位</b>：改成选城市，选过会记住，随时可以重新定位') +
-    phone(c, '<b>附近没有店能送到</b>：列出同城能自取的店，不显示配送范围') + '</div>';
+    phone(a, '<b>点左上角的位置</b>：默认是自动定位，可以换成搜索的地址、已存的地址或地图上选') +
+    phone(b, '<b>不允许定位</b>：自动弹出这个选择，登录过的顾客直接用默认收货地址') +
+    phone(c, '<b>没有店能送到</b>：给出下一步，不显示配送范围') + '</div>';
 }
 
 function wide(w, h, cols, pc) {
@@ -103,10 +115,10 @@ function wide(w, h, cols, pc) {
     '<hr><div>☑ 只看营业中</div><div>☐ 有优惠</div><div>☐ 可预约</div></div>';
   var list = S.slice(0, pc ? 6 : 4);
   return '<div class="frame' + (pc ? ' pc' : '') + '" style="width:' + (w + 16) + 'px;height:' + (h + 16) + 'px">' +
-    '<div class="hdr"><span class="lg">外卖商城</span><div class="here">📍 ' + HERE + '</div>' +
-    '<div class="search">🔍 搜索店铺或菜品<b>搜索</b></div><div class="nav">' + (pc ? '<span>收藏</span>' : '') + '<span>订单</span><span>消息</span><span class="av">陈</span></div></div>' +
+    '<div class="hdr"><span class="lg">外卖商城</span><div class="loc"><span class="tgt">◎</span><span class="ell">' + HERE + '</span><span class="go">›</span></div>' +
+    '<div class="search">🔍 搜索店铺或菜品<b>搜索</b></div><div class="nav">' + (pc ? '<span>收藏</span>' : '') + '<span>订单</span>' + MSG + '<span class="av">陈</span></div></div>' +
     '<div class="body">' + side + '<div class="main">' + banner('bannerw') +
-    '<div class="row between"><div class="sec">附近的店 <span>共 6 家 · 都能送到你现在的位置</span></div>' + sorts(0) + '</div>' +
+    '<div class="row between"><div class="sec">附近的店 <span>共 6 家 · 都能送到这个位置</span></div>' + sorts(0) + '</div>' +
     '<div class="grid" style="grid-template-columns:repeat(' + cols + ',1fr)">' + list.map(cardv).join('') + '</div></div></div></div>';
 }
 
@@ -129,7 +141,7 @@ var s = new URLSearchParams(location.search).get('s') || 'home';
 document.getElementById('root').innerHTML =
   s === 'location' ? loc() :
   s === 'ipad' ? wide(1024, 768, 2) + '<div class="capw"><b>iPad</b>：左边分类，右边两列店铺卡</div>' :
-  s === 'pc' ? wide(1440, 900, 3, true) + '<div class="capw"><b>电脑</b>：顶部是自动识别出的地区、搜索、订单和我的，店铺卡三列，带封面图</div>' :
+  s === 'pc' ? wide(1440, 900, 3, true) + '<div class="capw"><b>电脑</b>：左上角是位置，右上角是订单、消息和我的，店铺卡三列，带封面图</div>' :
   s === 'manage' ? manage() : home();
 </script>
 </body>
