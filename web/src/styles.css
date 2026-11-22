@@ -268,7 +268,8 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
 /* maps */
 .mapc { position: relative; overflow: hidden; background: #eef0f3; min-height: 240px; }
 .mapc-base { position: absolute; inset: 0; }
-.mapc-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; user-select: none; }
+.mapc-layer { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; user-select: none; }
+.mapc-host { position: absolute; left: 0; top: 0; }
 .mapc-layer .hit { pointer-events: auto; cursor: pointer; }
 .mapc-layer .grab { pointer-events: auto; cursor: grab; touch-action: none; }
 .mapc-float { position: absolute; background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.25); z-index: 2; }
@@ -282,7 +283,6 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
   background-size: 256px 256px, 256px 256px, 64px 64px, 64px 64px; }
 
 .dmap { display: grid; grid-template-columns: minmax(0, 1fr) 372px; height: calc(100vh - var(--shell-top, 0px)); }
-.dmap .mapc.drawing .mapc-base, .dmap .mapc.drawing .stubmap { cursor: crosshair; }
 .dmap-panel { background: #fff; border-left: 1px solid var(--line); overflow: auto; display: flex; flex-direction: column; font-size: 14px; }
 .dmap-panel section { padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .dmap-panel h2 { font-size: 15px; margin-bottom: 8px; }
@@ -301,7 +301,7 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
 .dmap-tools button { border: 0; background: none; padding: 6px 12px; border-radius: 7px; font-weight: 600; white-space: nowrap; cursor: pointer; }
 .dmap-tools button.on { background: var(--brand); color: #fff; }
 .dmap-tools button:disabled { opacity: .45; cursor: not-allowed; }
-.dmap-type { top: 12px; right: 12px; display: flex; overflow: hidden; }
+.dmap-type { left: 12px; bottom: 30px; display: flex; overflow: hidden; }
 .dmap-type button { border: 0; background: #fff; padding: 7px 12px; cursor: pointer; color: var(--muted); }
 .dmap-type button.on { font-weight: 700; color: var(--ink); }
 .dmap-type button + button { border-left: 1px solid var(--line); }

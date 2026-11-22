@@ -136,6 +136,13 @@ function onClick(at: LatLng) {
     selected.value = 0
   }
 }
+// A pen while drawing (a pointing hand over the first corner, where a click
+// closes the outline), a pin while placing the store.
+const cursor = computed(() => {
+  if (mode.value === 'location') return 'pin'
+  if (mode.value !== 'draw') return ''
+  return pts.value.length >= 3 && hover.value && pxDist(hover.value, pts.value[0]) <= SNAP_PX ? 'pointer' : 'pen'
+})
 function onDblClick() { if (mode.value === 'draw' && pts.value.length >= 3) finishShape() }
 function onMove(at: LatLng) {
   if (mode.value !== 'draw') return
@@ -424,7 +431,7 @@ async function fbSave() {
   </div>
 
   <div v-else-if="branch" class="dmap" :data-mode="mode">
-    <MapCanvas ref="map" :maps-key="key" :initial="initialView" :class="{ drawing: mode === 'draw' }" data-testid="map"
+    <MapCanvas ref="map" :maps-key="key" :initial="initialView" :cursor="cursor" data-testid="map"
       @ready="onReady" @click="onClick" @dblclick="onDblClick" @move="onMove">
       <template #default="{ px }">
         <defs>
