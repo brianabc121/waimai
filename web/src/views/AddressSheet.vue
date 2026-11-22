@@ -10,7 +10,7 @@ import AddressForm from './AddressForm.vue'
 
 const props = defineProps<{
   slug?: string; currency?: string; selected?: number | null; manage?: boolean
-  shop?: { lat: number; lng: number; name: string } | null
+  shop?: { lat: number; lng: number; name: string; country?: string } | null
   // open straight on the form for a new address
   startNew?: boolean
 }>()

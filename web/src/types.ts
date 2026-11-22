@@ -8,6 +8,8 @@ export interface Branch {
   kitchen_slow_minutes: number; detour_percent: number; detour_meters: number
   lat: number | null; lng: number | null; zone_mode: 'list' | 'map'; zone_tolerance_m: number
   notice: string; intro: string; baskets_enabled: boolean
+  // where the store is, in words; empty until its location was saved on the map
+  country_code: string; country: string; province: string; city: string; district: string; postal_code: string
 }
 export interface Station { id: number; name: string; name_en: string; active: boolean; sort: number; item_count: number; open_tasks: number }
 export type LatLngPair = [number, number]

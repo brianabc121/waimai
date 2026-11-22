@@ -86,10 +86,16 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 	})
 	must(err)
 
+	// The store is on the map and its delivery areas are drawn: the area of a
+	// delivery follows the pin of the customer's address.
+	_, err = a.SaveLocation(ctx, bid, app.LocationInput{Lat: 14.5547, Lng: 121.0244, Address: "123 Ayala Ave, Makati",
+		Region: &app.Region{CountryCode: "PH", Country: "Philippines", Province: "Metro Manila", City: "Makati", District: "Bel-Air", PostalCode: "1209"}})
+	must(err)
+	box := func(s, w, n, e float64) app.Polygon { return app.Polygon{{n, w}, {n, e}, {s, e}, {s, w}} }
 	for i, z := range []app.ZoneInput{
-		{Name: "马卡蒂 CBD", NameEn: "Makati CBD", Fee: 4900, Active: true},
-		{Name: "萨尔塞多村", NameEn: "Salcedo Village", Fee: 6900, Active: true},
-		{Name: "BGC", NameEn: "BGC", Fee: 9900, MinOrder: 50000, Active: true},
+		{Name: "马卡蒂 CBD", NameEn: "Makati CBD", Fee: 4900, Active: true, Polygon: box(14.5480, 121.0150, 14.5600, 121.0280), Color: "#2563eb"},
+		{Name: "萨尔塞多村", NameEn: "Salcedo Village", Fee: 6900, Active: true, Polygon: box(14.5600, 121.0150, 14.5680, 121.0280), Color: "#15803d"},
+		{Name: "BGC", NameEn: "BGC", Fee: 9900, MinOrder: 50000, Active: true, Polygon: box(14.5400, 121.0400, 14.5600, 121.0600), Color: "#7c3aed"},
 	} {
 		z.Sort = i
 		_, err := a.SaveZone(ctx, bid, 0, z)

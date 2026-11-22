@@ -80,6 +80,7 @@ extend({
   'co.basket': ['购物篮 {n}', 'Basket {n}'], 'co.basket_subtotal': ['购物篮小计', 'Basket subtotal'],
   'co.fee_later': ['选择地址后计算', 'After you choose an address'], 'co.no_fee_yet': ['未含配送费', 'Delivery fee not included'],
   'co.saved': ['已优惠 {amt}', 'You save {amt}'], 'co.short': ['还差 {amt} 起送', '{amt} more to order'],
+  'co.svc_delivery': ['配送', 'Delivery'], 'co.svc_pickup': ['到店自取', 'Pickup'],
   'co.pickup_name': ['取餐人', 'Name for pickup'], 'co.account': ['登录手机号', 'Logged in as'], 'co.note_ph': ['口味、餐具等要求（选填）', 'Requests (optional)'],
   'co.address_gone': ['这个地址已经不在了，请重新选择', 'That address is gone. Please choose again.'],
   'pp.title': ['选择位置', 'Choose the location'], 'pp.search': ['搜索大楼、街道或地标', 'Search a building, street or landmark'],

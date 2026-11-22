@@ -30,6 +30,18 @@ const mustSchedule = computed(() => !!store.value && !store.value.branch.open_no
 async function loadStore() {
   store.value = await get<Storefront>(`/stores/${props.slug}`).catch(() => null)
   if (scheduled.value && !slots.value.includes(scheduled.value)) scheduled.value = ''
+  // Fall back to a service the store actually offers.
+  const b = store.value?.branch
+  if (b && cart.service === 'delivery' && !b.delivery_enabled) cart.service = 'pickup'
+  if (b && cart.service === 'pickup' && !b.pickup_enabled) cart.service = 'delivery'
+}
+// Delivery or pickup is chosen here, on top of the page, when the store offers both.
+const bothServices = computed(() => !!store.value && store.value.branch.delivery_enabled && store.value.branch.pickup_enabled)
+async function setService(s: 'delivery' | 'pickup') {
+  if (cart.service === s || busy.value) return
+  cart.service = s; notice.value = ''
+  if (s === 'delivery') await loadAddresses()
+  await requote()
 }
 
 // A delivery goes to one of the customer's saved addresses. The one used last
@@ -39,7 +51,7 @@ const delivery = computed(() => cart.service === 'delivery')
 const addresses = ref<Address[]>([])
 const address = computed(() => addresses.value.find(a => a.id === cart.addressId && usable(a)) ?? null)
 const showSheet = ref(false), startNew = ref(false)
-const shopPin = computed(() => { const b = store.value?.branch; return b && b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng, name: pick(b.name, b.name_en) } : null })
+const shopPin = computed(() => { const b = store.value?.branch; return b && b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng, name: pick(b.name, b.name_en), country: b.country_code } : null })
 function use(a: Address | null) {
   cart.addressId = a?.id ?? null
   // The store page shows the same spot.
@@ -51,8 +63,9 @@ async function loadAddresses() {
   if (!r) return
   addresses.value = sorted(r.addresses)
   if (!address.value) use(addresses.value.find(usable) ?? null)
-  // Nothing saved yet: the first thing to do is to add an address.
-  if (!addresses.value.length) { startNew.value = true; showSheet.value = true }
+  // Nothing saved yet: the first thing to do is to add an address. Where the
+  // customer may also pick up, the page is shown first, so that they can say so.
+  if (!addresses.value.length && !bothServices.value) { startNew.value = true; showSheet.value = true }
 }
 // With nothing saved there is no list to show: go straight to the form.
 function openSheet() { startNew.value = !addresses.value.length; showSheet.value = true }
@@ -123,7 +136,9 @@ onMounted(async () => {
   await loadStore()
   await loadAddresses()
   await requote()
+  loaded.value = true
 })
+const loaded = ref(false)
 
 // ---- what is shown ----
 const cur = computed(() => quote.value?.currency ?? store.value?.branch.currency)
@@ -195,16 +210,20 @@ async function submit() {
 </script>
 
 <template>
-  <div class="phone wide co">
+  <div class="phone wide co" :data-ready="loaded || undefined">
     <div class="topbar co-top"><router-link :to="`/s/${slug}`" :aria-label="t('back_to_menu')" class="co-back">‹</router-link><h1>{{ t('co.title') }}</h1></div>
     <div class="section two-cols">
       <div class="stack">
+      <div v-if="bothServices" class="co-seg" role="tablist" data-testid="service-toggle">
+        <button type="button" role="tab" :aria-selected="delivery" :class="{ on: delivery }" data-testid="service-delivery" @click="setService('delivery')">{{ t('co.svc_delivery') }}</button>
+        <button type="button" role="tab" :aria-selected="!delivery" :class="{ on: !delivery }" data-testid="service-pickup" @click="setService('pickup')">{{ t('co.svc_pickup') }}</button>
+      </div>
       <div v-if="error" class="banner bad">{{ error }} <button class="btn link" @click="requote">{{ t('retry') }}</button></div>
       <div v-if="notice" class="banner warn">{{ notice }}</div>
 
       <!-- where to, and when -->
       <div class="card co-card">
-        <button v-if="delivery" type="button" class="co-addr" data-testid="checkout-address" @click="openSheet">
+        <button v-if="delivery" type="button" class="co-addr" data-testid="checkout-address" :data-empty="!addresses.length || undefined" @click="openSheet">
           <span class="grow" v-if="address">
             <b><span v-if="address.label" class="tag brand">{{ t('ad.label_' + address.label) }}</span>{{ address.place_name }}</b>
             <span>{{ address.unit }}<template v-if="address.place_address"> · {{ address.place_address }}</template></span>
@@ -213,7 +232,15 @@ async function submit() {
           <span class="grow ph" v-else>{{ t(addresses.length ? 'ad.choose' : 'co.add_address') }}</span>
           <span class="chev">›</span>
         </button>
-        <div v-else class="co-pick" data-testid="checkout-pickup">
+        <!-- a store whose customers pick their area by name -->
+        <label v-if="delivery && store && !mapMode && store.zones.length" class="field" style="margin:12px 0 0">
+          <span>{{ t('deliver_to') }}</span>
+          <select v-model="cart.zoneId" data-testid="checkout-zone" @change="requote">
+            <option :value="null">{{ t('choose_zone') }}</option>
+            <option v-for="z in store.zones" :key="z.id" :value="z.id">{{ pick(z.name, z.name_en) }} · {{ t('delivery_fee') }} {{ money(z.fee, cur) }}</option>
+          </select>
+        </label>
+        <div v-if="!delivery" class="co-pick" data-testid="checkout-pickup">
           <b>{{ store ? pick(store.branch.name, store.branch.name_en) : '' }}</b>
           <span v-if="store?.branch.address">{{ store.branch.address }}</span>
           <label class="field" style="margin:8px 0 0"><span>{{ t('co.pickup_name') }}</span><input v-model="cart.name" maxlength="80" autocomplete="name" /></label>
@@ -304,6 +331,9 @@ async function submit() {
 .co-top { display: flex; align-items: center; background: none; color: var(--ink); border: 0; }
 .co-top h1 { flex: 1; text-align: center; font-size: 18px; margin: 0 34px 0 0; }
 .co-back { font-size: 30px; line-height: 1; width: 34px; color: var(--ink); text-decoration: none; }
+.co-seg { display: flex; background: #fff; border-radius: 14px; padding: 4px; gap: 4px; }
+.co-seg button { flex: 1; border: 0; background: none; border-radius: 10px; padding: 11px 8px; font: inherit; font-size: 16px; font-weight: 600; color: #6b7280; cursor: pointer; }
+.co-seg button.on { background: var(--brand); color: #fff; }
 .co-card { border-radius: 16px; padding: 14px; border: 0; }
 .co-addr { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: none; padding: 4px 0 14px; cursor: pointer; font: inherit; color: inherit; border-bottom: 1px solid #f0f1f3; }
 .co-addr .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }

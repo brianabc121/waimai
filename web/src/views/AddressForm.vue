@@ -13,7 +13,7 @@ import PlacePicker, { type Picked } from './PlacePicker.vue'
 
 const props = defineProps<{
   address?: Address | null; slug?: string; currency?: string
-  shop?: { lat: number; lng: number; name: string } | null
+  shop?: { lat: number; lng: number; name: string; country?: string } | null
 }>()
 const emit = defineEmits<{ saved: [a: Address]; deleted: [id: number]; close: [] }>()
 
