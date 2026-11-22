@@ -33,7 +33,7 @@ func TestWorkerHeartbeatAndTasks(t *testing.T) {
 	// before the first run every task is listed and counts as fine
 	st, err := a.WorkerStatus(ctx)
 	noErr(t, err)
-	if len(st.Tasks) != 4 || st.Tasks[0].Task != "expire_pending" || st.Tasks[3].IntervalSeconds != 600 {
+	if len(st.Tasks) != 5 || st.Tasks[0].Task != "expire_pending" || st.Tasks[4].IntervalSeconds != 600 {
 		t.Fatalf("tasks: %+v", st.Tasks)
 	}
 	for _, task := range st.Tasks {

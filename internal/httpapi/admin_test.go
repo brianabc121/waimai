@@ -138,7 +138,7 @@ func TestAdminWorkerAndJobs(t *testing.T) {
 	}
 
 	out := admin.want(200, "", "GET", "/admin/worker", nil)
-	if len(out["tasks"].([]any)) != 4 || out["queue"].(map[string]any)["failed"].(float64) < 1 {
+	if len(out["tasks"].([]any)) != 5 || out["queue"].(map[string]any)["failed"].(float64) < 1 {
 		t.Fatalf("worker status: %v", out)
 	}
 	out = admin.want(200, "", "GET", "/admin/jobs?status=failed&kind=sms", nil)

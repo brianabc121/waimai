@@ -172,7 +172,7 @@ CREATE TABLE worker_instances (
 );
 
 CREATE TABLE worker_tasks (
-    task             TEXT PRIMARY KEY,         -- expire_pending、release_scheduled、jobs、cleanup
+    task             TEXT PRIMARY KEY,         -- expire_pending、release_scheduled、jobs、rider_trips、cleanup
     last_started_at  TIMESTAMPTZ,
     last_ok_at       TIMESTAMPTZ,
     last_duration_ms INT NOT NULL DEFAULT 0,

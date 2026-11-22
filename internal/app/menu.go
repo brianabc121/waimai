@@ -540,5 +540,8 @@ func (a *App) Cleanup(ctx context.Context) error {
 			return err
 		}
 	}
+	if err := a.forgetOldTripPaths(ctx); err != nil {
+		return err
+	}
 	return a.endLongShifts(ctx)
 }

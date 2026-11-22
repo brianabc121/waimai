@@ -268,6 +268,9 @@ func (a *App) handoff(ctx context.Context, tx pgx.Tx, o *lockedOrder, actor Acto
 		version=version+1, updated_at=now() WHERE id=$1`, o.ID); err != nil {
 		return err
 	}
+	if err := tripPickup(ctx, tx, riderID, o.BranchID, o.ID); err != nil {
+		return err
+	}
 	if err := audit(ctx, tx, o.BranchID, o.ID, actor, "order.handed_off", map[string]any{"rider_id": riderID}); err != nil {
 		return err
 	}
@@ -579,6 +582,9 @@ func (a *App) RiderDeliver(ctx context.Context, taskID, riderID, collected int64
 			completed_at=now(), version=version+1, updated_at=now() WHERE id=$1`, o.ID, pay); err != nil {
 			return err
 		}
+		if err := tripDrop(ctx, tx, o.ID, "delivered"); err != nil {
+			return err
+		}
 		if err := audit(ctx, tx, o.BranchID, o.ID, Actor{Type: "rider", ID: riderID}, "delivery.delivered",
 			map[string]any{"amount_due": o.Total, "amount_collected": collected}); err != nil {
 			return err
@@ -604,6 +610,9 @@ func (a *App) RiderFail(ctx context.Context, taskID, riderID int64, reason strin
 		}
 		if _, err := tx.Exec(ctx, `UPDATE orders SET fulfillment_status='delivery_failed', version=version+1,
 			updated_at=now() WHERE id=$1`, o.ID); err != nil {
+			return err
+		}
+		if err := tripDrop(ctx, tx, o.ID, "failed"); err != nil {
 			return err
 		}
 		if err := audit(ctx, tx, o.BranchID, o.ID, Actor{Type: "rider", ID: riderID}, "delivery.failed",
