@@ -528,6 +528,9 @@ func (a *App) closeOrder(ctx context.Context, tx pgx.Tx, o *lockedOrder, status,
 		AND status IN ('assigned','picked_up','arrived') RETURNING rider_id`, o.ID).Scan(&riderID)
 	if err == nil {
 		riders = append(riders, riderID)
+		if err := tripDrop(ctx, tx, o.ID, "removed"); err != nil {
+			return err
+		}
 		if err := a.pushRider(ctx, tx, riderID, o.ID, "cancelled"); err != nil {
 			return err
 		}

@@ -37,7 +37,7 @@
 <table>
 <tr><th>信息</th><th>用途</th><th>保存</th></tr>
 <tr><td>姓名、登录账号、手机号、岗位</td><td>登录，分配任务，顾客和门店联系骑手</td><td>在职期间；删除账号后，历史订单上只保留姓名</td></tr>
-<tr><td><b>位置</b>：只在你点了“上班”、并且处于骑手身份时采集，包括应用在后台或锁屏时</td><td>让门店知道谁在岗、离店多远以便派单；让顾客看到自己那一单的骑手在哪</td><td>最新位置在下班时清除；历史轨迹保存 7 天后自动删除</td></tr>
+<tr><td><b>位置</b>：只在你点了“上班”、并且处于骑手身份时采集，包括应用在后台或锁屏时</td><td>让门店知道谁在岗、离店多远以便派单；让顾客看到自己那一单的骑手在哪</td><td>最新位置在下班时清除；原始位置点保存 7 天后自动删除。每一趟配送（从取餐出发到回店）的路线图保存 90 天后删除，里程和单数长期保存</td></tr>
 <tr><td><b>考勤</b>：你每次上班、下班的时间；点上班或下班那一刻的位置（只取一次，可以不授权）；你做好了哪些菜、打包了哪些订单</td><td>记录工时，统计工作量；让店长知道打卡时是否在店里</td><td>在职期间长期保存。店长修改你的考勤时必须填写原因，原始记录保留</td></tr>
 <tr><td>推送令牌（手机或浏览器的推送标识）</td><td>发送新配送单、改派、取消的提醒</td><td>退出登录或卸载后删除</td></tr>
 <tr><td>送达照片（选填，由骑手拍摄）</td><td>放门口或代收时留证，处理投诉</td><td>30 天后自动删除</td></tr>
@@ -73,7 +73,7 @@
 <h2>2. Staff (in-store staff and riders using the Staff Workbench)</h2>
 <ul>
 <li><b>Account</b>: name, username, phone and posts, to sign in, assign work and let customers and the store reach a rider. Kept while you work with us; after deletion only your name remains on past orders.</li>
-<li><b>Location</b>: collected only after you tap "Start shift" and while you are in the rider identity, including when the app is in the background or the screen is off. It lets the store see who is on duty and how far away for assigning deliveries, and lets a customer see the rider carrying their own order. Your latest position is erased when your shift ends; the track history is deleted after 7 days. Collection stops when you end your shift, sign out, or after 12 hours without ending the shift. No location is collected off duty.</li>
+<li><b>Location</b>: collected only after you tap "Start shift" and while you are in the rider identity, including when the app is in the background or the screen is off. It lets the store see who is on duty and how far away for assigning deliveries, and lets a customer see the rider carrying their own order. Your latest position is erased when your shift ends; the raw position history is deleted after 7 days. The route of each delivery trip (from collecting the orders until you are back at the store) is kept for 90 days and then deleted; the distance and the number of orders are kept. Collection stops when you end your shift, sign out, or after 12 hours without ending the shift. No location is collected off duty.</li>
 <li><b>Attendance</b>: the times you clock on and off; your position at the moment you tap the switch (taken once; you may refuse it); which dishes you prepared and which orders you packed. It is used to count hours and work done, and to tell the manager whether you clocked on at the store. Kept while you work with us. A manager who corrects your attendance must give a reason, and the original record is kept.</li>
 <li><b>Push token</b>: to send reminders about new, reassigned and cancelled deliveries. Deleted when you sign out or uninstall.</li>
 <li><b>Delivery photo</b> (optional, taken by the rider): proof when an order is left at the door; deleted after 30 days.</li>

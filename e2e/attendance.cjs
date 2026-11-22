@@ -111,10 +111,20 @@ await cook.waitForSelector('[data-testid=shift][data-on=false]')
 step('the cook is clocked off by the correction')
 
 // ---- add a shift nobody clocked, three days ago ----
+const loaded = owner.waitForResponse(r => r.url().includes(`/attendance?from=${earlier}`) && r.ok())
 for (let i = 0; i < 3; i++) await owner.click('.datepick [data-act=prev]')
+await loaded
 await owner.locator(`[data-testid=att-title]:has-text("${earlier}")`).waitFor()
-await owner.locator('tr[data-att="rider1"] [data-act=fill]').click()
-await form.waitFor()
+// On a first run the row is empty and has its own button; on a later run it
+// holds the shifts earlier runs voided, and the shift is added from the top.
+await owner.locator('tr[data-att="zhang1"] [data-act=fill]').waitFor() // the cook has nothing that day
+if (await owner.locator('tr[data-att="rider1"] [data-act=fill]').count()) {
+  await owner.locator('tr[data-att="rider1"] [data-act=fill]').click()
+  await form.waitFor()
+} else {
+  await owner.click('[data-testid=att-add]')
+  await form.locator('select[name=user]').selectOption({ label: '骑手 Juan' })
+}
 expect(await form.locator('input[name=start]').inputValue(), earlier + 'T09:00', 'default start')
 await form.locator('textarea[name=reason]').fill('手机坏了')
 await form.locator('[data-testid=att-save]').click()
@@ -150,14 +160,15 @@ step('the month shows hours per day and totals; a cell opens its day')
 await added.locator('[data-act=edit]').click()
 await form.locator('textarea[name=reason]').fill('记错人了')
 await form.locator('[data-testid=att-void]').click()
-await added.locator('.tag:has-text("已作废")').waitFor()
+await added.locator('[data-act=edit]').waitFor({ state: 'detached' })
+await added.locator('.tag:has-text("已作废")').first().waitFor()
 expect((await added.locator('[data-col=hours] b').innerText()).trim(), '0:00', 'a voided shift does not count')
 step('a voided shift stays on the record and stops counting')
 
 // ---- English ----
 await owner.click('.staffbar .lang')
 await owner.locator('[data-testid=staff-tabs] :text("Attendance")').waitFor()
-await owner.locator('.tag:has-text("Voided")').waitFor()
+await owner.locator('.tag:has-text("Voided")').first().waitFor()
 await owner.click('.staffbar .lang')
 step('the page is bilingual')
 

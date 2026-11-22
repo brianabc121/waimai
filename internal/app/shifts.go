@@ -148,6 +148,9 @@ func clockOff(ctx context.Context, tx pgx.Tx, userID int64, reason string, at ti
 	if err := setDuty(ctx, tx, userID, false, nil); err != nil {
 		return err
 	}
+	if err := tripOffDuty(ctx, tx, userID, at); err != nil {
+		return err
+	}
 	if isNoRows(err) {
 		return nil
 	}

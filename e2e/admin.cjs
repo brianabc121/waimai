@@ -217,10 +217,10 @@ step('every change is in the audit trail, without the password')
 // ---- worker and job queue ----
 await admin.click('.adm-side a[href="/admin/worker"]')
 await admin.waitForSelector('tr[data-instance=online]')
-for (const task of ['expire_pending', 'release_scheduled', 'jobs', 'cleanup']) {
+for (const task of ['expire_pending', 'release_scheduled', 'jobs', 'rider_trips', 'cleanup']) {
   await admin.waitForSelector(`tr[data-task=${task}] .tag.ok`)
 }
-step('the worker page shows a live worker and its four periodic tasks')
+step('the worker page shows a live worker and its periodic tasks')
 
 const failed = Number(await admin.textContent('[data-testid=q-failed]'))
 if (failed < 2) throw new Error(`expected the two failed demo jobs, found ${failed}: run the seed again`)

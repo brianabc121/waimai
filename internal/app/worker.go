@@ -27,6 +27,7 @@ var workerTasks = []struct {
 	{"expire_pending", workerTick},
 	{"release_scheduled", workerTick},
 	{"jobs", workerTick},
+	{"rider_trips", tripInterval},
 	{"cleanup", cleanupInterval},
 }
 
@@ -39,6 +40,7 @@ type Worker struct {
 	embedded    bool
 	startedAt   time.Time
 	lastCleanup time.Time
+	lastTrips   time.Time
 }
 
 // NewWorker prepares a worker loop. embedded says that it runs inside the api process.
@@ -103,6 +105,10 @@ func (w *Worker) Tick(ctx context.Context) {
 	})
 	w.runTask(ctx, "release_scheduled", a.ReleaseScheduled)
 	w.runTask(ctx, "jobs", a.runJobs)
+	if time.Since(w.lastTrips) > tripInterval {
+		w.runTask(ctx, "rider_trips", a.AdvanceTrips)
+		w.lastTrips = time.Now()
+	}
 	if time.Since(w.lastCleanup) > cleanupInterval {
 		w.runTask(ctx, "cleanup", func(ctx context.Context) (int, error) { return 0, a.Cleanup(ctx) })
 		w.lastCleanup = time.Now()
