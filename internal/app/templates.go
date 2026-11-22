@@ -54,7 +54,9 @@ func (t *Template) normalize() error {
 			continue
 		}
 		p, err := url.Parse(u)
-		if err != nil || p.Scheme != "https" || p.Host == "" || len(u) > 500 {
+		// A path on this site ("/demo/logo.jpg") is as good as an https address.
+		local := err == nil && p.Scheme == "" && p.Host == "" && strings.HasPrefix(u, "/") && !strings.HasPrefix(u, "//")
+		if err != nil || len(u) > 500 || !(local || (p.Scheme == "https" && p.Host != "")) {
 			return ErrValidation("image links must be https addresses of at most 500 characters")
 		}
 	}

@@ -411,6 +411,8 @@ type Storefront struct {
 	// Sales is the number of orders the store has taken; Rating sums up its reviews.
 	Sales  int           `json:"sales"`
 	Rating ReviewSummary `json:"rating"`
+	// Media are the promotional pictures and videos at the top of the page.
+	Media []Media `json:"media"`
 }
 
 func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) {
@@ -463,6 +465,10 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	if err != nil {
 		return nil, err
 	}
+	media, err := listMedia(ctx, a.DB, b.ID, true)
+	if err != nil {
+		return nil, err
+	}
 	return &Storefront{Branch: b, Zones: zones, Categories: cats, Promotions: promos, Slots: b.Slots(time.Now()), Templates: tpl,
-		Sales: sales, Rating: *rating}, nil
+		Sales: sales, Rating: *rating, Media: media}, nil
 }
