@@ -10,6 +10,8 @@ brian 的要求：
 
 本方案只涉及商家后台和平台后台，顾客端不出现任何地址统计，也不出现配送区。
 
+**效果图**：网页原型 `docs/delivery-stats-prototype/index.html`（参数 `?role=merchant|admin&tab=list|top|map&mode=pins|heat|both&open=1`），截图在项目文件 `delivery-stats/screens/`：01 地址列表，02 排行展开明细，03 地图标点和弹出卡片，04 热力图，05 标点加热力，06–08 管理员端，09–11 手机版，12 超过 31 天的提示。原型底图是示意图，正式版是谷歌地图。
+
 ## 1. 业内怎么做
 
 | 平台 | 做法 | 能看到什么 |
