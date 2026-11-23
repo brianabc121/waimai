@@ -2156,7 +2156,7 @@
  "vo.zone": "Zone",
  "vo.promo": "Offre",
  "vo.fee_set": "ajusté",
- "vo.addr_ph": "Tapez l'adresse ; les adresses déjà livrées sont proposées",
+ "vo.addr_ph": "Saisissez l'adresse ; le carnet d'adresses est proposé en premier",
  "vo.unit_ph": "Appartement, étage (facultatif)",
  "vo.pinned": "Situé sur la carte",
  "vo.not_pinned": "Pas encore sur la carte : appuyez sur « Ouvrir la carte »",
@@ -2284,5 +2284,15 @@
  "sm.a.saved": "Enregistrée par l’équipe",
  "sm.a.more": "+{n}",
  "sm.a.more_title": "D’autres adresses : ouvrez les détails",
- "sm.a.hint": "Chaque nouvelle adresse utilisée pour une commande ou enregistrée pour le membre est gardée ici, une seule fois. Elles s’affichent en premier quand vous tapez une adresse pour ce membre."
+ "sm.a.hint": "Chaque nouvelle adresse utilisée pour une commande ou enregistrée pour le membre est gardée ici, une seule fois. Elles s’affichent en premier quand vous tapez une adresse pour ce membre.",
+ "vo.hints_book": "Carnet d'adresses",
+ "vo.hints_google": "Suggestions Google",
+ "vo.more": "Plus…",
+ "vo.more_hint": "Placez-vous ici pour charger les suggestions Google",
+ "vo.more_loading": "Chargement des suggestions Google…",
+ "vo.more_none": "Google n'a rien trouvé : appuyez sur « Ouvrir la carte » et placez le repère",
+ "vo.view": "🔍 Voir",
+ "vo.view_short": "Voir",
+ "vo.view_hint": "Ouvrir ce lieu dans Google Maps dans une nouvelle fenêtre",
+ "vo.view_none": "Pas encore de position : choisissez une suggestion ou « Ouvrir la carte »"
 }

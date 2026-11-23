@@ -140,6 +140,58 @@ export async function placeName(key: string, at: LatLng): Promise<string> {
   } catch { return '' }
 }
 
+// suggestPlaces offers places for typed words where there is no map on the
+// page (the order desk's address box). Each one is located only when chosen,
+// as on a map. [] when the platform has no map key or Google answers nothing.
+let deskSession: any = null
+export async function suggestPlaces(key: string, q: string, scope: Scope): Promise<Place[]> {
+  const text = q.trim()
+  if (!key || !text) return []
+  const direct = parseLatLng(text)
+  if (direct) return [{ label: text, at: direct }]
+  if (key === 'stub') {
+    const base = scope.near ?? [14.5547, 121.0244], tail = scope.country ? `, ${scope.country}` : ''
+    return ['Tower', 'Mall', 'Residences'].map((kind, i): Place => {
+      const where: LatLng = [base[0] + i * 0.0004, base[1] + i * 0.0004]
+      return { label: `${text} ${kind}`, detail: `${i + 1} Stub St${tail}`, locate: async () => where }
+    })
+  }
+  try {
+    const gm = await loadGoogle(key)
+    try {
+      const lib = await gm.importLibrary('places')
+      deskSession ??= new lib.AutocompleteSessionToken()
+      const req: any = { input: text, sessionToken: deskSession }
+      if (scope.near) req.locationBias = { center: { lat: scope.near[0], lng: scope.near[1] }, radius: 50000 }
+      if (scope.country) { req.includedRegionCodes = [scope.country.toLowerCase()]; req.region = scope.country.toLowerCase() }
+      const { suggestions } = await lib.AutocompleteSuggestion.fetchAutocompleteSuggestions(req)
+      return (suggestions ?? []).filter((s: any) => s.placePrediction).slice(0, 5).map((s: any): Place => {
+        const p = s.placePrediction
+        return {
+          label: p.mainText?.text ?? p.text?.text ?? '', detail: p.secondaryText?.text ?? '',
+          async locate() {
+            try {
+              const place = p.toPlace()
+              await place.fetchFields({ fields: ['location'] })
+              deskSession = null // one billing session ends when a suggestion is chosen
+              return place.location ? [place.location.lat(), place.location.lng()] : null
+            } catch { return null }
+          },
+        }
+      })
+    } catch {
+      // Places API (New) is not enabled on the key: whole-address search instead.
+      const req: any = { address: text }
+      if (scope.country) { req.componentRestrictions = { country: scope.country }; req.region = scope.country.toLowerCase() }
+      const { results } = await new gm.Geocoder().geocode(req)
+      return (results ?? []).slice(0, 5).map((r: any) => ({ label: r.formatted_address, at: [r.geometry.location.lat(), r.geometry.location.lng()] as LatLng }))
+    }
+  } catch { return [] }
+}
+
+// googleMapsLink opens a point in Google Maps: a plain link, no API call.
+export const googleMapsLink = (lat: number, lng: number) => `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+
 export function createMap(key: string, el: HTMLElement, view: View, ev: MapEvents): Promise<MapAdapter> {
   return key === 'stub' ? Promise.resolve(stubMap(el, view, ev)) : googleMap(key, el, view, ev)
 }

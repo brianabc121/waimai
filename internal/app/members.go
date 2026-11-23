@@ -295,23 +295,27 @@ func upsertMember(ctx context.Context, tx pgx.Tx, branchID, staffID int64, in Me
 	return m, nil
 }
 
-// AddressHint is an address the store has delivered to before, offered while
-// staff type one in.
+// AddressHint is an address offered while staff type one in: one this
+// phone number used before, one from the platform's address book (in the
+// store's region), or one the store delivered to before.
 type AddressHint struct {
 	Line string   `json:"line"`
 	Unit string   `json:"unit"`
 	Note string   `json:"note"`
 	Lat  *float64 `json:"lat"`
 	Lng  *float64 `json:"lng"`
-	// Mine: this phone number used it before.
+	// Kind: "mine" (this phone number), "book" (the address book) or "store".
+	Kind string `json:"kind"`
+	// Mine: this phone number used it before (Kind "mine").
 	Mine bool `json:"mine"`
 	// The delivery area and fee at the pin, when it has one.
 	ZoneName string `json:"zone_name"`
 	Fee      *int64 `json:"fee"`
 }
 
-// AddressHints lists addresses of the store's past deliveries and members
-// matching what was typed; the phone's own come first.
+// AddressHints lists, for what was typed: the phone's own addresses, then the
+// address book's in the store's region, then the store's past deliveries
+// not already among those.
 func (a *App) AddressHints(ctx context.Context, branchID int64, q, phone string) ([]AddressHint, error) {
 	q, phone = strings.TrimSpace(q), strings.TrimSpace(phone)
 	if q == "" && phone == "" {
@@ -320,42 +324,84 @@ func (a *App) AddressHints(ctx context.Context, branchID int64, q, phone string)
 	if len(q) > 100 {
 		q = q[:100]
 	}
-	rows, err := a.DB.Query(ctx, `SELECT line, unit, note, lat, lng, mine FROM (
-			SELECT DISTINCT ON (lower(line)) line, unit, note, lat, lng, mine, at FROM (
-				SELECT address_line AS line, address_unit AS unit, address_note AS note, dest_lat AS lat, dest_lng AS lng,
-					($3 <> '' AND customer_phone = $3) AS mine, created_at AS at
-				FROM orders WHERE branch_id=$1 AND service_type='delivery' AND address_line <> ''
-					AND ($2 = '' OR address_line ILIKE '%' || $2 || '%')
-				UNION ALL
-				SELECT address_line, address_unit, address_note, lat, lng, ($3 <> '' AND phone = $3), updated_at
-				FROM store_members WHERE branch_id=$1 AND address_line <> '' AND `+liveMember+`
-					AND ($2 = '' OR address_line ILIKE '%' || $2 || '%')
-				UNION ALL
-				SELECT a.address_line, a.address_unit, a.address_note, a.lat, a.lng, ($3 <> '' AND m.phone = $3), a.last_used_at
-				FROM store_member_addresses a JOIN store_members m ON m.id = a.member_id
-				WHERE m.branch_id=$1 AND `+liveMember+` AND ($2 = '' OR a.address_line ILIKE '%' || $2 || '%')
-			) x WHERE $2 <> '' OR mine
-			ORDER BY lower(line), mine DESC, at DESC
-		) y ORDER BY mine DESC, at DESC LIMIT 8`, branchID, q, phone)
+	b, err := a.BranchByID(ctx, branchID)
 	if err != nil {
 		return nil, err
 	}
-	out := []AddressHint{}
+	rows, err := a.DB.Query(ctx, `SELECT line, unit, note, lat, lng, mine, addr_key(line) FROM (
+			SELECT DISTINCT ON (addr_key(line)) line, unit, note, lat, lng, mine, at FROM (
+				SELECT address_line AS line, address_unit AS unit, address_note AS note, dest_lat AS lat, dest_lng AS lng,
+					($3 <> '' AND customer_phone = $3) AS mine, created_at AS at
+				FROM orders WHERE branch_id=$1 AND service_type='delivery' AND address_line <> ''
+					AND ($2 = '' OR address_line ILIKE '%' || $2 || '%' OR addr_key(address_line) LIKE '%' || addr_key($2) || '%')
+				UNION ALL
+				SELECT address_line, address_unit, address_note, lat, lng, ($3 <> '' AND phone = $3), updated_at
+				FROM store_members WHERE branch_id=$1 AND address_line <> '' AND `+liveMember+`
+					AND ($2 = '' OR address_line ILIKE '%' || $2 || '%' OR addr_key(address_line) LIKE '%' || addr_key($2) || '%')
+				UNION ALL
+				SELECT a.address_line, a.address_unit, a.address_note, a.lat, a.lng, ($3 <> '' AND m.phone = $3), a.last_used_at
+				FROM store_member_addresses a JOIN store_members m ON m.id = a.member_id
+				WHERE m.branch_id=$1 AND `+liveMember+` AND ($2 = '' OR a.address_line ILIKE '%' || $2 || '%'
+					OR addr_key(a.address_line) LIKE '%' || addr_key($2) || '%')
+			) x WHERE addr_key(line) <> '' AND ($2 <> '' OR mine)
+			ORDER BY addr_key(line), mine DESC, at DESC
+		) y ORDER BY mine DESC, at DESC LIMIT 12`, branchID, q, phone)
+	if err != nil {
+		return nil, err
+	}
+	var mine, store []AddressHint
+	seen := map[string]bool{}
+	var keys []string
 	for rows.Next() {
 		var h AddressHint
-		if err := rows.Scan(&h.Line, &h.Unit, &h.Note, &h.Lat, &h.Lng, &h.Mine); err != nil {
+		var key string
+		if err := rows.Scan(&h.Line, &h.Unit, &h.Note, &h.Lat, &h.Lng, &h.Mine, &key); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		out = append(out, h)
+		if h.Mine {
+			h.Kind = "mine"
+			seen[key] = true
+			mine = append(mine, h)
+		} else {
+			h.Kind = "store"
+			keys = append(keys, key)
+			store = append(store, h)
+		}
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	b, err := a.BranchByID(ctx, branchID)
-	if err != nil {
-		return nil, err
+	if len(mine) > 4 {
+		mine = mine[:4]
+	}
+	out := mine
+	if q != "" {
+		book, err := searchBook(ctx, a.DB, branchRegion(b), q, 6)
+		if err != nil {
+			return nil, err
+		}
+		for _, x := range book {
+			if seen[x.key] {
+				continue
+			}
+			seen[x.key] = true
+			lat, lng := x.Lat, x.Lng
+			out = append(out, AddressHint{Line: x.Line, Lat: &lat, Lng: &lng, Kind: "book"})
+		}
+	}
+	for i, h := range store {
+		if len(out) >= 10 {
+			break
+		}
+		if !seen[keys[i]] {
+			seen[keys[i]] = true
+			out = append(out, h)
+		}
+	}
+	if out == nil {
+		out = []AddressHint{}
 	}
 	zones, err := loadZones(ctx, a.DB, branchID, true)
 	if err != nil {
@@ -552,6 +598,10 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 		}
 		if cur.ServiceType == "delivery" {
 			if err := keepMemberAddress(ctx, tx, m, true); err != nil {
+				return err
+			}
+			// A new address with a pin goes into the platform's address book.
+			if err := rememberAddress(ctx, tx, b, m.AddressLine, lat, lng); err != nil {
 				return err
 			}
 		}
