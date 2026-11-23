@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>客户地址 · 原型</title>
+<style>
+:root { --brand:#d9480f; --brand-dark:#b93a08; --brand-soft:#fff1e8; --ink:#1f2328; --muted:#6b7280; --line:#e5e7eb; --bg:#f6f6f4; --side:#1f2329; --gold:#b7791f; --gold-soft:#fdf3dc; }
+* { box-sizing:border-box; }
+html,body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 -apple-system,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif; }
+.app { display:flex; min-height:100vh; }
+.side { width:200px; flex:none; background:var(--side); color:#e6e8eb; padding:18px 10px; display:flex; flex-direction:column; gap:2px; }
+.side .brand { font-weight:700; font-size:17px; padding:0 10px 14px; }
+.side .brand small { display:block; font-weight:400; font-size:12px; color:#9aa1ab; }
+.side .grp { font-size:11px; color:#8b929c; padding:10px 10px 4px; }
+.side a { padding:8px 10px; border-radius:8px; font-weight:600; color:#e6e8eb; }
+.side a.on { background:#2d323a; box-shadow:inset 3px 0 0 var(--brand); }
+.side a .new { font-size:10px; background:var(--brand); color:#fff; border-radius:8px; padding:0 5px; margin-left:6px; vertical-align:2px; }
+main { flex:1; min-width:0; padding:18px 22px 40px; }
+h1 { font-size:22px; margin:0; }
+.head { display:flex; align-items:baseline; gap:12px; margin-bottom:12px; }
+.head .grow { flex:1; }
+.muted { color:var(--muted); } .small { font-size:13px; } .num { font-variant-numeric:tabular-nums; }
+.tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:14px; }
+.tabs a { padding:9px 16px; font-weight:600; color:var(--muted); border-bottom:3px solid transparent; margin-bottom:-1px; cursor:pointer; }
+.tabs a.on { color:var(--brand-dark); border-bottom-color:var(--brand); }
+.bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
+.in { border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 11px; font:inherit; min-height:40px; display:inline-flex; align-items:center; gap:6px; }
+.in.grow { flex:1; min-width:220px; color:#9aa1ab; }
+.in.sel::after { content:"▾"; color:var(--muted); font-size:12px; margin-left:4px; }
+.btn { border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 14px; font-weight:600; min-height:40px; display:inline-flex; align-items:center; }
+.btn.sm { min-height:30px; padding:3px 10px; font-size:13px; }
+.chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:5px 14px; font-size:13px; color:var(--muted); cursor:pointer; }
+.chip.on { background:var(--brand); border-color:var(--brand); color:#fff; font-weight:600; }
+.card { background:#fff; border:1px solid var(--line); border-radius:12px; }
+table { width:100%; border-collapse:collapse; }
+th { text-align:left; font-size:13px; color:var(--muted); font-weight:600; padding:10px 12px; background:#fafafa; border-bottom:1px solid var(--line); white-space:nowrap; }
+td { padding:11px 12px; border-bottom:1px solid #f0f0f0; vertical-align:top; }
+tr:last-child td { border-bottom:0; }
+td.r, th.r { text-align:right; }
+.addr b { font-weight:600; }
+.tag { display:inline-block; font-size:12px; border-radius:6px; padding:1px 7px; background:#f1f2f4; color:var(--muted); white-space:nowrap; }
+.tag.brand { background:var(--brand-soft); color:var(--brand-dark); }
+.tag.gold { background:var(--gold-soft); color:var(--gold); }
+a.lnk { color:var(--brand); font-weight:600; cursor:pointer; white-space:nowrap; }
+.mno { color:var(--brand); font-family:ui-monospace,Menlo,monospace; font-weight:700; font-size:13px; }
+.date { font-variant-numeric:tabular-nums; }
+.kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:12px; }
+.kpi { background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 14px; }
+.kpi b { display:block; font-size:22px; font-variant-numeric:tabular-nums; }
+.kpi span { font-size:12px; color:var(--muted); }
+.rank { width:30px; height:30px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:700; background:#f1f2f4; color:var(--muted); font-size:13px; }
+.rank.t1 { background:var(--brand); color:#fff; } .rank.t2 { background:#e8590c; color:#fff; } .rank.t3 { background:#f08c00; color:#fff; }
+.barcell { min-width:140px; }
+.meter { height:8px; border-radius:4px; background:#f1f2f4; overflow:hidden; margin-top:6px; }
+.meter i { display:block; height:100%; background:linear-gradient(90deg,#f08c00,var(--brand)); border-radius:4px; }
+tr.open td { background:#fffaf5; }
+tr.sub td { background:#fffaf5; padding-top:4px; }
+.subtbl { width:100%; font-size:13px; }
+.subtbl td { padding:5px 8px; border:0; }
+.range-warn { color:#b42318; font-size:12px; }
+.maplay { display:grid; grid-template-columns:1fr 300px; gap:12px; }
+.mapbox { position:relative; height:620px; border-radius:12px; overflow:hidden; border:1px solid var(--line); background:#f1f3f4; }
+.mapbox svg { width:100%; height:100%; display:block; }
+.float { position:absolute; background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.25); font-size:13px; }
+.seg { top:12px; left:12px; display:flex; overflow:hidden; }
+.seg span { padding:7px 12px; cursor:pointer; font-weight:600; color:var(--muted); }
+.seg span.on { background:var(--brand); color:#fff; }
+.mtype { top:12px; right:12px; display:flex; overflow:hidden; }
+.mtype span { padding:7px 12px; } .mtype span:first-child { font-weight:700; }
+.zoom { right:12px; bottom:40px; display:flex; flex-direction:column; }
+.zoom span { width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:20px; color:#555; }
+.zoom span + span { border-top:1px solid #eee; }
+.legend { left:12px; bottom:28px; padding:8px 10px; min-width:200px; }
+.legend .grad { height:10px; border-radius:5px; background:linear-gradient(90deg,rgba(247,200,80,.25),#f7c850,#f08c00,#d9480f,#8f1d0b); margin:5px 0 3px; }
+.legend .ticks { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); }
+.attrib { position:absolute; right:6px; bottom:4px; font-size:10px; color:#666; background:rgba(255,255,255,.75); padding:0 4px; }
+.pop { width:250px; padding:12px; font-size:13px; }
+.pop b { font-size:14px; }
+.pop .row { display:flex; justify-content:space-between; margin-top:4px; }
+.pop .acts { display:flex; gap:12px; margin-top:8px; border-top:1px solid #f0f0f0; padding-top:8px; }
+.panel { display:flex; flex-direction:column; gap:12px; }
+.panel .card { padding:12px 14px; }
+.panel h3 { font-size:14px; margin:0 0 8px; }
+.opt { display:flex; align-items:center; gap:8px; font-size:14px; margin:6px 0; }
+.box { width:18px; height:18px; border-radius:4px; border:1.5px solid #c4c8ce; display:inline-flex; align-items:center; justify-content:center; font-size:12px; color:#fff; }
+.box.on { background:var(--brand); border-color:var(--brand); }
+.slider { position:relative; height:4px; background:#e5e7eb; border-radius:2px; margin:14px 4px 6px; }
+.slider i { position:absolute; left:0; top:0; height:4px; width:35%; background:var(--brand); border-radius:2px; }
+.slider b { position:absolute; left:35%; top:-7px; width:18px; height:18px; margin-left:-9px; border-radius:50%; background:#fff; border:2px solid var(--brand); }
+.toplist div { display:flex; gap:8px; align-items:center; font-size:13px; padding:5px 0; border-bottom:1px solid #f3f3f3; }
+.toplist div:last-child { border:0; }
+.toplist .rank { width:22px; height:22px; font-size:11px; flex:none; }
+.toplist span.a { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.note { font-size:12px; color:#b45309; background:#fff4d6; border-radius:8px; padding:7px 10px; }
+.mobilehead, .cards { display:none; }
+/* 手机 */
+@media (max-width: 760px) {
+  .side { display:none; }
+  .mobilehead { display:flex; align-items:center; gap:10px; background:var(--side); color:#fff; padding:12px 16px; font-weight:700; }
+  .mobilehead span { flex:1; }
+  main { padding:12px 12px 30px; }
+  h1 { font-size:19px; }
+  .head .muted { display:none; }
+  .tabs a { padding:8px 12px; flex:1; text-align:center; }
+  .bar .in.grow { min-width:100%; }
+  .bar .in, .bar .btn { flex:1; justify-content:center; }
+  .bar .in.date { flex:1 1 38%; font-size:14px; padding:6px 8px; white-space:nowrap; }
+  .bar .chip { padding:4px 10px; }
+  .seg span, .mtype span { padding:6px 9px; }
+  .kpis { grid-template-columns:repeat(2,1fr); }
+  table.desk { display:none; }
+  .cards { display:block; }
+  .cards .c { padding:12px; border-bottom:1px solid #f0f0f0; }
+  .cards .c:last-child { border:0; }
+  .cards .row { display:flex; justify-content:space-between; gap:8px; align-items:center; }
+  .maplay { grid-template-columns:1fr; }
+  .mapbox { height:440px; }
+  .legend { min-width:150px; }
+  .pop { width:220px; }
+  .panel .hide-m { display:none; }
+}
+</style>
+</head>
+<body>
+<!--
+  原型：客户地址页（商家端 /merchant/addresses）和送餐地址页（平台后台 /admin/delivery-addresses）。
+  参数：?role=merchant|admin  &tab=list|top|map  &mode=pins|heat|both  &open=1（排行展开第一名 / 地图弹出卡片）  &bad=1（日期超过 31 天）
+  底图是示意图，正式版是 Google 地图；热力图由我们自己画在地图上（谷歌自带热力层已下线），见 docs/DELIVERY_ADDRESS_STATS_DESIGN.md。
+-->
+<div class="app">
+  <nav class="side" id="side"></nav>
+  <div style="flex:1;min-width:0">
+    <div class="mobilehead"><span id="mtitle"></span>☰</div>
+    <main id="main"></main>
+  </div>
+</div>
+<script src="basemap.js"></script>
+<script>
+var Q = new URLSearchParams(location.search);
+var ROLE = Q.get('role') || 'merchant', TAB = Q.get('tab') || 'list', MODE = Q.get('mode') || 'both', OPEN = Q.get('open') === '1', BAD = Q.get('bad') === '1';
+var ADMIN = ROLE === 'admin';
+function go(k, v) { Q.set(k, v); location.search = Q.toString(); }
+
+// 侧栏
+var side = document.getElementById('side');
+if (ADMIN) {
+  side.innerHTML = '<div class="brand">外卖点餐系统<small>平台管理后台</small></div>' +
+    '<div class="grp">监控</div><a>总览</a><a>API 监控</a><a>Worker 和任务</a>' +
+    '<div class="grp">商家</div><a>商户</a><a>商品</a><a>顾客服务</a><a>会员管理</a><a>地址库</a><a class="on">送餐地址<span class="new">新</span></a><a>商城</a><a>平台优惠券</a><a>账单</a>' +
+    '<div class="grp">系统</div><a>密钥设置</a><a>语言适配</a><a>操作记录</a>';
+} else {
+  side.innerHTML = '<div class="brand">马卡蒂小馆</div><a>订单</a><a>会员管理</a><a class="on">客户地址<span class="new">新</span></a><a>桌台</a><a>后厨</a><a>消息</a><a>菜单</a><a>模板</a><a>宣传物料</a><a>优惠</a><a>核款</a><a>账单</a><a>骑手</a><a>配送地图</a><a>员工</a><a>设置</a>';
+}
+document.getElementById('mtitle').textContent = ADMIN ? '外卖点餐系统 · 后台' : '马卡蒂小馆';
+
+// 示意数据：地址（地图坐标是示意底图的坐标）
+var STORES = ['马卡蒂小馆', 'BGC 粥面店', '老王烧腊'];
+var A = [
+  { a: 'Ayala Tower One, 6750 Ayala Ave', city: 'Makati', n: 86, c: 31, amt: 41280, last: '11-23 12:40', p: [452, 352], units: [['23F 2301', '王先生', 14], ['18F 1802', 'Lina K', 11], ['7F 前台', 'Mark T', 9], ['其他 28 户', '', 52]] },
+  { a: 'SM Aura Premier, McKinley Pkwy', city: 'Taguig', n: 54, c: 22, amt: 23900, last: '11-23 11:58', p: [826, 448] },
+  { a: 'RCBC Plaza, 6819 Ayala Ave', city: 'Makati', n: 47, c: 18, amt: 21150, last: '11-22 19:05', p: [520, 328] },
+  { a: 'The Residences at Greenbelt', city: 'Makati', n: 39, c: 12, amt: 18420, last: '11-23 12:15', p: [398, 420] },
+  { a: 'Salcedo Village, 128 Valero St', city: 'Makati', n: 33, c: 15, amt: 14980, last: '11-21 20:30', p: [560, 260] },
+  { a: 'Rockwell Power Plant Mall', city: 'Makati', n: 28, c: 19, amt: 12610, last: '11-23 13:02', p: [650, 118] },
+  { a: 'Uptown Parksuites Tower 2', city: 'Taguig', n: 24, c: 9, amt: 10870, last: '11-20 18:44', p: [870, 380] },
+  { a: '8 Rockwell, Hidalgo Dr', city: 'Makati', n: 21, c: 8, amt: 9340, last: '11-22 12:20', p: [690, 150] },
+  { a: 'Legaspi Village, 112 Dela Rosa St', city: 'Makati', n: 19, c: 11, amt: 8120, last: '11-23 10:51', p: [430, 470] },
+  { a: 'Poblacion, 5888 Matilde St', city: 'Makati', n: 17, c: 10, amt: 7260, last: '11-19 21:14', p: [540, 180] }
+];
+// 其余零散地址
+var r = rng(42), i;
+for (i = 0; i < 140; i++) {
+  var hub = [[480, 380], [480, 380], [820, 430], [600, 200], [380, 560]][i % 5], rad = 40 + r() * 150, ang = r() * 6.283;
+  A.push({ a: '', n: 1 + Math.floor(r() * r() * 12), p: [hub[0] + Math.cos(ang) * rad, hub[1] + Math.sin(ang) * rad * .8] });
+}
+var TOTAL = A.reduce(function (s, x) { return s + x.n; }, 0);
+function money(v) { return '₱' + v.toLocaleString('en-US'); }
+
+var main = document.getElementById('main');
+var html = '<div class="head"><h1>' + (ADMIN ? '送餐地址' : '客户地址') + '</h1><span class="grow"></span><span class="muted small">' +
+  (ADMIN ? '全部商家 · 128 家店' : '共 416 个地址 · 302 位客户') + '</span></div>';
+html += '<div class="tabs">' + [['list', '地址列表'], ['top', '送餐排行'], ['map', '地图']].map(function (t) {
+  return '<a class="' + (TAB === t[0] ? 'on' : '') + '" onclick="go(\'tab\',\'' + t[0] + '\')">' + t[1] + '</a>';
+}).join('') + '</div>';
+
+var adminFilter = ADMIN ? '<span class="in sel">全部商家</span><span class="in sel">全部门店</span><span class="in sel">菲律宾</span><span class="in sel">全部城市</span>' : '';
+var dateBar = '<span class="in date">📅 ' + (BAD ? '2026-10-01' : '2026-10-24') + '</span><span class="muted">到</span><span class="in date">📅 2026-11-23</span>' +
+  ['今天', '近 7 天', '近 30 天', '上个月'].map(function (t, k) { return '<span class="chip ' + (k === 2 && !BAD ? 'on' : '') + '">' + t + '</span>'; }).join('') +
+  (BAD ? '<span class="range-warn">最多选 31 天，现在是 54 天</span>' : '<span class="muted small">最多 31 天</span>');
+
+if (TAB === 'list') {
+  html += '<div class="bar"><span class="in grow">🔍 搜索地址、姓名、电话</span>' + adminFilter +
+    '<span class="in sel">全部来源</span><span class="in sel">最近下单</span><span class="btn">搜索</span></div>';
+  var rows = [
+    ['Ayala Tower One, 6750 Ayala Ave', '23F 2301', '王先生', '+63 917 555 2046', '100023', '代客', 14, '2026-09-02', '2026-11-23 12:40', 1, '马卡蒂小馆'],
+    ['Ayala Tower One, 6750 Ayala Ave', '18F 1802', 'Lina K', '+63 917 170 1249', '', '顾客', 11, '2026-08-15', '2026-11-23 11:20', 1, '马卡蒂小馆'],
+    ['SM Aura Premier, McKinley Pkwy', '5F 美食广场旁', '陈小姐', '+63 917 552 0091', '100031', '代客', 9, '2026-10-03', '2026-11-23 11:58', 1, 'BGC 粥面店'],
+    ['RCBC Plaza, 6819 Ayala Ave', 'Tower 2 · 31F', 'Mark T', '+63 918 220 4410', '', '顾客', 8, '2026-07-21', '2026-11-22 19:05', 1, '马卡蒂小馆'],
+    ['The Residences at Greenbelt', 'Laguna 楼 12C', 'Joy', '+63 915 330 8812', '100008', '代客', 7, '2026-06-11', '2026-11-23 12:15', 1, '老王烧腊'],
+    ['2621 Zamora St, Pasay', '', '李先生', '+63 917 555 7788', '100001', '代客', 3, '2026-11-02', '2026-11-20 18:30', 0, '马卡蒂小馆'],
+    ['Salcedo Village, 128 Valero St', '6F', 'Anna R', '+63 916 777 1203', '', '顾客', 5, '2026-09-30', '2026-11-21 20:30', 1, '马卡蒂小馆'],
+    ['Rockwell Power Plant Mall', 'R2 层取餐点', 'Ken', '+63 917 909 1111', '', '顾客', 4, '2026-10-12', '2026-11-23 13:02', 1, 'BGC 粥面店']
+  ];
+  html += '<div class="card"><table class="desk"><thead><tr><th>地址</th><th>门牌</th><th>客户</th><th>来源</th>' + (ADMIN ? '<th>门店</th>' : '') +
+    '<th class="r">单数</th><th>首次下单</th><th>最近下单</th><th></th></tr></thead><tbody>' +
+    rows.map(function (x) {
+      return '<tr><td class="addr"><b>' + x[0] + '</b>' + (x[9] ? '' : ' <span class="tag gold">没有定位</span>') + '</td><td>' + (x[1] || '<span class="muted">—</span>') + '</td>' +
+        '<td>' + x[2] + '<div class="small muted num">' + x[3] + (x[4] ? ' · <span class="mno">' + x[4] + '</span>' : '') + '</div></td>' +
+        '<td><span class="tag ' + (x[5] === '代客' ? 'brand' : '') + '">' + (x[5] === '代客' ? '代客下单' : '顾客下单') + '</span></td>' +
+        (ADMIN ? '<td style="color:var(--brand)">' + x[10] + '</td>' : '') +
+        '<td class="r num"><b>' + x[6] + '</b></td><td class="date muted">' + x[7] + '</td><td class="date">' + x[8] + '</td>' +
+        '<td style="white-space:nowrap">' + (x[9] ? '<a class="lnk">查看</a>' : '<span class="muted" style="font-weight:600">查看</span>') + ' &nbsp; <a class="lnk">订单</a></td></tr>';
+    }).join('') + '</tbody></table><div class="cards">' +
+    rows.map(function (x) {
+      return '<div class="c"><div class="row"><b>' + x[0] + '</b><span class="num" style="white-space:nowrap"><b>' + x[6] + '</b> 单</span></div>' +
+        '<div class="small muted">' + (x[1] ? x[1] + ' · ' : '') + x[2] + ' · ' + x[3] + '</div>' +
+        '<div class="row small" style="margin-top:6px"><span><span class="tag ' + (x[5] === '代客' ? 'brand' : '') + '">' + (x[5] === '代客' ? '代客下单' : '顾客下单') + '</span>' + (ADMIN ? ' <span style="color:var(--brand)">' + x[10] + '</span>' : '') + (x[9] ? '' : ' <span class="tag gold">没有定位</span>') + '</span><span class="muted">' + x[8].slice(5) + '</span></div>' +
+        '<div class="row small" style="margin-top:6px;justify-content:flex-end;gap:16px"><a class="lnk">查看</a><a class="lnk">订单</a></div></div>';
+    }).join('') + '</div></div>';
+  html += '<div class="bar small muted" style="margin-top:10px;justify-content:space-between"><span>第 1–8 条，共 416 条</span><span><span class="btn sm">上一页</span> <span class="btn sm">下一页</span></span></div>';
+}
+
+if (TAB === 'top') {
+  html += '<div class="bar">' + adminFilter + dateBar + '</div>';
+  html += '<div class="kpis"><div class="kpi"><b>1,284</b><span>外卖单（不含拒单、取消、配送失败）</span></div><div class="kpi"><b>416</b><span>送过的地址</span></div><div class="kpi"><b>3.1</b><span>平均每个地址单数</span></div><div class="kpi"><b>7</b><span>没有定位的地址</span></div></div>';
+  var TOPS = A.slice(0, 10);
+  html += '<div class="card"><table class="desk"><thead><tr><th style="width:44px">#</th><th>地址</th><th class="r">单数</th><th class="barcell">占全部单数</th><th class="r">客户数</th><th class="r">金额</th><th>最近一次</th><th></th></tr></thead><tbody>' +
+    TOPS.map(function (x, k) {
+      var pct = x.n / 1284 * 100, open = OPEN && k === 0;
+      var s = '<tr class="' + (open ? 'open' : '') + '"><td><span class="rank ' + (k < 3 ? 't' + (k + 1) : '') + '">' + (k + 1) + '</span></td><td class="addr"><b>' + x.a + '</b><div class="small muted">' + x.city + (ADMIN ? ' · ' + STORES[k % 3] + (k === 0 ? ' 等 2 家店' : '') : '') + '</div></td>' +
+        '<td class="r num"><b>' + x.n + '</b></td><td class="barcell"><span class="small num">' + pct.toFixed(1) + '%</span><div class="meter"><i style="width:' + (x.n / 86 * 100) + '%"></i></div></td>' +
+        '<td class="r num">' + x.c + '</td><td class="r num">' + money(x.amt) + '</td><td class="date">' + x.last + '</td>' +
+        '<td style="white-space:nowrap"><a class="lnk">地图上看</a> &nbsp; <a class="lnk">' + (open ? '收起 ▴' : '明细 ▾') + '</a></td></tr>';
+      if (open) s += '<tr class="sub"><td></td><td colspan="7"><table class="subtbl"><tbody>' + x.units.map(function (u) {
+        return '<tr><td style="width:160px">' + u[0] + '</td><td>' + (u[1] || '<span class="muted">…</span>') + '</td><td class="r num" style="width:80px"><b>' + u[2] + '</b> 单</td>' + (ADMIN ? '<td class="muted">' + (u[1] === 'Mark T' ? '老王烧腊' : '马卡蒂小馆') + '</td>' : '') + '</tr>';
+      }).join('') + '</tbody></table></td></tr>';
+      return s;
+    }).join('') + '</tbody></table><div class="cards">' +
+    TOPS.map(function (x, k) {
+      return '<div class="c"><div class="row" style="justify-content:flex-start;gap:10px"><span class="rank ' + (k < 3 ? 't' + (k + 1) : '') + '">' + (k + 1) + '</span><div style="flex:1;min-width:0"><b>' + x.a + '</b><div class="small muted">' + x.c + ' 位客户 · ' + money(x.amt) + ' · ' + x.last + '</div><div class="meter"><i style="width:' + (x.n / 86 * 100) + '%"></i></div></div><span class="num" style="white-space:nowrap"><b>' + x.n + '</b> 单</span></div></div>';
+    }).join('') + '</div></div>';
+  html += '<p class="small muted">列出前 100 名。同一栋楼的不同门牌合在一起算，点“明细”看每户各几单。</p>';
+}
+
+if (TAB === 'map') {
+  html += '<div class="bar">' + adminFilter + dateBar + '</div>';
+  html += '<div class="maplay"><div class="mapbox"><svg id="svg"></svg>' +
+    '<div class="float seg">' + [['pins', '标点'], ['heat', '热力'], ['both', '两个都显示']].map(function (m) {
+      return '<span class="' + (MODE === m[0] ? 'on' : '') + '" onclick="go(\'mode\',\'' + m[0] + '\')">' + m[1] + '</span>';
+    }).join('') + '</div>' +
+    '<div class="float mtype"><span>地图</span><span>卫星</span></div><div class="float zoom"><span>+</span><span>−</span></div>' +
+    (MODE !== 'pins' ? '<div class="float legend"><b class="small">送餐次数</b><div class="grad"></div><div class="ticks"><span>少</span><span>多</span></div></div>' : '') +
+    (OPEN ? '<div class="float pop" style="left:calc(45% - 272px);top:calc(49% - 110px)"><b>Ayala Tower One, 6750 Ayala Ave</b><div class="muted">Makati</div>' +
+      '<div class="row"><span class="muted">单数</span><b class="num">86</b></div><div class="row"><span class="muted">客户数</span><span class="num">31</span></div><div class="row"><span class="muted">最近一次</span><span class="num">11-23 12:40</span></div>' +
+      '<div class="acts"><a class="lnk">打开谷歌地图</a><a class="lnk">看排行明细</a></div></div>' : '') +
+    '<div class="attrib">示意底图 · 正式版使用 Google 地图</div></div>' +
+    '<div class="panel"><div class="card"><h3>显示</h3>' +
+    '<div class="opt"><span class="box on">✓</span>' + (ADMIN ? '门店位置（128 家）' : '店铺位置') + '</div>' +
+    '<div class="opt"><span class="box ' + (ADMIN ? '' : 'on') + '">' + (ADMIN ? '' : '✓') + '</span>配送区轮廓' + (ADMIN ? '<span class="small muted">（选了门店才有）</span>' : '') + '</div>' +
+    (MODE !== 'pins' ? '<div class="small muted" style="margin-top:10px">热力半径</div><div class="slider"><i></i><b></b></div><div class="small muted" style="display:flex;justify-content:space-between"><span>看单个热点</span><span>看整片区域</span></div>' : '') +
+    '</div>' +
+    '<div class="card hide-m"><h3>这段时间单数最多</h3><div class="toplist">' + A.slice(0, 5).map(function (x, k) {
+      return '<div><span class="rank ' + (k < 3 ? 't' + (k + 1) : '') + '">' + (k + 1) + '</span><span class="a">' + x.a + '</span><b class="num">' + x.n + '</b></div>';
+    }).join('') + '</div><div style="margin-top:6px"><a class="lnk small" onclick="go(\'tab\',\'top\')">看完整排行 ›</a></div></div>' +
+    '<div class="note">有 7 个地址没有定位，不在地图上。</div>' +
+    '<div class="small muted">地图上 409 个地址、1,284 单。点圆点看地址详情；地图缩小时相邻的点会合并成一个数字。</div></div></div>';
+}
+main.innerHTML = html;
+
+if (TAB === 'map') {
+  var svg = document.getElementById('svg');
+  baseMap(svg);
+  if (!ADMIN) ZONES.forEach(function (z) {
+    svg.appendChild(el('polygon', { points: z.pts.join(' '), fill: 'none', stroke: z.color, 'stroke-width': 2, 'stroke-dasharray': '6 4', 'stroke-opacity': .8 }));
+    var c = centroid(z.pts);
+    svg.appendChild(el('text', { x: c[0], y: z.id === 'cbd' ? 505 : c[1] - 30, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 700, fill: z.color, stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke' }, z.name));
+  });
+  // 热力：每个地址按单数加权画模糊圆，再按密度上色（正式版同样在自己的 canvas 层上画）
+  if (MODE !== 'pins') {
+    var W = 1000, H = 720, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    var g = cv.getContext('2d'), R = 46;
+    A.forEach(function (x) {
+      var grd = g.createRadialGradient(x.p[0], x.p[1], 0, x.p[0], x.p[1], R);
+      var a = Math.min(1, 0.06 + x.n / 40);
+      grd.addColorStop(0, 'rgba(0,0,0,' + a + ')'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = grd; g.fillRect(x.p[0] - R, x.p[1] - R, R * 2, R * 2);
+    });
+    var ramp = document.createElement('canvas'); ramp.width = 256; ramp.height = 1;
+    var rg = ramp.getContext('2d'), lg = rg.createLinearGradient(0, 0, 256, 0);
+    lg.addColorStop(0, 'rgba(247,200,80,0)'); lg.addColorStop(.18, 'rgba(247,200,80,.55)'); lg.addColorStop(.45, '#f08c00'); lg.addColorStop(.72, '#d9480f'); lg.addColorStop(1, '#8f1d0b');
+    rg.fillStyle = lg; rg.fillRect(0, 0, 256, 1);
+    var pal = rg.getImageData(0, 0, 256, 1).data, img = g.getImageData(0, 0, W, H), d = img.data;
+    for (i = 0; i < d.length; i += 4) {
+      var v = d[i + 3]; if (!v) continue;
+      d[i] = pal[v * 4]; d[i + 1] = pal[v * 4 + 1]; d[i + 2] = pal[v * 4 + 2]; d[i + 3] = Math.min(220, pal[v * 4 + 3] * 0.85 + v * 0.15);
+    }
+    g.putImageData(img, 0, 0);
+    svg.appendChild(el('image', { href: cv.toDataURL(), x: 0, y: 0, width: W, height: H }));
+  }
+  // 标点：圆的大小跟单数走，单数写在圆里；1–2 单的小点不写数
+  if (MODE !== 'heat') {
+    A.slice().sort(function (a, b) { return a.n - b.n; }).forEach(function (x) {
+      var rr = x.n >= 10 ? 9 + Math.sqrt(x.n) * 1.6 : 4 + x.n;
+      var fill = x.n >= 40 ? '#b93a08' : x.n >= 15 ? '#d9480f' : x.n >= 5 ? '#f08c00' : '#f2a541';
+      svg.appendChild(el('circle', { cx: x.p[0], cy: x.p[1], r: rr, fill: fill, 'fill-opacity': MODE === 'both' ? .92 : .85, stroke: '#fff', 'stroke-width': 1.5 }));
+      if (x.n >= 10) svg.appendChild(el('text', { x: x.p[0], y: x.p[1] + 4, 'text-anchor': 'middle', 'font-size': x.n >= 40 ? 12 : 11, 'font-weight': 700, fill: '#fff' }, x.n));
+    });
+    if (OPEN) svg.appendChild(el('circle', { cx: 452, cy: 352, r: 26, fill: 'none', stroke: '#1f2328', 'stroke-width': 2.5 }));
+  }
+  // 门店画在最上面
+  if (ADMIN) { pin(svg, [480, 390], {}); pin(svg, [830, 470], {}); pin(svg, [600, 160], {}); }
+  else pin(svg, STORE, { text: '马卡蒂小馆' });
+}
+</script>
+</body>
+</html>
