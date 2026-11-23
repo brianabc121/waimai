@@ -58,12 +58,18 @@ func TestMallOverHTTP(t *testing.T) {
 	}
 	here := fmt.Sprintf("lat=%f&lng=%f", lat0+0.002, lng0+0.002)
 
-	// A spot inside the near store's area: it delivers; the far one does not and is left out,
-	// though it offers pickup close by.
+	// A spot inside the near store's area: it delivers; the far one does not
+	// and comes after it, marked, with no delivery terms.
 	stores, out := list(anon, here)
 	s := stores[near.slug]
-	if s == nil || len(stores) != 1 || stores[far.slug] != nil {
+	if s == nil || len(stores) != 2 || stores[far.slug] == nil || s["no_delivery"] != false {
 		t.Fatalf("stores at the spot: %v", out)
+	}
+	if f := stores[far.slug]; f["no_delivery"] != true || f["delivery"] != nil || f["pickup"] != true {
+		t.Fatalf("the store that does not deliver here: %v", f)
+	}
+	if first := out["stores"].([]any)[0].(map[string]any); first["slug"] != near.slug {
+		t.Fatalf("the store that delivers comes first: %v", out["stores"])
 	}
 	d := s["delivery"].(map[string]any)
 	if d["fee"] != float64(4900) || d["min_order"] != float64(20000) || d["eta_minutes"] != float64(25) || len(d) != 3 {
@@ -79,10 +85,14 @@ func TestMallOverHTTP(t *testing.T) {
 		t.Fatalf("frequent stores for nobody: %v", out["frequent"])
 	}
 
-	// Too far for either: nothing, though the region is still known.
+	// Too far for either to deliver: both, marked, within 50 km; nothing beyond.
 	stores, out = list(anon, fmt.Sprintf("lat=%f&lng=%f", lat0+0.2, lng0))
+	if len(stores) != 2 || stores[near.slug]["no_delivery"] != true || stores[far.slug]["no_delivery"] != true || out["region"] == nil {
+		t.Fatalf("20 km from the stores: %v", out)
+	}
+	stores, out = list(anon, fmt.Sprintf("lat=%f&lng=%f", lat0-0.46, lng0))
 	if len(stores) != 0 || out["region"] == nil {
-		t.Fatalf("far from every store: %v", out)
+		t.Fatalf("over 50 km from every store: %v", out)
 	}
 	if _, out = list(anon, "lat=60&lng=10"); out["region"] != nil || len(out["stores"].([]any)) != 0 {
 		t.Fatalf("another continent: %v", out)
@@ -112,7 +122,7 @@ func TestMallOverHTTP(t *testing.T) {
 	}
 
 	// Search: by a dish, and with nothing to find.
-	if stores, _ = list(anon, here+"&q=tea"); len(stores) != 1 || len(stores[near.slug]["dishes"].([]any)) != 1 {
+	if stores, _ = list(anon, here+"&q=tea"); len(stores) != 2 || len(stores[near.slug]["dishes"].([]any)) != 1 {
 		t.Fatalf("search by dish: %v", stores)
 	}
 	if stores, _ = list(anon, here+"&q=no-such-thing"); len(stores) != 0 {
@@ -152,7 +162,7 @@ func TestMallOverHTTP(t *testing.T) {
 
 	// The merchant opts out; the store's own page keeps working.
 	owner.want(200, "", "PUT", b, map[string]any{"listed": false, "category_ids": []any{id(0)}})
-	if stores, _ = list(anon, here); len(stores) != 0 {
+	if stores, _ = list(anon, here); stores[near.slug] != nil {
 		t.Fatalf("a store that opted out is listed: %v", stores)
 	}
 	anon.want(200, "", "GET", "/stores/"+near.slug, nil)
@@ -164,7 +174,7 @@ func TestMallOverHTTP(t *testing.T) {
 	hide := fmt.Sprintf("/admin/mall/stores/%d", near.branchID)
 	owner.want(403, "FORBIDDEN", "PUT", hide, map[string]any{"hidden": true})
 	admin.want(200, "", "PUT", hide, map[string]any{"hidden": true})
-	if stores, _ = list(anon, here); len(stores) != 0 {
+	if stores, _ = list(anon, here); stores[near.slug] != nil {
 		t.Fatalf("a store the platform took off is listed: %v", stores)
 	}
 	state := ""
@@ -180,7 +190,7 @@ func TestMallOverHTTP(t *testing.T) {
 		t.Fatalf("the merchant is not told the platform took the store off: %v", l)
 	}
 	admin.want(200, "", "PUT", hide, map[string]any{"hidden": false})
-	if stores, _ = list(anon, here); len(stores) != 1 {
+	if stores, _ = list(anon, here); stores[near.slug] == nil {
 		t.Fatalf("a store put back is missing: %v", stores)
 	}
 

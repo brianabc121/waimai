@@ -17,9 +17,12 @@ import (
 // only what delivery to their spot costs and how long it takes.
 
 const (
-	// mallReachDeg is a first cut around the customer, a little more than the
-	// farthest a delivery area may reach from its store (maxZoneReachM).
-	mallReachDeg = 0.32
+	// mallNearM is how far a store that does not deliver to the spot may be
+	// and still be listed, after the ones that deliver, marked as such.
+	mallNearM = 50000
+	// mallReachDeg is a first cut around the customer, a little more than
+	// mallNearM (which is more than maxZoneReachM).
+	mallReachDeg = 0.46
 	// mallMinReviews is how many reviews a store needs before its rating is shown.
 	mallMinReviews = 5
 	mallMaxStores  = 200
@@ -99,7 +102,10 @@ type MallStore struct {
 	// Delivery is nil when the store does not deliver to the spot, or when
 	// stores are listed by city and no spot is known.
 	Delivery *MallDelivery `json:"delivery"`
-	Pickup   bool          `json:"pickup"`
+	// NoDelivery marks a store near the spot (within mallNearM) that does
+	// not deliver there: listed after the others, to browse or pick up.
+	NoDelivery bool `json:"no_delivery"`
+	Pickup     bool `json:"pickup"`
 	// MinOrderFrom is the store's lowest minimum order, shown when listing by city.
 	MinOrderFrom int64       `json:"min_order_from"`
 	DistanceM    *int        `json:"distance_m"`
@@ -134,8 +140,9 @@ type MallQuery struct {
 	CustomerID int64
 }
 
-// MallList is the answer: the stores that deliver to the spot. A store that
-// does not deliver there is left out, even when it offers pickup nearby.
+// MallList is the answer: the stores that deliver to the spot, then the
+// stores within mallNearM that do not (NoDelivery), so a place with few
+// stores still has something to show.
 type MallList struct {
 	// Region is where the spot is, going by the nearest store.
 	Region *MallRegionRef `json:"region"`
@@ -267,7 +274,7 @@ func storeIDs(list []*MallStore) []int64 {
 // MallStores answers the marketplace page.
 func (a *App) MallStores(ctx context.Context, q MallQuery) (*MallList, error) {
 	out := &MallList{Stores: []MallStore{}, Frequent: []string{}}
-	var delivers []*MallStore
+	var delivers, listed []*MallStore
 	if q.At != nil {
 		at := *q.At
 		if !validLatLng(at) {
@@ -300,6 +307,10 @@ func (a *App) MallStores(ctx context.Context, q MallQuery) (*MallList, error) {
 			if hit != nil {
 				s.Delivery = &MallDelivery{Fee: hit.Zone.Fee, MinOrder: max(b.MinOrderAmount, hit.Zone.MinOrder), EtaMinutes: hit.Zone.EtaMinutes}
 				delivers = append(delivers, s)
+				listed = append(listed, s)
+			} else if d <= mallNearM {
+				s.NoDelivery = true
+				listed = append(listed, s)
 			}
 		}
 		if nearest != nil {
@@ -331,11 +342,11 @@ func (a *App) MallStores(ctx context.Context, q MallQuery) (*MallList, error) {
 				}
 			}
 		}
-		delivers = cands
+		delivers, listed = cands, cands
 		out.Region = &MallRegionRef{CountryCode: strings.ToUpper(q.CountryCode), City: q.City, District: q.District}
 	}
 
-	all := delivers
+	all := listed
 	if err := a.mallPromos(ctx, all); err != nil {
 		return nil, err
 	}
@@ -390,7 +401,7 @@ func (a *App) MallStores(ctx context.Context, q MallQuery) (*MallList, error) {
 			}
 		}
 	}
-	for _, s := range mallSorted(delivers, q.Sort) {
+	for _, s := range mallSorted(listed, q.Sort) {
 		if keep(s) && len(out.Stores) < mallMaxStores {
 			out.Stores = append(out.Stores, *s)
 		}
@@ -404,8 +415,9 @@ func (s *MallStore) matched(q string) bool {
 	return strings.Contains(strings.ToLower(s.Name), q) || strings.Contains(strings.ToLower(s.NameEn), q)
 }
 
-// mallSorted puts the stores taking orders now first; within that, by the
-// order asked for: nearest first unless told otherwise.
+// mallSorted puts the stores that deliver first, then the stores taking
+// orders now; within that, by the order asked for: nearest first unless told
+// otherwise.
 func mallSorted(list []*MallStore, by string) []*MallStore {
 	rank := func(s *MallStore) int {
 		switch s.Status {
@@ -425,6 +437,9 @@ func mallSorted(list []*MallStore, by string) []*MallStore {
 	out := append([]*MallStore{}, list...)
 	sort.SliceStable(out, func(i, j int) bool {
 		x, y := out[i], out[j]
+		if x.NoDelivery != y.NoDelivery {
+			return !x.NoDelivery
+		}
 		if rank(x) != rank(y) {
 			return rank(x) < rank(y)
 		}

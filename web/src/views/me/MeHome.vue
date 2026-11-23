@@ -142,7 +142,7 @@ const more = computed<Entry[]>(() => [
 <style scoped>
 .mehome { padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 24px); }
 .hero { padding: 10px 16px 84px; color: #fff; border-radius: 0 0 50% 50% / 0 0 26px 26px;
-  background: radial-gradient(90% 70% at 70% 0%, rgba(255, 160, 120, .28) 0%, transparent 60%), linear-gradient(180deg, var(--red-deep) 0%, #b23a2a 100%); }
+  background: radial-gradient(90% 70% at 70% 0%, rgba(255, 160, 120, .28) 0%, transparent 60%), var(--motif) 0 0 / 56px 56px, linear-gradient(180deg, var(--red-deep) 0%, #b23a2a 100%); }
 .tools { display: flex; align-items: center; gap: 6px; }
 .tools h1 { flex: 1; font-size: 22px; font-weight: 800; letter-spacing: 1px; padding-left: 2px; }
 .tools button { width: 42px; height: 42px; border: 0; background: none; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: #fff; }
