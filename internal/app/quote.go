@@ -34,6 +34,9 @@ type QuoteInput struct {
 	Items     []QuoteLineInput `json:"items"`
 	// ScheduledFor is nil for "as soon as possible".
 	ScheduledFor *time.Time `json:"scheduled_for"`
+	// CouponIDs are the coupons to use. nil lets the system choose the best
+	// ones; an empty list uses none. A stored quote always has the list.
+	CouponIDs *[]int64 `json:"coupon_ids"`
 }
 
 type LineOption struct {
@@ -72,8 +75,12 @@ type Quote struct {
 	ScheduledFor  *time.Time  `json:"scheduled_for"`
 	Lines         []QuoteLine `json:"lines"`
 	Totals        Totals      `json:"totals"`
-	ExpiresAt     time.Time   `json:"expires_at"`
-	Input         QuoteInput  `json:"input"`
+	// Coupons are the coupons used; CouponChoices are all of the customer's
+	// coupons that work at this store, for the picker.
+	Coupons       []AppliedCoupon `json:"coupons"`
+	CouponChoices []CouponChoice  `json:"coupon_choices"`
+	ExpiresAt     time.Time       `json:"expires_at"`
+	Input         QuoteInput      `json:"input"`
 	// address is the saved address named by Input.AddressID, as it is now.
 	address *Address
 }
@@ -182,9 +189,17 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		return nil, err
 	}
 	promo, d := bestPromotion(promos, time.Now(), b.location(), in.ServiceType, subtotal, deliveryFee)
-	quote.Totals = ComputeTotals(subtotal, deliveryFee, b.taxConfig(), d)
+	var promoID int64
+	var promoName, promoNameEn string
 	if promo != nil {
-		quote.Totals.PromotionID, quote.Totals.PromotionName, quote.Totals.PromotionNameEn = promo.ID, promo.Name, promo.NameEn
+		promoID, promoName, promoNameEn = promo.ID, promo.Name, promo.NameEn
+	}
+	wallet, err := walletFor(ctx, q, phone, b)
+	if err != nil {
+		return nil, err
+	}
+	if err := applyCoupons(quote, wallet, b.taxConfig(), promoID, promoName, promoNameEn, subtotal, deliveryFee, d); err != nil {
+		return nil, err
 	}
 	return quote, nil
 }
@@ -397,8 +412,13 @@ func (a *App) CreateQuote(ctx context.Context, slug string, in QuoteInput, phone
 
 // sameQuote reports whether a re-priced quote still matches what the customer confirmed.
 func sameQuote(old, cur *Quote) bool {
-	if old.Totals != cur.Totals || len(old.Lines) != len(cur.Lines) {
+	if old.Totals != cur.Totals || len(old.Lines) != len(cur.Lines) || len(old.Coupons) != len(cur.Coupons) {
 		return false
+	}
+	for i := range old.Coupons {
+		if old.Coupons[i] != cur.Coupons[i] {
+			return false
+		}
 	}
 	for i := range old.Lines {
 		if old.Lines[i].UnitPrice != cur.Lines[i].UnitPrice || old.Lines[i].Qty != cur.Lines[i].Qty ||

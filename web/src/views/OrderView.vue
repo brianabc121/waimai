@@ -14,6 +14,7 @@ import { closedStatus, finished as isFinished, orderAgain, stamp } from '../orde
 import type { Order, OrderReview } from '../types'
 import './storeStrings'
 import TotalsTable from './TotalsTable.vue'
+import { couponTitle, lastDay } from '../coupons'
 import { chatEnabled } from '../chat'
 
 // The "contact store" entry shows only where chat is set up.
@@ -166,6 +167,12 @@ async function copyNo() {
 
       <div class="od-cols">
         <div class="od-col">
+          <router-link v-if="order.gift" to="/me/coupons" class="od-gift" data-testid="order-gift">
+            <span class="ic">🎁</span>
+            <span class="grow"><b>{{ t('cp.gift', { what: couponTitle(order.gift, order.gift.currency) }) }}</b>
+              <span>{{ t('cp.gift_sub', { store: pick(order.gift.store_name, order.gift.store_name_en) || t('cp.all_stores'), d: lastDay(order.gift.expires_at) }) }}</span></span>
+            <span class="chev">›</span>
+          </router-link>
           <section v-if="!closed && !finished" class="od-card">
             <ol class="steps">
               <li v-for="(s, i) in steps" :key="s" :class="{ done: i <= stepIndex, cur: i === stepIndex }"><span class="dot"></span><span class="small">{{ t('s.' + s) }}</span></li>
@@ -227,7 +234,7 @@ async function copyNo() {
               <span class="price">{{ money(it.line_total, order.currency) }}</span>
             </div>
           </template>
-          <TotalsTable :totals="order.totals" :currency="order.currency" :delivery="order.service_type === 'delivery'" />
+          <TotalsTable :totals="order.totals" :currency="order.currency" :delivery="order.service_type === 'delivery'" :discounts="order.discounts" />
         </section>
 
         <section class="od-card od-infocard" data-testid="order-info">
@@ -277,6 +284,10 @@ async function copyNo() {
 </template>
 
 <style scoped>
+.od-gift { display: flex; gap: 12px; align-items: center; background: linear-gradient(120deg, #fbe7b3, #f4cf73); border-radius: 14px; padding: 12px 14px; color: #5a2a12; text-decoration: none; }
+.od-gift .ic { width: 42px; height: 42px; border-radius: 12px; background: #a02c20; display: grid; place-items: center; font-size: 21px; flex: none; }
+.od-gift .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; } .od-gift b { font-size: 15.5px; } .od-gift .grow span { font-size: 12.5px; }
+.od-gift .chev { font-size: 20px; }
 .od { min-height: 100vh; padding-bottom: calc(env(safe-area-inset-bottom) + 28px); }
 .od-bar, .od-wrap { max-width: 760px; margin: 0 auto; }
 .od-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 2px; position: sticky; top: 0; z-index: 10; background: var(--bg); }

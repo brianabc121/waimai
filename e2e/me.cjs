@@ -185,7 +185,7 @@ step('the platform records a balance; the customer sees it, its history, and tha
 
 // ---- offers ----
 await page.goto(BASE + '/me/coupons')
-await page.waitForSelector(`${tid('offer')}, ${tid('offers-empty')}`)
+await page.waitForSelector(`${tid('my-coupon')}, ${tid('coupons-empty')}`)
 await shot('me9-offers')
 step('the offers page lists what the customer\'s stores run right now')
 

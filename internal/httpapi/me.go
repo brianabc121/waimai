@@ -49,6 +49,7 @@ func (s *Server) meRoutes(api *gin.RouterGroup) {
 	api.PUT("/customer/favorites/:slug", w, s.setMyFavorite)
 	api.DELETE("/customer/favorites/:slug", w, s.setMyFavorite)
 	api.GET("/customer/offers", s.myOffers)
+	api.GET("/customer/coupons", s.myCoupons)
 	api.GET("/customer/reviews", s.myReviews)
 	api.GET("/customer/messages", s.myMessages)
 	api.POST("/customer/messages/read", w, s.readMyMessages)
@@ -152,6 +153,13 @@ func (s *Server) myOffers(c *gin.Context) {
 	if cu, ok := s.me(c); ok {
 		list, err := s.App.MyOffers(c, cu.ID, c.Query("store"))
 		reply(c, gin.H{"offers": list}, err)
+	}
+}
+
+func (s *Server) myCoupons(c *gin.Context) {
+	if cu, ok := s.me(c); ok {
+		list, err := s.App.MyCoupons(c, cu.ID)
+		reply(c, gin.H{"coupons": list}, err)
 	}
 }
 

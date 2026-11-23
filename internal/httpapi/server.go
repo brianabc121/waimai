@@ -380,6 +380,8 @@ func (s *Server) Router() *gin.Engine {
 	auth.POST("/merchant/branches/:bid/promotions", s.savePromotion)
 	auth.PUT("/merchant/branches/:bid/promotions/:id", s.savePromotion)
 	auth.POST("/merchant/branches/:bid/promotions/:id/status", s.setPromotionStatus)
+	auth.GET("/merchant/branches/:bid/coupons/repurchase", s.repurchaseRule)
+	auth.PUT("/merchant/branches/:bid/coupons/repurchase", s.saveRepurchaseRule)
 	auth.POST("/merchant/branches/:bid/promotion-trial", s.trialPromotions)
 	auth.GET("/merchant/branches/:bid/staff", s.listStaff)
 	auth.POST("/merchant/branches/:bid/staff", s.createStaff)

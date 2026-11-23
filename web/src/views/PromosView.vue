@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { get, post, put } from '../api'
 import { money, promoLabel, t, toMajor, toMinor } from '../i18n'
 import { currentRole, session } from '../session'
 import type { Promotion, Totals } from '../types'
+import { useRoute, useRouter } from 'vue-router'
+import CouponRules from './CouponRules.vue'
+import '../coupons'
+
+// Two tabs: the store's promotions, and its coupons. The tab is kept in the address.
+const route = useRoute(), router = useRouter()
+const tab = computed(() => route.query.tab === 'coupons' ? 'coupons' : 'promos')
+const setTab = (k: string) => router.replace({ query: k === 'coupons' ? { tab: k } : {} })
 
 const bid = session.branchId!
 const cur = currentRole()?.currency ?? 'PHP'
@@ -85,9 +93,15 @@ async function runTrial() {
 <template>
   <div class="page stack" style="max-width:1000px">
     <div class="row between">
-      <h1>{{ t('promos') }}</h1>
-      <button class="btn primary" @click="edit(null)">{{ t('new_promo') }}</button>
+      <h1>{{ t('cr.page') }}</h1>
+      <button v-if="tab === 'promos'" class="btn primary" @click="edit(null)">{{ t('new_promo') }}</button>
     </div>
+    <div class="subtabs" role="tablist">
+      <button type="button" role="tab" :class="{ on: tab === 'promos' }" data-testid="promo-tab" @click="setTab('promos')">{{ t('cr.tab_promos') }}</button>
+      <button type="button" role="tab" :class="{ on: tab === 'coupons' }" data-testid="coupon-tab" @click="setTab('coupons')">{{ t('cp.coupons') }}</button>
+    </div>
+    <CouponRules v-if="tab === 'coupons'" />
+    <template v-else>
     <p class="muted small">{{ t('promos_hint') }}</p>
     <div v-if="error && !form.open" class="banner bad">{{ error }}</div>
 
@@ -179,9 +193,13 @@ async function runTrial() {
         </div>
       </form>
     </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: center; }
+.subtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.subtabs button { border: 0; background: none; padding: 9px 16px; font: inherit; font-weight: 600; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; }
+.subtabs button.on { color: var(--brand-dark, var(--brand)); border-bottom-color: var(--brand); }
 </style>

@@ -249,6 +249,9 @@ func (a *App) handoff(ctx context.Context, tx pgx.Tx, o *lockedOrder, actor Acto
 		if err := audit(ctx, tx, o.BranchID, o.ID, actor, "order.picked_up", nil); err != nil {
 			return err
 		}
+		if err := a.giftRepurchase(ctx, tx, o.ID); err != nil {
+			return err
+		}
 		return notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID})
 	}
 	switch o.Fulfillment {
@@ -585,6 +588,9 @@ func (a *App) RiderDeliver(ctx context.Context, taskID, riderID, collected int64
 			return err
 		}
 		if err := tripDrop(ctx, tx, o.ID, "delivered"); err != nil {
+			return err
+		}
+		if err := a.giftRepurchase(ctx, tx, o.ID); err != nil {
 			return err
 		}
 		if err := a.tellOrder(ctx, tx, o.ID, "订单已送达，欢迎评价", "Your order was delivered. Tell us how it was."); err != nil {

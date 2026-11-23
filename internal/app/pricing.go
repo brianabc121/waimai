@@ -24,7 +24,26 @@ type Totals struct {
 	PromotionID     int64  `json:"promotion_id"`
 	PromotionName   string `json:"promotion_name"`
 	PromotionNameEn string `json:"promotion_name_en"`
-	Total           int64  `json:"total"`
+	// PromotionDiscount is what the promotion alone took off (quotes only).
+	PromotionDiscount int64 `json:"promotion_discount"`
+	// MerchantDiscount is the part of Discount the store pays for (its
+	// promotion and its coupons); PlatformSubsidy is the platform coupon,
+	// which the platform pays back to the store. Discount is their sum.
+	MerchantDiscount int64 `json:"merchant_discount"`
+	PlatformSubsidy  int64 `json:"platform_subsidy"`
+	// Total is what the customer pays.
+	Total int64 `json:"total"`
+}
+
+// applyPlatform takes a platform coupon off what the customer pays. It is
+// paid by the platform, so the store's tax and service charge do not change.
+// It returns how much was taken off: never more than is left to pay.
+func (t *Totals) applyPlatform(value int64) int64 {
+	v := min(max(value, 0), t.Total)
+	t.PlatformSubsidy = v
+	t.Discount += v
+	t.Total -= v
+	return v
 }
 
 // mulDivRound returns a*b/d rounded half up.
@@ -47,6 +66,7 @@ func ComputeTotals(subtotal, deliveryFee int64, cfg TaxConfig, d Discount) Total
 		TaxRateBP:    cfg.TaxRateBP,
 		Discount:     d.total(),
 	}
+	t.MerchantDiscount = t.Discount
 	t.ServiceCharge = mulDivRound(goods, int64(cfg.ServiceChargeBP), 10000)
 	base := goods + t.PackagingFee + t.ServiceCharge
 	rate := int64(cfg.TaxRateBP)

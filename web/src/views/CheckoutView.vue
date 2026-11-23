@@ -8,8 +8,10 @@ import { customer, loadCustomer, loginRoute, prettyPhone } from '../customer'
 import { money, pick, t, whenText } from '../i18n'
 import { mallAddressId } from '../mall'
 import type { Item, Quote, Storefront } from '../types'
+import { discountLabel, kindBadge } from '../coupons'
 
 const AddressSheet = defineAsyncComponent(() => import('./AddressSheet.vue'))
+const CouponSheet = defineAsyncComponent(() => import('./CouponSheet.vue'))
 
 const props = defineProps<{ slug: string }>()
 const router = useRouter()
@@ -106,6 +108,14 @@ function describe(e: unknown): string {
 
 // How much is missing to the store's minimum for this address.
 const short = ref(0)
+
+// Coupons: the server picks the best ones until the customer chooses.
+const couponIds = ref<number[] | null>(null)
+const showCoupons = ref(false)
+const coupons = computed(() => quote.value?.coupons ?? [])
+const choices = computed(() => quote.value?.coupon_choices ?? [])
+const couponOff = computed(() => coupons.value.reduce((s, c) => s + c.amount, 0))
+function couponsChosen(ids: number[]) { couponIds.value = ids; showCoupons.value = false; void requote() }
 async function requote() {
   error.value = ''; short.value = 0
   if (cart.lines.length === 0) { router.replace(`/s/${props.slug}`); return }
@@ -120,6 +130,8 @@ async function requote() {
       address_id: delivery.value ? cart.addressId : null,
       items: quoteItems(),
       scheduled_for: scheduled.value || null,
+      // null lets the server choose the coupons that save most
+      coupon_ids: couponIds.value,
     })
     idemKey = keyFor(quote.value.id)
   } catch (e) {
@@ -291,8 +303,16 @@ async function submit() {
           <template v-if="quote">
             <div class="co-row" v-if="quote.totals.service_charge"><span>{{ t('service_charge') }}</span><span>{{ money(quote.totals.service_charge, cur) }}</span></div>
             <div class="co-row" v-if="quote.totals.tax_amount && !quote.totals.tax_inclusive"><span>{{ t('tax') }} {{ quote.totals.tax_rate_bp / 100 }}%</span><span>{{ money(quote.totals.tax_amount, cur) }}</span></div>
-            <div class="co-row disc" v-if="quote.totals.discount"><span><i class="ic">惠</i>{{ pick(quote.totals.promotion_name, quote.totals.promotion_name_en) || t('discount') }}</span><span>−{{ money(quote.totals.discount, cur) }}</span></div>
+            <div class="co-row disc" v-if="quote.totals.promotion_discount"><span><i class="ic promo">{{ kindBadge('promotion') }}</i>{{ pick(quote.totals.promotion_name, quote.totals.promotion_name_en) || t('discount') }}</span><span>−{{ money(quote.totals.promotion_discount, cur) }}</span></div>
+            <button v-if="choices.length" type="button" class="co-coupons" data-testid="coupon-row" @click="showCoupons = true">
+              <span>{{ t('cp.coupons') }} <small>{{ coupons.length ? t('cp.picked', { n: coupons.length }) : choices.some(c => c.usable) ? t('cp.none_picked') : t('cp.none_usable', { n: choices.length }) }}</small></span>
+              <span><b v-if="couponOff">{{ t('cp.saves', { amt: money(couponOff, cur) }) }}</b> ›</span>
+            </button>
+            <div v-for="c in coupons" :key="c.id" class="co-row disc" :class="{ plat: c.funded_by === 'platform' }" data-testid="coupon-line">
+              <span><i class="ic" :class="c.kind">{{ kindBadge(c.kind) }}</i>{{ discountLabel({ ...c, coupon_id: c.id }) }}</span><span>−{{ money(c.amount, cur) }}</span></div>
+            <div class="co-row" v-if="quote.totals.discount && (coupons.length || !quote.totals.promotion_discount)"><b>{{ t('cp.total_off') }}</b><b class="off">{{ money(quote.totals.discount, cur) }}</b></div>
             <div class="co-row sum"><b>{{ t('total') }}</b><b>{{ money(quote.totals.total, cur) }}</b></div>
+            <div class="small muted" v-if="quote.totals.platform_subsidy">{{ t('cp.platform_note') }}</div>
             <div class="co-row small muted" v-if="quote.totals.tax_amount && quote.totals.tax_inclusive"><span>{{ t('tax_included') }} {{ quote.totals.tax_rate_bp / 100 }}%</span><span>{{ money(quote.totals.tax_amount, cur) }}</span></div>
           </template>
         </div>
@@ -317,6 +337,7 @@ async function submit() {
 
     <AddressSheet v-if="showSheet" :slug="mapMode ? slug : undefined" :currency="store?.branch.currency" :selected="cart.addressId" :shop="shopPin" :country="store?.branch.country_code" :fields="store?.branch.contact_fields" :start-new="startNew"
       @select="chosen" @changed="bookChanged" @close="showSheet = false" />
+    <CouponSheet v-if="showCoupons && quote" :choices="choices" :currency="cur ?? 'PHP'" @done="couponsChosen" @close="showCoupons = false" />
     <div v-if="showSlots" class="sheet-mask" data-testid="slot-sheet" @click.self="showSlots = false">
       <div class="sheet">
         <div class="sheet-head row between"><b>{{ t(delivery ? 'co.later_delivery' : 'co.later_pickup') }}</b><button class="btn link" @click="showSlots = false">{{ t('close') }}</button></div>
@@ -361,6 +382,12 @@ async function submit() {
 .co-fees { padding: 8px 0; border-bottom: 1px solid #f0f1f3; }
 .co-fees .ic { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; background: var(--brand); color: #fff; font-size: 12px; font-style: normal; margin-right: 8px; }
 .co-fees .disc span:last-child { color: var(--brand); }
+.co-fees .ic.promo { background: #d97706; width: auto; padding: 0 4px; } .co-fees .ic.store_delivery { background: #b8792a; }
+.co-fees .ic.platform_free { background: #6d28d9; width: auto; padding: 0 4px; }
+.co-fees .disc.plat span:last-child { color: #6d28d9; }
+.co-fees .off { color: var(--brand); }
+.co-coupons { display: flex; justify-content: space-between; align-items: center; width: 100%; margin: 4px 0; padding: 10px 12px; border: 1px solid #f3d7a6; background: #fff3e0; border-radius: 10px; font: inherit; color: inherit; cursor: pointer; }
+.co-coupons small { color: var(--muted); margin-left: 4px; } .co-coupons b { color: var(--brand); }
 .co-fees .sum { font-size: 17px; border-top: 1px solid #f0f1f3; margin-top: 6px; padding-top: 10px; }
 .co-meta { padding-top: 8px; }
 .co-bar { display: flex; align-items: stretch; background: #1f2329; border-radius: 999px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.18); }

@@ -36,7 +36,7 @@ const sorted = computed(() => [...(o.value?.items ?? [])].sort((a, b) => a.baske
       <small v-if="it.note">{{ t('note') }}: {{ it.note }}</small>
     </div>
     <hr />
-    <TotalsTable :totals="o.totals" :currency="o.currency" :delivery="o.service_type === 'delivery'" />
+    <TotalsTable :totals="o.totals" :currency="o.currency" :delivery="o.service_type === 'delivery'" :discounts="o.discounts" />
     <p>{{ t(o.payment_method) }} · {{ t(o.payment_status) }}</p>
   </div>
 </template>

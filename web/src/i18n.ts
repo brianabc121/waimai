@@ -111,7 +111,7 @@ const dict: Record<string, [string, string]> = {
   failed_hint: ['配送异常：请联系顾客后选择重新配送或结束订单。', 'Delivery failed. Contact the customer, then send it out again or close the order.'],
   choose_rider: ['选择骑手', 'Choose rider'],
   promo_media: ['宣传物料', 'Promo media'],
-  promos: ['活动', 'Promotions'], new_promo: ['新建活动', 'New promotion'], no_promos: ['还没有活动', 'No promotions yet'],
+  promos: ['优惠', 'Offers'], new_promo: ['新建活动', 'New promotion'], no_promos: ['还没有活动', 'No promotions yet'],
   promos_hint: ['一张订单只用一个活动，系统自动选对顾客最划算的那个。已下的订单保留当时的优惠，不受之后修改影响。', 'One promotion per order: the system picks the one that saves the customer the most. Existing orders keep the discount they got.'],
   promo_name: ['活动', 'Promotion'], promo_rule: ['规则', 'Rule'], promo_when: ['时间', 'When'], promo_usage: ['已用', 'Used'],
   promo_name_ph: ['例如：满300减30', 'e.g. Spend 300, save 30'], promo_kind: ['类型', 'Type'],
