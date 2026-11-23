@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // The merchant's delivery map: store location, zone outlines, overlap order,
 // gaps and tolerance. Design: docs/MAP_ZONES_DESIGN.md.
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { del, get, post, put } from '../api'
-import { both, money, pick, t, toMajor, toMinor } from '../i18n'
+import { both, currencySymbol, money, pick, t, toMajor, toMinor } from '../i18n'
 import { session } from '../session'
 import { mapsKey as loadMapsKey, type Spot as Place } from '../maps'
 import * as geo from '../geo'
@@ -437,6 +437,9 @@ async function fillRegion() {
   } catch { /* stays unknown; the line under the address says so */ }
   resolving.value = false
 }
+// The store's currency follows its country (the server sets it); the other
+// back-office pages read it from the signed-in role.
+watch(() => branch.value?.currency, c => { const r = session.user?.roles.find(x => x.branch_id === bid); if (r && c) r.currency = c })
 const regionText = computed(() => { const b = branch.value; return b ? [b.country, b.province, b.city, b.district].filter(Boolean).join(' · ') + (b.postal_code ? ` (${b.postal_code})` : '') : '' })
 
 // ---- search ----
@@ -731,6 +734,7 @@ async function fbSave() {
             <template v-if="store"><dt>{{ t('mz.region') }}</dt>
               <dd v-if="branch.country_code" data-testid="store-region">{{ regionText }}</dd>
               <dd v-else class="muted" data-testid="store-region-unknown">{{ t(resolving ? 'mz.region_wait' : 'mz.region_unknown') }} <button v-if="!resolving && !readOnly" class="btn link" @click="fillRegion">{{ t('retry') }}</button></dd></template>
+            <dt>{{ t('mz.currency') }}</dt><dd data-testid="store-currency">{{ branch.currency }} · {{ currencySymbol(branch.currency) }}<span v-if="branch.country_code" class="muted small"> · {{ t('mz.currency_follows') }}</span></dd>
             <dt>{{ t('mz.latlng') }}</dt><dd data-testid="store-latlng">{{ store ? store[0].toFixed(5) + ', ' + store[1].toFixed(5) : t('mz.not_set') }}</dd></dl>
         </section>
         <section>

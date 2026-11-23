@@ -117,7 +117,8 @@ const origin = location.origin
             <div class="small muted" style="margin-top:3px">{{ t('ad.slug_hint', { url: origin + '/s/' + (create.f.slug || '…') }) }}</div></label>
           <div class="f2">
             <label class="field"><span>{{ t('ad.timezone') }}</span><input v-model="create.f.timezone" name="timezone" required /></label>
-            <label class="field"><span>{{ t('ad.currency') }}</span><input v-model="create.f.currency" name="currency" required maxlength="3" /></label>
+            <label class="field"><span>{{ t('ad.currency') }}</span><input v-model="create.f.currency" name="currency" required maxlength="3" />
+              <div class="small muted" style="margin-top:3px">{{ t('ad.currency_auto') }}</div></label>
           </div>
           <h2 style="margin:14px 0 8px">{{ t('owner_account') }}</h2>
           <div class="f2">

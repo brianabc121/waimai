@@ -36,14 +36,14 @@ const today = computed(() => { const o = d.value?.stats.orders_today ?? {}; retu
 const completion = computed(() => { const s = d.value?.stats; return s && s.orders_7d ? Math.round(s.completed_7d * 100 / s.orders_7d) : 0 })
 
 // ---- stores ----
-const blankBranch = () => ({ id: 0, name: '', name_en: '', slug: '', timezone: 'Asia/Manila', currency: 'PHP', address: '', phone: '', oldSlug: '' })
+const blankBranch = () => ({ id: 0, name: '', name_en: '', slug: '', timezone: 'Asia/Manila', currency: 'PHP', country: '', address: '', phone: '', oldSlug: '' })
 const br = reactive({ open: false, error: '', f: blankBranch() })
 function editBranch(b: AdminBranch | null) {
-  br.f = b ? { id: b.id, name: b.name, name_en: b.name_en, slug: b.slug, timezone: b.timezone, currency: b.currency, address: b.address, phone: b.phone, oldSlug: b.slug } : blankBranch()
+  br.f = b ? { id: b.id, name: b.name, name_en: b.name_en, slug: b.slug, timezone: b.timezone, currency: b.currency, country: b.country_code, address: b.address, phone: b.phone, oldSlug: b.slug } : blankBranch()
   br.error = ''; br.open = true
 }
 async function saveBranch() {
-  const { id, oldSlug, ...body } = br.f
+  const { id, oldSlug, country, ...body } = br.f
   br.error = ''
   try {
     await (id ? put(`/admin/branches/${id}`, body) : post(`/admin/merchants/${props.id}/branches`, body))
@@ -200,7 +200,8 @@ const rolesOf = (u: MerchantUser) => [...new Set(u.roles.map(r => r.role))]
             <div v-if="br.f.id && br.f.slug !== br.f.oldSlug" class="banner warn" style="margin-bottom:12px">{{ t('ad.slug_change_warn') }}</div>
             <div class="f2">
               <label class="field"><span>{{ t('ad.timezone') }}</span><input v-model="br.f.timezone" name="timezone" required /></label>
-              <label class="field"><span>{{ t('ad.currency') }}</span><input v-model="br.f.currency" name="currency" required maxlength="3" /></label>
+              <label class="field"><span>{{ t('ad.currency') }}</span><input v-model="br.f.currency" name="currency" required maxlength="3" :disabled="!!br.f.country" />
+                <div class="small muted" style="margin-top:3px" data-testid="currency-hint">{{ br.f.country ? t('ad.currency_follows', { cc: br.f.country }) : t('ad.currency_auto') }}</div></label>
             </div>
             <label class="field"><span>{{ t('address') }}</span><input v-model="br.f.address" name="address" /></label>
             <label class="field"><span>{{ t('phone') }}</span><input v-model="br.f.phone" name="phone" /></label>

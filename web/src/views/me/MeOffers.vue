@@ -6,7 +6,7 @@ import { locale, pick, promoLabel, t } from '../../i18n'
 import type { Promotion } from '../../types'
 import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
-import { describe, homeStore, me, myOffers, offerParts, type StoreOffers } from './me'
+import { bare, describe, homeStore, me, myOffers, offerParts, type StoreOffers } from './me'
 
 const offers = ref<StoreOffers[] | null>(null)
 const error = ref('')
@@ -22,7 +22,7 @@ function only(p: Promotion): string {
   return ''
 }
 // The name the store gave it, unless it only repeats what the offer is.
-const named = (p: Promotion, currency: string) => { const n = pick(p.name, p.name_en); return n && n.replace(/[\s₱$¥]/g, '') !== promoLabel(p, currency).replace(/[\s₱$¥]/g, '') ? n : '' }
+const named = (p: Promotion, currency: string) => { const n = pick(p.name, p.name_en); return n && bare(n, currency) !== bare(promoLabel(p, currency), currency) ? n : '' }
 function valid(p: Promotion): string {
   const out: string[] = []
   out.push(p.ends_at ? t('mo.until', { d: new Date(p.ends_at).toLocaleDateString(locale.value === 'zh' ? 'zh-CN' : 'en-GB') }) : t('mo.no_end'))

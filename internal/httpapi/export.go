@@ -181,7 +181,7 @@ func ridersXLSX(c *gin.Context, r *app.RiderReport, trips []app.Trip) {
 	sums := [][]any{{w("骑手", "Rider"), w("账号", "Username"), w("在岗（小时）", "Hours at work"), w("出车趟数", "Trips"), w("带的单数", "Orders"),
 		w("送达", "Delivered"), w("异常", "Failed"), w("实际里程（公里）", "Ridden (km)"), w("没有位置记录的趟数", "Trips without positions"),
 		w("轨迹中断的趟数", "Trips with a gap"), w("可对比的实际里程（公里）", "Ridden, comparable trips (km)"), w("推荐里程（公里）", "Planned (km)"),
-		w("偏多的趟数", "Detours"), w("代收现金", "Cash collected")}}
+		w("偏多的趟数", "Detours"), w("代收现金", "Cash collected") + " (" + r.Currency + ")"}}
 	for _, l := range r.Riders {
 		names[l.ID] = l
 		sums = append(sums, []any{l.DisplayName, l.Username, hours(l.ShiftMinutes), l.Trips, l.Orders, l.Delivered, l.Failed, kms(l.ActualM),
