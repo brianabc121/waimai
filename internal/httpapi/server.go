@@ -450,9 +450,23 @@ func (s *Server) static(r *gin.Engine) {
 			fail(c, app.ErrNotFound)
 			return
 		}
-		clean := filepath.Join(dir, filepath.Clean("/"+c.Request.URL.Path))
+		path := filepath.Clean("/" + c.Request.URL.Path)
+		clean := filepath.Join(dir, path)
 		if st, err := os.Stat(clean); err == nil && !st.IsDir() {
+			if strings.HasPrefix(path, "/assets/") {
+				// built files carry a hash in their name and never change
+				c.Header("Cache-Control", "public, max-age=31536000, immutable")
+			} else {
+				c.Header("Cache-Control", "no-cache")
+			}
 			c.File(clean)
+			return
+		}
+		// A built file that is gone (an older build's name) must answer 404,
+		// not the page: the browser would otherwise try to run HTML as a
+		// script, and the page could not tell that it needs a reload.
+		if strings.HasPrefix(path, "/assets/") {
+			c.Status(http.StatusNotFound)
 			return
 		}
 		c.Header("Cache-Control", "no-cache")
