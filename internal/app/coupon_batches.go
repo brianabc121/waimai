@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -246,7 +247,8 @@ func giftNewCustomer(ctx context.Context, tx pgx.Tx, customerID int64) error {
 		if id != 0 {
 			if err := tell(ctx, tx, customerID, Message{Kind: "wallet", Title: "新人礼：" + fmtMoney(x.value, x.cur) + "无门槛券已放入你的账户",
 				TitleEn: "Welcome gift: " + fmtMoney(x.value, x.cur) + " off your first orders",
-				Body:    "全平台通用，下单时自动使用", BodyEn: "Any store; it applies by itself at checkout", Link: "/me/coupons"}); err != nil {
+				Body:    "全平台通用，下单时自动使用", BodyEn: "Any store; it applies by itself at checkout", Link: "/me/coupons",
+				Key: "welcome_gift", Args: map[string]string{"value": strconv.FormatInt(x.value, 10), "currency": x.cur}}); err != nil {
 				return err
 			}
 		}
@@ -593,7 +595,7 @@ func (a *App) IssuePlatform(ctx context.Context, actor AdminActor, id int64, in 
 			res.Given++
 			if err := tell(ctx, tx, cid, Message{Kind: "wallet", Title: "平台送你一张" + fmtMoney(value, cur) + "无门槛券",
 				TitleEn: "A " + fmtMoney(value, cur) + " coupon from us", Body: name + " · 限" + where + "店铺使用", BodyEn: name + " · stores in " + where,
-				Link: "/me/coupons"}); err != nil {
+				Link: "/me/coupons", Key: "platform_coupon", Args: map[string]string{"value": strconv.FormatInt(value, 10), "currency": cur}}); err != nil {
 				return err
 			}
 		}

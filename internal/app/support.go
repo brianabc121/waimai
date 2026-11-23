@@ -240,7 +240,7 @@ func (a *App) runSupportAlert(ctx context.Context, j supportAlertJob) error {
 	}
 	tag := fmt.Sprintf("support-%d", j.ThreadID)
 	if customer != nil {
-		return a.pushCustomer(ctx, *customer, PushMessage{Title: "平台客服 Support", Body: "回复了你的消息 answered your message", Tag: tag, URL: "/me/support/chat"})
+		return a.pushCustomer(ctx, *customer, PushMessage{TitleKey: "sys.push.support.title", BodyKey: "sys.push.support.answered", Tag: tag, URL: "/me/support/chat"})
 	}
 	rows, err := a.DB.Query(ctx, `SELECT DISTINCT r.user_id FROM user_branch_roles r JOIN users u ON u.id=r.user_id
 		WHERE r.branch_id=$1 AND u.active AND r.role IN ('owner','manager','cashier')
@@ -252,7 +252,7 @@ func (a *App) runSupportAlert(ctx context.Context, j supportAlertJob) error {
 	if err != nil {
 		return err
 	}
-	m := PushMessage{Title: "平台客服回复了 Support answered", Body: "请打开查看 Open to read", Tag: tag, URL: "/merchant/support"}
+	m := PushMessage{TitleKey: "sys.push.support.merchant_title", BodyKey: "sys.push.support.open", Tag: tag, URL: "/merchant/support"}
 	for _, u := range users {
 		if err := a.sendPush(ctx, pushJob{UserID: u, Message: m}); err != nil {
 			log.Printf("support: reminder to user %d: %v", u, err)

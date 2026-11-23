@@ -194,6 +194,8 @@ func TestRiderPush(t *testing.T) {
 	wantCode(t, err, "VALIDATION")
 	d1, err := a.RegisterDevice(ctx, s.rider1, "android", uniq("tok"), "1.0", "")
 	noErr(t, err)
+	// this phone is set to Chinese; the other has no language and gets English
+	noErr(t, a.SetDeviceLang(ctx, true, d1.ID, "zh"))
 	shared := uniq("tok")
 	_, err = a.RegisterDevice(ctx, s.rider1, "android", shared, "1.0", "")
 	noErr(t, err)
@@ -208,7 +210,7 @@ func TestRiderPush(t *testing.T) {
 	noErr(t, err)
 	noErr(t, a.RunJobs(ctx))
 	got := push.take()
-	if len(got) != 2 || got[0].Title != "新配送单 New delivery" || got[0].URL != "/work" || got[0].Body == "" {
+	if len(got) != 2 || got[0].Title != "新配送单" || got[1].Title != "New delivery" || got[0].URL != "/work" || got[0].Body == "" {
 		t.Fatalf("assigned: %+v", got)
 	}
 	// Assigning the same rider again changes nothing and tells nobody.
@@ -222,7 +224,7 @@ func TestRiderPush(t *testing.T) {
 	_, err = a.Pack(ctx, o.ID, 1, o.ManifestVersion, s.staff)
 	noErr(t, err)
 	noErr(t, a.RunJobs(ctx))
-	if got = push.take(); len(got) != 2 || got[0].Title != "可以取餐了 Ready to collect" {
+	if got = push.take(); len(got) != 2 || got[0].Title != "可以取餐了" || got[1].Title != "Ready to collect" {
 		t.Fatalf("packed: %+v", got)
 	}
 
@@ -237,7 +239,7 @@ func TestRiderPush(t *testing.T) {
 	for _, m := range got {
 		titles[m.Title]++
 	}
-	if len(got) != 2 || titles["新配送单 New delivery"] != 1 || titles["配送单已改派给别人 Delivery reassigned to someone else"] != 1 {
+	if len(got) != 2 || titles["New delivery"] != 1 || titles["配送单已改派给别人"] != 1 {
 		t.Fatalf("reassigned: %+v", got)
 	}
 

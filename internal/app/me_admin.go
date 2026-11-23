@@ -74,7 +74,7 @@ func (a *App) AdminReplyFeedback(ctx context.Context, actor AdminActor, id int64
 		} else if err != nil {
 			return err
 		}
-		if err := tell(ctx, tx, customerID, Message{Kind: "service", Title: "你的意见反馈有回复了", TitleEn: "We replied to your feedback",
+		if err := tell(ctx, tx, customerID, Message{Kind: "service", Title: "你的意见反馈有回复了", TitleEn: "We replied to your feedback", Key: "feedback_reply",
 			Body: reply + "\n\n> " + cut(content, 60), BodyEn: reply + "\n\n> " + cut(content, 60), Link: "/me/feedback"}); err != nil {
 			return err
 		}
@@ -138,7 +138,8 @@ func (a *App) AdminDecideApplication(ctx context.Context, actor AdminActor, id i
 			return err
 		}
 		m := Message{Kind: "service", Body: reply, BodyEn: reply, Link: "/me/apply",
-			Title: "商家入驻申请已通过：" + store, TitleEn: "Your application was approved: " + store}
+			Title: "商家入驻申请已通过：" + store, TitleEn: "Your application was approved: " + store,
+			Key: "apply_approved", Args: map[string]string{"store": store}}
 		if status == "rejected" {
 			m.Title, m.TitleEn = "商家入驻申请未通过："+store, "Your application was not approved: "+store
 		}
@@ -262,7 +263,8 @@ func (a *App) AdminAdjustWallet(ctx context.Context, actor AdminActor, customerI
 			verb = [2]string{"减少", "taken from"}
 		}
 		if err := tell(ctx, tx, customerID, Message{Kind: "wallet", Body: in.Note, BodyEn: in.Note, Link: "/me/wallet/" + in.Account,
-			Title: name[0] + verb[0] + "了", TitleEn: "Something was " + verb[1] + " your " + name[1]}); err != nil {
+			Title: name[0] + verb[0] + "了", TitleEn: "Something was " + verb[1] + " your " + name[1],
+			Key: map[bool]string{true: "wallet_added", false: "wallet_taken"}[in.Amount >= 0] + "." + in.Account}); err != nil {
 			return err
 		}
 		if err := adminAudit(ctx, tx, actor, "customer.wallet", "customer", customerID,

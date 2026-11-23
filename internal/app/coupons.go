@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -460,7 +461,9 @@ func (a *App) giftRepurchase(ctx context.Context, tx pgx.Tx, orderID int64) erro
 		Title:   b.Name + "送你一张" + zh,
 		TitleEn: pickName(b.NameEn, b.Name) + " sent you a coupon: " + en,
 		Body:    day.Format("1月2日") + "前在本店下单可用", BodyEn: "Use it at this store by " + day.Format("2 Jan"),
-		Link: "/me/coupons"})
+		Link: "/me/coupons", Key: "store_coupon", Args: map[string]string{"store": b.Name, "store_en": b.NameEn,
+			"kind": bt.Kind, "value": strconv.FormatInt(bt.Value, 10), "threshold": strconv.FormatInt(bt.Threshold, 10),
+			"currency": b.Currency, "day": day.Format("2006-01-02")}})
 }
 
 // couponWords describes a coupon in a few words, Chinese and English.
@@ -518,11 +521,15 @@ func (a *App) RemindExpiringCoupons(ctx context.Context) (int, error) {
 	for _, d := range list {
 		zh, en := couponWords(d.kind, d.value, d.threshold, d.cur)
 		body, bodyEn := "全平台通用", "Any store on the platform"
+		args := map[string]string{"kind": d.kind, "value": strconv.FormatInt(d.value, 10),
+			"threshold": strconv.FormatInt(d.threshold, 10), "currency": d.cur, "_body": "msg.any_store"}
 		if d.store != "" {
 			body, bodyEn = d.store, d.store
+			delete(args, "_body")
 		}
 		if err := tell(ctx, a.DB, d.cust, Message{Kind: "wallet", Title: "你的" + zh + "快过期了",
-			TitleEn: "Your coupon expires soon: " + en, Body: body, BodyEn: bodyEn, Link: "/me/coupons"}); err != nil {
+			TitleEn: "Your coupon expires soon: " + en, Body: body, BodyEn: bodyEn, Link: "/me/coupons",
+			Key: "coupon_expiring", Args: args}); err != nil {
 			return 0, err
 		}
 	}

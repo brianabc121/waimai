@@ -65,3 +65,21 @@ func TestUITexts(t *testing.T) {
 		t.Fatal("a sheet without the language's column should be refused")
 	}
 }
+
+// Corrections of the server's own texts on the language page reach SMS.
+func TestSysTextFix(t *testing.T) {
+	need(t)
+	ctx := context.Background()
+	a := app.New(testApp.DB, "test-secret")
+	if s := app.SysTextForTest(a, ctx, "th", "sys.sms.pickup", "code", "A12"); s != "รหัสรับอาหาร: A12" {
+		t.Fatalf("thai %q", s)
+	}
+	if s := app.SysTextForTest(a, ctx, "xx", "sys.order.cancelled"); s != "Your order was cancelled" {
+		t.Fatalf("unknown language %q", s)
+	}
+	noErr(t, a.SaveUITexts(ctx, adminActor(t), "ja", []app.UIEdit{{Key: "sys.order.cancelled", Text: "キャンセル済み"}}))
+	t.Cleanup(func() { _ = a.SaveUITexts(ctx, adminActor(t), "ja", []app.UIEdit{{Key: "sys.order.cancelled", Text: ""}}) })
+	if s := app.SysTextForTest(a, ctx, "ja", "sys.order.cancelled"); s != "キャンセル済み" {
+		t.Fatalf("corrected %q", s)
+	}
+}

@@ -73,6 +73,9 @@ type App struct {
 	base        config.Config
 	effective   *config.Config
 	settingsSig string
+
+	// fixed caches the language page's corrections of system texts.
+	fixed *sysFixCache
 }
 
 // forCustomer applies platform-wide limits to a store as customers use it.
@@ -84,7 +87,7 @@ func (a *App) forCustomer(b *Branch) *Branch {
 }
 
 func New(pool *pgxpool.Pool, secret string) *App {
-	return &App{DB: pool, Secret: []byte(secret), SMS: LogSMS{}, mu: &sync.RWMutex{}}
+	return &App{DB: pool, Secret: []byte(secret), SMS: LogSMS{}, mu: &sync.RWMutex{}, fixed: &sysFixCache{}}
 }
 
 // Error is a business error with a stable code that the HTTP layer maps 1:1.

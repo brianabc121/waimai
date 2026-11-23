@@ -2,7 +2,9 @@
 import { reactive } from 'vue'
 import { del, get, post, put, upload } from '../../api'
 import { customer, loadCustomer } from '../../customer'
-import { currencySymbol, extend, intlTag, money, t } from '../../i18n'
+import { currencySymbol, extend, has, intlTag, money, pick, t } from '../../i18n'
+import { couponTitle } from '../../coupons'
+import './messageStrings'
 import type { Promotion } from '../../types'
 
 export interface Wallet { currency: string; balance: number; bonus: number }
@@ -17,7 +19,26 @@ export interface MyReview {
   id: number; rating: number; taste: number; packaging: number; delivery: number | null; comment: string
   created_at: string; display_name: string; items: { name: string; name_en: string }[]; store: StoreRef; token: string
 }
-export interface Message { id: number; kind: 'order' | 'service' | 'wallet'; title: string; title_en: string; body: string; body_en: string; link: string; created_at: string; read: boolean }
+export interface Message { id: number; kind: 'order' | 'service' | 'wallet'; title: string; title_en: string; body: string; body_en: string; link: string; created_at: string; read: boolean
+  key?: string; args?: Record<string, string> }
+
+// messageText is a message in the reader's language of the moment: messages
+// are kept as a text key and its values (docs/I18N_DESIGN.md §10). Older
+// messages, and parts without a text of their own, show the stored Chinese
+// or English.
+export function messageText(m: Message): { title: string; body: string } {
+  const plain = { title: pick(m.title, m.title_en), body: pick(m.body, m.body_en) }
+  if (!m.key || !has('msg.' + m.key)) return plain
+  const a: Record<string, string> = { ...(m.args ?? {}) }
+  if (a.value && a.currency) {
+    a.amount = money(Number(a.value), a.currency)
+    if (a.kind) a.coupon = couponTitle({ kind: a.kind, value: Number(a.value), threshold: Number(a.threshold ?? 0) }, a.currency)
+  }
+  if (a.day) a.day = new Date(a.day + 'T12:00:00').toLocaleDateString(intlTag(), { month: 'short', day: 'numeric' })
+  if (a.store_en !== undefined) a.store = pick(a.store, a.store_en)
+  const bodyKey = a._body ?? 'msg.' + m.key + '.body'
+  return { title: t('msg.' + m.key, a), body: has(bodyKey) ? t(bodyKey, a) : plain.body }
+}
 export interface Feedback { id: number; kind: string; content: string; contact: string; reply: string; replied_at: string | null; created_at: string }
 // Where a store that applies is: picked on the map, with the country and region read off it.
 export interface ApplicationPlace {

@@ -16,6 +16,7 @@ interface Row { key: string; zh: string; en: string; text: string; shipped: stri
 
 const lang = ref<Locale>((localStorage.getItem('i18n-lang') as Locale) || 'th')
 const source = ref<Record<string, Src>>({})
+const sys = ref<Record<string, Record<string, string>>>({})
 const shipped = ref<Record<string, string>>({})
 const fixes = ref<Record<string, Fix>>({})
 const error = ref('')
@@ -33,12 +34,16 @@ async function load() {
   error.value = ''; note.value = ''; editing.value = ''
   try {
     const [src, ship, fx] = await Promise.all([
-      Object.keys(source.value).length ? Promise.resolve(source.value) : import('virtual:i18n-source').then(m => m.default),
+      Object.keys(source.value).length ? Promise.resolve(source.value) : import('virtual:i18n-source').then(m => {
+        // the server's own texts (SMS, push reminders) are listed too, under "sys"
+        sys.value = m.sys
+        return { ...m.default, ...Object.fromEntries(Object.entries(m.sys).map(([k, v]) => [k, { zh: v.zh, en: v.en, file: 'server' }])) }
+      }),
       textsOf(lang.value),
       get<{ fixes: Fix[] }>(`/admin/i18n/${lang.value}`),
     ])
     source.value = src
-    shipped.value = ship
+    shipped.value = { ...ship, ...Object.fromEntries(Object.entries(sys.value).filter(([, v]) => v[lang.value]).map(([k, v]) => [k, v[lang.value]])) }
     fixes.value = Object.fromEntries(fx.fixes.map(f => [f.key, f]))
   } catch (e) { error.value = (e as Error).message }
 }

@@ -121,7 +121,7 @@ func (a *App) runChatAlert(ctx context.Context, j chatAlertJob) error {
 		if err != nil {
 			return err
 		}
-		m := PushMessage{Title: "有新的顾客消息 New customer message", Body: store, Tag: tag,
+		m := PushMessage{TitleKey: "sys.push.chat.store_title", Body: store, Tag: tag,
 			URL: fmt.Sprintf("/merchant/messages?c=%d", customerID)}
 		for _, u := range users {
 			if err := a.sendPush(ctx, pushJob{UserID: u, Message: m}); err != nil {
@@ -133,7 +133,7 @@ func (a *App) runChatAlert(ctx context.Context, j chatAlertJob) error {
 		if customerUnread == 0 || quiet {
 			return nil
 		}
-		return a.pushCustomer(ctx, customerID, PushMessage{Title: store, Body: "给你发了新消息 sent you a message", Tag: tag, URL: "/chat/" + slug})
+		return a.pushCustomer(ctx, customerID, PushMessage{Title: store, BodyKey: "sys.push.chat.sent_you", Tag: tag, URL: "/chat/" + slug})
 	case "sms":
 		if customerUnread == 0 || quiet || !notifySMS {
 			return nil
@@ -150,13 +150,13 @@ func (a *App) pushCustomer(ctx context.Context, customerID int64, m PushMessage)
 	if sender == nil {
 		return nil
 	}
-	rows, err := a.DB.Query(ctx, `SELECT id, token FROM customer_devices WHERE customer_id=$1 ORDER BY id`, customerID)
+	rows, err := a.DB.Query(ctx, `SELECT id, token, lang FROM customer_devices WHERE customer_id=$1 ORDER BY id`, customerID)
 	if err != nil {
 		return err
 	}
 	devices, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Device, error) {
 		d := Device{Platform: "web"}
-		return d, r.Scan(&d.ID, &d.Token)
+		return d, r.Scan(&d.ID, &d.Token, &d.Lang)
 	})
 	if err != nil {
 		return err
@@ -165,7 +165,7 @@ func (a *App) pushCustomer(ctx context.Context, customerID int64, m PushMessage)
 	var last error
 	for _, d := range devices {
 		sendCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-		err := sender.Send(sendCtx, d, m)
+		err := sender.Send(sendCtx, d, m.in(ctx, a, d.Lang))
 		cancel()
 		switch {
 		case err == nil:
@@ -188,12 +188,12 @@ func (a *App) pushCustomer(ctx context.Context, customerID int64, m PushMessage)
 // browser to push to, and has not been texted about this order before.
 func (a *App) chatSMS(ctx context.Context, threadID, branchID, customerID int64, store, slug string) error {
 	var orderID int64
-	var phone string
-	err := a.DB.QueryRow(ctx, `SELECT o.id, o.customer_phone FROM orders o
+	var phone, lang string
+	err := a.DB.QueryRow(ctx, `SELECT o.id, o.customer_phone, o.customer_lang FROM orders o
 		WHERE o.branch_id=$1 AND o.customer_id=$2 AND o.closed_at IS NULL AND o.channel <> 'dine_in'
 		  AND o.acceptance_status IN ('pending','accepted')
 		  AND NOT EXISTS (SELECT 1 FROM customer_devices d WHERE d.customer_id=o.customer_id)
-		ORDER BY o.id DESC LIMIT 1`, branchID, customerID).Scan(&orderID, &phone)
+		ORDER BY o.id DESC LIMIT 1`, branchID, customerID).Scan(&orderID, &phone, &lang)
 	if isNoRows(err) {
 		return nil
 	}
@@ -205,7 +205,11 @@ func (a *App) chatSMS(ctx context.Context, threadID, branchID, customerID int64,
 	if err != nil || tag.RowsAffected() == 0 {
 		return err
 	}
-	msg := fmt.Sprintf("【%s】给你发了消息，请打开查看。%s sent you a message.", store, store)
+	// one language only: the one the customer ordered in
+	if names, err := storeNames(ctx, a.DB, lang, []int64{branchID}); err == nil && names[branchID] != "" {
+		store = names[branchID]
+	}
+	msg := a.sysText(ctx, lang, "sys.sms.chat", "store", store)
 	if a.PublicBaseURL != "" {
 		msg += " " + strings.TrimRight(a.PublicBaseURL, "/") + "/chat/" + slug
 	}

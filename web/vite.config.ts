@@ -1,17 +1,23 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { readFileSync } from 'node:fs'
 import { source } from './scripts/i18n.mjs'
 
 // virtual:i18n-source is every interface text with its Chinese and English,
-// read from the code the way `npm run i18n source` does; only the platform's
+// read from the code the way `npm run i18n source` does, and (as `sys`) the
+// texts the server sends itself in every language; only the platform's
 // language page loads it.
 function i18nSource() {
   const id = 'virtual:i18n-source'
   return {
     name: 'i18n-source',
     resolveId: (s: string) => (s === id ? '\0' + id : null),
-    load: (s: string) => (s === '\0' + id ? `export default ${JSON.stringify(source())}` : null),
+    load: (s: string) => {
+      if (s !== '\0' + id) return null
+      const sys = JSON.parse(readFileSync(new URL('../internal/app/systexts/texts.json', import.meta.url), 'utf8'))
+      return `export default ${JSON.stringify(source())}\nexport const sys = ${JSON.stringify(sys)}`
+    },
   }
 }
 
