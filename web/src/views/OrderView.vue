@@ -217,8 +217,6 @@ async function copyNo() {
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.phone" /></svg>{{ t('od.call_rider') }}</a>
               <router-link v-if="chatOn && store" class="btn act" data-testid="act-chat" :to="`/chat/${store.slug}`">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.chat" /></svg>{{ t('ch.contact_store') }}</router-link>
-              <a v-if="store?.phone" class="btn act" data-testid="act-store" :href="'tel:' + store.phone">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" stroke="none"><path :d="ICONS.phone" /></svg>{{ t('od.call_store') }}</a>
               <button class="btn act primary" data-testid="act-again" :disabled="againBusy" @click="again">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.again" /></svg>{{ t('ol.again') }}</button>
             </div>
@@ -295,16 +293,14 @@ async function copyNo() {
         <section class="od-card od-infocard" data-testid="order-info">
           <h2>{{ t('od.info') }}</h2>
           <div v-if="order.service_type === 'delivery'" class="od-where">
-            <svg class="pin" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 2.500a7 7 0 0 0-7 7c0 5.100 7 12 7 12s7-6.900 7-12a7 7 0 0 0-7-7zm0 9.600a2.600 2.600 0 1 1 0-5.200 2.600 2.600 0 0 1 0 5.200z" /></svg>
-            <div><small>{{ t('od.address') }}</small>
+            <div><small><svg class="pin" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M12 2.500a7 7 0 0 0-7 7c0 5.100 7 12 7 12s7-6.900 7-12a7 7 0 0 0-7-7zm0 9.600a2.600 2.600 0 1 1 0-5.200 2.600 2.600 0 0 1 0 5.200z" /></svg>{{ t('od.address') }}</small>
               <b>{{ order.address_line }}</b>
               <b v-if="order.address_unit">{{ order.address_unit }}</b>
               <span>{{ contactName(order) }}<i v-if="contactName(order)" class="gap"></i>{{ prettyPhone(contactPhone(order)) }}</span>
               <span v-if="order.address_note" class="note">{{ order.address_note }}</span></div>
           </div>
           <div v-else-if="store" class="od-where">
-            <svg class="pin" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="ICONS.bag" /></svg>
-            <div><small>{{ t('od.pickup_at_store') }}</small><b>{{ storeName }}</b><span>{{ store.address }}</span></div>
+            <div><small><svg class="pin" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="ICONS.bag" /></svg>{{ t('od.pickup_at_store') }}</small><b>{{ storeName }}</b><span>{{ store.address }}</span></div>
           </div>
           <dl class="od-info">
             <div><dt>{{ t('od.no') }}</dt>
@@ -460,10 +456,10 @@ async function copyNo() {
 .od-receipt :deep(.totals tr.sum + tr td) { font-size: 13px; padding-top: 0; color: var(--muted); }
 
 /* where it goes and the order's facts */
-.od-where { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 10px; background: var(--gold-soft); }
-.od-where .pin { flex: none; color: var(--red); margin-top: 1px; }
-.od-where > div { display: grid; gap: 2px; min-width: 0; }
-.od-where small { font-size: 12px; color: var(--muted); }
+.od-where { display: flex; padding: 2px 0 10px; }
+.od-where .pin { flex: none; color: var(--red); }
+.od-where > div { display: grid; gap: 2px; min-width: 0; text-align: start; }
+.od-where small { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
 .od-where b { font-weight: 500; font-size: 15px; overflow-wrap: anywhere; }
 .od-where span { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .od-where .gap { display: inline-block; width: 10px; }

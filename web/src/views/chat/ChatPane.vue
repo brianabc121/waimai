@@ -12,7 +12,7 @@ const props = defineProps<{
   staff?: { uid: number; name: string }
   peerReadAt: string | null
   blocked?: string // why nothing can be sent, when it cannot
-  desk?: boolean // Enter sends
+  desk?: boolean // the store desk (wording of the box)
   uploadPath: string // where this conversation's pictures are uploaded
   orders?: ChatOrder[] // the customer's orders with the store: what a card shows and what can be sent
   emptyText?: string // shown before the first message
@@ -92,8 +92,11 @@ const orderOf = (id?: number) => props.orders?.find(o => o.id === id)
 const input = ref<HTMLTextAreaElement | null>(null)
 function put(text: string) { draft.value = text; void nextTick(() => input.value?.focus()) }
 defineExpose({ put })
+// Enter sends on every chat page, Shift+Enter breaks the line; Enter that
+// picks a word in a Chinese input method (isComposing, or Safari's 229) is left alone
 function key(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && props.desk) { e.preventDefault(); send() }
+  if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.keyCode === 229) return
+  e.preventDefault(); send()
 }
 
 let stop = () => {}
