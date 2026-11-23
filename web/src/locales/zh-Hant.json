@@ -2294,5 +2294,9 @@
 "vo.view":"🔍 查看",
 "vo.view_short":"查看",
 "vo.view_hint":"在新視窗打開谷歌地圖看這個位置",
-"vo.view_none":"這個地址還沒有經緯度，先從推薦裡選或點「打開谷歌地圖」定位"
+"vo.view_none":"這個地址還沒有經緯度，先從推薦裡選或點「打開谷歌地圖」定位",
+"co.deliver_to":"配送至",
+"co.pickup_at":"自取門市",
+"co.cod":"貨到付款",
+"co.pay_cash":"現金支付"
 }
