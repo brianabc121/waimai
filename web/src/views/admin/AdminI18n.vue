@@ -51,9 +51,47 @@ onMounted(load)
 watch(lang, l => { try { localStorage.setItem('i18n-lang', l) } catch { /* private mode */ } page.value = 1; void load() })
 watch([filter, group, q], () => { page.value = 1 })
 
-// a label or button whose text is far longer than the English may not fit
-const chars = (s: string) => [...s].length
-const tooLong = (text: string, en: string) => chars(en) <= 24 && chars(text) > Math.max(chars(en) * 2.2, chars(en) + 12)
+// A label or button whose text is much wider on screen than the English may
+// not fit where the English does (docs/I18N_DESIGN.md §15). Widths are
+// measured in the site's font, not counted in letters: a Burmese or Thai
+// letter is narrower than a Latin one, a Chinese one wider. Short texts
+// (buttons, tabs, labels) get a budget against the English; sentences wrap,
+// so they are left alone.
+const canvas = document.createElement('canvas').getContext('2d')
+const fontVer = ref(0)
+function width(s: string): number {
+  void fontVer.value
+  if (!canvas) return [...s].length * 8
+  canvas.font = `15px ${getComputedStyle(document.documentElement).fontFamily || 'sans-serif'}`
+  return canvas.measureText(s).width
+}
+// budget is how much wider than the English a text may be: generous for a
+// word or two, tighter for a short phrase
+function budget(en: string): number | null {
+  const n = [...en].length
+  return n <= 12 ? 2 : n <= 30 ? 1.6 : n <= 50 ? 1.45 : null
+}
+// over is how much a text runs past its budget, in per cent of the English
+// width (0 when it fits)
+function over(text: string, en: string): number {
+  const b = budget(en)
+  if (!b || !text || !en) return 0
+  const we = width(plain(en)), wt = width(plain(text))
+  // a few letters more is never the problem: at least about six letters wider
+  return we > 0 && wt > we * b && wt - we > 48 ? Math.round((wt / we - 1) * 100) : 0
+}
+// plain is a text as it shows: the "other" form of a plural, a short number
+// for each {placeholder}
+const plain = (s: string) => s
+  .replace(/\{(\w+), plural,((?:\s*[=\w]+\s*\{[^{}]*\})+)\s*\}/g, (_, _n: string, body: string) => (/other\s*\{([^{}]*)\}/.exec(body)?.[1] ?? '').replace(/#/g, '8'))
+  .replace(/\{\w+\}/g, '88')
+const tooLong = (text: string, en: string) => over(text, en) > 0
+watch(lang, l => { if (l === 'my' || l === 'km') import('../../fonts').then(() => document.fonts.ready).then(() => fontVer.value++) }, { immediate: true })
+// while typing: how much wider than the English the draft is
+const draftOver = computed(() => {
+  const r = rows.value.find(x => x.key === editing.value)
+  return r ? over(draft.value, r.en) : 0
+})
 
 const rows = computed<Row[]>(() => Object.entries(source.value).map(([key, s]) => {
   const ship = lang.value === 'zh' ? s.zh : lang.value === 'en' ? s.en : shipped.value[key] ?? ''
@@ -182,10 +220,12 @@ async function applyImport() {
 const pages_ = [
   { path: '/', label: 'ad.i18n.p_mall' }, { path: '/orders', label: 'ad.i18n.p_orders' }, { path: '/me', label: 'ad.i18n.p_me' },
 ] as const
-const preview = reactive({ path: '/' as string, store: '', on: true, n: 0 })
+const preview = reactive({ path: '/' as string, store: '', on: true, n: 0, pseudo: false })
+// "40% longer" shows the page with every text lengthened (pseudo-localisation),
+// to see where a long translation would break it
 const previewUrl = computed(() => {
   const p = preview.store.trim() ? `/s/${encodeURIComponent(preview.store.trim())}` : preview.path
-  return `${p}?lang=${lang.value}&i18nfresh=${preview.n}`
+  return `${p}?lang=${preview.pseudo ? 'en' : lang.value}&i18nfresh=${preview.n}&pseudo=${preview.pseudo ? 1 : 0}`
 })
 function reloadPreview() { preview.n++ }
 
@@ -240,13 +280,14 @@ const statusText = (s: Status) => t('ad.i18n.st_' + s)
                 <td :dir="lang === 'ar' ? 'rtl' : undefined" :lang="lang">
                   <template v-if="editing === r.key">
                     <textarea v-model="draft" rows="3" data-testid="i18n-draft"></textarea>
+                    <div v-if="draftOver" class="small" style="color:var(--warn)" data-testid="i18n-draft-long">{{ t('ad.i18n.long_draft', { pct: draftOver }) }}</div>
                     <div class="row wrap" style="margin-top:4px">
                       <button class="btn small primary" :disabled="busy || !draft.trim()" data-testid="i18n-save" @click="saveOne(r)">{{ t('ad.i18n.save') }}</button>
                       <button class="btn small" @click="editing = ''">{{ t('cancel') }}</button>
                     </div>
                   </template>
                   <button v-else class="cell" data-testid="i18n-cell" @click="edit(r)">{{ r.text || '—' }}</button>
-                  <span v-if="r.long" class="tag warn small">{{ t('ad.i18n.long') }}</span>
+                  <span v-if="r.long" class="tag warn small" data-testid="i18n-long" :title="t('ad.i18n.long_hint')">{{ t('ad.i18n.long_pct', { pct: over(r.text, r.en) }) }}</span>
                 </td>
                 <td>
                   <span class="tag" :class="{ ok: r.status === 'human', warn: r.status === 'machine', bad: r.status === 'missing' }">{{ statusText(r.status) }}</span>
@@ -272,6 +313,7 @@ const statusText = (s: Status) => t('ad.i18n.st_' + s)
           <select v-model="preview.path" @change="preview.store = ''"><option v-for="p in pages_" :key="p.path" :value="p.path">{{ t(p.label) }}</option></select>
           <input v-model.lazy="preview.store" :placeholder="t('ad.i18n.p_store')" style="width:110px" />
         </div>
+        <label class="check small" style="margin:0" :title="t('ad.i18n.pseudo_hint')"><input v-model="preview.pseudo" type="checkbox" data-testid="i18n-pseudo" />{{ t('ad.i18n.pseudo') }}</label>
         <iframe :key="previewUrl" :src="previewUrl" title="preview" data-testid="i18n-preview"></iframe>
       </aside>
     </div>

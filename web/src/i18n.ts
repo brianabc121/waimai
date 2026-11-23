@@ -320,9 +320,45 @@ export function t(key: string, vars: Record<string, string | number> = {}): stri
   void fixVer.value
   let s = fixes[l]?.[key] ?? (l === 'zh' ? e?.[0] : l === 'en' ? e?.[1] : texts[l]?.[key] ?? e?.[1]) ?? key
   if (s.includes(', plural,')) s = plural(s, vars)
+  if (pseudo.value) s = pseudoText(s)
   for (const k in vars) s = s.split(`{${k}}`).join(String(vars[k]))
   return s
 }
+
+// Pseudo-localisation, for testing layouts (docs/I18N_DESIGN.md §15): a link
+// with ?pseudo=1 makes every text on the page about 40% longer (short ones
+// longer still), with accents and brackets, "⟦Šéáŕçĥ šţöŕéš ŵŵŵŵ⟧", so the
+// places where a long translation would break the layout show up in any
+// language, and a cut-off end shows as a missing ⟧. Dish and store names are
+// lengthened too. ?pseudo=0 turns it off; it lasts for the tab only. Nobody
+// sees it without the link.
+export const pseudo = ref(readPseudo())
+function readPseudo(): boolean {
+  try {
+    const q = new URLSearchParams(location.search).get('pseudo')
+    // the language page's preview shares the tab's storage: it asks without remembering
+    if (/[?&]i18nfresh=/.test(location.search)) return q === '1'
+    if (q !== null) sessionStorage.setItem('pseudo', q === '0' ? '' : '1')
+    return !!sessionStorage.getItem('pseudo')
+  } catch { return false }
+}
+const ACCENTS: Record<string, string> = {
+  a: 'á', b: 'ƀ', c: 'ç', d: 'ð', e: 'é', f: 'ƒ', g: 'ĝ', h: 'ĥ', i: 'î', j: 'ĵ', k: 'ķ', l: 'ļ', m: 'ɱ',
+  n: 'ñ', o: 'ö', p: 'þ', q: 'ǫ', r: 'ŕ', s: 'š', t: 'ţ', u: 'û', v: 'ṽ', w: 'ŵ', x: 'ẋ', y: 'ý', z: 'ž',
+  A: 'Å', B: 'Ɓ', C: 'Ç', D: 'Ð', E: 'É', F: 'Ƒ', G: 'Ĝ', H: 'Ĥ', I: 'Î', J: 'Ĵ', K: 'Ķ', L: 'Ļ', M: 'Ṁ',
+  N: 'Ñ', O: 'Ö', P: 'Þ', Q: 'Ǫ', R: 'Ŕ', S: 'Š', T: 'Ţ', U: 'Û', V: 'Ṽ', W: 'Ŵ', X: 'Ẋ', Y: 'Ý', Z: 'Ž',
+}
+// pseudoText lengthens one text. {placeholders} stay as they are; a CJK
+// character counts as two letters.
+export function pseudoText(s: string): string {
+  if (!s || s === '—' || s.startsWith('⟦')) return s
+  const out = s.replace(/\{[^{}]*\}|[A-Za-z]/g, c => ACCENTS[c] ?? c)
+  let n = 0
+  for (const ch of s) n += /[\u2E80-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 2 : 1
+  const extra = n <= 4 ? n + 2 : n <= 10 ? Math.ceil(n * 0.7) : Math.ceil(n * 0.4)
+  return `⟦${out} ${'ŵŵŵŵŵŵŵŵ ŵŵŵŵŵŵ ŵŵŵŵŵŵŵŵŵŵ ŵŵŵŵ '.repeat(Math.ceil(extra / 32) + 1).slice(0, extra).trim()}⟧`
+}
+const pz = (s: string) => pseudo.value ? pseudoText(s) : s
 
 // plural picks the form for a count: "{n, plural, one {# заказ} few {# заказа} other {# заказов}}".
 function plural(s: string, vars: Record<string, string | number>): string {
@@ -348,20 +384,20 @@ export const menuOriginal = ref(false)
 // mn names a dish, category, option or offer for the customer: in their
 // language when the server sent it (name_tr), else as pick does.
 export function mn(o: { name: string; name_en?: string; name_tr?: string }): string {
-  if (menuOriginal.value) return o.name
-  return o.name_tr || pick(o.name, o.name_en ?? '')
+  if (menuOriginal.value) return pz(o.name)
+  return pz(o.name_tr || pick(o.name, o.name_en ?? ''))
 }
 
 // sn names a store for the customer: its name in their language when the
 // server sent one (Simplified Chinese, English, Traditional Chinese, or the
 // store's own language; English for everyone else), else as pick does.
 export function sn(o: { name: string; name_en?: string; name_tr?: string }): string {
-  return o.name_tr || pick(o.name, o.name_en ?? '')
+  return pz(o.name_tr || pick(o.name, o.name_en ?? ''))
 }
 
 // mt is a longer menu text (description, details) for the customer.
 export function mt(orig: string | undefined, tr: string | undefined): string {
-  return (!menuOriginal.value && tr) || orig || ''
+  return pz((!menuOriginal.value && tr) || orig || '')
 }
 
 // both shows "中文 / English" for staff screens where the team is mixed.

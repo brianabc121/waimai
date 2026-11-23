@@ -105,8 +105,8 @@ const resetPw = () => act(() => post(`/merchant/branches/${bid}/staff/${f.id}/pa
     <StaffTabs />
     <div class="row between wrap" style="margin-bottom:12px">
       <h1 style="font-size:20px">{{ t('staff') }} <span class="muted small" style="font-weight:400">{{ t('st.count', { a: active.length, d: counts.off }) }}</span></h1>
-      <span class="row">
-        <input v-model="q" type="search" :placeholder="t('st.search')" style="width:220px" data-testid="staff-search" />
+      <span class="row wrap" style="max-width:100%">
+        <input v-model="q" type="search" :placeholder="t('st.search')" style="width:220px;max-width:100%" data-testid="staff-search" />
         <button class="btn primary" data-testid="staff-new" @click="edit(null)">＋ {{ t('st.new') }}</button>
       </span>
     </div>

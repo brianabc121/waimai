@@ -14,11 +14,11 @@ const unread = computed(() => me.profile ? me.profile.unread + me.profile.chat_u
 <template>
   <header class="cnav" data-testid="customer-nav">
     <div class="cnav-in">
-      <router-link to="/" class="brand">{{ t('cn.brand') }}</router-link>
+      <router-link to="/" class="brand" :title="t('cn.brand')">{{ t('cn.brand') }}</router-link>
       <nav class="links">
-        <router-link to="/" :class="{ on: active === 'home' }">{{ t('me.home') }}</router-link>
-        <router-link to="/orders" :class="{ on: active === 'orders' }" data-testid="nav-orders">{{ t('cn.orders') }}</router-link>
-        <router-link to="/me" :class="{ on: active === 'me' }" data-testid="nav-me">{{ t('cn.center') }}</router-link>
+        <router-link to="/" :class="{ on: active === 'home' }" :title="t('me.home')">{{ t('me.home') }}</router-link>
+        <router-link to="/orders" :class="{ on: active === 'orders' }" data-testid="nav-orders" :title="t('cn.orders')">{{ t('cn.orders') }}</router-link>
+        <router-link to="/me" :class="{ on: active === 'me' }" data-testid="nav-me" :title="t('cn.center')">{{ t('cn.center') }}</router-link>
       </nav>
       <span class="grow"></span>
       <LangButton class="lang" />
@@ -40,12 +40,13 @@ const unread = computed(() => me.profile ? me.profile.unread + me.profile.chat_u
 @media (min-width: 768px) {
   .cnav { display: block; background: var(--red-bg); color: #fff; }
   .cnav-in { max-width: 1240px; margin: 0 auto; display: flex; align-items: center; gap: 28px; height: 60px; padding: 0 24px; }
-  .brand { font-size: 20px; font-weight: 700; color: #fff3da; white-space: nowrap; letter-spacing: 1px; }
-  .links { display: flex; gap: 6px; }
-  .links a { color: #fff; opacity: .88; padding: 6px 12px; border-radius: 9px; white-space: nowrap; font-size: 14px; }
+  .brand { font-size: 20px; font-weight: 700; color: #fff3da; white-space: nowrap; letter-spacing: 1px; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .links { display: flex; gap: 6px; flex: 0 1 auto; min-width: 0; }
+  .links a { color: #fff; opacity: .88; padding: 6px 12px; border-radius: 9px; white-space: nowrap; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .links a:hover { opacity: 1; background: rgba(255, 255, 255, .12); }
   .links a.on { opacity: 1; background: var(--gold); color: var(--red); font-weight: 600; }
-  .grow { flex: 1; }
+  .grow { flex: 1 0 0; }
+  .lang, .msg, .avatar { flex: none; }
   .lang { border: 1px solid rgba(255, 255, 255, .7); background: none; color: #fff; border-radius: 6px; padding: 1px 8px; font-size: 12px; cursor: pointer; margin-inline-end: -12px; }
   .msg { position: relative; width: 36px; height: 36px; border-radius: 8px; background: rgba(255, 255, 255, .16); color: #fff; display: grid; place-items: center; }
   .msg i { position: absolute; inset-inline-end: -6px; top: -6px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: var(--gold); color: var(--red); font-style: normal; font-size: 11px; font-weight: 700; display: grid; place-items: center; border: 1.5px solid var(--red); }

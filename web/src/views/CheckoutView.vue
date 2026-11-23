@@ -382,7 +382,7 @@ async function submit() {
 .co-thumb.none { display: grid; place-items: center; background: #fdebd9; color: #c2570f; font-size: 20px; font-weight: 600; }
 .co-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; }
 .co-fees { padding: 8px 0; border-bottom: 1px solid #f0f1f3; }
-.co-fees .ic { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; background: var(--brand); color: #fff; font-size: 12px; font-style: normal; margin-inline-end: 8px; }
+.co-fees .ic { display: inline-grid; place-items: center; min-width: 20px; padding: 0 3px; height: 20px; white-space: nowrap; flex: none; border-radius: 5px; background: var(--brand); color: #fff; font-size: 12px; font-style: normal; margin-inline-end: 8px; }
 .co-fees .disc span:last-child { color: var(--brand); }
 .co-fees .ic.promo { background: #d97706; width: auto; padding: 0 4px; } .co-fees .ic.store_delivery { background: #b8792a; }
 .co-fees .ic.platform_free { background: #6d28d9; width: auto; padding: 0 4px; }

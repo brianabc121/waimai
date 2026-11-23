@@ -56,3 +56,4 @@ e2e:
 	node e2e/menutranslate.cjs
 	node e2e/i18nadmin.cjs
 	node e2e/zawgyi.cjs
+	node e2e/longtext.cjs
