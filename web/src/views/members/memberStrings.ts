@@ -1,0 +1,36 @@
+// Texts of the member pages (MemberBook.vue): a store's own members in the
+// back office, and every store's members on the platform.
+import { extend } from '../../i18n'
+
+extend({
+  'sm.title': ['会员管理', 'Members'],
+  'sm.search_ph': ['搜索会员号、电话、称呼、地址', 'Search number, phone, name or address'],
+  'sm.search': ['搜索', 'Search'],
+  'sm.all': ['全部', 'All'], 'sm.active': ['正式会员', 'Members'], 'sm.temp': ['临时号', 'Temporary'],
+  'sm.any_source': ['全部来源', 'Any source'], 'sm.store_all': ['全部店铺', 'All stores'],
+  'sm.sort.new': ['最新加入', 'Newest'], 'sm.sort.recent': ['最近下单', 'Last order'],
+  'sm.sort.orders': ['下单最多', 'Most orders'], 'sm.sort.spent': ['消费最多', 'Top spenders'],
+  'sm.col.no': ['会员号', 'Member'], 'sm.col.name': ['称呼', 'Name'], 'sm.col.phone': ['电话', 'Phone'],
+  'sm.col.source': ['来源', 'Source'], 'sm.col.address': ['地址', 'Address'], 'sm.col.store': ['店铺', 'Store'],
+  'sm.col.orders': ['消费次数', 'Orders'], 'sm.col.spent': ['消费金额', 'Spent'], 'sm.col.last': ['最近下单', 'Last order'],
+  'sm.col.joined': ['加入时间', 'Joined'],
+  'sm.count': ['共 {n} 位', '{n} in all'], 'sm.count_temp': ['其中临时号 {n} 个', '{n} temporary'],
+  'sm.empty': ['还没有会员。代客下单时填的顾客资料会自动成为本店会员。', 'No members yet. Customers you order for become members of this store.'],
+  'sm.no_match': ['没有找到符合条件的会员', 'No members match'],
+  'sm.temp_left': ['{n} 分钟后回收', 'Released in {n} min'],
+  'sm.temp_hint': ['临时号是点“新增会员”拿到的号码，1 小时内不补资料也没下单就会自动回收。保存资料后变成正式会员。',
+    'A temporary number comes from "New member" and is released after an hour unless it is filled in or ordered for. Saving the details makes it a member.'],
+  'sm.view': ['详情', 'Details'], 'sm.edit': ['编辑', 'Edit'], 'sm.edit_title': ['编辑会员 {no}', 'Edit member {no}'],
+  'sm.save': ['保存', 'Save'], 'sm.cancel': ['取消', 'Cancel'], 'sm.close': ['关闭', 'Close'],
+  'sm.page': ['第 {p} / {t} 页', 'Page {p} of {t}'], 'sm.prev': ['上一页', 'Previous'], 'sm.next': ['下一页', 'Next'],
+  'sm.never': ['还没下过单', 'No orders yet'],
+  'sm.d.contact': ['联系账号', 'Account'], 'sm.d.note': ['会员备注', 'Member note'], 'sm.d.unit': ['门牌、楼层', 'Unit, floor'],
+  'sm.d.addr_note': ['地址备注', 'Address note'], 'sm.d.map': ['在谷歌地图查看', 'Open in Google Maps'],
+  'sm.d.no_pin': ['还没在地图上定位', 'Not on the map yet'],
+  'sm.d.stats': ['消费情况', 'Orders so far'], 'sm.d.total': ['累计', 'In all'],
+  'sm.d.orders': ['订单记录', 'Order history'], 'sm.d.no_orders': ['还没有订单', 'No orders yet'],
+  'sm.d.by_phone': ['同号码', 'Same phone'],
+  'sm.d.by_phone_hint': ['标着“同号码”的是用这个电话自己下的单，也算进消费次数。', 'Orders marked "Same phone" were placed with this phone number and count too.'],
+  'sm.o.self': ['顾客下单', 'By customer'],
+  'sm.addr_changed': ['地址改了，原来的地图定位会清掉，下次代客下单时再定位。', 'The address changed, so its map pin is cleared. Pin it again on the next order.'],
+})

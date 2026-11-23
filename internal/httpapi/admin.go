@@ -65,6 +65,10 @@ func (s *Server) adminRoutes(admin *gin.RouterGroup) {
 	admin.POST("/users/:id/reset-password", s.adminResetPassword)
 
 	admin.GET("/items", s.adminSearchItems)
+	admin.GET("/members", s.adminListMembers)
+	admin.GET("/members/:id", s.adminGetMember)
+	admin.GET("/members/:id/orders", s.adminMemberOrders)
+	admin.PUT("/members/:id", s.adminSaveMember)
 	admin.GET("/branches/:bid/menu", s.adminBranchMenu)
 	admin.POST("/branches/:bid/categories", s.menuChanged, s.adminSaveCategory)
 	admin.PUT("/branches/:bid/categories/:id", s.menuChanged, s.adminSaveCategory)

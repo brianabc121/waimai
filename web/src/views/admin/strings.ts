@@ -21,7 +21,7 @@ extend({
   'ad.title': ['平台管理后台', 'Platform admin'], 'ad.product': ['外卖点餐系统', 'Waimai'],
   'ad.g_monitor': ['监控', 'Monitoring'], 'ad.g_merchants': ['商家', 'Merchants'], 'ad.g_system': ['系统', 'System'],
   'ad.dashboard': ['总览', 'Overview'], 'ad.api': ['API 监控', 'API'], 'ad.worker': ['Worker 和任务', 'Worker & jobs'],
-  'ad.merchants': ['商户', 'Merchants'], 'ad.items': ['商品', 'Items'], 'ad.audit': ['操作记录', 'Audit trail'], 'ad.customers': ['顾客服务', 'Customers'],
+  'ad.merchants': ['商户', 'Merchants'], 'ad.items': ['商品', 'Items'], 'ad.audit': ['操作记录', 'Audit trail'], 'ad.customers': ['顾客服务', 'Customers'], 'ad.members': ['会员管理', 'Store members'],
   'ad.search_merchants': ['搜索商户名、门店名、链接、电话', 'Search name, store, link or phone'],
   'ad.all': ['全部', 'All'], 'ad.st.active': ['营业中', 'Active'], 'ad.st.suspended': ['已暂停', 'Suspended'], 'ad.st.deleted': ['已删除', 'Deleted'],
   'ad.new_merchant': ['新建商户', 'New merchant'], 'ad.new_merchant_hint': ['同时创建首家门店和店主账号', 'Creates the first store and the owner account'],
