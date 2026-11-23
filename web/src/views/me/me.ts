@@ -34,7 +34,13 @@ export type PlatformInfo = Record<'name' | 'about' | 'about_en' | 'support_phone
 // The profile is shared by the pages so that the header and the red dot stay in step.
 export const me = reactive<{ profile: Profile | null }>({ profile: null })
 
-export async function loadProfile(): Promise<Profile | null> {
+// Pages that open together (a page and the bar above it) share one request.
+let loading: Promise<Profile | null> | null = null
+export function loadProfile(): Promise<Profile | null> {
+  loading ??= fetchProfile().finally(() => { loading = null })
+  return loading
+}
+async function fetchProfile(): Promise<Profile | null> {
   if (!(await loadCustomer())) { me.profile = null; return null }
   try { me.profile = await get<Profile>('/customer/me') }
   catch { await loadCustomer(true); if (!customer.verified) me.profile = null }
@@ -89,6 +95,9 @@ export function plain(minor: number): string {
 export const describe = (e: unknown) => (e as { code?: string }).code === 'NETWORK' ? t('offline') : (e as Error).message
 
 extend({
+  'cn.brand': ['外卖商城', 'Food Market'], 'cn.orders': ['我的订单', 'My orders'], 'cn.center': ['个人中心', 'My account'],
+  'cn.g_wallet': ['资产和优惠', 'Money and offers'], 'cn.g_daily': ['常用服务', 'Everyday'], 'cn.g_more': ['更多服务', 'More'],
+  'cn.recent': ['最近订单', 'Recent orders'], 'cn.all_orders': ['全部订单', 'All orders'], 'cn.no_orders': ['还没有订单，去商城逛逛吧', 'No orders yet. Have a look around.'],
   'me.home': ['首页', 'Home'], 'me.orders': ['订单', 'Orders'], 'me.me': ['我的', 'Me'],
   'me.login': ['登录 / 注册', 'Log in or sign up'], 'me.login_hint': ['登录后查看订单、收藏和消息', 'Log in to see your orders, favourites and messages'],
   'me.member_no': ['会员号：{no}', 'Member no. {no}'], 'me.settings': ['设置', 'Settings'], 'me.share': ['分享', 'Share'],

@@ -25,5 +25,11 @@ defineProps<{ title: string; sub?: string; icon?: string }>()
 .me-intro b { font-size: 15px; font-weight: 600; line-height: 1.4; }
 .me-intro p span { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .me-intro .ic svg { width: 24px; height: 24px; }
+/* an iPad or a computer: the bar above is red already, the card stands alone */
+@media (min-width: 768px) {
+  .me-intro { margin: 0; padding: 0; }
+  .me-intro::before { display: none; }
+  .me-intro .info { padding: 14px 18px; box-shadow: 0 3px 12px rgba(90, 40, 15, .08); background: linear-gradient(100deg, var(--paper) 55%, #fdf0d6); }
+}
 @media (max-width: 380px) { .me-intro .info { gap: 10px; } .me-intro p { padding-left: 10px; } .me-intro .ic { width: 40px; height: 40px; } }
 </style>

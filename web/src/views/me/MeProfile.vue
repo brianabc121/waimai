@@ -35,7 +35,7 @@ async function logout() {
 </script>
 
 <template>
-  <MePage :title="t('mp.title')">
+  <MePage :title="t('mp.title')" layout="narrow">
     <template v-if="me.profile">
       <div v-if="error" class="banner bad" data-testid="profile-error">{{ error }}</div>
       <div class="card me-rows">

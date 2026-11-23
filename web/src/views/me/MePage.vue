@@ -6,9 +6,14 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { loginRoute } from '../../customer'
 import { t } from '../../i18n'
+import CustomerFrame from './CustomerFrame.vue'
 import { loadProfile, me } from './me'
 
-const props = withDefaults(defineProps<{ title: string; open?: boolean; back?: string }>(), { open: false, back: '/me' })
+// layout: how the page uses a wide screen. "two" puts the page's cards
+// (those marked .cell) two by two; "split" keeps the form on the left and
+// what was sent before (.side) on the right; "narrow" keeps a short form
+// readable. A phone always shows one column.
+const props = withDefaults(defineProps<{ title: string; open?: boolean; back?: string; layout?: 'one' | 'two' | 'split' | 'narrow' }>(), { open: false, back: '/me', layout: 'one' })
 const route = useRoute(), router = useRouter()
 const ready = ref(props.open)
 
@@ -22,14 +27,16 @@ function goBack() { if (window.history.state?.back) router.back(); else void rou
 
 <template>
   <div class="phone mepage warm">
-    <header class="mp-bar">
-      <button :aria-label="t('back')" data-testid="me-back" @click="goBack">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7" /></svg></button>
-      <b>{{ title }}</b>
-      <span class="right"><slot name="right" /></span>
-    </header>
-    <div v-if="ready" class="mp-body" :data-ready="!!me.profile || open"><slot /></div>
-    <div v-else class="mp-body muted">{{ t('loading') }}</div>
+    <CustomerFrame active="me">
+      <header class="mp-bar">
+        <button :aria-label="t('back')" data-testid="me-back" @click="goBack">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7" /></svg></button>
+        <b>{{ title }}</b>
+        <span class="right"><slot name="right" /></span>
+      </header>
+      <div v-if="ready" class="mp-body" :class="'l-' + layout" :data-ready="!!me.profile || open"><slot /></div>
+      <div v-else class="mp-body muted">{{ t('loading') }}</div>
+    </CustomerFrame>
   </div>
 </template>
 
@@ -42,6 +49,7 @@ function goBack() { if (window.history.state?.back) router.back(); else void rou
 .mp-bar > b { text-align: center; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-bar .right { display: flex; justify-content: flex-end; padding-right: 8px; white-space: nowrap; }
 .mp-body { padding: 12px; display: grid; gap: 10px; align-content: start; }
+.mp-body > div.side:not(.card) { display: grid; gap: 10px; align-content: start; min-width: 0; }
 .mepage .card { border: 0; border-radius: 12px; padding: 12px 14px; background: var(--paper); box-shadow: 0 3px 12px rgba(90, 40, 15, .08); }
 .mepage .card h2 { font-size: 15px; font-weight: 600; }
 .mepage .me-sec { font-size: 15px; font-weight: 600; padding: 4px 4px 0; }
@@ -69,4 +77,36 @@ function goBack() { if (window.history.state?.back) router.back(); else void rou
 .me-logo { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; flex: none; background: var(--brand-soft); color: var(--brand-dark); display: grid; place-items: center; font-size: 16px; font-weight: 600; }
 .me-toast { position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + 32px); transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff; padding: 7px 14px; border-radius: 999px; font-size: 13px; z-index: 90; white-space: nowrap; }
 .me-stars i { font-style: normal; color: #e3d6c3; font-size: 13px; } .me-stars i.on { color: #e9a92b; }
+
+/* an iPad or a computer: the red bar is the top bar above (CustomerNav); the
+   page's own bar becomes its heading */
+@media (min-width: 768px) {
+  .mepage.phone { max-width: none; padding-bottom: 40px; }
+  .mp-bar { position: static; height: auto; background: none; color: var(--ink); grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px; padding: 0 0 12px; }
+  .mp-bar > button { color: var(--ink); height: 36px; width: 36px; margin-left: -8px; border-radius: 50%; }
+  .mp-bar > button:hover { background: var(--gold-soft); }
+  .mp-bar > b { text-align: left; font-size: 20px; }
+  .mp-bar .right { padding-right: 0; }
+  .mp-bar .right .btn.link { color: var(--red); }
+  .mp-body { padding: 0; gap: 12px; }
+  .mepage .card { padding: 16px 18px; }
+  .mepage .card.me-rows, .mepage .me-rows { padding: 0 18px; }
+  .mp-body.l-narrow { max-width: 640px; }
+  .mp-body.l-two { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .mp-body.l-two > :not(.cell) { grid-column: 1 / -1; }
+  .me-toast { bottom: 40px; }
+}
+/* a computer: the side list is the way back */
+@media (min-width: 1024px) {
+  .mp-bar > button { display: none; }
+  .mp-body.l-split { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); grid-auto-flow: row dense; align-items: start; }
+  .mp-body.l-split > :not(.main):not(.side) { grid-column: 1 / -1; }
+  .mp-body.l-split > .main { grid-column: 1; }
+  .mp-body.l-split > .side { grid-column: 2; }
+  /* nothing sent before: the form alone, at a width that reads well */
+  .mp-body.l-split:not(:has(> .side)) > .main { grid-column: 1 / -1; max-width: 680px; }
+}
+@media (min-width: 1200px) {
+  .mp-body.l-two.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 </style>

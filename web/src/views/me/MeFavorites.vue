@@ -64,4 +64,9 @@ async function toggle(s: MyStore) {
 .store:last-child { border-bottom: 0; }
 .lnk { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; color: var(--ink); }
 .lnk .grow { display: grid; } .lnk .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a computer: the stores two by two */
+@media (min-width: 1024px) {
+  .list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; padding: 2px 18px; }
+  .store:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
+}
 </style>

@@ -22,14 +22,16 @@ watch(() => [kind.value, me.profile?.id], async ([, id]) => {
 </script>
 
 <template>
-  <MePage :title="t('mw.' + kind)">
-    <div class="card total" data-testid="wallet-total">
-      <span class="small">{{ t('me.' + kind) }}</span>
-      <b v-for="w in totals" :key="w.currency">{{ money(w.amount, w.currency) }}</b>
+  <MePage :title="t('mw.' + kind)" layout="split">
+    <div class="side">
+      <div class="card total" data-testid="wallet-total">
+        <span class="small">{{ t('me.' + kind) }}</span>
+        <b v-for="w in totals" :key="w.currency">{{ money(w.amount, w.currency) }}</b>
+      </div>
+      <p class="note" style="padding:0 6px" data-testid="wallet-note">{{ t(`mw.${kind}_note`) }}</p>
     </div>
-    <p class="note" style="padding:0 6px" data-testid="wallet-note">{{ t(`mw.${kind}_note`) }}</p>
     <div v-if="error" class="banner bad">{{ error }}</div>
-    <div class="card">
+    <div class="card main">
       <h2 style="margin-bottom:6px">{{ t('mw.records') }}</h2>
       <div v-if="entries && !entries.length" class="empty" data-testid="wallet-empty">{{ t('mw.none') }}</div>
       <div v-for="e in entries ?? []" :key="e.id" class="entry" data-testid="wallet-entry">
@@ -41,7 +43,7 @@ watch(() => [kind.value, me.profile?.id], async ([, id]) => {
 </template>
 
 <style scoped>
-.total { display: grid; gap: 2px; padding: 16px; color: #fff; background: linear-gradient(120deg, var(--brand) 0%, #f08c3a 100%); }
+.total { display: grid; gap: 2px; padding: 16px; color: #fff; background: var(--motif) 0 0 / 56px 56px, linear-gradient(120deg, var(--red-deep) 0%, #c0503a 100%); }
 .total b { font-size: 26px; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .entry { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f1f3; }
 .entry:last-child { border-bottom: 0; }

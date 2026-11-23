@@ -26,9 +26,9 @@ async function submit() {
 </script>
 
 <template>
-  <MePage :title="t('mk.title')">
+  <MePage :title="t('mk.title')" layout="split">
     <MeIntro :title="t('mi.feedback')" :sub="t('mi.feedback_sub')" :icon="'M4 6.5h16v11H4zM4.5 7l7.5 6 7.5-6'" />
-    <form class="card" data-testid="feedback-form" @submit.prevent="submit">
+    <form class="card main" data-testid="feedback-form" @submit.prevent="submit">
       <div v-if="sent" class="banner ok" style="margin-bottom:12px" data-testid="feedback-sent">{{ t('mk.sent') }}</div>
       <div v-if="error" class="banner bad" style="margin-bottom:12px" data-testid="feedback-error">{{ error }}</div>
       <div class="field"><span class="small muted">{{ t('mk.kind') }}</span>
@@ -37,7 +37,7 @@ async function submit() {
       <label class="field"><span>{{ t('mk.contact') }}</span><input v-model="f.contact" maxlength="100" :placeholder="t('mk.contact_ph')" data-testid="feedback-contact" /></label>
       <button class="btn primary block big" :disabled="busy" data-testid="feedback-submit">{{ t('mk.submit') }}</button>
     </form>
-    <template v-if="list.length">
+    <div v-if="list.length" class="side">
       <h3 class="me-sec">{{ t('mk.mine') }}</h3>
       <div v-for="x in list" :key="x.id" class="card stack" data-testid="feedback-item">
         <div class="row between"><span class="tag">{{ t('mk.' + x.kind) }}</span><span class="small muted">{{ dateTime(x.created_at) }}</span></div>
@@ -45,7 +45,7 @@ async function submit() {
         <div v-if="x.reply" class="reply" data-testid="feedback-reply"><b>{{ t('mk.replied') }}</b>：{{ x.reply }}</div>
         <div v-else class="small muted">{{ t('mk.waiting') }}</div>
       </div>
-    </template>
+    </div>
   </MePage>
 </template>
 

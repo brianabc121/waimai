@@ -3,8 +3,12 @@
 // belongs to the customer rather than to one store.
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { get } from '../../api'
 import { loginRoute } from '../../customer'
-import { currencySymbol, pick, t } from '../../i18n'
+import { currencySymbol, money, pick, t } from '../../i18n'
+import { cardStatus, shortStamp } from '../../orders'
+import type { OrderCard } from '../../types'
+import CustomerFrame from './CustomerFrame.vue'
 import CustomerTabs from './CustomerTabs.vue'
 import { avatarUrl, displayName, homeStore, loadProfile, me, myOffers, offerParts, plain, type StoreOffers } from './me'
 
@@ -22,12 +26,18 @@ const wallet = computed(() => {
 })
 const symbol = computed(() => currencySymbol(wallet.value.currency))
 const offerCount = computed(() => offers.value.reduce((n, o) => n + o.promotions.length, 0))
-const firstOffers = computed(() => offers.value.flatMap(o => o.promotions.map(p => ({ p, o }))).slice(0, 2))
+// A computer has room for four offers and the latest orders; a phone shows two
+// offers, and its orders are one tap away at the bottom.
+const wide = window.matchMedia('(min-width: 1024px)').matches
+const firstOffers = computed(() => offers.value.flatMap(o => o.promotions.map(p => ({ p, o }))).slice(0, wide ? 4 : 2))
+const recent = ref<OrderCard[] | null>(null)
 
 onMounted(async () => {
   const p = await loadProfile()
   ready.value = true
-  if (p) offers.value = await myOffers(home?.slug).catch(() => [])
+  if (!p) return
+  if (wide) void get<{ orders: OrderCard[] }>('/customer/orders?tab=all').then(r => { recent.value = r.orders.slice(0, 4) }).catch(() => { recent.value = [] })
+  offers.value = await myOffers(home?.slug).catch(() => [])
 })
 
 // Everything here belongs to an account: without one, the way leads through login.
@@ -64,6 +74,7 @@ const more = computed<Entry[]>(() => [
 
 <template>
   <div class="phone mehome warm" :data-ready="ready || null">
+   <CustomerFrame active="me">
     <header class="hero">
       <div class="tools">
         <h1>{{ t('me.me') }}</h1>
@@ -122,7 +133,25 @@ const more = computed<Entry[]>(() => [
         </div>
       </section>
 
-      <section>
+      <section v-if="wide && profile" class="recent" data-testid="me-recent">
+        <div class="row between"><h2>{{ t('cn.recent') }}</h2>
+          <router-link to="/orders" class="more">{{ t('cn.all_orders') }}
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg></router-link></div>
+        <div v-if="recent && !recent.length" class="none">{{ t('cn.no_orders') }}</div>
+        <div v-else-if="recent" class="panel olist">
+          <router-link v-for="o in recent" :key="o.token" :to="`/o/${o.token}`" class="orow">
+            <img v-if="o.items[0]?.image_url" :src="o.items[0].image_url" alt="" />
+            <span v-else class="ph">{{ pick(o.store.name, o.store.name_en).slice(0, 1) }}</span>
+            <span class="what"><b>{{ pick(o.store.name, o.store.name_en) }}</b>
+              <small>{{ o.items.map(i => pick(i.name, i.name_en) + (i.qty > 1 ? ' ×' + i.qty : '')).join('、') }}</small></span>
+            <span class="when">{{ shortStamp(o.created_at, o.timezone) }}</span>
+            <span class="st">{{ cardStatus(o) }}</span>
+            <b class="amt">{{ money(o.total, o.currency) }}</b>
+          </router-link>
+        </div>
+      </section>
+
+      <section class="moresvc">
         <h2>{{ t('me.more_services') }}</h2>
         <div class="panel rows">
           <button v-for="e in more" :key="e.key" :data-testid="'me-' + e.key" @click="go(e.to!, e.open)">
@@ -135,6 +164,7 @@ const more = computed<Entry[]>(() => [
     </div>
 
     <div v-if="toast" class="me-toast">{{ toast }}</div>
+   </CustomerFrame>
     <CustomerTabs active="me" />
   </div>
 </template>
@@ -189,5 +219,41 @@ h2 { font-size: 15px; font-weight: 600; }
 .rows button span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rows .chev { flex: none; color: #b9a793; }
 @media (max-width: 370px) { .rows button { font-size: 13.5px; gap: 6px; padding-left: 4px; } .rows button:nth-child(even) { padding-left: 10px; } .ticket b { font-size: 15px; } }
-@media (min-width: 768px) { .mehome { max-width: 620px; } }
+/* an iPad or a computer: the red becomes a card under the top bar */
+@media (min-width: 768px) {
+  .mehome.phone { max-width: none; padding-bottom: 40px; }
+  .hero { border-radius: 16px; padding: 16px 22px 64px; display: flex; flex-direction: row-reverse; align-items: center; gap: 12px; }
+  .tools h1 { display: none; }
+  .who { padding: 0; flex: 1; min-width: 0; }
+  .who .chev { display: none; }
+  .avatar { width: 60px; height: 60px; }
+  .names b { font-size: 20px; }
+  .body { padding: 0 16px; gap: 20px; }
+  .stats { padding: 16px 0; }
+  .stats b { font-size: 20px; }
+  .common { padding: 10px 8px; }
+  .common button { font-size: 13px; padding: 12px 0; }
+  .rows { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 4px 16px; }
+  .rows button:nth-child(-n+3) { border-top: 0; }
+  .rows button:nth-child(even) { box-shadow: none; padding-left: 6px; }
+  .rows button:not(:nth-child(3n+1)) { box-shadow: -1px 0 0 var(--line); padding-left: 14px; }
+  .rows button:last-child:nth-child(odd) { grid-column: auto; }
+  .me-toast { bottom: 40px; }
+}
+/* a computer: the side list has every page, so the rows give way to the latest orders */
+@media (min-width: 1024px) {
+  .tickets { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .moresvc { display: none; }
+  .olist { padding: 2px 16px; }
+  .orow { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto 96px 90px; align-items: center; gap: 14px; padding: 10px 0; border-top: 1px solid var(--line); color: var(--ink); }
+  .orow:first-child { border-top: 0; }
+  .orow:hover .what b { color: var(--red); }
+  .orow img, .orow .ph { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; }
+  .orow .ph { background: #c2401c; color: #fff3da; display: grid; place-items: center; font-weight: 600; }
+  .what { display: grid; min-width: 0; }
+  .what b { font-size: 14px; font-weight: 600; }
+  .what small, .when { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st { justify-self: center; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--gold-soft); color: var(--red); white-space: nowrap; }
+  .amt { justify-self: end; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+}
 </style>

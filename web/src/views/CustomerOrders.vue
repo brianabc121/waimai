@@ -8,6 +8,7 @@ import { loadCustomer, loginRoute } from '../customer'
 import { locale, money, pick, setLocale, t } from '../i18n'
 import { cardStatus, closedStatus, finished, orderAgain, shortStamp } from '../orders'
 import type { OrderCard } from '../types'
+import CustomerFrame from './me/CustomerFrame.vue'
 import CustomerTabs from './me/CustomerTabs.vue'
 
 const router = useRouter()
@@ -69,6 +70,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 
 <template>
   <div class="ol warm" data-testid="order-list" :data-state="state" @click="menu = ''">
+   <CustomerFrame active="orders">
     <header class="ol-head">
       <div class="ol-bar">
         <button class="ol-back" :aria-label="t('back')" data-testid="orders-back" @click="back">
@@ -137,6 +139,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
         <span v-else class="ol-end">{{ t('ol.end') }}</span>
       </div>
     </main>
+   </CustomerFrame>
     <CustomerTabs active="orders" />
   </div>
 </template>
@@ -201,15 +204,26 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
   .ol-sum { min-width: 66px; padding-left: 10px; } .ol-total { font-size: 16px; }
   .pill { padding: 4px 10px; } .pill.brand { padding: 4px 12px; }
 }
+/* an iPad or a computer: the red bar is the top bar above; title, search and
+   tabs head the list */
 @media (min-width: 768px) {
-  .ol-bar { padding: 10px 20px 12px; }
-  .ol-tabs { justify-content: flex-start; gap: 8px; padding: 12px 20px 6px; } .ol-list { padding: 6px 20px 0; }
+  .ol { padding-bottom: 40px; }
+  .ol-head { position: static; background: none; color: var(--ink); }
+  .ol-bar, .ol-tabs, .ol-list { max-width: none; }
+  .ol-bar { grid-template-columns: 36px auto minmax(0, 1fr); grid-template-areas: 'back title search'; gap: 4px 12px; padding: 0 0 12px; }
+  .ol-back { color: var(--ink); margin-left: -8px; }
+  .ol-back:hover { background: var(--gold-soft); }
+  .ol-bar h1 { text-align: left; font-size: 20px; }
+  .ol-lang { display: none; }
+  .ol-search { max-width: 360px; width: 100%; justify-self: end; border: 1px solid var(--line); }
+  .ol-tabs { justify-content: flex-start; gap: 8px; padding: 0 0 12px; }
+  .ol-list { padding: 0; gap: 12px; }
+  .ol-card { padding: 12px 16px; }
 }
-/* a computer shows two orders side by side, and the search beside the title */
+/* a computer: the side list is the way back; two orders side by side */
 @media (min-width: 1024px) {
-  .ol-bar, .ol-tabs, .ol-list { max-width: 1100px; }
-  .ol-bar { grid-template-columns: 44px auto minmax(0, 1fr) auto; grid-template-areas: 'back title search lang'; gap: 16px; }
-  .ol-bar h1 { text-align: left; } .ol-search { max-width: 420px; justify-self: end; width: 100%; }
+  .ol-bar { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'title search'; }
+  .ol-back { display: none; }
   .ol-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   .ol-note, .ol-foot { grid-column: 1 / -1; }
 }
