@@ -37,6 +37,8 @@ type MallCategory struct {
 	Icon   string `json:"icon"`
 	Sort   int    `json:"sort"`
 	Active bool   `json:"active"`
+	// NameTr is the name in the customer's language, where it differs.
+	NameTr string `json:"name_tr,omitempty" db:"-"`
 }
 
 // MallBanner is a banner at the top of the marketplace.
@@ -51,6 +53,8 @@ type MallBanner struct {
 	ImageURL   string `json:"image_url"`
 	Sort       int    `json:"sort"`
 	Active     bool   `json:"active"`
+	TitleTr    string `json:"title_tr,omitempty"`
+	SubtitleTr string `json:"subtitle_tr,omitempty"`
 }
 
 // MallDelivery is what delivery to the customer's spot costs at one store.
@@ -112,6 +116,8 @@ type MallStore struct {
 	DistanceM    *int        `json:"distance_m"`
 	Promos       []MallPromo `json:"promos"`
 	Dishes       []MallDish  `json:"dishes"`
+	// NameTr is the store's name in the customer's language, when it differs.
+	NameTr string `json:"name_tr,omitempty"`
 
 	id       int64
 	branch   *Branch
@@ -353,6 +359,9 @@ func (a *App) MallStores(ctx context.Context, q MallQuery) (*MallList, error) {
 	if err := a.mallPromos(ctx, all); err != nil {
 		return nil, err
 	}
+	if err := a.mallNames(ctx, all, q.Lang); err != nil {
+		return nil, err
+	}
 	if text := strings.TrimSpace(q.Q); text != "" {
 		if err := a.mallSearch(ctx, all, text, q.Lang); err != nil {
 			return nil, err
@@ -415,7 +424,26 @@ func (a *App) MallStores(ctx context.Context, q MallQuery) (*MallList, error) {
 // matched says whether the store's own name answers a search.
 func (s *MallStore) matched(q string) bool {
 	q = strings.ToLower(strings.TrimSpace(q))
-	return strings.Contains(strings.ToLower(s.Name), q) || strings.Contains(strings.ToLower(s.NameEn), q)
+	return strings.Contains(strings.ToLower(s.Name), q) || strings.Contains(strings.ToLower(s.NameEn), q) ||
+		strings.Contains(strings.ToLower(s.NameTr), q)
+}
+
+// mallNames names the stores in the customer's language.
+func (a *App) mallNames(ctx context.Context, list []*MallStore, lang string) error {
+	bs := make([]*Branch, 0, len(list))
+	for _, s := range list {
+		if s.branch != nil {
+			bs = append(bs, s.branch)
+		}
+	}
+	t, err := storeTexts(ctx, a.DB, lang, bs)
+	if err != nil {
+		return err
+	}
+	for _, s := range list {
+		s.NameTr = t[s.id].Name
+	}
+	return nil
 }
 
 // mallSorted puts the stores that deliver first, then the stores taking

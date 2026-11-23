@@ -2046,5 +2046,18 @@
  "mtr.keep": "このまま",
  "mtr.save": "保存",
  "mtr.revert": "機械翻訳に戻す",
- "mtr.empty": "内容がありません"
+ "mtr.empty": "内容がありません",
+ "mtr.store_title": "店舗情報の多言語表示",
+ "mtr.store_hint": "店名・お知らせ・紹介文は簡体字中国語、英語、繁体字中国語に自動翻訳され、すぐにお客様に表示されます。内容を確認して「確認」を押すか、書き直してください。その他の言語のお客様には英語が表示されます。",
+ "mtr.store_pending": "確認待ち {n} 件",
+ "mtr.store_name": "店名",
+ "mtr.st_confirmed": "確認済み",
+ "mtr.st_to_confirm": "確認待ち",
+ "mtr.confirm": "確認",
+ "mtr.store_banner": "店舗情報の自動翻訳 {n} 件が確認待ちです。",
+ "mtr.store_go": "確認する",
+ "mtr.store_notice": "お知らせ",
+ "mtr.store_intro": "店舗紹介",
+ "zawgyi_confirm": "このビルマ語は旧 Zawgyi エンコードで入力されたようです：「{text}」。ほかの端末では文字化けし、翻訳もできません。Unicode のビルマ語キーボードで入力し直してください。\n\n「OK」でこのまま保存、「キャンセル」で戻って修正します。",
+ "zawgyi_stopped": "保存していません：Unicode キーボードでビルマ語を入力し直してください。"
 }

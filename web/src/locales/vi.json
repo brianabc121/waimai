@@ -2046,5 +2046,18 @@
  "mtr.keep": "Giữ nguyên",
  "mtr.save": "Lưu",
  "mtr.revert": "Quay lại bản dịch máy",
- "mtr.empty": "Không có nội dung"
+ "mtr.empty": "Không có nội dung",
+ "mtr.store_title": "Thông tin cửa hàng bằng ngôn ngữ khác",
+ "mtr.store_hint": "Tên cửa hàng, thông báo và giới thiệu được tự động dịch sang tiếng Trung giản thể, tiếng Anh và tiếng Trung phồn thể, khách hàng thấy ngay. Hãy kiểm tra rồi xác nhận, hoặc sửa lại. Khách đọc ngôn ngữ khác sẽ thấy tiếng Anh.",
+ "mtr.store_pending": "{n} mục chờ xác nhận",
+ "mtr.store_name": "Tên cửa hàng",
+ "mtr.st_confirmed": "Đã xác nhận",
+ "mtr.st_to_confirm": "Chờ xác nhận",
+ "mtr.confirm": "Xác nhận",
+ "mtr.store_banner": "Có {n} bản dịch tự động thông tin cửa hàng đang chờ bạn xác nhận.",
+ "mtr.store_go": "Kiểm tra",
+ "mtr.store_notice": "Thông báo",
+ "mtr.store_intro": "Giới thiệu cửa hàng",
+ "zawgyi_confirm": "Đoạn tiếng Miến Điện này có vẻ được gõ bằng mã Zawgyi cũ: \"{text}\". Nó sẽ hiển thị lỗi trên điện thoại khác và không dịch được. Hãy gõ lại bằng bàn phím Miến Điện Unicode.\n\nOK để vẫn lưu; Hủy để quay lại sửa.",
+ "zawgyi_stopped": "Chưa lưu: hãy gõ lại tiếng Miến Điện bằng bàn phím Unicode."
 }

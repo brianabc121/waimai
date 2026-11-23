@@ -160,3 +160,120 @@ func TestMenuTranslation(t *testing.T) {
 		t.Fatalf("error kept: %q", ms.Error)
 	}
 }
+
+// The store's name and notice go into Simplified Chinese, English and
+// Traditional Chinese only; the other languages read English.
+func TestStoreTexts(t *testing.T) {
+	need(t)
+	ctx := context.Background()
+	s := newStore(t, false)
+	a := app.New(testApp.DB, "test-secret")
+	a.Translator = &markTranslator{}
+	_, err := a.DB.Exec(ctx, `UPDATE branches SET name='老王面馆', name_en='', notice='今天休息' WHERE id=$1`, s.branchID)
+	noErr(t, err)
+	noErr(t, a.TranslateMenu(ctx, s.branchID, false))
+
+	v, err := a.StoreTexts(ctx, s.branchID)
+	noErr(t, err)
+	langs := map[string]bool{}
+	for _, x := range v.Translations {
+		langs[x.Lang] = true
+	}
+	if !langs["en"] || !langs["zh-Hant"] || len(langs) != 2 {
+		t.Fatalf("store text languages %v", langs)
+	}
+	if v.Pending != 4 { // name and notice, in English and Traditional Chinese
+		t.Fatalf("pending = %d", v.Pending)
+	}
+	ms, err := a.MenuTranslations(ctx, s.branchID)
+	noErr(t, err)
+	for _, x := range ms.Translations {
+		if x.Entity == "branch" && x.Lang == "th" {
+			t.Fatal("the store's name went into Thai")
+		}
+	}
+	branch := func(lang string) *app.Branch {
+		sf, err := a.Storefront(ctx, s.slug)
+		noErr(t, err)
+		noErr(t, a.LocalizeStorefront(ctx, sf, lang))
+		return sf.Branch
+	}
+	if b := branch("th"); b.NameTr != "en:老王面馆" || b.NoticeTr != "en:今天休息" {
+		t.Fatalf("thai reader got %q / %q", b.NameTr, b.NoticeTr)
+	}
+	if b := branch("zh-Hant"); b.NameTr != "老王麵館" {
+		t.Fatalf("traditional name %q", b.NameTr)
+	}
+
+	// the merchant confirms the English name by saving it; it is also the store's name_en
+	err = a.SaveTranslation(ctx, s.branchID, app.TranslationEdit{Entity: "branch", EntityID: s.branchID, Field: "name",
+		Lang: "en", Text: "Wang's Noodles"}, s.staff)
+	noErr(t, err)
+	var en string
+	noErr(t, a.DB.QueryRow(ctx, `SELECT name_en FROM branches WHERE id=$1`, s.branchID).Scan(&en))
+	if en != "Wang's Noodles" {
+		t.Fatalf("name_en = %q", en)
+	}
+	v, err = a.StoreTexts(ctx, s.branchID)
+	noErr(t, err)
+	if v.Pending != 3 {
+		t.Fatalf("pending after confirming = %d", v.Pending)
+	}
+	if err := a.SaveTranslation(ctx, s.branchID, app.TranslationEdit{Entity: "branch", EntityID: s.branchID, Field: "name",
+		Lang: "th", Text: "x"}, s.staff); err == nil {
+		t.Fatal("a Thai store name should be refused")
+	}
+}
+
+// The mall's categories and banners are translated into every language.
+func TestPlatformTranslation(t *testing.T) {
+	need(t)
+	ctx := context.Background()
+	a := app.New(testApp.DB, "test-secret")
+	a.Translator = &markTranslator{}
+	var bid int64
+	noErr(t, a.DB.QueryRow(ctx, `INSERT INTO mall_banners (title, subtitle, sort, active) VALUES ('新店开业', '满减', 99, true)
+		RETURNING id`).Scan(&bid))
+	t.Cleanup(func() { _, _ = a.DB.Exec(ctx, `DELETE FROM mall_banners WHERE id=$1`, bid) })
+	noErr(t, a.TranslatePlatform(ctx, false))
+
+	home := func(lang string) *app.MallHome {
+		h, err := a.MallHome(ctx)
+		noErr(t, err)
+		noErr(t, a.LocalizeMallHome(ctx, h, lang))
+		return h
+	}
+	h := home("th")
+	var ban *app.MallBanner
+	for i := range h.Banners {
+		if h.Banners[i].ID == bid {
+			ban = &h.Banners[i]
+		}
+	}
+	if ban == nil || ban.TitleTr != "th:新店开业" || ban.SubtitleTr != "th:满减" {
+		t.Fatalf("thai banner %+v", ban)
+	}
+	if len(h.Categories) == 0 || h.Categories[0].NameTr != "th:"+h.Categories[0].Name {
+		t.Fatalf("thai category %+v", h.Categories)
+	}
+	// English typed by the platform is used as it is
+	for _, c := range home("en").Categories {
+		if c.NameEn != "" && c.NameTr != c.NameEn {
+			t.Fatalf("english category %q, typed %q", c.NameTr, c.NameEn)
+		}
+	}
+	for _, b := range home("zh").Banners {
+		if b.TitleTr != "" {
+			t.Fatalf("the original language got %q", b.TitleTr)
+		}
+	}
+	// a deleted banner loses its translations
+	_, err := a.DB.Exec(ctx, `DELETE FROM mall_banners WHERE id=$1`, bid)
+	noErr(t, err)
+	noErr(t, a.TranslatePlatform(ctx, false))
+	var n int
+	noErr(t, a.DB.QueryRow(ctx, `SELECT count(*) FROM content_translations WHERE entity='mall_banner' AND entity_id=$1`, bid).Scan(&n))
+	if n != 0 {
+		t.Fatalf("%d translations of a deleted banner", n)
+	}
+}

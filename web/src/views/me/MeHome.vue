@@ -5,7 +5,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { get } from '../../api'
 import { loginRoute } from '../../customer'
-import { currencySymbol, money, pick, t } from '../../i18n'
+import { currencySymbol, money, pick, t, sn } from '../../i18n'
 import { cardStatus, shortStamp } from '../../orders'
 import type { OrderCard } from '../../types'
 import CustomerFrame from './CustomerFrame.vue'
@@ -121,8 +121,8 @@ const more = computed<Entry[]>(() => [
         <div v-else-if="recent" class="panel olist">
           <router-link v-for="o in recent" :key="o.token" :to="`/o/${o.token}`" class="orow">
             <img v-if="o.items[0]?.image_url" :src="o.items[0].image_url" alt="" />
-            <span v-else class="ph">{{ pick(o.store.name, o.store.name_en).slice(0, 1) }}</span>
-            <span class="what"><b>{{ pick(o.store.name, o.store.name_en) }}</b>
+            <span v-else class="ph">{{ sn(o.store).slice(0, 1) }}</span>
+            <span class="what"><b>{{ sn(o.store) }}</b>
               <small>{{ o.items.map(i => pick(i.name, i.name_en) + (i.qty > 1 ? ' ×' + i.qty : '')).join('、') }}</small></span>
             <span class="when">{{ shortStamp(o.created_at, o.timezone) }}</span>
             <span class="st">{{ cardStatus(o) }}</span>

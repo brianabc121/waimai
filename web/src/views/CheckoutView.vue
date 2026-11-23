@@ -5,7 +5,7 @@ import { listAddresses, sorted, usable, whoLine, type Address } from '../address
 import { ApiError, get, newKey, post } from '../api'
 import { clearLines, linePrice, quoteItems, useCart } from '../cart'
 import { customer, loadCustomer, loginRoute, prettyPhone } from '../customer'
-import { locale, money, pick, t, whenText, mn } from '../i18n'
+import { locale, money, pick, t, whenText, mn, sn } from '../i18n'
 import { mallAddressId } from '../mall'
 import type { Item, Quote, Storefront } from '../types'
 import { discountLabel, kindBadge } from '../coupons'
@@ -54,7 +54,7 @@ const delivery = computed(() => cart.service === 'delivery')
 const addresses = ref<Address[]>([])
 const address = computed(() => addresses.value.find(a => a.id === cart.addressId && usable(a)) ?? null)
 const showSheet = ref(false), startNew = ref(false)
-const shopPin = computed(() => { const b = store.value?.branch; return b && b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng, name: pick(b.name, b.name_en), country: b.country_code } : null })
+const shopPin = computed(() => { const b = store.value?.branch; return b && b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng, name: sn(b), country: b.country_code } : null })
 function use(a: Address | null) {
   cart.addressId = a?.id ?? null
   // The store page shows the same spot.
@@ -257,7 +257,7 @@ async function submit() {
           </select>
         </label>
         <div v-if="!delivery" class="co-pick" data-testid="checkout-pickup">
-          <b>{{ store ? pick(store.branch.name, store.branch.name_en) : '' }}</b>
+          <b>{{ store ? sn(store.branch) : '' }}</b>
           <span v-if="store?.branch.address">{{ store.branch.address }}</span>
           <label class="field" style="margin:8px 0 0"><span>{{ t('co.pickup_name') }}</span><input v-model="cart.name" maxlength="80" autocomplete="name" /></label>
         </div>
@@ -281,7 +281,7 @@ async function submit() {
       <aside class="stack side">
       <!-- the order -->
       <div class="card co-card" v-if="store">
-        <div class="co-shop"><b>{{ pick(store.branch.name, store.branch.name_en) }}</b><span class="co-tag">{{ t(delivery ? 'co.by_store' : 'pickup') }}</span></div>
+        <div class="co-shop"><b>{{ sn(store.branch) }}</b><span class="co-tag">{{ t(delivery ? 'co.by_store' : 'pickup') }}</span></div>
         <div v-for="b in baskets" :key="b.n" class="co-basket">
           <div v-if="baskets.length > 1" class="co-bhead">🧺 {{ t('co.basket', { n: b.n }) }}</div>
           <div v-for="(l, i) in b.lines" :key="i" class="co-line">

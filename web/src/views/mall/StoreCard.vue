@@ -5,9 +5,9 @@
 // store near the customer that does not deliver to them keeps its colours and
 // says "no delivery" next to the distance; opening it starts its cart on pickup when it offers that.
 import { computed } from 'vue'
-import { money, pick, promoLabel, t, mn } from '../../i18n'
+import { money, pick, promoLabel, t, mn, sn } from '../../i18n'
 import { cart, useCart } from '../../cart'
-import { cartCount, distanceText, type MallCategory, type MallStore } from '../../mall'
+import { cartCount, catName, distanceText, type MallCategory, type MallStore } from '../../mall'
 
 const props = defineProps<{ store: MallStore; categories: MallCategory[] }>()
 
@@ -15,7 +15,7 @@ const s = computed(() => props.store)
 const open = computed(() => s.value.status === 'open')
 const inCart = computed(() => cartCount(s.value.slug))
 const kinds = computed(() => s.value.categories
-  .map(code => props.categories.find(c => c.code === code)).filter((c): c is MallCategory => !!c).map(c => pick(c.name, c.name_en)).join(' · '))
+  .map(code => props.categories.find(c => c.code === code)).filter((c): c is MallCategory => !!c).map(catName).join(' · '))
 const shut = computed(() => s.value.status === 'paused' ? t('ml.paused') : t('ml.closed'))
 const opens = computed(() => s.value.status === 'closed' && s.value.opens_at
   ? t(s.value.opens_tomorrow ? 'ml.opens_tomorrow' : 'ml.opens_today', { t: s.value.opens_at }) : '')
@@ -43,7 +43,7 @@ function opened() {
       <i v-if="inCart" class="n" data-testid="mall-cart-count"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h2.500l2 10h10l2-7H7" /><circle cx="9.5" cy="19" r="1.2" /><circle cx="16.5" cy="19" r="1.2" /></svg>{{ inCart }}</i>
     </div>
     <div class="body">
-      <h3><span>{{ pick(s.name, s.name_en) }}</span><em v-if="isNew" class="new">{{ t('ml.new') }}</em></h3>
+      <h3><span>{{ sn(s) }}</span><em v-if="isNew" class="new">{{ t('ml.new') }}</em></h3>
       <p v-if="s.rating != null || s.monthly_sales || kinds" class="l1">
         <span v-if="s.rating != null" class="rate">★ {{ s.rating.toFixed(1) }}</span>
         <span v-if="s.monthly_sales">{{ t('ml.monthly', { n: s.monthly_sales }) }}</span>

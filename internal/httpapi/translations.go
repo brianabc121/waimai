@@ -36,17 +36,30 @@ func (s *Server) menuChanged(c *gin.Context) {
 	}
 }
 
+// platformChanged queues translating the mall's categories and banners after
+// the platform changes them.
+func (s *Server) platformChanged(c *gin.Context) {
+	c.Next()
+	if c.Writer.Status() < 300 {
+		_ = s.App.QueueTranslatePlatform(c)
+	}
+}
+
 func (s *Server) translationRoutes(auth, admin *gin.RouterGroup) {
 	// the merchant's own store
 	auth.GET("/merchant/branches/:bid/translations", s.withBranch(managerRoles, s.getTranslations))
 	auth.PUT("/merchant/branches/:bid/translations", s.withBranch(managerRoles, s.saveTranslation))
 	auth.PUT("/merchant/branches/:bid/menu-langs", s.withBranch(managerRoles, s.saveMenuLangs))
 	auth.POST("/merchant/branches/:bid/translations/retranslate", s.withBranch(managerRoles, s.retranslate))
+	auth.GET("/merchant/branches/:bid/store-texts", s.withBranch(managerRoles, s.storeTexts))
+	auth.PUT("/merchant/branches/:bid/store-texts", s.withBranch(managerRoles, s.saveStoreText))
 	// the platform, for any store
 	admin.GET("/branches/:bid/translations", s.withAnyBranch(s.getTranslations))
 	admin.PUT("/branches/:bid/translations", s.withAnyBranch(s.saveTranslation))
 	admin.PUT("/branches/:bid/menu-langs", s.withAnyBranch(s.saveMenuLangs))
 	admin.POST("/branches/:bid/translations/retranslate", s.withAnyBranch(s.retranslate))
+	admin.GET("/branches/:bid/store-texts", s.withAnyBranch(s.storeTexts))
+	admin.PUT("/branches/:bid/store-texts", s.withAnyBranch(s.saveStoreText))
 }
 
 func (s *Server) withBranch(roles []string, h func(*gin.Context, int64)) gin.HandlerFunc {
@@ -112,4 +125,26 @@ func (s *Server) retranslate(c *gin.Context, bid int64) {
 func idValue(s string) (int64, bool) {
 	n, err := strconv.ParseInt(s, 10, 64)
 	return n, err == nil && n > 0
+}
+
+func (s *Server) storeTexts(c *gin.Context, bid int64) {
+	v, err := s.App.StoreTexts(c, bid)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, v)
+}
+
+func (s *Server) saveStoreText(c *gin.Context, bid int64) {
+	var in app.TranslationEdit
+	if !bind(c, &in) {
+		return
+	}
+	in.Entity, in.EntityID = "branch", bid
+	if err := s.App.SaveTranslation(c, bid, in, staffActor(c)); err != nil {
+		fail(c, err)
+		return
+	}
+	s.storeTexts(c, bid)
 }

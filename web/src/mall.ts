@@ -3,11 +3,11 @@ import { reactive } from 'vue'
 import { get } from './api'
 import { listAddresses, type Address } from './addresses'
 import { loadCustomer } from './customer'
-import { extend, pick, t } from './i18n'
+import { extend, locale, pick, t } from './i18n'
 import { mapsKey, placeName } from './maps'
 
-export interface MallCategory { id: number; code: string; name: string; name_en: string; icon: string; sort: number; active: boolean }
-export interface MallBanner { id: number; title: string; title_en: string; subtitle: string; subtitle_en: string; link_slug: string; link_url: string; image_url: string; sort: number; active: boolean }
+export interface MallCategory { id: number; code: string; name: string; name_en: string; name_tr?: string; icon: string; sort: number; active: boolean }
+export interface MallBanner { id: number; title: string; title_en: string; subtitle: string; subtitle_en: string; title_tr?: string; subtitle_tr?: string; link_slug: string; link_url: string; image_url: string; sort: number; active: boolean }
 export interface MallHome { name: string; categories: MallCategory[]; banners: MallBanner[] }
 export interface MallPromo { kind: string; threshold: number; value: number; max_discount: number | null; name: string; name_en: string }
 export interface MallDish { name: string; name_en: string; price: number; image_url: string }
@@ -118,7 +118,7 @@ export async function start(): Promise<void> {
   await locate()
 }
 
-export const mallHome = () => get<MallHome>('/mall/home')
+export const mallHome = () => get<MallHome>(`/mall/home?lang=${locale.value}`)
 export const mallRegions = () => get<{ countries: MallCountry[] }>('/mall/regions').then(r => r.countries)
 export interface MallAsk { category?: string; q?: string; sort?: string; filters?: string[] }
 export function mallStores(loc: MallLoc, ask: MallAsk = {}): Promise<MallList> {
@@ -143,7 +143,9 @@ export function cartCount(slug: string): number {
 }
 
 export const distanceText = (m: number) => m < 1000 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : `${(m / 1000).toFixed(1)} km`
-export const catName = (c: MallCategory) => pick(c.name, c.name_en)
+export const catName = (c: MallCategory) => c.name_tr || pick(c.name, c.name_en)
+export const bannerTitle = (b: MallBanner) => b.title_tr || pick(b.title, b.title_en)
+export const bannerSub = (b: MallBanner) => b.subtitle_tr || pick(b.subtitle, b.subtitle_en)
 export const mallName = (h: MallHome | null) => h?.name || t('ml.brand')
 
 extend({

@@ -3,7 +3,7 @@
 // store remembered on this device, "home" leads here too, so the page is open
 // to someone who is not logged in.
 import { computed, ref, watch } from 'vue'
-import { pick, t } from '../../i18n'
+import { pick, t, sn } from '../../i18n'
 import CustomerTabs from './CustomerTabs.vue'
 import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
@@ -34,8 +34,8 @@ async function toggle(s: MyStore) {
       <div v-else class="card list">
         <div v-for="s in kept" :key="s.slug" class="store" data-testid="fav-store">
           <router-link :to="`/s/${s.slug}`" class="lnk">
-            <img v-if="s.logo_url" :src="s.logo_url" alt="" class="me-logo" /><span v-else class="me-logo">{{ pick(s.name, s.name_en).slice(0, 1) }}</span>
-            <span class="grow"><b>{{ pick(s.name, s.name_en) }}</b><span class="small muted">{{ s.address }}</span></span>
+            <img v-if="s.logo_url" :src="s.logo_url" alt="" class="me-logo" /><span v-else class="me-logo">{{ sn(s).slice(0, 1) }}</span>
+            <span class="grow"><b>{{ sn(s) }}</b><span class="small muted">{{ s.address }}</span></span>
           </router-link>
           <button class="pill" data-testid="fav-remove" @click="toggle(s)">{{ t('mf.unfav') }}</button>
         </div>
@@ -45,8 +45,8 @@ async function toggle(s: MyStore) {
         <div class="card list">
           <div v-for="s in visited" :key="s.slug" class="store" data-testid="visited-store">
             <router-link :to="`/s/${s.slug}`" class="lnk">
-              <img v-if="s.logo_url" :src="s.logo_url" alt="" class="me-logo" /><span v-else class="me-logo">{{ pick(s.name, s.name_en).slice(0, 1) }}</span>
-              <span class="grow"><b>{{ pick(s.name, s.name_en) }}</b><span class="small muted">{{ s.address }}</span></span>
+              <img v-if="s.logo_url" :src="s.logo_url" alt="" class="me-logo" /><span v-else class="me-logo">{{ sn(s).slice(0, 1) }}</span>
+              <span class="grow"><b>{{ sn(s) }}</b><span class="small muted">{{ s.address }}</span></span>
             </router-link>
             <button class="pill red" data-testid="fav-add" @click="toggle(s)">{{ t('mf.fav') }}</button>
           </div>

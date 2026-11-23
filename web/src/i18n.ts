@@ -328,6 +328,13 @@ export function mn(o: { name: string; name_en?: string; name_tr?: string }): str
   return o.name_tr || pick(o.name, o.name_en ?? '')
 }
 
+// sn names a store for the customer: its name in their language when the
+// server sent one (Simplified Chinese, English, Traditional Chinese, or the
+// store's own language; English for everyone else), else as pick does.
+export function sn(o: { name: string; name_en?: string; name_tr?: string }): string {
+  return o.name_tr || pick(o.name, o.name_en ?? '')
+}
+
 // mt is a longer menu text (description, details) for the customer.
 export function mt(orig: string | undefined, tr: string | undefined): string {
   return (!menuOriginal.value && tr) || orig || ''

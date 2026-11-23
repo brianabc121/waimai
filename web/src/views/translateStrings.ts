@@ -26,4 +26,13 @@ extend({
   'mtr.st_stale': ['原文改过，待核对', 'Original changed, check'], 'mtr.st_missing': ['未翻译', 'Not translated'],
   'mtr.keep': ['保持不变', 'Keep'], 'mtr.save': ['保存', 'Save'], 'mtr.revert': ['恢复机器翻译', 'Back to machine translation'],
   'mtr.empty': ['没有内容', 'Nothing here'],
+  'mtr.store_title': ['店铺信息多语言', 'Store details in other languages'],
+  'mtr.store_hint': ['店名、公告和简介会自动翻译成简体中文、英文和繁体中文，顾客马上能看到。请核对后点“确认”，或改成你想要的写法。其他语言的顾客看英文。',
+    'The store name, notice and introduction are translated into Simplified Chinese, English and Traditional Chinese, and customers see them right away. Check each one and confirm it, or change it. Customers reading other languages see English.'],
+  'mtr.store_pending': ['{n} 条待确认', '{n} to confirm'],
+  'mtr.store_name': ['店名', 'Store name'], 'mtr.store_notice': ['公告', 'Notice'], 'mtr.store_intro': ['店铺简介', 'About the store'],
+  'mtr.st_confirmed': ['已确认', 'Confirmed'], 'mtr.st_to_confirm': ['待确认', 'To confirm'],
+  'mtr.confirm': ['确认', 'Confirm'],
+  'mtr.store_banner': ['店铺信息有 {n} 条自动翻译待确认。', '{n} automatic translations of your store details are waiting for you to confirm.'],
+  'mtr.store_go': ['去确认', 'Check them'],
 })
