@@ -78,7 +78,9 @@ func TestSysTextFix(t *testing.T) {
 		t.Fatalf("unknown language %q", s)
 	}
 	noErr(t, a.SaveUITexts(ctx, adminActor(t), "ja", []app.UIEdit{{Key: "sys.order.cancelled", Text: "キャンセル済み"}}))
-	t.Cleanup(func() { _ = a.SaveUITexts(ctx, adminActor(t), "ja", []app.UIEdit{{Key: "sys.order.cancelled", Text: ""}}) })
+	t.Cleanup(func() {
+		_ = a.SaveUITexts(ctx, adminActor(t), "ja", []app.UIEdit{{Key: "sys.order.cancelled", Text: ""}})
+	})
 	if s := app.SysTextForTest(a, ctx, "ja", "sys.order.cancelled"); s != "キャンセル済み" {
 		t.Fatalf("corrected %q", s)
 	}
