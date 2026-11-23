@@ -72,11 +72,11 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
     <header class="ol-head">
       <div class="ol-bar">
         <button class="ol-back" :aria-label="t('back')" data-testid="orders-back" @click="back">
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7" /></svg></button>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7" /></svg></button>
         <h1>{{ t('ol.title') }}</h1>
         <button class="ol-lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
         <label class="ol-search">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg>
           <input v-model="q" type="search" maxlength="50" :placeholder="t('ol.search')" data-testid="orders-search" />
         </label>
       </div>
@@ -94,9 +94,9 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
         <div class="ol-store">
           <a class="ol-name" :href="`/s/${o.store.slug}`" @click.prevent.stop="router.push(`/s/${o.store.slug}`)">
             <img v-if="o.store.logo_url" :src="o.store.logo_url" alt="" />
-            <span v-else class="ph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 3.500c-.8.9.8 1.7 0 2.600M12 3.500c-.8.9.8 1.7 0 2.600M15 3.500c-.8.9.8 1.7 0 2.6" /><path d="M4 11h16a8 8 0 0 1-5 7.400V20H9v-1.600A8 8 0 0 1 4 11z" fill="currentColor" stroke="none" /></svg></span>
+            <span v-else class="ph"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 3.500c-.8.9.8 1.7 0 2.600M12 3.500c-.8.9.8 1.7 0 2.600M15 3.500c-.8.9.8 1.7 0 2.6" /><path d="M4 11h16a8 8 0 0 1-5 7.400V20H9v-1.600A8 8 0 0 1 4 11z" fill="currentColor" stroke="none" /></svg></span>
             <b>{{ pick(o.store.name, o.store.name_en) }}</b>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7" /></svg>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7" /></svg>
           </a>
           <span class="ol-status" :class="tone(o)" data-testid="card-status">{{ cardStatus(o) }}</span>
         </div>
@@ -104,7 +104,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
           <ul class="ol-items">
             <li v-for="(it, i) in o.items.slice(0, 3)" :key="i">
               <img v-if="it.image_url" :src="it.image_url" alt="" loading="lazy" />
-              <span v-else class="ph"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 11h16a8 8 0 0 1-5 7.400V20H9v-1.600A8 8 0 0 1 4 11z" /><path d="M10 4c-.8.9.8 1.7 0 2.600M14 4c-.8.9.8 1.7 0 2.6" /></svg></span>
+              <span v-else class="ph"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 11h16a8 8 0 0 1-5 7.400V20H9v-1.600A8 8 0 0 1 4 11z" /><path d="M10 4c-.8.9.8 1.7 0 2.600M14 4c-.8.9.8 1.7 0 2.6" /></svg></span>
               <span class="nm">{{ pick(it.name, it.name_en) }}</span>
               <span v-if="it.qty > 1" class="qty">×{{ it.qty }}</span>
             </li>
@@ -142,68 +142,68 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 </template>
 
 <style scoped>
-.ol { min-height: 100vh; padding-bottom: calc(var(--tabbar-h, 0px) + env(safe-area-inset-bottom) + 24px); }
+.ol { font-size: 14px; min-height: 100vh; padding-bottom: calc(var(--tabbar-h, 0px) + env(safe-area-inset-bottom) + 24px); }
 .ol-head { position: sticky; top: 0; z-index: 10; background: var(--red-bg); color: #fff; }
 .ol-bar, .ol-tabs, .ol-list { max-width: 760px; margin: 0 auto; }
-.ol-bar { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: 'back title lang' 'search search search'; align-items: center; gap: 8px 8px; padding: 10px 16px 14px; }
-.ol-back { grid-area: back; border: 0; background: none; color: #fff; padding: 6px; margin-left: -8px; cursor: pointer; display: flex; border-radius: 50%; justify-self: start; }
-.ol-bar h1 { grid-area: title; text-align: center; font-size: 22px; font-weight: 800; letter-spacing: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ol-lang { grid-area: lang; border: 1.5px solid rgba(255, 255, 255, .85); background: none; color: #fff; border-radius: 7px; padding: 2px 9px; font-size: 13.5px; font-weight: 700; cursor: pointer; white-space: nowrap; min-width: 44px; }
-.ol-search { grid-area: search; min-width: 0; display: flex; align-items: center; gap: 10px; background: var(--paper); border-radius: 12px; padding: 0 14px; color: var(--muted); }
-.ol-search input { border: 0; padding: 10px 0; background: none; color: var(--ink); outline: none; min-width: 0; font-size: 16px; }
+.ol-bar { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: 'back title lang' 'search search search'; align-items: center; gap: 6px 8px; padding: 6px 12px 10px; }
+.ol-back { grid-area: back; border: 0; background: none; color: #fff; padding: 6px; margin-left: -6px; cursor: pointer; display: flex; border-radius: 50%; justify-self: start; }
+.ol-bar h1 { grid-area: title; text-align: center; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ol-lang { grid-area: lang; border: 1px solid rgba(255, 255, 255, .8); background: none; color: #fff; border-radius: 6px; padding: 1px 7px; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; min-width: 36px; justify-self: end; }
+.ol-search { grid-area: search; min-width: 0; display: flex; align-items: center; gap: 8px; background: var(--paper); border-radius: 999px; padding: 0 12px; color: var(--muted); }
+.ol-search input { border: 0; padding: 7px 0; background: none; color: var(--ink); outline: none; min-width: 0; font-size: 14px; }
 .ol-search input::placeholder { color: var(--muted); }
 .ol-search:focus-within { box-shadow: 0 0 0 2px var(--gold); }
-.ol-tabs { display: flex; justify-content: space-between; gap: 6px; padding: 14px 14px 6px; overflow-x: auto; scrollbar-width: none; }
+.ol-tabs { display: flex; justify-content: space-between; gap: 4px; padding: 10px 12px 4px; overflow-x: auto; scrollbar-width: none; }
 .ol-tabs::-webkit-scrollbar { display: none; }
-.ol-tabs button { flex: none; border: 0; background: none; padding: 7px 18px; border-radius: 999px; font-size: 16.5px; color: var(--ink); cursor: pointer; white-space: nowrap; }
-.ol-tabs button.on { background: var(--gold); font-weight: 800; }
-.ol-list { padding: 8px 12px 0; display: grid; gap: 12px; }
-.ol-note { text-align: center; color: var(--muted); padding: 64px 16px; }
-.ol-card { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; cursor: pointer; display: grid; gap: 10px; min-width: 0; }
-.ol-store { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
-.ol-name { display: flex; align-items: center; gap: 12px; color: var(--ink); min-width: 0; font-size: 19px; }
-.ol-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
-.ol-name > svg { flex: none; }
-.ol-name img, .ol-name .ph { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; flex: none; }
+.ol-tabs button { flex: none; border: 0; background: none; padding: 4px 14px; border-radius: 999px; font-size: 14px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.ol-tabs button.on { background: var(--gold); color: var(--ink); font-weight: 600; }
+.ol-list { padding: 6px 12px 0; display: grid; gap: 10px; }
+.ol-note { text-align: center; color: var(--muted); padding: 64px 16px; font-size: 13px; }
+.ol-card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; display: grid; gap: 8px; min-width: 0; }
+.ol-store { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.ol-name { display: flex; align-items: center; gap: 8px; color: var(--ink); min-width: 0; font-size: 15px; }
+.ol-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ol-name > svg { flex: none; color: var(--muted); }
+.ol-name img, .ol-name .ph { width: 28px; height: 28px; border-radius: 7px; object-fit: cover; flex: none; }
 .ol-name .ph { background: #c2401c; color: #fff3da; display: grid; place-items: center; }
-.ol-status { white-space: nowrap; font-size: 14px; padding: 3px 12px; border-radius: 999px; background: #e7e2d9; color: #6d6259; }
-.ol-status.live { background: var(--gold-soft); color: var(--red); font-weight: 700; }
-.ol-body { display: flex; align-items: stretch; gap: 12px; }
-.ol-items { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 0; display: grid; gap: 8px; align-content: center; }
-.ol-items li { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.ol-items img, .ol-items .ph { width: 100px; height: 52px; border-radius: 9px; object-fit: cover; flex: none; }
+.ol-status { white-space: nowrap; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: #e7e2d9; color: #6d6259; }
+.ol-status.live { background: var(--gold-soft); color: var(--red); font-weight: 600; }
+.ol-body { display: flex; align-items: stretch; gap: 10px; }
+.ol-items { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 0; display: grid; gap: 6px; align-content: center; }
+.ol-items li { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ol-items img, .ol-items .ph { width: 64px; height: 40px; border-radius: 6px; object-fit: cover; flex: none; }
 .ol-items .ph { background: var(--gold-soft); color: #b98a3a; display: grid; place-items: center; }
-.ol-items .nm { font-size: 16.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.ol-items .qty { color: var(--muted); font-size: 13.5px; flex: none; }
-.ol-items .rest { color: var(--muted); font-size: 13.5px; }
-.ol-sum { flex: none; display: grid; align-content: center; justify-items: center; gap: 2px; padding-left: 14px; border-left: 1px solid var(--line); min-width: 92px; }
-.ol-total { font-size: 23px; font-weight: 800; color: var(--red); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ol-count { color: var(--muted); font-size: 14.5px; }
-.ol-meta { display: flex; flex-wrap: wrap; gap: 0 10px; color: var(--muted); font-size: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.ol-items .nm { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ol-items .qty { color: var(--muted); font-size: 12px; flex: none; }
+.ol-items .rest { color: var(--muted); font-size: 12px; }
+.ol-sum { flex: none; display: grid; align-content: center; justify-items: center; gap: 0; padding-left: 12px; border-left: 1px solid var(--line); min-width: 76px; }
+.ol-total { font-size: 17px; font-weight: 700; color: var(--red); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ol-count { color: var(--muted); font-size: 12px; }
+.ol-meta { display: flex; flex-wrap: wrap; gap: 0 8px; color: var(--muted); font-size: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .ol-meta i { font-style: normal; }
 .ol-acts { display: flex; align-items: center; gap: 8px; }
 .ol-more { position: relative; }
-.ol-morebtn { border: 0; background: none; color: var(--muted); padding: 8px 4px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 15px; }
-.ol-morebtn b { letter-spacing: 1px; color: var(--ink); font-size: 13px; }
-.ol-menu { position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 5; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(60, 30, 10, .16); padding: 4px; min-width: 132px; display: grid; }
-.ol-menu button, .ol-menu a { border: 0; background: none; text-align: left; padding: 9px 12px; border-radius: 6px; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.ol-morebtn { border: 0; background: none; color: var(--muted); padding: 6px 4px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.ol-morebtn b { letter-spacing: 1px; color: var(--ink); font-size: 11px; }
+.ol-menu { position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 5; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(60, 30, 10, .16); padding: 4px; min-width: 120px; display: grid; font-size: 13px; }
+.ol-menu button, .ol-menu a { border: 0; background: none; text-align: left; padding: 8px 12px; border-radius: 6px; color: var(--ink); cursor: pointer; white-space: nowrap; }
 .ol-menu button:hover, .ol-menu a:hover { background: var(--bg); }
-.pill { border: 1px solid #cdb9a0; background: none; color: var(--ink); border-radius: 10px; padding: 7px 14px; cursor: pointer; white-space: nowrap; min-height: 38px; }
-.pill.brand { border-color: var(--red); background: var(--red); color: #fff; font-weight: 800; padding: 7px 24px; letter-spacing: 1px; }
+.pill { border: 1px solid #cdb9a0; background: none; color: var(--ink); border-radius: 999px; padding: 4px 14px; font-size: 13px; cursor: pointer; white-space: nowrap; min-height: 30px; }
+.pill.brand { border-color: var(--red); background: var(--red); color: #fff; font-weight: 500; padding: 4px 16px; }
 .pill.brand:hover { background: var(--red-deep); }
 .pill:disabled { opacity: .5; }
-.ol-foot { text-align: center; padding: 12px 0 6px; }
-.ol-end { display: flex; align-items: center; justify-content: center; gap: 22px; color: var(--muted); font-size: 14px; }
-.ol-end::before, .ol-end::after { content: ""; width: 64px; height: 1px; background: #cdbda8; }
+.ol-foot { text-align: center; padding: 8px 0 6px; }
+.ol-end { display: flex; align-items: center; justify-content: center; gap: 14px; color: var(--muted); font-size: 12px; }
+.ol-end::before, .ol-end::after { content: ""; width: 48px; height: 1px; background: #cdbda8; }
 @media (max-width: 380px) {
-  .ol-tabs button { padding: 7px 12px; font-size: 15.5px; }
-  .ol-items img, .ol-items .ph { width: 76px; height: 46px; } .ol-items .nm { font-size: 15.5px; }
-  .ol-sum { min-width: 76px; padding-left: 10px; } .ol-total { font-size: 20px; }
-  .pill { padding: 7px 10px; } .pill.brand { padding: 7px 16px; }
+  .ol-tabs button { padding: 4px 10px; font-size: 13.5px; }
+  .ol-items img, .ol-items .ph { width: 54px; height: 36px; } .ol-items .nm { font-size: 13.5px; }
+  .ol-sum { min-width: 66px; padding-left: 10px; } .ol-total { font-size: 16px; }
+  .pill { padding: 4px 10px; } .pill.brand { padding: 4px 12px; }
 }
 @media (min-width: 768px) {
-  .ol-bar { padding: 14px 20px 16px; }
-  .ol-tabs { justify-content: flex-start; gap: 12px; padding: 16px 20px 8px; } .ol-list { padding: 8px 20px 0; }
+  .ol-bar { padding: 10px 20px 12px; }
+  .ol-tabs { justify-content: flex-start; gap: 8px; padding: 12px 20px 6px; } .ol-list { padding: 6px 20px 0; }
 }
 /* a computer shows two orders side by side, and the search beside the title */
 @media (min-width: 1024px) {

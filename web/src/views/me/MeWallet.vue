@@ -41,9 +41,9 @@ watch(() => [kind.value, me.profile?.id], async ([, id]) => {
 </template>
 
 <style scoped>
-.total { display: grid; gap: 4px; padding: 22px 18px; color: #fff; background: linear-gradient(120deg, var(--brand) 0%, #f08c3a 100%); }
-.total b { font-size: 32px; line-height: 1.15; font-variant-numeric: tabular-nums; }
-.entry { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid #f0f1f3; }
+.total { display: grid; gap: 2px; padding: 16px; color: #fff; background: linear-gradient(120deg, var(--brand) 0%, #f08c3a 100%); }
+.total b { font-size: 26px; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.entry { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f1f3; }
 .entry:last-child { border-bottom: 0; }
-.entry b { font-variant-numeric: tabular-nums; white-space: nowrap; } .entry .in { color: var(--brand-dark); } .entry .out { color: var(--ink); }
+.entry b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; } .entry .in { color: var(--brand-dark); } .entry .out { color: var(--ink); }
 </style>

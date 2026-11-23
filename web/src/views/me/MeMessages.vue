@@ -115,16 +115,16 @@ async function readAll() {
 
 <style scoped>
 .msg { display: grid; gap: 6px; text-align: left; width: 100%; cursor: pointer; }
-.msg b { font-size: 16px; } .msg:not(.unread) b { font-weight: 500; color: var(--muted); }
+.msg b { font-size: 14px; font-weight: 600; } .msg:not(.unread) b { font-weight: 500; color: var(--muted); }
 .mtabs { display: flex; gap: 6px; background: var(--paper); border-radius: 999px; padding: 4px; box-shadow: 0 3px 12px rgba(90, 40, 15, .08); }
-.mtabs button { flex: 1; border: 0; background: none; padding: 9px 0; border-radius: 999px; color: var(--ink); font-size: 15.5px; cursor: pointer; }
-.mtabs button.on { background: var(--gold); color: var(--red); font-weight: 800; }
+.mtabs button { flex: 1; border: 0; background: none; padding: 6px 0; border-radius: 999px; color: var(--muted); font-size: 14px; cursor: pointer; }
+.mtabs button.on { background: var(--gold); color: var(--red); font-weight: 600; }
 .mtabs i, .crow .num { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #e5352b; color: #fff; font-size: 11px; font-style: normal; font-weight: 700; flex: none; vertical-align: 1px; }
 .clist { padding: 0 14px; }
-.crow { display: flex; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line); color: var(--ink); align-items: flex-start; }
+.crow { display: flex; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line); color: var(--ink); align-items: flex-start; }
 .crow:last-child { border-bottom: 0; }
 .crow .grow { min-width: 0; display: grid; gap: 2px; }
-.crow .last { color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.crow .last { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .crow .tag { justify-self: start; }
 .me-logo.sp { background: var(--red, #8b1a1a); color: var(--gold, #f3c86b); }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #e5352b; margin-right: 6px; vertical-align: 1px; }

@@ -52,7 +52,7 @@ async function submit() {
 <style scoped>
 .field { margin-bottom: 12px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-.chips button { border: 1px solid #d9c7ae; background: none; border-radius: 999px; padding: 6px 14px; cursor: pointer; font-size: 14px; color: var(--ink); }
-.chips button.on { background: var(--gold); border-color: var(--gold); color: var(--red); font-weight: 700; }
-.reply { background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 14px; white-space: pre-wrap; }
+.chips button { border: 1px solid #d9c7ae; background: none; border-radius: 999px; padding: 3px 12px; cursor: pointer; font-size: 13px; color: var(--ink); }
+.chips button.on { background: var(--gold); border-color: var(--gold); color: var(--red); font-weight: 500; }
+.reply { background: var(--bg); border-radius: 10px; padding: 8px 10px; font-size: 13px; white-space: pre-wrap; }
 </style>

@@ -89,30 +89,30 @@ function valid(p: Promotion): string {
 
 <style scoped>
 .cp-tabs { display: flex; background: var(--paper); border-radius: 14px; padding: 4px; gap: 4px; box-shadow: 0 3px 12px rgba(90, 40, 15, .06); }
-.cp-tabs button { flex: 1; border: 0; background: none; border-radius: 10px; padding: 9px 4px; font: inherit; font-weight: 700; color: var(--muted); cursor: pointer; }
-.cp-tabs button.on { background: var(--red); color: #fff; }
-.cp-head { font-size: 13.5px; color: var(--muted); font-weight: 700; margin: 6px 4px -2px; }
-.coupon.mine .stub b { font-size: 25px; }
+.cp-tabs button { flex: 1; border: 0; background: none; border-radius: 10px; padding: 6px 4px; font: inherit; font-size: 14px; color: var(--muted); cursor: pointer; }
+.cp-tabs button.on { background: var(--red); color: #fff; font-weight: 600; }
+.cp-head { font-size: 12px; color: var(--muted); font-weight: 500; margin: 6px 4px -2px; }
+.coupon.mine .stub b { font-size: 20px; }
 .coupon.mine.store_delivery .stub { background: linear-gradient(135deg, #fdf1d6, #fbe3ad); border-right-color: #dcbf7c; color: #a8641a; }
 .coupon.mine.platform_free .stub { background: linear-gradient(135deg, #efe6ff, #e2d3fb); border-right-color: #b9a1e6; color: #5b21b6; }
 .coupon.mine.gone { opacity: .6; filter: grayscale(.6); }
-.l .soon { color: #c2410c; font-weight: 700; }
-.coupon { position: relative; display: flex; align-items: stretch; background: var(--paper); border-radius: 16px; box-shadow: 0 3px 12px rgba(90, 40, 15, .08); min-width: 0; }
-.stub { flex: none; width: 31%; min-width: 106px; max-width: 170px; display: grid; justify-items: center; align-content: center; gap: 4px; padding: 14px 6px; border-radius: 16px 0 0 16px; background: linear-gradient(135deg, #fdeae4, #f9d9d3); color: var(--red); border-right: 1.500px dashed #d9a79a; position: relative; text-align: center; }
+.l .soon { color: #c2410c; font-weight: 500; }
+.coupon { position: relative; display: flex; align-items: stretch; background: var(--paper); border-radius: 12px; box-shadow: 0 3px 12px rgba(90, 40, 15, .08); min-width: 0; }
+.stub { flex: none; width: 28%; min-width: 92px; max-width: 150px; display: grid; justify-items: center; align-content: center; gap: 2px; padding: 12px 6px; border-radius: 12px 0 0 12px; background: linear-gradient(135deg, #fdeae4, #f9d9d3); color: var(--red); border-right: 1.500px dashed #d9a79a; position: relative; text-align: center; }
 .coupon.ship .stub { background: linear-gradient(135deg, #fdf1d6, #fbe3ad); border-right-color: #dcbf7c; }
 .coupon.ship .stub svg { color: #b9781e; }
 /* the two notches of a ticket, where the stub tears off */
-.stub::before, .stub::after { content: ""; position: absolute; right: -10px; width: 18px; height: 18px; border-radius: 50%; background: var(--bg); }
-.stub::before { top: -9px; } .stub::after { bottom: -9px; }
-.stub b { font-size: 23px; font-weight: 900; line-height: 1.2; }
-.l { flex: 1; min-width: 0; display: grid; gap: 3px; align-content: center; padding: 14px 6px 14px 16px; }
-.l > b { font-size: 18.500px; font-weight: 800; }
-.l .store { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 15px; min-width: 0; flex-wrap: wrap; }
-.l .store em { font-style: normal; font-size: 12.500px; padding: 1px 8px; border-radius: 6px; background: var(--gold-soft); color: #a8641a; border: 1px solid #f0d9a0; white-space: nowrap; }
-.l .small { color: var(--muted); font-size: 12.5px; }
-.use { flex: none; align-self: center; margin-right: 12px; display: inline-flex; align-items: center; gap: 2px; background: var(--red); color: #fff; font-weight: 700; font-size: 14.5px; border-radius: 999px; padding: 7px 8px 7px 14px; white-space: nowrap; }
+.stub::before, .stub::after { content: ""; position: absolute; right: -8px; width: 14px; height: 14px; border-radius: 50%; background: var(--bg); }
+.stub::before { top: -7px; } .stub::after { bottom: -7px; }
+.stub b { font-size: 19px; font-weight: 700; line-height: 1.2; }
+.l { flex: 1; min-width: 0; display: grid; gap: 2px; align-content: center; padding: 10px 6px 10px 14px; }
+.l > b { font-size: 15px; font-weight: 600; }
+.l .store { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; min-width: 0; flex-wrap: wrap; }
+.l .store em { font-style: normal; font-size: 11px; padding: 0 6px; border-radius: 4px; background: var(--gold-soft); color: #a8641a; border: 1px solid #f0d9a0; white-space: nowrap; }
+.l .small { color: var(--muted); font-size: 12px; }
+.use { flex: none; align-self: center; margin-right: 12px; display: inline-flex; align-items: center; gap: 2px; background: var(--red); color: #fff; font-weight: 500; font-size: 12px; border-radius: 999px; padding: 4px 6px 4px 12px; white-space: nowrap; }
 .use:hover { background: var(--red-deep); }
 @media (max-width: 380px) {
-  .stub b { font-size: 19px; } .l { padding-left: 14px; } .l > b { font-size: 16.500px; } .use { padding: 6px 8px 6px 12px; font-size: 14px; margin-right: 8px; }
+  .stub b { font-size: 17px; } .l { padding-left: 12px; } .l > b { font-size: 14px; } .use { padding: 4px 6px 4px 10px; margin-right: 8px; }
 }
 </style>

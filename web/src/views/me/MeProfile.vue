@@ -71,10 +71,10 @@ async function logout() {
 </template>
 
 <style scoped>
-.pic { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: #eceef1; }
+.pic { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #eceef1; }
 .me-rows form input { flex: 1; min-width: 0; }
 .langseg { gap: 0 !important; }
-.langseg button { border: 1px solid var(--line); background: #fff; padding: 5px 12px; cursor: pointer; font-size: 13px; }
+.langseg button { border: 1px solid var(--line); background: #fff; padding: 3px 10px; cursor: pointer; font-size: 12px; }
 .langseg button:first-child { border-radius: 8px 0 0 8px; } .langseg button:last-child { border-radius: 0 8px 8px 0; border-left: 0; }
 .langseg button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
 </style>
