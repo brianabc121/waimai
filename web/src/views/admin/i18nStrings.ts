@@ -1,0 +1,26 @@
+// Texts of the platform's language page, [zh, en].
+import { extend } from '../../i18n'
+
+extend({
+  'ad.i18n.nav': ['语言适配', 'Languages'],
+  'ad.i18n.lang': ['核对语言', 'Language'],
+  'ad.i18n.hint': ['列出顾客端、商家端和员工端的所有界面文字。点译文直接改，保存后立即生效，不用重新发版（其他人最多一分钟内看到）。商家的菜单译文由商家自己管，不在这里。',
+    'Every text of the customer, merchant and staff screens. Click a translation to correct it; it takes effect at once, without a new release (others see it within a minute). Merchants manage their own menu translations.'],
+  'ad.i18n.fill': ['机器补齐缺失', 'Fill in missing'], 'ad.i18n.export': ['导出 Excel', 'Export Excel'], 'ad.i18n.import': ['导入 Excel', 'Import Excel'],
+  'ad.i18n.f_all': ['全部', 'All'], 'ad.i18n.f_human': ['人工已校对', 'Checked'], 'ad.i18n.f_machine': ['机器补齐待校对', 'Machine, to check'],
+  'ad.i18n.f_missing': ['缺失', 'Missing'], 'ad.i18n.f_long': ['可能显示不下', 'May not fit'],
+  'ad.i18n.all_groups': ['全部页面', 'All pages'], 'ad.i18n.search': ['搜文字或编号', 'Search text or key'],
+  'ad.i18n.key': ['编号', 'Key'], 'ad.i18n.status': ['状态', 'Status'],
+  'ad.i18n.st_human': ['已校对', 'Checked'], 'ad.i18n.st_machine': ['机器补齐', 'Machine'], 'ad.i18n.st_shipped': ['随版本', 'Built in'], 'ad.i18n.st_missing': ['缺失', 'Missing'],
+  'ad.i18n.long': ['太长', 'Too long'],
+  'ad.i18n.save': ['保存并标记已校对', 'Save as checked'], 'ad.i18n.approve': ['标记已校对', 'Mark checked'], 'ad.i18n.revert': ['恢复原译文', 'Back to built-in'],
+  'ad.i18n.saved': ['已保存，已生效', 'Saved and in use'], 'ad.i18n.reverted': ['已恢复随版本的译文', 'Back to the built-in text'],
+  'ad.i18n.none_missing': ['这种语言没有缺失的文字', 'Nothing is missing in this language'],
+  'ad.i18n.fill_confirm': ['用翻译服务补齐 {n} 条缺失的文字？补上的标为“机器补齐”，请再核对。', 'Translate the {n} missing texts with the translation service? They are marked “Machine” for checking.'],
+  'ad.i18n.filled': ['已补齐 {n} 条，请核对', 'Filled in {n}; please check them'],
+  'ad.i18n.import_same': ['表格里的译文和现在的一样，没有要改的', 'The sheet matches what is in use; nothing to change'],
+  'ad.i18n.import_review': ['表格里有 {n} 条和现在不同，确认后保存为已校对：', '{n} texts differ from what is in use; save them as checked:'],
+  'ad.i18n.import_apply': ['保存这些修改', 'Save these changes'], 'ad.i18n.imported': ['已导入 {n} 条', 'Imported {n}'],
+  'ad.i18n.preview': ['页面预览', 'Preview'], 'ad.i18n.p_mall': ['商城首页', 'Mall'], 'ad.i18n.p_orders': ['订单', 'Orders'], 'ad.i18n.p_me': ['我的', 'Me'],
+  'ad.i18n.p_store': ['店铺链接名', 'Store slug'],
+})

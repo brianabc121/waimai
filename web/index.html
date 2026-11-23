@@ -25,7 +25,8 @@
           var q = new URLSearchParams(location.search).get('lang')
           if (q && codes.indexOf(q) >= 0) {
             l = q
-            document.cookie = 'lang=' + encodeURIComponent(q) + '; path=/; max-age=31536000; samesite=lax'
+            // the language page's preview shows a language without changing the admin's own
+            if (!/[?&]i18nfresh=/.test(location.search)) document.cookie = 'lang=' + encodeURIComponent(q) + '; path=/; max-age=31536000; samesite=lax'
           }
         } catch (e) {}
         if (!l) {

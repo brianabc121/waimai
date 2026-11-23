@@ -27,9 +27,31 @@ const texts: Partial<Record<Locale, Record<string, string>>> = {}
 const fixes: Partial<Record<Locale, Record<string, string>>> = {}
 
 async function load(l: Locale) {
-  if (l === 'zh' || l === 'en' || texts[l]) return
-  const f = loaders[`./locales/${l}.json`]
-  if (f) texts[l] = (await f()).default
+  void loadFixes(l)
+  if (l !== 'zh' && l !== 'en' && !texts[l]) {
+    const f = loaders[`./locales/${l}.json`]
+    if (f) texts[l] = (await f()).default
+  }
+}
+
+// loadFixes fetches the back office's corrections once per language; the page
+// works without them.
+const fixing: Partial<Record<Locale, Promise<void>>> = {}
+function loadFixes(l: Locale): Promise<void> {
+  // the language page's preview asks past the cache, to show a correction just saved
+  const fresh = /[?&]i18nfresh=/.test(location.search)
+  return fixing[l] ??= fetch(`/api/v1/i18n/${l}`, { credentials: 'same-origin', cache: fresh ? 'no-store' : 'default' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { if (d?.texts && !fixes[l]) { fixes[l] = d.texts; fixVer.value++ } }, () => {})
+}
+// fixVer makes texts already on screen follow corrections that arrive later.
+const fixVer = ref(0)
+
+// textsOf is a language's shipped texts, for the language page.
+export async function textsOf(l: Locale): Promise<Record<string, string>> {
+  if (l === 'zh' || l === 'en') return {}
+  await load(l).catch(() => {})
+  return texts[l] ?? {}
 }
 
 function apply(l: Locale) {
@@ -286,7 +308,8 @@ const dict: Record<string, [string, string]> = {
 // extend adds the texts of a lazily loaded area (the platform back office).
 export function extend(more: Record<string, [string, string]>) { Object.assign(dict, more) }
 
-export function fixTexts(l: Locale, m: Record<string, string>) { fixes[l] = m }
+// fixTexts puts the language page's corrections in use right away.
+export function fixTexts(l: Locale, m: Record<string, string>) { fixes[l] = m; fixVer.value++ }
 
 // has reports whether a key exists (some lists fall back to the raw code).
 export const has = (key: string) => key in dict
@@ -294,6 +317,7 @@ export const has = (key: string) => key in dict
 export function t(key: string, vars: Record<string, string | number> = {}): string {
   const l = shown.value
   const e = dict[key]
+  void fixVer.value
   let s = fixes[l]?.[key] ?? (l === 'zh' ? e?.[0] : l === 'en' ? e?.[1] : texts[l]?.[key] ?? e?.[1]) ?? key
   if (s.includes(', plural,')) s = plural(s, vars)
   for (const k in vars) s = s.split(`{${k}}`).join(String(vars[k]))

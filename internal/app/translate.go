@@ -111,6 +111,10 @@ var translationSchema = map[string]any{
 }
 
 func (t *claudeTranslator) Translate(ctx context.Context, from, to string, texts []string) ([]string, error) {
+	return t.translate(ctx, menuPrompt, from, to, texts)
+}
+
+func (t *claudeTranslator) translate(ctx context.Context, prompt, from, to string, texts []string) ([]string, error) {
 	type in struct {
 		ID   int    `json:"id"`
 		Text string `json:"text"`
@@ -123,7 +127,7 @@ func (t *claudeTranslator) Translate(ctx context.Context, from, to string, texts
 	msg, err := t.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(t.model),
 		MaxTokens: 16000,
-		System:    []anthropic.TextBlockParam{{Text: menuPrompt}},
+		System:    []anthropic.TextBlockParam{{Text: prompt}},
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock("Translate into " + langNames[to] + ":\n" + string(body))),
 		},
