@@ -108,7 +108,7 @@ await page.screenshot({ path: `${SHOTS}/af3-form-no-contact-names.png` })
 step('with nothing ticked the form shows none of them')
 
 // ---- a store in another country starts on that country's code ----
-await page.route('**/api/v1/stores/makati', async route => {
+await page.route('**/api/v1/stores/makati?*', async route => {
   const res = await route.fetch(), body = await res.json()
   body.branch.country_code = 'SG'
   await route.fulfill({ response: res, json: body })

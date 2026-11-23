@@ -306,10 +306,10 @@ async function sendReport() {
         <div class="tools">
           <!-- back to the marketplace; delivery or pickup is chosen at checkout -->
           <router-link to="/" class="ico" :aria-label="t('ml.back_mall')" :title="t('ml.back_mall')" data-testid="back-mall">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 5-7 7 7 7" /></svg></router-link>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 5-7 7 7 7" /></svg><span class="lbl">{{ t('ml.back_mall') }}</span></router-link>
           <span class="grow"></span>
           <button class="ico" :class="{ on: searching }" :aria-label="t('sf.search')" data-testid="search-toggle" @click="toggleSearch">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg></button>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg><span class="lbl">{{ t('sf.search') }}</span></button>
           <button class="ico" :class="{ fav: favorite }" :aria-label="t(favorite ? 'mf.faved' : 'mf.fav')" :aria-pressed="favorite" data-testid="favorite" @click="toggleFavorite">
             <svg viewBox="0 0 24 24" width="24" height="24" :fill="favorite ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.500l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.900z" /></svg></button>
           <button class="ico" :aria-label="t('sf.share')" data-testid="share" @click="share">
@@ -328,6 +328,8 @@ async function sendReport() {
           </div>
           <LangButton class="lang" />
         </div>
+        <!-- the store's name, offers and notice; beside the pictures on a computer -->
+        <div class="idwrap">
         <div class="ident">
           <img v-if="tpl.logo_url" :src="tpl.logo_url" alt="" class="logo" />
           <div v-else class="logo ph">{{ name.slice(0, 1) }}</div>
@@ -355,6 +357,7 @@ async function sendReport() {
           <span class="lbl">{{ t('sf.notice') }}</span>
           <!-- a notice too long for the line scrolls round and round -->
           <div ref="marq" class="marq" :class="{ run: scrolls }"><span :style="{ animationDuration: Math.max(8, store.branch.notice.length / 4) + 's' }">{{ store.branch.notice }}<template v-if="scrolls"><i></i>{{ store.branch.notice }}<i></i></template></span></div>
+        </div>
         </div>
       </header>
       </div>
@@ -415,7 +418,7 @@ async function sendReport() {
       <!-- the cart beside the menu on a computer; smaller screens use the bar below -->
       <aside class="sidecart" v-if="tab === 'menu'" data-testid="side-cart">
         <div class="card">
-          <h2>{{ t('cart') }}<span v-if="count" class="muted small"> · {{ count }}</span></h2>
+          <h2>{{ t('cart') }}<span v-if="count" class="cnt" data-testid="side-count">{{ count }}</span></h2>
           <CartPanel :store="store" :items="items" :currency="cur" :orderable="orderable" />
           <div class="foot">
             <div v-if="count" class="sumline">
@@ -509,11 +512,29 @@ async function sendReport() {
 
       <!-- every offer -->
       <div class="sheet-mask" v-if="showPromos" @click.self="showPromos = false">
-        <div class="sheet" data-testid="promo-sheet">
-          <div class="sheet-head row between"><h2>{{ t('sf.promos') }}</h2><button class="btn link" @click="showPromos = false">{{ t('close') }}</button></div>
-          <div class="sheet-body stack">
-            <div v-for="p in promos" :key="p.id" class="row between">
-              <span>{{ mn(p) }}</span><span class="tag brand">{{ promoLabel(p, cur) }}</span>
+        <div class="sheet promosheet" data-testid="promo-sheet">
+          <div class="carthead">
+            <div class="grow">
+              <h2>{{ t('sf.promos') }}<span class="cnt">{{ promos.length }}</span></h2>
+              <p>{{ t('sf.promo_tip') }}</p>
+            </div>
+            <button class="x" :aria-label="t('close')" @click="showPromos = false">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
+          </div>
+          <!-- every offer as a ticket: what it gives on the left, its rule on the right -->
+          <div class="tickets">
+            <div v-for="p in promos" :key="p.id" class="ticket" :class="{ idle: p.live_now === false }" :data-promo="p.id">
+              <div class="stub" :class="p.kind">
+                <svg v-if="p.kind === 'free_delivery'" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7" /><circle cx="6.5" cy="17.5" r="1.8" /><circle cx="17" cy="17.5" r="1.8" /></svg>
+                <b v-else>{{ p.kind === 'amount_off' ? money(p.value, cur) : t('pr.percent_off', { pct: p.value / 100, zhe: (100 - p.value / 100) / 10 }) }}</b>
+                <small>{{ p.threshold > 0 ? t('sf.promo_over', { th: money(p.threshold, cur) }) : t('sf.promo_any') }}</small>
+              </div>
+              <div class="rule">
+                <div class="nm">{{ mn(p) }}</div>
+                <div class="lbl">{{ promoLabel(p, cur) }}</div>
+                <div class="when" v-if="p.daily_start && p.daily_end && p.daily_start !== p.daily_end">{{ t('sf.promo_hours', { from: p.daily_start.slice(0, 5), to: p.daily_end.slice(0, 5) }) }}</div>
+                <div class="when idle" v-if="p.live_now === false">{{ t('sf.promo_paused') }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -564,6 +585,10 @@ async function sendReport() {
 @media (max-width: 767.98px) {
   .shoptabbar { display: block; }
   .shop { --tabs: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); padding-bottom: calc(96px + var(--tabs)); }
+  /* on the menu the room kept for the cart bar is part of the menu, so the
+     category rail and the dishes run on under the bar instead of stopping above
+     a strip of page */
+  .shop:not(.solo) { padding-bottom: 0; --menu-pad: calc(96px + var(--tabs)); }
   .shop .bottombar.cartbar { bottom: var(--tabbar-h); }
   .shop .cartmask { padding-bottom: var(--tabs); }
   .shop .toast { bottom: calc(96px + var(--tabs)); }
@@ -672,40 +697,102 @@ async function sendReport() {
 .carthead p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
 .carthead .x { flex: none; width: 36px; height: 36px; border: 0; border-radius: 50%; background: #f3eee7; color: var(--muted); display: grid; place-items: center; cursor: pointer; padding: 0; }
 
+/* the offers: tickets with a red stub */
+.promosheet { background: var(--paper); max-height: min(80vh, 640px); overflow: hidden; }
+.promosheet .carthead { background: #fff; }
+.tickets { overflow-y: auto; padding: 14px 16px calc(18px + env(safe-area-inset-bottom)); display: grid; gap: 10px; }
+.ticket { position: relative; display: flex; min-height: 84px; background: #fff; border-radius: 12px; box-shadow: 0 1px 6px rgba(59, 31, 20, .08); overflow: hidden; }
+.stub { flex: none; width: 104px; display: grid; place-content: center; justify-items: center; gap: 2px; padding: 8px 6px; text-align: center; color: #fff; background: linear-gradient(150deg, #b8382a, var(--red)); position: relative; }
+.stub.free_delivery { background: linear-gradient(150deg, #d9a43c, #c08a22); }
+/* the punched edge between the stub and the rule */
+.stub::after { content: ''; position: absolute; top: 6px; bottom: 6px; inset-inline-end: -4px; width: 8px; background: radial-gradient(circle at 4px 5px, #fff 3px, transparent 3.5px) 0 0 / 8px 10px repeat-y; }
+.stub b { font-size: 22px; line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stub small { font-size: 11px; opacity: .92; line-height: 1.3; }
+.rule { flex: 1; min-width: 0; padding: 12px 14px; padding-inline-start: 18px; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+.rule .nm { font-size: 15px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.rule .lbl { align-self: flex-start; font-size: 12px; line-height: 20px; padding: 0 7px; border-radius: 5px; background: #fbe3dc; color: var(--red); }
+.rule .when { font-size: 12px; color: var(--muted); }
+.rule .when.idle { color: var(--warn); }
+.ticket.idle .stub { filter: grayscale(.6); opacity: .8; }
+@media (min-width: 768px) { .promosheet { max-width: 480px; } }
+
 .toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 14px; z-index: 90; }
 
 .sidecart { display: none; }
+.idwrap { display: contents; }
+.tools .lbl { display: none; }
 @media (min-width: 768px) {
-  .shophead { padding: 16px var(--gut) 18px; border-radius: 0; }
-  .hero.media { display: grid; grid-template-columns: min(44%, 460px) minmax(0, 1fr); gap: 0 24px; align-items: start; background: var(--paper); padding: 16px var(--gut) 18px; }
-  .hero.media .shophead { padding: 0; }
-  .hero-media { --promo-foot: 12px; border-radius: 14px; overflow: hidden; }
+  /* the store card: the tools along the top, the name and offers on the left,
+     the pictures on the right */
+  .hero { margin: 16px var(--gut) 0; background: var(--paper); border: 1px solid #efe3d1; border-radius: 16px; box-shadow: 0 2px 12px rgba(59, 31, 20, .05);
+    padding: 10px 24px 20px; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 28px; }
+  .shophead { display: contents; }
+  .tools { grid-column: 1 / -1; grid-row: 1; padding-bottom: 10px; margin-bottom: 16px; border-bottom: 1px solid #efe3d1; }
+  .idwrap { grid-column: 1; grid-row: 2; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-content: start; min-width: 0; }
+  .hero-media { grid-column: 2; grid-row: 2; align-self: start; width: clamp(240px, 26vw, 320px); --promo-foot: 10px; border-radius: 12px; overflow: hidden; }
   .hero-media::before, .lip { display: none; }
-  .logo { width: 88px; height: 88px; }
-  .ident h1 { font-size: 24px; }
-  .shoptabs { margin: 12px calc(var(--gut) - 14px) 0; padding: 0 26px; gap: 40px; }
+  .hero.media .shophead { padding: 0; }
+  .logo { width: 80px; height: 80px; border-radius: 14px; }
+  .ident h1 { font-size: 22px; }
+  .chips span { border: 0; background: #f3e6d2; color: #6f5a49; }
+  .chips.brand span { background: #fbe3dc; color: var(--red); }
+  .shoptabs { margin: 16px var(--gut) 0; padding: 0 22px; gap: 36px; border-radius: 14px; border: 1px solid #efe3d1; border-bottom-color: #efe3d1; }
+  .shop-cols { padding: 0 var(--gut); }
   .shop-main { border-radius: 0 0 14px 14px; overflow: clip; }
   .about section { padding: 16px 26px; }
   .cartmask { padding: 0; align-items: flex-end; }
   .cartsheet { border-radius: 16px 16px 0 0; }
 }
 @media (min-width: 1024px) {
-  .shoptabs { border-radius: 14px 14px 0 0; }
+  /* the back link and the search say what they are */
+  .tools .lbl { display: inline; }
+  .tools > a.ico { width: auto; border-radius: 8px; padding: 0 10px 0 4px; gap: 4px; display: inline-flex; font-size: 14px; color: var(--muted); }
+  .tools > a.ico svg { width: 20px; height: 20px; }
+  .tools > button.ico:first-of-type { width: auto; height: 34px; border-radius: 9px; padding: 0 12px; gap: 6px; display: inline-flex; background: #f3e6d2; font-size: 13px; color: var(--muted); margin-inline-end: 6px; }
+  .tools > button.ico:first-of-type svg { width: 17px; height: 17px; }
+  .tools > button.ico:first-of-type.on { background: var(--gold-soft); color: var(--ink); }
+
+  /* the menu and the cart side by side; the tabs above the menu only */
+  .shop-cols { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; margin-top: 14px; }
   .shop.solo .shop-cols { grid-template-columns: minmax(0, 1fr); }
-  .shop-cols { display: grid; }
-  .shop-main { align-self: stretch; }
-  .sidecart { display: block; position: sticky; top: 12px; align-self: start; margin-top: -50px; }
-  .sidecart .card { display: flex; flex-direction: column; padding: 0; max-height: calc(100vh - 24px); overflow: hidden; }
-  .sidecart h2 { padding: 14px 16px 0; }
-  .sidecart .card { background: #fff; border-color: var(--line); }
-  .sidecart .foot { display: grid; gap: 6px; padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+  .shoptabs { margin-inline-end: calc(var(--gut) + 360px); }
+  .shop.solo .shoptabs { margin-inline-end: var(--gut); }
+  .shop-main { align-self: stretch; border-radius: 14px; }
+  .shop.solo .shop-main { background: var(--paper); border: 1px solid #efe3d1; }
+
+  /* the menu: the categories in a card of their own, every dish a card, two
+     to a row; both stay under the tabs while the page scrolls */
+  .shop { --menu-top: 64px; }
+  .shoptabs { box-shadow: 0 -16px 0 var(--bg); }
+  .menuwrap { background: none; }
+  .menuwrap .pre { padding-inline: 0; }
+  .menuwrap :deep(.menu.list .body) { --rail: 112px; background: none; gap: 14px; }
+  .menuwrap :deep(.menu.list .cats) { position: sticky; top: var(--menu-top); width: var(--rail); padding: 6px; background: var(--paper); border: 1px solid #efe3d1; border-radius: 12px; max-height: calc(100vh - var(--menu-top) - 16px); }
+  .menuwrap :deep(.menu.list .cats button) { border-radius: 8px; padding: 12px 10px; text-align: start; }
+  .menuwrap :deep(.menu.list .cats button.on) { background: #fff; color: var(--red); box-shadow: 0 1px 4px rgba(59, 31, 20, .08); }
+  .menuwrap :deep(.menu.list .cats button.on::before) { top: 10px; bottom: 10px; border-radius: 2px; }
+  .menuwrap :deep(.menu.list .cats .badge) { top: 50%; transform: translateY(-50%); inset-inline-end: 8px; }
+  .menuwrap :deep(.menu.list .lists) { padding: 0 0 20px; gap: 4px; }
+  .menuwrap :deep(.menu.list .cat > h2) { font-size: 15px; font-weight: 700; color: var(--ink); padding: 4px 0 10px; }
+  .menuwrap :deep(.menu.list .cat:not(:first-child) > h2) { padding-top: 16px; }
+  .menuwrap :deep(.menu.list .items) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .menuwrap :deep(.menu.list .item) { background: var(--paper); border: 1px solid #efe3d1; border-radius: 12px; padding: 12px; gap: 12px; }
+  .menuwrap :deep(.menu.list .item:hover) { border-color: #e2cfb4; box-shadow: 0 4px 14px rgba(59, 31, 20, .08); }
+  .menuwrap :deep(.menu.list .item img), .menuwrap :deep(.menu.list .item .ph) { width: 96px; height: 96px; border-radius: 10px; }
+  .menuwrap :deep(.menu.list .item .bold) { font-size: 15px; }
+
+  /* the cart */
+  .sidecart { display: block; position: sticky; top: 12px; align-self: start; margin-top: -64px; }
+  .sidecart .card { display: flex; flex-direction: column; padding: 0; max-height: calc(100vh - 24px); overflow: hidden; background: var(--paper); border: 1px solid #efe3d1; border-radius: 14px; box-shadow: 0 2px 12px rgba(59, 31, 20, .05); }
+  .sidecart h2 { padding: 14px 16px 0; font-size: 17px; display: flex; align-items: center; justify-content: space-between; }
+  .sidecart h2 .cnt { font-size: 12px; font-weight: 600; color: #8a5a12; background: var(--gold-soft); border-radius: 6px; padding: 0 8px; line-height: 20px; }
+  .sidecart .foot { display: grid; gap: 8px; padding: 14px 16px 16px; border-top: 1px solid #efe3d1; }
   .sidecart .sumline { display: flex; align-items: baseline; gap: 8px; }
-  .sidecart .now { font-size: 22px; font-variant-numeric: tabular-nums; }
+  .sidecart .now { font-size: 24px; font-variant-numeric: tabular-nums; }
   .sidecart .was { font-size: 13px; }
-  .sidecart .got { font-size: 13px; color: var(--red); }
-  .sidecart .btn.primary { background: var(--red); border-color: var(--red); }
-  .sidecart .must { background: #eee; border-color: #ddd; }
-  .shoptabs { margin-inline-end: calc(var(--gut) - 14px + 352px); }
-  .shop.solo .shoptabs { margin-inline-end: calc(var(--gut) - 14px); }
+  .sidecart .got { font-size: 12px; color: var(--red); background: #fbe3dc; border-radius: 8px; padding: 7px 10px; }
+  .sidecart .btn.primary { background: var(--red); border-color: var(--red); border-radius: 10px; min-height: 46px; }
+  .sidecart .btn.primary:disabled { background: #d9cfc3; border-color: #d9cfc3; opacity: 1; }
+  .sidecart .must { background: var(--gold); border-color: var(--gold); color: var(--red-deep); }
 }
 </style>
