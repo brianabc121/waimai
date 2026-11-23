@@ -71,8 +71,55 @@ function toggle(f: string) { ask.filters = ask.filters.includes(f) ? ask.filters
 function messages() { void router.push(customer.verified ? '/me/messages' : loginRoute('/me/messages')) }
 
 // ---- banners ----
+// They play by themselves every five seconds and can be swiped left and right
+// (or dragged with a mouse). While a finger or the pointer is on them they hold
+// still, and after a swipe the next turn waits a full five seconds.
 const slide = ref(0)
+const drag = ref(0)
+const dragging = ref(false)
 let timer = 0
+let startX = 0, startY = 0, moved = false, held = false, hover = false, swallow = false, lastTouch = 0
+const rtl = () => document.documentElement.dir === 'rtl'
+function goTo(i: number) { const n = banners.value.length; if (n) slide.value = (i + n) % n }
+function tick() {
+  if (banners.value.length < 2 || held || hover || Date.now() - lastTouch < 4500) return
+  goTo(slide.value + 1)
+}
+function bDown(e: PointerEvent) {
+  if (banners.value.length < 2 || (e.pointerType === 'mouse' && e.button !== 0)) return
+  startX = e.clientX; startY = e.clientY; moved = false; held = true; dragging.value = true; drag.value = 0
+}
+function bMove(e: PointerEvent) {
+  if (!dragging.value) return
+  const dx = e.clientX - startX, dy = e.clientY - startY
+  if (!moved) {
+    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
+    // a mostly-up-or-down move is the page scrolling, not a swipe
+    if (Math.abs(dy) > Math.abs(dx)) { dragging.value = false; held = false; return }
+    moved = true
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) } catch { /* the pointer is already gone */ }
+  }
+  drag.value = dx
+}
+function bUp(e: PointerEvent) {
+  held = false; lastTouch = Date.now()
+  if (!dragging.value) return
+  dragging.value = false
+  if (moved) {
+    swallow = true; window.setTimeout(() => { swallow = false }, 0)
+    const w = (e.currentTarget as HTMLElement).clientWidth || 1
+    if (Math.abs(drag.value) > Math.min(60, w * 0.18)) goTo(slide.value + ((drag.value < 0) !== rtl() ? 1 : -1))
+  }
+  drag.value = 0
+}
+// only a mouse resting on them holds them; a tap on a phone leaves no hover behind
+function setHover(e: PointerEvent, on: boolean) { if (e.pointerType !== 'mouse') return; hover = on; if (!on) lastTouch = Date.now() }
+function pickDot(i: number) { goTo(i); lastTouch = Date.now() }
+function bClick(e: MouseEvent) { if (swallow) { e.stopPropagation(); e.preventDefault() } }
+const trackStyle = computed(() => ({
+  transform: `translateX(calc(${(rtl() ? 1 : -1) * slide.value * 100}% + ${drag.value}px))`,
+  transition: dragging.value ? 'none' : undefined,
+}))
 function follow(b: MallBanner) {
   if (b.link_slug) void router.push(`/s/${b.link_slug}`)
   else if (b.link_url.startsWith('/')) void router.push(b.link_url)
@@ -93,7 +140,7 @@ onMounted(async () => {
   document.title = t('ml.brand')
   loadHome()
   void loadProfile()
-  timer = window.setInterval(() => { if (banners.value.length > 1) slide.value = (slide.value + 1) % banners.value.length }, 5000)
+  timer = window.setInterval(tick, 5000)
   if (loc.value) void load()
   await start()
   if (mall.denied && !loc.value) showLoc.value = 'list'
@@ -143,16 +190,20 @@ onBeforeUnmount(() => clearInterval(timer))
 
       <main class="mmain">
         <template v-if="!ask.q">
-          <div v-if="banners.length" class="banners" data-testid="mall-banners">
-            <a v-for="(b, i) in banners" v-show="i === slide" :key="b.id" class="banner" :class="{ link: b.link_slug || b.link_url }" :aria-label="t('ml.banner')" @click="follow(b)">
-              <img v-if="b.image_url" :src="b.image_url" alt="" />
+          <div v-if="banners.length" class="banners" :class="{ many: banners.length > 1 }" data-testid="mall-banners"
+            @pointerdown="bDown" @pointermove="bMove" @pointerup="bUp" @pointercancel="bUp" @click.capture="bClick"
+            @pointerenter="setHover($event, true)" @pointerleave="setHover($event, false)">
+            <div class="track" :style="trackStyle">
+            <a v-for="(b, i) in banners" :key="b.id" class="banner" :class="{ link: b.link_slug || b.link_url }" :aria-label="t('ml.banner')" :aria-hidden="i !== slide || undefined" draggable="false" @click="follow(b)">
+              <img v-if="b.image_url" :src="b.image_url" alt="" draggable="false" />
               <div>
                 <b>{{ bannerTitle(b) }}</b>
                 <span v-if="bannerSub(b)" class="ribbon">{{ bannerSub(b) }}</span>
                 <em v-if="bannerStore(b)">{{ bannerStore(b) }}</em>
               </div>
             </a>
-            <div v-if="banners.length > 1" class="dots"><i v-for="(b, i) in banners" :key="b.id" :class="{ on: i === slide }" @click="slide = i"></i></div>
+            </div>
+            <div v-if="banners.length > 1" class="dots"><i v-for="(b, i) in banners" :key="b.id" :class="{ on: i === slide }" @click="pickDot(i)"></i></div>
           </div>
 
           <div v-if="categories.length" class="cats" data-testid="mall-categories">
@@ -273,8 +324,11 @@ onBeforeUnmount(() => clearInterval(timer))
 .mmain { min-width: 0; display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-content: start; padding-top: 12px; }
 
 /* on a phone the banner continues the red top, from edge to edge */
-.banners { position: relative; margin: -12px -12px 0; }
-.banner { position: relative; display: block; height: 150px; overflow: hidden; border-radius: 0; padding: 0; font-size: inherit; color: #fff; background: var(--motif) 0 -28px / 56px 56px, linear-gradient(180deg, var(--red), #b23a26); }
+.banners { position: relative; margin: -12px -12px 0; overflow: hidden; }
+.banners.many { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.track { display: flex; transition: transform .38s cubic-bezier(.25, .8, .3, 1); will-change: transform; }
+@media (prefers-reduced-motion: reduce) { .track { transition: none; } }
+.banner { flex: 0 0 100%; min-width: 0; position: relative; display: block; height: 150px; overflow: hidden; border-radius: 0; padding: 0; font-size: inherit; color: #fff; background: var(--motif) 0 -28px / 56px 56px, linear-gradient(180deg, var(--red), #b23a26); }
 .banner.link { cursor: pointer; }
 .banner img { position: absolute; inset-inline-end: 0; top: 0; height: 100%; width: 68%; object-fit: cover; -webkit-mask-image: linear-gradient(90deg, transparent, #000 42%); mask-image: linear-gradient(90deg, transparent, #000 42%); }
 .banner div { position: relative; padding: 18px 16px 0; max-width: 66%; display: grid; gap: 7px; justify-items: start; text-shadow: 0 1px 6px rgba(80, 20, 10, .35); }

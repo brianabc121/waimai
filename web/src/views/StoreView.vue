@@ -617,8 +617,15 @@ async function sendReport() {
 .shoptabs button.on::after { content: ''; position: absolute; left: 50%; bottom: 6px; width: 22px; height: 3px; margin-inline-start: -11px; border-radius: 2px; background: var(--brand); }
 .shoptabs small { font-size: 11px; color: var(--muted); margin-inline-start: 2px; font-weight: 400; }
 
-/* the menu fills the screen under the tabs, so the category rail runs to the bottom however few dishes there are */
-.menuwrap { background: var(--paper); min-height: calc(100vh - 50px); min-height: calc(100dvh - 50px); display: flex; flex-direction: column; }
+/* The menu fills what is left of the screen, so the category rail runs to the
+   bottom however few dishes there are, but it never makes the page taller than
+   the screen: the page is a column at least a screen high and the menu takes
+   the rest of it. */
+.shop { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+.shop-cols { flex: 1 0 auto; display: flex; flex-direction: column; }
+.shop-main { flex: 1 0 auto; display: flex; flex-direction: column; }
+.shop-main > * { flex: none; }
+.menuwrap { background: var(--paper); flex: 1 0 auto !important; display: flex; flex-direction: column; }
 .menuwrap > .menu { flex: 1; }
 .pre { padding: 10px 14px 0; } .pre:last-of-type { padding-bottom: 10px; }
 .searchbox { width: 100%; border: 0; background: var(--rail-bg); border-radius: 999px; padding: 9px 16px; font-size: 15px; }
@@ -685,6 +692,8 @@ async function sendReport() {
 @media (min-width: 1024px) {
   .shoptabs { border-radius: 14px 14px 0 0; }
   .shop.solo .shop-cols { grid-template-columns: minmax(0, 1fr); }
+  .shop-cols { display: grid; }
+  .shop-main { align-self: stretch; }
   .sidecart { display: block; position: sticky; top: 12px; align-self: start; margin-top: -50px; }
   .sidecart .card { display: flex; flex-direction: column; padding: 0; max-height: calc(100vh - 24px); overflow: hidden; }
   .sidecart h2 { padding: 14px 16px 0; }

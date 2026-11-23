@@ -35,7 +35,7 @@ extend({
   'od.h.awaiting_rider': ['骑手取餐后就出发', 'The rider leaves as soon as it is picked up'], 'od.h.out_for_delivery': ['骑手正在送来，请保持电话畅通', 'Your rider is on the way. Keep your phone at hand.'],
   'od.h.rider_arrived': ['骑手已到，请准备好现金', 'Your rider is here. Please have the cash ready.'], 'od.h.ready_for_pickup': ['到店报取餐号取餐', 'Give your pickup code at the store'],
   'od.h.closed': ['这张订单已经关闭', 'This order is closed'],
-  'od.call_rider': ['致电骑手', 'Call rider'], 'od.call_store': ['联系商家', 'Call store'],
+  'od.call_rider': ['致电骑手', 'Call rider'], 'od.call_store': ['致电商家', 'Call store'],
   'od.satisfied': ['你对本单满意吗？', 'Happy with this order?'],
   'od.fees': ['商品费用', 'Items and fees'], 'od.info': ['订单信息', 'Order details'],
   'od.address': ['配送地址', 'Deliver to'], 'od.pickup_at_store': ['取餐门店', 'Pick up at'], 'od.no': ['订单号', 'Order no.'], 'od.copy': ['复制', 'Copy'], 'od.copied': ['已复制', 'Copied'],

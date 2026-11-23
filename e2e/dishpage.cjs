@@ -68,13 +68,15 @@ await phone.goto(BASE + '/s/bgc')
 await phone.waitForSelector('.item')
 expect(await phone.locator(tid('deliver-to')).count(), 0, 'no "do you deliver to me" box on the store page')
 expect((await phone.textContent('body')).includes('看看能不能送到我这里'), false, 'no "do you deliver to me" text')
-// one category only: the rail still runs down to the bottom of the screen
+// one category only: the rail still runs down to the bottom of the screen,
+// but the page is no taller than that (no empty space to scroll into)
 await phone.click(tid('search-toggle'))
 await phone.fill(tid('search-box'), '盐酥鸡')
 await phone.waitForFunction(() => document.querySelectorAll('.item').length === 1)
-await phone.locator('.shoptabs').evaluate(e => window.scrollTo(0, e.getBoundingClientRect().top + scrollY))
-const rail = await phone.evaluate(() => ({ body: document.querySelector('.menu .body').getBoundingClientRect().bottom, view: innerHeight }))
-expect(rail.body >= rail.view - 1, true, `the grey rail stops at ${rail.body}px of ${rail.view}px`)
+await phone.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+const rail = await phone.evaluate(() => ({ body: document.querySelector('.menu .body').getBoundingClientRect().bottom,
+  end: innerHeight - parseFloat(getComputedStyle(document.querySelector('.shop')).paddingBottom) }))
+expect(Math.abs(rail.body - rail.end) <= 1, true, `the grey rail stops at ${rail.body}px, the page ends at ${rail.end}px`)
 await shot(phone, 'dp2-phone-one-dish')
 step('with a single dish the category rail runs to the bottom; no address box')
 
