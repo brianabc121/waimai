@@ -4,7 +4,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { newKey } from '../api'
 import { linePrice, type CartLine } from '../cart'
-import { money, pick, t } from '../i18n'
+import { money, pick, t, mn } from '../i18n'
 import type { BatchLine, Category, Item } from '../types'
 import MenuList from './MenuList.vue'
 
@@ -76,7 +76,7 @@ function optionNames(l: CartLine) {
   const it = items.value.get(l.item_id)
   if (!it) return ''
   const all = new Map(it.groups.flatMap(g => g.options).map(o => [o.id, o]))
-  return l.option_ids.map(id => all.get(id)).filter(Boolean).map(o => pick(o!.name, o!.name_en)).join(' · ')
+  return l.option_ids.map(id => all.get(id)).filter(Boolean).map(o => mn(o!)).join(' · ')
 }
 function changeQty(i: number, d: number) {
   const l = state.lines[i]
@@ -109,15 +109,15 @@ defineExpose({ clear, count })
     <div class="sheet-mask" v-if="sheet.item" @click.self="sheet.item = null">
       <div class="sheet">
         <div class="sheet-head">
-          <h2>{{ pick(sheet.item.name, sheet.item.name_en) }}</h2>
+          <h2>{{ mn(sheet.item) }}</h2>
           <div class="muted small" v-if="sheet.item.description">{{ sheet.item.description }}</div>
         </div>
         <div class="sheet-body stack">
           <div v-for="(g, gi) in sheet.item.groups" :key="g.id">
-            <div class="row between"><h3>{{ pick(g.name, g.name_en) }}</h3><span class="muted small">{{ groupHint(g) }}</span></div>
+            <div class="row between"><h3>{{ mn(g) }}</h3><span class="muted small">{{ groupHint(g) }}</span></div>
             <label v-for="o in g.options" :key="o.id" class="opt" :class="{ off: o.sold_out }">
               <input :type="g.max_select === 1 ? 'radio' : 'checkbox'" :checked="sheet.chosen.has(o.id)" :disabled="o.sold_out" @click.prevent="toggle(gi, o.id)" />
-              <span class="grow">{{ pick(o.name, o.name_en) }}<span v-if="o.sold_out" class="muted small"> · {{ t('sold_out') }}</span></span>
+              <span class="grow">{{ mn(o) }}<span v-if="o.sold_out" class="muted small"> · {{ t('sold_out') }}</span></span>
               <span class="price muted" v-if="o.price_delta">+{{ money(o.price_delta, currency) }}</span>
             </label>
           </div>
@@ -126,7 +126,7 @@ defineExpose({ clear, count })
         <div class="sheet-foot row between">
           <span class="stepper"><button @click="sheet.qty = Math.max(1, sheet.qty - 1)">−</button><span>{{ sheet.qty }}</span><button class="fill" @click="sheet.qty = Math.min(99, sheet.qty + 1)">+</button></span>
           <button class="btn primary grow" :disabled="!!sheetMissing" @click="confirmSheet">
-            {{ sheetMissing ? `${t('required')}: ${pick(sheetMissing.name, sheetMissing.name_en)}` : `${t('add_to_cart')} · ${money(sheetPrice, currency)}` }}
+            {{ sheetMissing ? `${t('required')}: ${mn(sheetMissing)}` : `${t('add_to_cart')} · ${money(sheetPrice, currency)}` }}
           </button>
         </div>
       </div>
@@ -138,7 +138,7 @@ defineExpose({ clear, count })
         <div class="sheet-body stack">
           <div v-for="(l, i) in state.lines" :key="l.key" class="row top between">
             <div class="grow">
-              <div class="bold">{{ items.get(l.item_id) ? pick(items.get(l.item_id)!.name, items.get(l.item_id)!.name_en) : '—' }}</div>
+              <div class="bold">{{ items.get(l.item_id) ? mn(items.get(l.item_id)!) : '—' }}</div>
               <div class="muted small" v-if="optionNames(l)">{{ optionNames(l) }}</div>
               <div class="muted small" v-if="l.note">{{ t('note') }}: {{ l.note }}</div>
               <div v-if="bad(l)" class="small" style="color:var(--bad)">{{ t('unavailable') }}</div>

@@ -21,9 +21,17 @@ type Config struct {
 	// of a rider's trip. Empty keeps the straight-line estimate; "stub" is a
 	// stand-in for tests and demos.
 	GoogleRoutesKey string
-	EmbedWorker     bool
-	StaticDir       string
-	PublicBaseURL   string // customer-facing origin, for order links in SMS
+
+	// Menu translation (docs/I18N_DESIGN.md §6.5). TranslateProvider is
+	// claude-haiku-5-5 (the default when an Anthropic key is set),
+	// claude-sonnet-5-5, google, off, or stub (tests: marks the text instead
+	// of translating it).
+	TranslateProvider  string
+	AnthropicAPIKey    string
+	GoogleTranslateKey string
+	EmbedWorker        bool
+	StaticDir          string
+	PublicBaseURL      string // customer-facing origin, for order links in SMS
 
 	// Web push for the staff workbench in a browser. Empty keys turn it off.
 	// Make a pair with: admin vapid
@@ -74,15 +82,18 @@ func envBool(key string, def bool) bool {
 
 func Load() Config {
 	c := Config{
-		Addr:            env("ADDR", ":8080"),
-		DatabaseURL:     env("DATABASE_URL", "postgres://postgres@localhost:5432/waimai?sslmode=disable"),
-		AppSecret:       env("APP_SECRET", "dev-secret-change-me"),
-		CookieSecure:    envBool("COOKIE_SECURE", false),
-		OTPDevEcho:      envBool("OTP_DEV_ECHO", false),
-		EmbedWorker:     envBool("EMBED_WORKER", false),
-		StaticDir:       env("STATIC_DIR", ""),
-		GoogleMapsKey:   env("GOOGLE_MAPS_API_KEY", ""),
-		GoogleRoutesKey: env("GOOGLE_ROUTES_API_KEY", ""),
+		Addr:               env("ADDR", ":8080"),
+		DatabaseURL:        env("DATABASE_URL", "postgres://postgres@localhost:5432/waimai?sslmode=disable"),
+		AppSecret:          env("APP_SECRET", "dev-secret-change-me"),
+		CookieSecure:       envBool("COOKIE_SECURE", false),
+		OTPDevEcho:         envBool("OTP_DEV_ECHO", false),
+		EmbedWorker:        envBool("EMBED_WORKER", false),
+		StaticDir:          env("STATIC_DIR", ""),
+		GoogleMapsKey:      env("GOOGLE_MAPS_API_KEY", ""),
+		GoogleRoutesKey:    env("GOOGLE_ROUTES_API_KEY", ""),
+		TranslateProvider:  env("TRANSLATE_PROVIDER", ""),
+		AnthropicAPIKey:    env("ANTHROPIC_API_KEY", ""),
+		GoogleTranslateKey: env("GOOGLE_TRANSLATE_API_KEY", ""),
 
 		VAPIDPublicKey:    env("VAPID_PUBLIC_KEY", ""),
 		VAPIDPrivateKey:   env("VAPID_PRIVATE_KEY", ""),

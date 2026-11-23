@@ -29,6 +29,10 @@ func (s *Server) storefront(c *gin.Context) {
 	for i := range sf.Zones {
 		sf.Zones[i].Polygon, sf.Zones[i].Color = nil, ""
 	}
+	if err := s.App.LocalizeStorefront(c, sf, reqLang(c)); err != nil {
+		fail(c, err)
+		return
+	}
 	c.JSON(200, sf)
 }
 
@@ -128,6 +132,9 @@ func (s *Server) createQuote(c *gin.Context) {
 	var in app.QuoteInput
 	if !bind(c, &in) {
 		return
+	}
+	if !app.IsLang(in.Lang) {
+		in.Lang = reqLang(c)
 	}
 	// The phone is optional here: a verified customer gets promotions checked
 	// against their own usage; an anonymous one is checked again when ordering.

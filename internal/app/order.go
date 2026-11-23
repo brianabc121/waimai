@@ -12,10 +12,12 @@ import (
 )
 
 type OrderItem struct {
-	ID          int64        `json:"id"`
-	ItemID      int64        `json:"item_id"`
-	Name        string       `json:"name"`
-	NameEn      string       `json:"name_en"`
+	ID     int64  `json:"id"`
+	ItemID int64  `json:"item_id"`
+	Name   string `json:"name"`
+	NameEn string `json:"name_en"`
+	// NameTr is the name in the language the customer ordered in, when it differs.
+	NameTr      string       `json:"name_tr,omitempty"`
 	UnitPrice   int64        `json:"unit_price"`
 	Qty         int          `json:"qty"`
 	LineTotal   int64        `json:"line_total"`
@@ -243,7 +245,7 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 
 	rows, err = q.Query(ctx, `SELECT i.id, i.order_id, i.item_id, i.name, i.name_en, i.unit_price, i.qty, i.line_total,
 		i.options, i.note, i.needs_prep, i.prep_status, i.station_id, i.station_name, b.seq, b.source, i.served_at,
-		i.void_reason, i.basket_no FROM order_items i JOIN order_batches b ON b.id = i.batch_id
+		i.void_reason, i.basket_no, i.name_customer FROM order_items i JOIN order_batches b ON b.id = i.batch_id
 		WHERE i.order_id = ANY($1) ORDER BY i.id`, ids)
 	if err != nil {
 		return nil, err
@@ -254,7 +256,7 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 		var opts []byte
 		if err := rows.Scan(&it.ID, &orderID, &it.ItemID, &it.Name, &it.NameEn, &it.UnitPrice, &it.Qty,
 			&it.LineTotal, &opts, &it.Note, &it.NeedsPrep, &it.PrepStatus, &it.StationID, &it.StationName,
-			&it.BatchSeq, &it.BatchSource, &it.ServedAt, &it.VoidReason, &it.Basket); err != nil {
+			&it.BatchSeq, &it.BatchSource, &it.ServedAt, &it.VoidReason, &it.Basket, &it.NameTr); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -504,11 +506,11 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			service_charge, tax_amount, tax_inclusive, tax_rate_bp, discount, total, payment_method, accept_deadline,
 			promotion_id, promotion_name, promotion_name_en, scheduled_for, release_at, dest_lat, dest_lng,
 			zone_distance_m, address_id, contact_phone, contact_title, contact_wechat, contact_telegram,
-			contact_line, contact_whatsapp)
+			contact_line, contact_whatsapp, customer_lang)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
 				now() + make_interval(mins => $27), NULLIF($28, 0), $29, $30,
 				$31::timestamptz, $31::timestamptz - make_interval(mins => $32), $33, $34, $35, $36, $37, $38, $39, $40,
-				$41, $42)
+				$41, $42, $43)
 			RETURNING id`,
 			b.MerchantID, b.ID, publicNo, pickupCode, hashToken(token), nonce, cur.ServiceType, in.CustomerName,
 			phone, cur.ZoneID, cur.ZoneName, in.AddressLine, in.AddressUnit, in.AddressNote, in.Note, b.Currency,
@@ -516,7 +518,7 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			t.Discount, t.Total, payMethod, b.AcceptTimeoutMinutes, t.PromotionID, t.PromotionName,
 			t.PromotionNameEn, cur.ScheduledFor, b.PrepMinutes, destLat, destLng, cur.ZoneDistanceM,
 			addressID, contact.Phone, contact.Title, contact.Wechat, contact.Telegram,
-			contact.Line, contact.Whatsapp).Scan(&orderID)
+			contact.Line, contact.Whatsapp, langOrEmpty(cur.Input.Lang)).Scan(&orderID)
 		if err != nil {
 			return wrap("insert order", err)
 		}
@@ -548,9 +550,9 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		for _, l := range cur.Lines {
 			opts, _ := json.Marshal(l.Options)
 			if _, err := tx.Exec(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name,
-				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, orderID, b.ID, batchID, l.ItemID, l.Name,
-				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, max(1, l.Basket)); err != nil {
+				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, orderID, b.ID, batchID, l.ItemID, l.Name,
+				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, max(1, l.Basket), l.NameTr); err != nil {
 				return wrap("insert order item", err)
 			}
 		}

@@ -61,6 +61,8 @@ type App struct {
 	// Router plans a rider's round trip on real roads. Without one the
 	// planned route of a trip is a straight-line estimate.
 	Router Router
+	// Translator translates menus; nil when no service is set up.
+	Translator Translator
 	// IM is the chat server (OpenIM). Nil turns chat off.
 	IM IM
 

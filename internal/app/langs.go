@@ -54,3 +54,11 @@ func (a *App) SaveCustomerLang(ctx context.Context, customerID int64, lang strin
 	_, err := a.DB.Exec(ctx, `UPDATE customers SET lang=$2 WHERE id=$1`, customerID, lang)
 	return err
 }
+
+// langOrEmpty is lang when it is one of Langs, else "".
+func langOrEmpty(lang string) string {
+	if IsLang(lang) {
+		return lang
+	}
+	return ""
+}

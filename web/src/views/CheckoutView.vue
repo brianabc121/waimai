@@ -5,7 +5,7 @@ import { listAddresses, sorted, usable, whoLine, type Address } from '../address
 import { ApiError, get, newKey, post } from '../api'
 import { clearLines, linePrice, quoteItems, useCart } from '../cart'
 import { customer, loadCustomer, loginRoute, prettyPhone } from '../customer'
-import { money, pick, t, whenText } from '../i18n'
+import { locale, money, pick, t, whenText, mn } from '../i18n'
 import { mallAddressId } from '../mall'
 import type { Item, Quote, Storefront } from '../types'
 import { discountLabel, kindBadge } from '../coupons'
@@ -31,7 +31,7 @@ const slots = computed(() => store.value?.slots ?? [])
 const mapMode = computed(() => store.value?.branch.zone_mode === 'map')
 const mustSchedule = computed(() => !!store.value && !store.value.branch.open_now)
 async function loadStore() {
-  store.value = await get<Storefront>(`/stores/${props.slug}`).catch(() => null)
+  store.value = await get<Storefront>(`/stores/${props.slug}?lang=${locale.value}`).catch(() => null)
   if (scheduled.value && !slots.value.includes(scheduled.value)) scheduled.value = ''
   // Fall back to a service the store actually offers.
   const b = store.value?.branch
@@ -100,7 +100,7 @@ function describe(e: unknown): string {
     case 'ADDRESS_NOT_FOUND': return t('co.address_gone')
     case 'STORE_CLOSED': return t('closed')
     case 'SCHEDULE_INVALID': return t('schedule_invalid')
-    case 'REQUIRED_MISSING': return t('required_missing_named', { names: ((e.details?.categories ?? []) as { name: string; name_en: string }[]).map(c => pick(c.name, c.name_en)).join('、') })
+    case 'REQUIRED_MISSING': return t('required_missing_named', { names: ((e.details?.categories ?? []) as { name: string; name_en: string }[]).map(c => mn(c)).join('、') })
     case 'BELOW_MINIMUM': short.value = (e.details?.minimum ?? 0) - (e.details?.subtotal ?? 0); return t('below_min', { amt: money((e.details?.minimum ?? 0) - (e.details?.subtotal ?? 0), quote.value?.currency) })
     default: return e.message
   }
@@ -132,6 +132,8 @@ async function requote() {
       scheduled_for: scheduled.value || null,
       // null lets the server choose the coupons that save most
       coupon_ids: couponIds.value,
+      // the order keeps the dishes' names in this language
+      lang: locale.value,
     })
     idemKey = keyFor(quote.value.id)
   } catch (e) {
@@ -161,13 +163,13 @@ interface Shown { item_id: number; name: string; options: string; note: string; 
 // The dishes as priced by the server; before there is a price (no address
 // yet), as the menu has them.
 const lines = computed<Shown[]>(() => {
-  if (quote.value) return quote.value.lines.map(l => ({ item_id: l.item_id, name: pick(l.name, l.name_en), options: l.options.map(o => pick(o.name, o.name_en)).join(' · '),
+  if (quote.value) return quote.value.lines.map(l => ({ item_id: l.item_id, name: mn(l), options: l.options.map(o => mn(o)).join(' · '),
     note: l.note, qty: l.qty, total: l.line_total, basket: l.basket || 1 }))
   const sent = quoteItems()
   return cart.lines.map((l, i) => {
     const it = items.value.get(l.item_id), unit = linePrice(l, items.value)
-    const names = new Map((it?.groups ?? []).flatMap(g => g.options).map(o => [o.id, pick(o.name, o.name_en)]))
-    return { item_id: l.item_id, name: it ? pick(it.name, it.name_en) : '', options: l.option_ids.map(id => names.get(id) ?? '').filter(Boolean).join(' · '),
+    const names = new Map((it?.groups ?? []).flatMap(g => g.options).map(o => [o.id, mn(o)]))
+    return { item_id: l.item_id, name: it ? mn(it) : '', options: l.option_ids.map(id => names.get(id) ?? '').filter(Boolean).join(' · '),
       note: l.note, qty: l.qty, total: unit == null ? null : unit * l.qty, basket: sent[i].basket }
   }).filter(l => l.name)
 })

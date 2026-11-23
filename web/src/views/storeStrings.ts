@@ -8,6 +8,8 @@ extend({
   'sf.own_delivery': ['门店配送', 'Store delivery'], 'sf.self_pickup': ['到店自取', 'Pickup'], 'sf.cod': ['货到付款', 'Cash on delivery'],
   'sf.promos_n': ['{n} 个优惠', '{n} offers'], 'sf.promos': ['优惠活动', 'Offers'],
   'sf.notice': ['公告：', 'Notice: '],
+  'sf.mt_note': ['菜单由机器翻译', 'This menu was machine translated'], 'sf.mt_original': ['正在看商家原文', 'Showing the menu as the store wrote it'],
+  'sf.mt_show_orig': ['查看原文', 'Show original'], 'sf.mt_show_tr': ['看译文', 'Show translation'],
   'sf.search': ['搜索菜品', 'Search dishes'], 'sf.search_none': ['没有找到相关菜品', 'No dishes match'],
   'sf.account': ['我的账号', 'My account'], 'sf.logged_in': ['已登录', 'Logged in as'], 'sf.logout': ['退出登录', 'Log out'],
   'sf.share': ['分享', 'Share'], 'sf.link_copied': ['链接已复制', 'Link copied'],

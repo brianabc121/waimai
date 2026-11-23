@@ -48,6 +48,9 @@ var settingDefs = []settingDef{
 	{"TWILIO_AUTH_TOKEN", "sms", true, func(c *config.Config) *string { return &c.TwilioAuthToken }},
 	{"TWILIO_FROM", "sms", false, func(c *config.Config) *string { return &c.TwilioFrom }},
 	{"TWILIO_MESSAGING_SERVICE_SID", "sms", false, func(c *config.Config) *string { return &c.TwilioMessagingSID }},
+	{"TRANSLATE_PROVIDER", "translate", false, func(c *config.Config) *string { return &c.TranslateProvider }},
+	{"ANTHROPIC_API_KEY", "translate", true, func(c *config.Config) *string { return &c.AnthropicAPIKey }},
+	{"GOOGLE_TRANSLATE_API_KEY", "translate", true, func(c *config.Config) *string { return &c.GoogleTranslateKey }},
 }
 
 func settingDefByKey(key string) *settingDef {
@@ -108,6 +111,7 @@ type integrations struct {
 	push    map[string]PushSender
 	router  Router
 	mapsOff bool
+	tr      Translator
 }
 
 func buildIntegrations(cfg config.Config) (*integrations, error) {
@@ -126,6 +130,7 @@ func buildIntegrations(cfg config.Config) (*integrations, error) {
 	if sender != nil {
 		in.sms = sender
 	}
+	in.tr = newTranslator(cfg)
 	if cfg.VAPIDPublicKey != "" && cfg.VAPIDPrivateKey != "" {
 		subject := cfg.VAPIDSubject
 		if subject == "" {
@@ -146,7 +151,7 @@ func buildIntegrations(cfg config.Config) (*integrations, error) {
 func (a *App) install(in *integrations, signature string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.SMS, a.Push, a.Router, a.MapsOff = in.sms, in.push, in.router, in.mapsOff
+	a.SMS, a.Push, a.Router, a.MapsOff, a.Translator = in.sms, in.push, in.router, in.mapsOff, in.tr
 	a.effective, a.settingsSig = &in.cfg, signature
 }
 
@@ -169,6 +174,12 @@ func (a *App) router() Router {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.Router
+}
+
+func (a *App) translator() Translator {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.Translator
 }
 
 func (a *App) mapsOff() bool {
@@ -322,6 +333,8 @@ type SettingsView struct {
 		WebPush bool   `json:"web_push"`
 		AppPush bool   `json:"app_push"`
 		SMS     string `json:"sms"` // log, webhook, twilio
+		// Translate is the menu translation service in use, "off" without one.
+		Translate string `json:"translate"`
 	} `json:"active"`
 	// WeakSecret: APP_SECRET is the development default, so the encryption
 	// protects nothing.
@@ -388,6 +401,10 @@ func (a *App) settingsView(saved map[string]storedSetting) *SettingsView {
 	out.Active.WebPush = cfg.VAPIDPublicKey != "" && cfg.VAPIDPrivateKey != ""
 	out.Active.AppPush = cfg.FCMServiceAccount != ""
 	out.Active.SMS = cfg.SMSProvider
+	out.Active.Translate = "off"
+	if tr := newTranslator(cfg); tr != nil {
+		out.Active.Translate = tr.Name()
+	}
 	if out.Active.SMS == "" {
 		out.Active.SMS = "log"
 	}
@@ -420,6 +437,10 @@ func checkSetting(key, v string) error {
 	case "SMS_PROVIDER":
 		if v != "log" && v != "webhook" && v != "twilio" {
 			return ErrValidation("SMS_PROVIDER must be log, webhook or twilio")
+		}
+	case "TRANSLATE_PROVIDER":
+		if !validTranslateProvider(v) {
+			return ErrValidation("TRANSLATE_PROVIDER must be claude-haiku-5-5, claude-sonnet-5-5, google or off")
 		}
 	case "SMS_WEBHOOK_URL":
 		u, err := url.Parse(v)

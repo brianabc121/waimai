@@ -27,7 +27,7 @@ func (s *Server) mallHome(c *gin.Context) {
 
 func (s *Server) mallStores(c *gin.Context) {
 	q := app.MallQuery{CountryCode: c.Query("country"), City: c.Query("city"), District: c.Query("district"),
-		Category: c.Query("category"), Q: c.Query("q"), Sort: c.Query("sort")}
+		Category: c.Query("category"), Q: c.Query("q"), Sort: c.Query("sort"), Lang: reqLang(c)}
 	if len(q.Q) > 60 {
 		q.Q = q.Q[:60]
 	}

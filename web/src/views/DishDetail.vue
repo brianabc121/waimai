@@ -4,7 +4,7 @@
 // menu. On a phone it rises from the bottom and fills the screen; from tablet
 // width up it is a dialog with the pictures beside the text.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { locale, money, pick, t } from '../i18n'
+import { locale, money, pick, t, mn, mt } from '../i18n'
 import type { Item } from '../types'
 import './storeStrings'
 
@@ -12,7 +12,7 @@ const props = defineProps<{ item: Item; currency: string; canOrder: boolean; qty
 const emit = defineEmits<{ add: []; dec: []; close: [] }>()
 
 const pictures = computed(() => [props.item.image_url, ...(props.item.photos ?? [])].filter(Boolean))
-const name = computed(() => pick(props.item.name, props.item.name_en))
+const name = computed(() => mn(props.item))
 
 const track = ref<HTMLElement | null>(null)
 const index = ref(0)
@@ -56,14 +56,14 @@ onBeforeUnmount(() => removeEventListener('keydown', onKey))
             <span>{{ t('sold_n', { n: item.sold ?? 0 }) }}</span>
             <span v-if="item.stock_qty != null">{{ t('stock_n', { n: item.stock_qty }) }}</span>
           </div>
-          <p v-if="item.description" class="desc" data-testid="dish-desc">{{ item.description }}</p>
+          <p v-if="item.description" class="desc" data-testid="dish-desc">{{ mt(item.description, item.description_tr) }}</p>
           <section v-if="item.groups.length" class="block">
             <h3>{{ t('dd.options') }}</h3>
-            <p v-for="g in item.groups" :key="g.id" class="opts"><b>{{ pick(g.name, g.name_en) }}</b>{{ g.options.map(o => pick(o.name, o.name_en)).join(' / ') }}</p>
+            <p v-for="g in item.groups" :key="g.id" class="opts"><b>{{ mn(g) }}</b>{{ g.options.map(o => mn(o)).join(' / ') }}</p>
           </section>
           <section class="block">
             <h3>{{ t('dd.details') }}</h3>
-            <p class="details" :class="{ muted: !item.details }" data-testid="dish-details">{{ item.details || t('dd.none') }}</p>
+            <p class="details" :class="{ muted: !item.details }" data-testid="dish-details">{{ mt(item.details, item.details_tr) || t('dd.none') }}</p>
           </section>
         </div>
         <div class="foot">

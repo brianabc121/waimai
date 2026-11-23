@@ -6,7 +6,7 @@ import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { get } from '../api'
 import { loadCustomer, loginRoute } from '../customer'
-import { locale, money, pick, setLocale, t } from '../i18n'
+import { locale, money, pick, setLocale, t, mn } from '../i18n'
 import { cardStatus, closedStatus, finished, orderAgain, shortStamp } from '../orders'
 import type { OrderCard } from '../types'
 import CustomerFrame from './me/CustomerFrame.vue'
@@ -108,7 +108,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
             <li v-for="(it, i) in o.items.slice(0, 3)" :key="i">
               <img v-if="it.image_url" :src="it.image_url" alt="" loading="lazy" />
               <span v-else class="ph"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 11h16a8 8 0 0 1-5 7.400V20H9v-1.600A8 8 0 0 1 4 11z" /><path d="M10 4c-.8.9.8 1.7 0 2.600M14 4c-.8.9.8 1.7 0 2.6" /></svg></span>
-              <span class="nm">{{ pick(it.name, it.name_en) }}</span>
+              <span class="nm">{{ mn(it) }}</span>
               <span v-if="it.qty > 1" class="qty">×{{ it.qty }}</span>
             </li>
             <li v-if="o.items.length > 3" class="rest">{{ t('ol.n_more', { n: o.items.length - 3 }) }}</li>

@@ -2,7 +2,7 @@
 // Guest ordering at a table: a phone that scanned the table code (/t/:code)
 // or a tablet paired with the table (/ipad). Both add to the same bill.
 import LangButton from './LangButton.vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ApiError, get, post } from '../api'
 import { locale, setLocale, t } from '../i18n'
 import { useLive } from '../live'
@@ -27,6 +27,8 @@ const error = ref('')
 const notice = ref('')
 const menu = ref<InstanceType<typeof DineMenu> | null>(null)
 let storeAt = 0
+// the menu comes in the guest's language: read it again when that changes
+watch(locale, () => { storeAt = 0 })
 let entered = false // a phone exchanges its table code once per sitting
 
 function setPhase(e: unknown) {
@@ -52,7 +54,7 @@ async function refresh() {
     document.title = `${r.access.store_name} · ${r.access.table_name}`
     // Re-read the menu now and then: sold-out marks and the published template can change mid-meal.
     if (!store.value || phase.value !== 'ready' || Date.now() - storeAt > (ipad ? 20000 : 60000)) {
-      store.value = await get<Storefront>(`/stores/${r.access.slug}`); storeAt = Date.now()
+      store.value = await get<Storefront>(`/stores/${r.access.slug}?lang=${locale.value}`); storeAt = Date.now()
     }
     phase.value = r.bill ? 'ready' : 'idle'
     if (!live.online.value) live.reconnect() // the stream was refused before this device had access
@@ -86,14 +88,14 @@ async function pair() {
 async function submit(lines: BatchLine[], expectedTotal: number, key: string) {
   busy.value = true; error.value = ''; notice.value = ''
   try {
-    bill.value = await post<Bill>('/table-sessions/current/batches' + via, { items: lines, expected_total: expectedTotal }, { 'Idempotency-Key': key })
+    bill.value = await post<Bill>('/table-sessions/current/batches' + via, { items: lines, expected_total: expectedTotal, lang: locale.value }, { 'Idempotency-Key': key })
     menu.value?.clear()
     notice.value = t('sent_ok'); tab.value = 'bill'
   } catch (e) {
-    if (e instanceof ApiError && e.code === 'QUOTE_CHANGED') { error.value = t('amount_changed'); store.value = await get<Storefront>(`/stores/${access.value!.slug}`) }
+    if (e instanceof ApiError && e.code === 'QUOTE_CHANGED') { error.value = t('amount_changed'); store.value = await get<Storefront>(`/stores/${access.value!.slug}?lang=${locale.value}`) }
     else if (e instanceof ApiError && e.code === 'TABLE_SESSION_CLOSED') { await refreshNow() }
     else if (e instanceof ApiError && e.status === 0) error.value = t('submit_failed')
-    else { error.value = (e as Error).message; if (access.value) store.value = await get<Storefront>(`/stores/${access.value.slug}`).catch(() => store.value) }
+    else { error.value = (e as Error).message; if (access.value) store.value = await get<Storefront>(`/stores/${access.value.slug}?lang=${locale.value}`).catch(() => store.value) }
   }
   busy.value = false
 }

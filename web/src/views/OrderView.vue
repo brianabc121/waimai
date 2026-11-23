@@ -9,7 +9,7 @@ import { ApiError, get, post } from '../api'
 import { contactName, contactPhone } from '../addresses'
 import { prettyPhone } from '../dial'
 import { loadCustomer } from '../customer'
-import { locale, money, pick, reasonText, setLocale, t, whenText } from '../i18n'
+import { locale, money, pick, reasonText, setLocale, t, whenText, mn } from '../i18n'
 import { useLive } from '../live'
 import { closedStatus, finished as isFinished, orderAgain, stamp } from '../orders'
 import type { Order, OrderReview } from '../types'
@@ -227,10 +227,10 @@ async function copyNo() {
           <template v-for="(it, i) in sorted" :key="it.id">
             <div v-if="multi && (i === 0 || sorted[i - 1].basket !== it.basket)" class="muted small bold" data-testid="basket-head">{{ t('basket_n', { n: it.basket }) }}</div>
             <div class="od-item">
-              <img v-if="it.image_url" :src="it.image_url" alt="" loading="lazy" /><span v-else class="ph">{{ pick(it.name, it.name_en).slice(0, 1) }}</span>
+              <img v-if="it.image_url" :src="it.image_url" alt="" loading="lazy" /><span v-else class="ph">{{ mn(it).slice(0, 1) }}</span>
               <div class="grow">
-                <div class="od-iname">{{ pick(it.name, it.name_en) }}</div>
-                <div class="muted small" v-if="it.options.length">{{ it.options.map(o => pick(o.name, o.name_en)).join(' · ') }}</div>
+                <div class="od-iname">{{ mn(it) }}</div>
+                <div class="muted small" v-if="it.options.length">{{ it.options.map(o => mn(o)).join(' · ') }}</div>
                 <div class="muted small" v-if="it.note">{{ t('note') }}: {{ it.note }}</div>
                 <div class="muted small">x{{ it.qty }}</div>
               </div>

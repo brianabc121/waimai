@@ -5,7 +5,7 @@
 //   featured - signature dishes in a large strip, then the full list
 //   grid     - cards in columns with the picture on top
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { locale, money, pick, t } from '../i18n'
+import { locale, money, pick, t, mn, mt } from '../i18n'
 import type { Category, Item } from '../types'
 
 const props = defineProps<{ categories: Category[]; currency: string; layout: string
@@ -52,8 +52,8 @@ defineExpose({ scrollTo })
       <h2>{{ t('signature') }}</h2>
       <div class="strip">
         <button v-for="it in featured" :key="it.id" class="hcard" @click="$emit('add', it)">
-          <img v-if="it.image_url" :src="it.image_url" alt="" /><div v-else class="ph">{{ pick(it.name, it.name_en).slice(0, 1) }}</div>
-          <div class="bold">{{ pick(it.name, it.name_en) }}</div>
+          <img v-if="it.image_url" :src="it.image_url" alt="" /><div v-else class="ph">{{ mn(it).slice(0, 1) }}</div>
+          <div class="bold">{{ mn(it) }}</div>
           <div class="row between"><span class="price">{{ money(it.price, currency) }}</span><span class="plus">+<template v-if="qtyOf(it)"> {{ qtyOf(it) }}</template></span></div>
         </button>
       </div>
@@ -62,21 +62,21 @@ defineExpose({ scrollTo })
     <div class="body">
       <div class="cats">
         <button v-for="c in cats" :key="c.id" :class="{ on: active === c.id }" :data-cat="c.id" @click="scrollTo(c.id)">
-          {{ pick(c.name, c.name_en) }}<span v-if="c.required" class="must">{{ t('required') }}</span>
+          {{ mn(c) }}<span v-if="c.required" class="must">{{ t('required') }}</span>
           <span v-if="inCart(c)" class="badge">{{ inCart(c) }}</span>
         </button>
       </div>
       <div class="lists">
         <div v-for="c in cats" :key="c.id" :id="'cat-' + c.id" class="cat">
-          <h2>{{ pick(c.name, c.name_en) }}<span v-if="c.required" class="must">{{ t('required') }}</span></h2>
+          <h2>{{ mn(c) }}<span v-if="c.required" class="must">{{ t('required') }}</span></h2>
           <div class="items">
             <div v-for="it in c.items" :key="it.id" class="card item" :class="{ off: !canOrder(it) }" :data-item="it.id" @click="$emit('show', it)">
               <img v-if="it.image_url" :src="it.image_url" alt="" />
-              <div v-else class="ph">{{ pick(it.name, it.name_en).slice(0, 1) }}</div>
+              <div v-else class="ph">{{ mn(it).slice(0, 1) }}</div>
               <div class="grow">
-                <div class="bold">{{ pick(it.name, it.name_en) }}</div>
+                <div class="bold">{{ mn(it) }}</div>
                 <div class="muted small" v-if="locale === 'zh' && it.name_en">{{ it.name_en }}</div>
-                <div class="muted small desc" v-if="it.description">{{ it.description }}</div>
+                <div class="muted small desc" v-if="it.description">{{ mt(it.description, it.description_tr) }}</div>
                 <div class="stats" v-if="stats">
                   <span>{{ t('sold_n', { n: it.sold ?? 0 }) }}</span>
                   <span v-if="it.stock_qty != null">{{ t('stock_n', { n: it.stock_qty }) }}</span>

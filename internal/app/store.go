@@ -63,6 +63,10 @@ type Branch struct {
 	// Suspended is set by the platform on the whole merchant. Customers cannot
 	// order; staff can still sign in and finish the orders already in progress.
 	Suspended bool `json:"suspended"`
+	// MenuLang is the language the merchant writes the menu in; customers
+	// reading one of MenuLangsOff get the English menu (docs/I18N_DESIGN.md §6).
+	MenuLang     string   `json:"menu_lang"`
+	MenuLangsOff []string `json:"menu_langs_off"`
 }
 
 var errStoreClosed = Err(http.StatusConflict, "STORE_CLOSED", "the store is not taking orders right now")
@@ -145,7 +149,7 @@ const branchCols = `id, merchant_id, slug, name, name_en, address, phone, timezo
 	delivery_enabled, pickup_enabled, paused, open_time, close_time, notify_sms, scheduling_enabled, prep_minutes,
 	lat, lng, zone_mode, zone_tolerance_m, kitchen_slow_minutes, detour_percent, detour_meters,
 	notice, intro, baskets_enabled, country_code, country, province, city, district, postal_code, contact_fields,
-	(SELECT m.status = 'suspended' FROM merchants m WHERE m.id = branches.merchant_id)`
+	menu_lang, menu_langs_off, (SELECT m.status = 'suspended' FROM merchants m WHERE m.id = branches.merchant_id)`
 
 func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 	var b Branch
@@ -154,7 +158,7 @@ func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime, &b.NotifySMS,
 		&b.SchedulingEnabled, &b.PrepMinutes, &b.Lat, &b.Lng, &b.ZoneMode, &b.ZoneToleranceM,
 		&b.KitchenSlowMinutes, &b.DetourPercent, &b.DetourMeters, &b.Notice, &b.Intro, &b.BasketsEnabled,
-		&b.CountryCode, &b.Country, &b.Province, &b.City, &b.District, &b.PostalCode, &b.ContactFields, &b.Suspended)
+		&b.CountryCode, &b.Country, &b.Province, &b.City, &b.District, &b.PostalCode, &b.ContactFields, &b.MenuLang, &b.MenuLangsOff, &b.Suspended)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, ErrNotFound
@@ -202,6 +206,8 @@ type Option struct {
 	NameEn     string `json:"name_en"`
 	PriceDelta int64  `json:"price_delta"`
 	SoldOut    bool   `json:"sold_out"`
+	// NameTr is the name in the customer's language, when it differs.
+	NameTr string `json:"name_tr,omitempty"`
 }
 
 type OptionGroup struct {
@@ -211,6 +217,7 @@ type OptionGroup struct {
 	MinSelect int      `json:"min_select"`
 	MaxSelect int      `json:"max_select"`
 	Options   []Option `json:"options"`
+	NameTr    string   `json:"name_tr,omitempty"`
 }
 
 type Item struct {
@@ -235,6 +242,11 @@ type Item struct {
 	Groups            []OptionGroup `json:"groups"`
 	// Sold is how many were ordered so far; only the storefront fills it in.
 	Sold int `json:"sold"`
+	// The name, description and details in the customer's language, when
+	// they differ from the merchant's (menu_translate.go).
+	NameTr        string `json:"name_tr,omitempty"`
+	DescriptionTr string `json:"description_tr,omitempty"`
+	DetailsTr     string `json:"details_tr,omitempty"`
 }
 
 // available reports whether the item can be ordered right now for a service type.
@@ -262,6 +274,7 @@ type Category struct {
 	// Required: an order must contain something from this category.
 	Required bool   `json:"required"`
 	Items    []Item `json:"items"`
+	NameTr   string `json:"name_tr,omitempty"`
 }
 
 func loadZones(ctx context.Context, q Querier, branchID int64, activeOnly bool) ([]Zone, error) {
@@ -416,6 +429,8 @@ type Storefront struct {
 	Rating ReviewSummary `json:"rating"`
 	// Media are the promotional pictures and videos at the top of the page.
 	Media []Media `json:"media"`
+	// MachineTranslated: some of the menu is shown machine translated.
+	MachineTranslated bool `json:"machine_translated"`
 }
 
 func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) {
