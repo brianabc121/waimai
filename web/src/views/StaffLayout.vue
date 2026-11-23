@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LangButton from './LangButton.vue'
 import '../bills'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -103,7 +104,7 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
           <i></i>{{ t(shift.on_duty ? 'shift_on' : 'shift_start') }}</button>
         <div class="row between">
           <span class="small grow who">{{ session.user?.display_name }}</span>
-          <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
+          <LangButton class="lang" />
         </div>
         <button class="btn link" @click="out">{{ t('sign_out') }}</button>
       </div>
@@ -113,7 +114,7 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
         <router-link to="/merchant/messages" @click="chatNew = false">{{ t('ch.new_msg_go') }}</router-link>
         <button :aria-label="t('close')" @click="chatNew = false">×</button></div>
       <div v-if="viewing" class="banner info no-print" style="border-radius:0" data-testid="admin-viewing">
-        {{ t('admin_viewing') }} <button class="btn small" style="margin-left:8px" @click="backToAdmin">{{ t('admin_back') }}</button></div>
+        {{ t('admin_viewing') }} <button class="btn small" style="margin-inline-start:8px" @click="backToAdmin">{{ t('admin_back') }}</button></div>
       <div v-if="!session.branchId" class="page"><div class="banner warn">{{ t('not_found') }}</div></div>
       <router-view v-else :key="session.branchId" />
     </main>
@@ -122,6 +123,6 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
 
 <style>
 .shiftbtn { background: none; border: 1px solid #8b949e; color: #fff; border-radius: 999px; padding: 4px 12px; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
-.shiftbtn i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #8b949e; margin-right: 5px; }
+.shiftbtn i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #8b949e; margin-inline-end: 5px; }
 .shiftbtn.on { border-color: #3fb950; } .shiftbtn.on i { background: #3fb950; }
 </style>

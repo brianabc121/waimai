@@ -17,9 +17,9 @@ onMounted(async () => { info.value = await platformInfo().catch(() => null) })
       <p style="white-space:pre-wrap;line-height:1.7" data-testid="about-text">{{ (info && pick(info.about, info.about_en)) || t('mb.default') }}</p>
     </div>
     <div class="card me-rows side">
-      <a href="/terms.html" target="_blank"><span>{{ t('mp.terms') }}</span><span class="v chev">›</span></a>
-      <a href="/privacy.html" target="_blank"><span>{{ t('mp.privacy') }}</span><span class="v chev">›</span></a>
-      <router-link to="/me/support"><span>{{ t('me.support') }}</span><span class="v chev">›</span></router-link>
+      <a href="/terms.html" target="_blank"><span>{{ t('mp.terms') }}</span><span class="v chev"><span class="rtl-flip">›</span></span></a>
+      <a href="/privacy.html" target="_blank"><span>{{ t('mp.privacy') }}</span><span class="v chev"><span class="rtl-flip">›</span></span></a>
+      <router-link to="/me/support"><span>{{ t('me.support') }}</span><span class="v chev"><span class="rtl-flip">›</span></span></router-link>
     </div>
   </MePage>
 </template>

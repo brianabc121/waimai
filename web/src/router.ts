@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { homeFor, loadSession } from './session'
+import { adminScope } from './i18n'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -92,3 +93,6 @@ router.beforeEach(async to => {
   }
   return true
 })
+
+// The platform back office is in Chinese or English only (see i18n.ts).
+router.afterEach(to => { adminScope.value = to.path === '/admin' || to.path.startsWith('/admin/') })

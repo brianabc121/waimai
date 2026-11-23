@@ -2,6 +2,7 @@
 // The staff workbench: one screen for people who work in the store or deliver.
 // A person's posts decide which identities they have; they switch between
 // "in store" (their stations, the packing counter) and "rider" (deliveries).
+import LangButton from './LangButton.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { locale, pick, setLocale, t } from '../i18n'
@@ -77,14 +78,14 @@ const standalone = native || window.matchMedia('(display-mode: standalone)').mat
           <div class="row between"><span class="muted">{{ t('display_name') }}</span><b>{{ session.user?.display_name }}</b></div>
           <div class="row between"><span class="muted">{{ t('wk.identity') }}</span><b>{{ t('wk.id.' + identity + '_long') }}</b></div>
           <div class="row between" style="align-items:flex-start"><span class="muted">{{ t('wk.posts') }}</span>
-            <span style="text-align:right" data-testid="my-posts"><span v-for="p in posts" :key="p.kind + (p.station_id ?? '')" class="tag" style="margin:0 0 4px 4px">{{ postName(p) }}</span></span></div>
+            <span style="text-align: end" data-testid="my-posts"><span v-for="p in posts" :key="p.kind + (p.station_id ?? '')" class="tag" style="margin:0 0 4px 4px">{{ postName(p) }}</span></span></div>
         </div>
         <MyShifts />
         <div class="card stack">
           <div class="row between"><span>{{ t('wk.language') }}</span>
-            <button class="btn small" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'English' : '中文' }}</button></div>
-          <router-link v-if="ids.includes('store')" class="row between" to="/kitchen"><span>{{ t('wk.kitchen_screen') }}</span><span>›</span></router-link>
-          <router-link v-if="office" class="row between" to="/merchant/orders"><span>{{ t('wk.back_office') }}</span><span>›</span></router-link>
+            <LangButton class="btn small" /></div>
+          <router-link v-if="ids.includes('store')" class="row between" to="/kitchen"><span>{{ t('wk.kitchen_screen') }}</span><span><span class="rtl-flip">›</span></span></router-link>
+          <router-link v-if="office" class="row between" to="/merchant/orders"><span>{{ t('wk.back_office') }}</span><span><span class="rtl-flip">›</span></span></router-link>
         </div>
         <div v-if="ids.includes('rider') && push.supported" class="card stack" data-testid="push-card">
           <div class="row between"><span>{{ t('wk.push') }} <span v-if="push.on" class="tag ok">{{ t('wk.push.on') }}</span></span>
@@ -130,25 +131,25 @@ const standalone = native || window.matchMedia('(display-mode: standalone)').mat
 .wk { padding-bottom: 76px; }
 .wk .idsw { border: 0; background: rgba(255,255,255,.22); color: #fff; border-radius: 999px; padding: 6px 12px; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .wk .idsw::after { content: " ▾"; font-size: 11px; } .wk .idsw.solo::after { content: ""; }
-.wk-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; max-width: 520px; margin: 0 auto; display: flex; background: #fff; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+.wk-tabs { position: fixed; inset-inline-start: 0; inset-inline-end: 0; bottom: 0; z-index: 20; max-width: 520px; margin: 0 auto; display: flex; background: #fff; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
 .wk-tabs button { flex: 1; border: 0; background: none; padding: 13px 0; color: var(--muted); font-size: 13.5px; cursor: pointer; }
 .wk-tabs button.on { color: var(--brand); font-weight: 700; }
 @media (min-width: 768px) {
   .phone.wk { max-width: none; }
   .phone.wk > .topbar { padding: 16px max(20px, calc((100% - 760px) / 2)); }
-  .phone.wk > .section, .phone.wk > div > .section, .phone.wk .subbar { max-width: 800px; margin-left: auto; margin-right: auto; padding-left: 20px; padding-right: 20px; }
+  .phone.wk > .section, .phone.wk > div > .section, .phone.wk .subbar { max-width: 800px; margin-inline-start: auto; margin-inline-end: auto; padding-inline-start: 20px; padding-inline-end: 20px; }
   .wk-tabs { max-width: 420px; bottom: 16px; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.12); padding-bottom: 0; }
   .wk { padding-bottom: 96px; }
 }
-.wk-tabs em { font-style: normal; background: var(--brand); color: #fff; border-radius: 999px; font-size: 11px; padding: 0 6px; margin-left: 4px; }
-.wk .idopt { display: grid; gap: 3px; width: 100%; text-align: left; border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; background: #fff; cursor: pointer; }
+.wk-tabs em { font-style: normal; background: var(--brand); color: #fff; border-radius: 999px; font-size: 11px; padding: 0 6px; margin-inline-start: 4px; }
+.wk .idopt { display: grid; gap: 3px; width: 100%; text-align: start; border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; background: #fff; cursor: pointer; }
 .wk .idopt.on { border-color: var(--brand); background: var(--brand-soft); } .wk .idopt b { font-size: 16px; }
 .wk .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .wk .chips button { padding: 6px 12px; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: 13px; color: var(--muted); cursor: pointer; }
 .wk .chips button.on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
 .wk .task { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
 .wk .task .q { font-size: 17px; font-weight: 700; } .wk .task .src { font-size: 12.5px; color: var(--muted); }
-.wk .task.preparing { border-left: 4px solid var(--info); } .wk .late { color: var(--bad); font-weight: 600; }
+.wk .task.preparing { border-inline-start: 4px solid var(--info); } .wk .late { color: var(--bad); font-weight: 600; }
 .wk .card.fresh { border: 2px solid var(--brand); box-shadow: 0 2px 10px rgba(217,72,15,.15); }
 .wk .no { font-size: 18px; } .wk .line { display: flex; gap: 8px; align-items: baseline; }
 .wk .pt { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--info); } .wk .pt.s { background: var(--brand); }
@@ -158,6 +159,6 @@ const standalone = native || window.matchMedia('(display-mode: standalone)').mat
 .wk .quick { display: flex; gap: 8px; flex-wrap: wrap; }
 .wk .quick button { border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13px; background: #fff; cursor: pointer; }
 .wk .quick button.on { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-soft); font-weight: 600; }
-.wk .duty { display: grid; gap: 6px; border-left: 4px solid var(--line); } .wk .duty.on { border-left-color: var(--ok); }
+.wk .duty { display: grid; gap: 6px; border-inline-start: 4px solid var(--line); } .wk .duty.on { border-inline-start-color: var(--ok); }
 .wk .cash input { font-size: 26px; font-weight: 700; border: 2px solid var(--brand); }
 </style>

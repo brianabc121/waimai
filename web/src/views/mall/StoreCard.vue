@@ -89,13 +89,13 @@ function opened() {
 .pic img, .pic .bowl { width: 100%; height: 100%; border-radius: 12px; object-fit: cover; display: block; }
 .bowl { display: grid !important; place-items: center; background: #9a3018; color: #fbe9c2; }
 .pic .veil { position: absolute; inset: 0; border-radius: 12px; background: rgba(59, 31, 20, .62); color: #fff; font-size: 13px; font-weight: 700; display: grid; place-items: center; text-align: center; }
-.pic .n { position: absolute; top: -5px; right: -7px; height: 24px; padding: 0 8px 0 6px; border-radius: 12px; background: var(--paper); color: var(--red); font-style: normal; font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 3px; border: 1.5px solid var(--red); }
+.pic .n { position: absolute; top: -5px; inset-inline-end: -7px; height: 24px; padding: 0 8px 0 6px; border-radius: 12px; background: var(--paper); color: var(--red); font-style: normal; font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 3px; border: 1.5px solid var(--red); }
 .body { min-width: 0; }
 h3 { font-size: 19px; font-weight: 800; display: flex; align-items: center; gap: 8px; min-width: 0; }
 h3 span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 h3 .new { flex: none; font-style: normal; font-size: 12.500px; font-weight: 600; padding: 1px 8px; border-radius: 6px; background: var(--gold-soft); color: var(--red-deep); }
 .l1, .l2 { display: flex; flex-wrap: wrap; gap: 2px 0; font-size: 14px; color: var(--muted); margin-top: 4px; align-items: center; }
-.l1 > span + span, .l2 > span + span { margin-left: 10px; padding-left: 10px; border-left: 1px solid #cbb9a2; }
+.l1 > span + span, .l2 > span + span { margin-inline-start: 10px; padding-inline-start: 10px; border-inline-start: 1px solid #cbb9a2; }
 .l1 .rate { color: var(--red); font-weight: 700; }
 .l1 .kinds { display: none; overflow: hidden; text-overflow: ellipsis; }
 .l2 .ic { display: inline-flex; align-items: center; gap: 5px; }
@@ -118,7 +118,7 @@ h3 .new { flex: none; font-style: normal; font-size: 12.500px; font-weight: 600;
 .nodel { background: #f6f0e7; }
 .nodel .pic img, .nodel .pic .bowl { filter: grayscale(1) opacity(.7); }
 .nodel .dish img { filter: grayscale(1) opacity(.7); }
-.pic .nodtag { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0 0 12px 12px; background: rgba(59, 31, 20, .78); color: #fff; font-size: 12px; font-weight: 700; text-align: center; padding: 2px 0; letter-spacing: 1px; }
+.pic .nodtag { position: absolute; inset-inline-start: 0; inset-inline-end: 0; bottom: 0; border-radius: 0 0 12px 12px; background: rgba(59, 31, 20, .78); color: #fff; font-size: 12px; font-weight: 700; text-align: center; padding: 2px 0; letter-spacing: 1px; }
 .nodel .pic .veil { bottom: 20px; border-radius: 12px 12px 0 0; font-size: 12px; }
 .l2 .nod { color: #8a4a3a; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
 .l2 .nod::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid currentColor; background: linear-gradient(135deg, transparent 44%, currentColor 44%, currentColor 56%, transparent 56%); }
@@ -132,13 +132,13 @@ h3 .new { flex: none; font-style: normal; font-size: 12.500px; font-weight: 600;
   .mcard.off { box-shadow: none; }
   .mcard:hover { box-shadow: 0 6px 20px rgba(90, 40, 15, .14); }
   .cover { display: block; position: relative; height: 148px; background: var(--gold-soft) center / cover no-repeat; }
-  .cover .eta { position: absolute; top: 10px; right: 10px; background: var(--paper); border-radius: 12px; padding: 1px 9px; font-size: 13px; font-weight: 700; }
+  .cover .eta { position: absolute; top: 10px; inset-inline-end: 10px; background: var(--paper); border-radius: 12px; padding: 1px 9px; font-size: 13px; font-weight: 700; }
   .cover .veil { position: absolute; inset: 0; background: rgba(59, 31, 20, .62); color: #fff; font-weight: 700; display: grid; place-items: center; text-align: center; padding: 0 10px; }
   .pic { width: 56px; height: 56px; margin: -34px 0 0 16px; z-index: 1; }
   .pic img, .pic .bowl { border: 3px solid var(--paper); border-radius: 12px; }
   .pic .veil, .pic .nodtag { display: none; }
   .nodel .cover { filter: grayscale(1) opacity(.75); }
-  .cover .nodtag { display: block; position: absolute; left: 10px; top: 10px; background: rgba(59, 31, 20, .82); color: #fff; border-radius: 7px; padding: 2px 10px; font-size: 13px; font-weight: 700; letter-spacing: 1px; }
+  .cover .nodtag { display: block; position: absolute; inset-inline-start: 10px; top: 10px; background: rgba(59, 31, 20, .82); color: #fff; border-radius: 7px; padding: 2px 10px; font-size: 13px; font-weight: 700; letter-spacing: 1px; }
   .body { padding: 6px 16px 14px; }
   h3 { font-size: 17.500px; }
   .l1 .kinds { display: inline; }

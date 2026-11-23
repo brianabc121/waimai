@@ -64,7 +64,7 @@ const discard = () => run(() => post(base() + '/discard'))
         <div class="row between">
           <h2>{{ t('ch.' + channel) }}</h2>
           <span><span class="tag ok">{{ t('in_use') }}: {{ t('ly.' + current.published.layout) }}</span>
-            <span v-if="current.draft" class="tag warn" style="margin-left:6px" data-test="has-draft">{{ t('has_draft') }}</span></span>
+            <span v-if="current.draft" class="tag warn" style="margin-inline-start:6px" data-test="has-draft">{{ t('has_draft') }}</span></span>
         </div>
         <div>
           <div class="small muted" style="margin-bottom:6px">{{ t('layout') }}</div>
@@ -109,7 +109,7 @@ const discard = () => run(() => post(base() + '/discard'))
 @media (max-width: 900px) { .split { grid-template-columns: minmax(0, 1fr); } }
 .lay { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 8px; cursor: pointer; }
 .lay.on { border-color: var(--brand); background: var(--brand-soft); }
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); margin-left: 6px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); margin-inline-start: 6px; }
 .device { border: 8px solid #1f2328; border-radius: 22px; overflow: auto; background: var(--bg); width: 390px; max-width: 100%; height: 640px; position: relative; }
 .device.ipad { width: 100%; max-width: 900px; height: 600px; }
 .pbar { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #fff; border-top: 1px solid var(--line); pointer-events: none; z-index: 20; }

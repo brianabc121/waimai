@@ -47,7 +47,7 @@ function goBack() { if (window.history.state?.back) router.back(); else void rou
 .mp-bar > button { border: 0; background: none; height: 52px; display: grid; place-items: center; cursor: pointer; color: #fff; }
 .mp-bar .right .btn.link { color: #fff; }
 .mp-bar > b { text-align: center; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mp-bar .right { display: flex; justify-content: flex-end; padding-right: 8px; white-space: nowrap; }
+.mp-bar .right { display: flex; justify-content: flex-end; padding-inline-end: 8px; white-space: nowrap; }
 .mp-body { padding: 12px; display: grid; gap: 10px; align-content: start; }
 .mp-body > div.side:not(.card) { display: grid; gap: 10px; align-content: start; min-width: 0; }
 .mepage .card { border: 0; border-radius: 12px; padding: 12px 14px; background: var(--paper); box-shadow: 0 3px 12px rgba(90, 40, 15, .08); }
@@ -70,9 +70,9 @@ function goBack() { if (window.history.state?.back) router.back(); else void rou
 .mepage .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 13px; }
 .mepage .note { font-size: 12px; color: var(--muted); line-height: 1.6; }
 .mepage .card.me-rows, .me-rows { padding: 0 14px; }
-.me-rows > * { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 0; border-bottom: 1px solid var(--line); color: var(--ink); width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; text-align: left; cursor: pointer; }
+.me-rows > * { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 0; border-bottom: 1px solid var(--line); color: var(--ink); width: 100%; background: none; border-inline-start: 0; border-inline-end: 0; border-top: 0; text-align: start; cursor: pointer; }
 .me-rows > *:last-child { border-bottom: 0; }
-.me-rows .v { margin-left: auto; color: var(--muted); display: flex; align-items: center; gap: 6px; min-width: 0; text-align: right; }
+.me-rows .v { margin-inline-start: auto; color: var(--muted); display: flex; align-items: center; gap: 6px; min-width: 0; text-align: end; }
 .me-rows .chev { color: #b9a793; flex: none; }
 .me-logo { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; flex: none; background: var(--brand-soft); color: var(--brand-dark); display: grid; place-items: center; font-size: 16px; font-weight: 600; }
 .me-toast { position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + 32px); transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff; padding: 7px 14px; border-radius: 999px; font-size: 13px; z-index: 90; white-space: nowrap; }
@@ -83,10 +83,10 @@ function goBack() { if (window.history.state?.back) router.back(); else void rou
 @media (min-width: 768px) {
   .mepage.phone { max-width: none; padding-bottom: 40px; }
   .mp-bar { position: static; height: auto; background: none; color: var(--ink); grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px; padding: 0 0 12px; }
-  .mp-bar > button { color: var(--ink); height: 36px; width: 36px; margin-left: -8px; border-radius: 50%; }
+  .mp-bar > button { color: var(--ink); height: 36px; width: 36px; margin-inline-start: -8px; border-radius: 50%; }
   .mp-bar > button:hover { background: var(--gold-soft); }
-  .mp-bar > b { text-align: left; font-size: 20px; }
-  .mp-bar .right { padding-right: 0; }
+  .mp-bar > b { text-align: start; font-size: 20px; }
+  .mp-bar .right { padding-inline-end: 0; }
   .mp-bar .right .btn.link { color: var(--red); }
   .mp-body { padding: 0; gap: 12px; }
   .mepage .card { padding: 16px 18px; }

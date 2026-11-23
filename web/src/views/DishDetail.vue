@@ -43,8 +43,8 @@ onBeforeUnmount(() => removeEventListener('keydown', onKey))
         </div>
         <div v-else class="ph">{{ name.slice(0, 1) }}</div>
         <template v-if="pictures.length > 1">
-          <button class="arrow prev" :aria-label="t('pm.prev')" @click="go(index - 1)">‹</button>
-          <button class="arrow next" :aria-label="t('pm.next')" data-testid="dish-next" @click="go(index + 1)">›</button>
+          <button class="arrow prev" :aria-label="t('pm.prev')" @click="go(index - 1)"><span class="rtl-flip">‹</span></button>
+          <button class="arrow next" :aria-label="t('pm.next')" data-testid="dish-next" @click="go(index + 1)"><span class="rtl-flip">›</span></button>
           <span class="count" data-testid="dish-count">{{ index + 1 }}/{{ pictures.length }}</span>
         </template>
       </div>
@@ -84,15 +84,15 @@ onBeforeUnmount(() => removeEventListener('keydown', onKey))
 <style scoped>
 .dishmask { z-index: 65; }
 .dish { position: relative; background: #fff; width: 100%; max-width: 520px; height: 100%; max-height: 100%; display: flex; flex-direction: column; overflow: hidden; }
-.x { position: absolute; top: 10px; right: 10px; z-index: 3; width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .45); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.x { position: absolute; top: 10px; inset-inline-end: 10px; z-index: 3; width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .45); color: #fff; display: grid; place-items: center; cursor: pointer; }
 .gallery { position: relative; flex: none; aspect-ratio: 1; max-height: 56vh; background: #f4f1ec; }
 .track { display: flex; height: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
 .track::-webkit-scrollbar { display: none; }
 .track img { flex: 0 0 100%; width: 100%; height: 100%; object-fit: cover; scroll-snap-align: start; user-select: none; }
 .gallery .ph { height: 100%; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand-dark); font-size: 64px; font-weight: 700; }
-.count { position: absolute; right: 12px; bottom: 12px; padding: 2px 10px; border-radius: 999px; background: rgba(0, 0, 0, .5); color: #fff; font-size: 13px; }
+.count { position: absolute; inset-inline-end: 12px; bottom: 12px; padding: 2px 10px; border-radius: 999px; background: rgba(0, 0, 0, .5); color: #fff; font-size: 13px; }
 .arrow { display: none; position: absolute; top: 50%; width: 36px; height: 36px; margin-top: -18px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .45); color: #fff; font-size: 24px; line-height: 1; cursor: pointer; padding: 0 0 3px; }
-.arrow.prev { left: 10px; } .arrow.next { right: 10px; }
+.arrow.prev { inset-inline-start: 10px; } .arrow.next { inset-inline-end: 10px; }
 @media (hover: hover) { .gallery:hover .arrow { display: block; } }
 .info { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .body { flex: 1; overflow-y: auto; padding: 16px 18px; }
@@ -103,7 +103,7 @@ onBeforeUnmount(() => removeEventListener('keydown', onKey))
 .block h3 { font-size: 15px; margin-bottom: 6px; }
 .details { margin: 0; color: #4d5157; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
 .opts { margin: 4px 0 0; color: #5d6168; font-size: 14px; overflow-wrap: anywhere; }
-.opts b { font-weight: 600; color: var(--ink); margin-right: 8px; }
+.opts b { font-weight: 600; color: var(--ink); margin-inline-end: 8px; }
 .foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .foot .price { color: #e5462b; font-size: 22px; font-weight: 700; }
 .foot .btn { min-width: 132px; border-radius: 999px; }

@@ -5,6 +5,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#d9480f" />
     <title>外卖点餐</title>
+    <script>
+      // Pick the language before anything paints, so that the page never
+      // flashes in another language or flips from left-to-right to
+      // right-to-left: a link's ?lang= (remembered), then the cookie, then
+      // the browser's languages, else English. Same rules as src/langs.ts.
+      (function () {
+        var codes = ['zh', 'en', 'zh-Hant', 'th', 'vi', 'fr', 'ar', 'es', 'ru', 'ja', 'my', 'km']
+        var tags = { zh: 'zh-CN', 'zh-Hant': 'zh-Hant' }
+        function map(t) {
+          t = String(t || '').toLowerCase()
+          if (t.indexOf('zh') === 0) return /hant|tw|hk|mo/.test(t) ? 'zh-Hant' : 'zh'
+          if (t === 'zh-hant') return 'zh-Hant'
+          var p = t.split('-')[0]
+          return codes.indexOf(p) >= 0 ? p : null
+        }
+        var l = null
+        try {
+          var q = new URLSearchParams(location.search).get('lang')
+          if (q && codes.indexOf(q) >= 0) {
+            l = q
+            document.cookie = 'lang=' + encodeURIComponent(q) + '; path=/; max-age=31536000; samesite=lax'
+          }
+        } catch (e) {}
+        if (!l) {
+          var m = document.cookie.match(/(?:^|;\s*)lang=([^;]+)/)
+          var c = m && decodeURIComponent(m[1])
+          if (c && codes.indexOf(c) >= 0) l = c
+        }
+        if (!l) {
+          try {
+            var old = localStorage.getItem('locale')
+            if (old === 'zh' || old === 'en') {
+              l = old
+              document.cookie = 'lang=' + old + '; path=/; max-age=31536000; samesite=lax'
+            }
+          } catch (e) {}
+        }
+        if (!l) {
+          var list = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language]
+          for (var i = 0; i < list.length && !l; i++) l = map(list[i])
+        }
+        l = l || 'en'
+        var h = document.documentElement
+        h.lang = tags[l] || l
+        h.dir = l === 'ar' ? 'rtl' : 'ltr'
+        h.setAttribute('data-lang', l)
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

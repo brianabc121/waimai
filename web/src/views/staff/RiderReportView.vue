@@ -125,7 +125,7 @@ const dayText = (d: string) => `${d.slice(5)} ${t('weekday.' + weekday(d))}`
               <th class="num">{{ t('rr.c.actual') }}</th><th class="num">{{ t('rr.c.planned') }}</th><th class="num">{{ t('rr.c.over') }}</th><th></th></tr></thead>
             <tbody>
               <tr v-for="x in tripsOf(d.day)" :key="x.id" :data-trip="x.id">
-                <td class="num" style="text-align:left">{{ no(x) }}</td>
+                <td class="num" style="text-align: start">{{ no(x) }}</td>
                 <td style="white-space:nowrap">{{ clock(x.left_store_at ?? x.started_at, tz) }}</td>
                 <td style="white-space:nowrap" data-col="back"><template v-if="x.returned_at">{{ clock(x.returned_at, tz) }}</template>
                   <span v-else class="tag" :class="x.status === 'done' ? 'warn' : 'brand'">{{ tripState(x) }}</span></td>
@@ -151,7 +151,7 @@ const dayText = (d: string) => `${d.slice(5)} ${t('weekday.' + weekday(d))}`
 .warnt { color: var(--warn); font-weight: 700; }
 .dayhead { display: flex; justify-content: space-between; gap: 12px; width: 100%; border: 0; border-top: 1px solid var(--line); background: #fafafa; padding: 9px 14px; font: inherit; cursor: pointer; color: inherit; }
 .dayhead span { color: var(--muted); font-size: 13px; }
-.stop { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px 1px 2px; margin-right: 5px; font-size: 13px; font-variant-numeric: tabular-nums; background: #fff; }
+.stop { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px 1px 2px; margin-inline-end: 5px; font-size: 13px; font-variant-numeric: tabular-nums; background: #fff; }
 .stop i { font-style: normal; width: 18px; height: 18px; border-radius: 50%; background: var(--brand); color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
 .stop.failed { border-color: #f0d9a8; color: var(--warn); } .stop.failed i { background: var(--warn); }
 .stop.pending i { background: #9aa1ab; } .stop.removed { text-decoration: line-through; color: var(--muted); } .stop.removed i { background: #9aa1ab; }

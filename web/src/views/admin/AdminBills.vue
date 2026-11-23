@@ -116,7 +116,7 @@ async function showOrders(s: Settlement) {
           <button v-for="s in (['pending', 'paid', ''] as const)" :key="s" class="btn small" :class="{ primary: status === s }" :data-status="s" @click="status = s">
             {{ s ? t('bl.s.' + s) : t('abl.f.all') }}</button>
         </div>
-        <div v-if="pending.length" class="small" data-testid="abl-pending">{{ t('abl.pending_sum') }}：<b v-for="[c, v] in pending" :key="c" style="margin-left:6px">{{ money(v, c) }}</b></div>
+        <div v-if="pending.length" class="small" data-testid="abl-pending">{{ t('abl.pending_sum') }}：<b v-for="[c, v] in pending" :key="c" style="margin-inline-start:6px">{{ money(v, c) }}</b></div>
       </div>
       <p class="muted small">{{ t('bl.settle_hint') }}</p>
       <div class="card" style="padding:0;overflow:auto">
@@ -152,8 +152,8 @@ async function showOrders(s: Settlement) {
 </template>
 
 <style scoped>
-.r { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.r { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .plat { color: #6d28d9; }
-.nowrap { white-space: nowrap; } .nowrap .btn { margin-left: 6px; }
+.nowrap { white-space: nowrap; } .nowrap .btn { margin-inline-start: 6px; }
 .pay { align-items: flex-end; } .pay .field { margin: 0; }
 </style>

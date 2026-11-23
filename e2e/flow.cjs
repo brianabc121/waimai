@@ -237,7 +237,7 @@ step(`scheduled order ${laterNo} for ${slotText} accepted and held back from the
 
 // English view of the same storefront
 const en = await open({ width: 390, height: 844 })
-await en.goto(BASE + '/s/makati'); await en.waitForSelector('.item'); await en.click('.lang')
+await en.goto(BASE + '/s/makati'); await en.waitForSelector('.item'); await en.locator('[data-testid=lang-btn]').filter({ visible: true }).first().click(); await en.click('[data-testid=lang-en]')
 await en.waitForSelector('text=Popcorn Chicken'); await shot(en, '14-english')
 step('language switch shows English names')
 

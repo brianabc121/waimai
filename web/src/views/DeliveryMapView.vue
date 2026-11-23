@@ -748,7 +748,7 @@ async function fbSave() {
               <button :disabled="readOnly || i === zones.length - 1" :data-testid="'down-' + i" @click.stop="nudge(i, 1)">▼</button></span>
             <span class="dot" :style="{ background: colorOf(z) }"></span>
             <div><div class="bold">{{ zname(z) }} <span class="tag" :class="z.active ? 'ok' : ''">{{ z.active ? t('mz.on') : t('mz.off') }}</span>
-                <span v-if="z.polygon.length < 3" class="tag warn" style="margin-left:4px">{{ t('mz.undrawn') }}</span></div>
+                <span v-if="z.polygon.length < 3" class="tag warn" style="margin-inline-start:4px">{{ t('mz.undrawn') }}</span></div>
               <div class="small muted">{{ t('mz.fee') }} {{ money(z.fee, cur) }} · {{ t('mz.min') }} {{ money(z.min_order, cur) }}<template v-if="z.eta_minutes"> · {{ t('mz.eta', { n: z.eta_minutes }) }}</template></div></div>
             <button v-if="!readOnly" class="btn small" :data-testid="'edit-' + i" @click.stop="editZone(z)">{{ z.polygon.length < 3 && !narrow ? t('mz.go_draw') : t('mz.edit') }}</button>
           </div>
@@ -784,7 +784,7 @@ async function fbSave() {
         <section><div class="row between"><span>{{ t('mz.snap') }}</span><button class="switch" :class="{ on: snapOn }" data-testid="snap-switch" @click="snapOn = !snapOn"></button></div>
           <p class="small muted" style="margin-top:6px">{{ t('mz.snap_hint') }}</p></section>
         <section><p class="muted small" style="margin-bottom:8px">{{ t('mz.how_draw') }}</p>
-          <ol style="margin:0;padding-left:18px;display:grid;gap:6px"><li>{{ t('mz.step1') }}</li><li>{{ t('mz.step2') }}</li><li>{{ t('mz.step3') }}</li><li>{{ t('mz.step4') }}</li></ol></section>
+          <ol style="margin:0;padding-inline-start:18px;display:grid;gap:6px"><li>{{ t('mz.step1') }}</li><li>{{ t('mz.step2') }}</li><li>{{ t('mz.step3') }}</li><li>{{ t('mz.step4') }}</li></ol></section>
         <div class="foot"><button class="btn" :disabled="!pts.length" data-testid="undo-point" @click="undoPoint">{{ t('mz.undo') }}</button>
           <button class="btn" data-testid="cancel-draw" @click="cancelDraw">{{ t('mz.cancel') }}</button>
           <button class="btn primary grow" :disabled="pts.length < 3" data-testid="finish-draw" @click="finishShape">{{ t('mz.finish') }}</button></div>

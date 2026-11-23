@@ -146,7 +146,7 @@ function voidShift() {
   <div class="page att">
     <StaffTabs />
     <div class="row wrap" style="margin-bottom:14px">
-      <span class="datepick"><button data-act="prev" @click="step(-1)">‹</button><b data-testid="att-title">{{ title }}</b><button data-act="next" @click="step(1)">›</button></span>
+      <span class="datepick"><button data-act="prev" @click="step(-1)"><span class="rtl-flip">‹</span></button><b data-testid="att-title">{{ title }}</b><button data-act="next" @click="step(1)"><span class="rtl-flip">›</span></button></span>
       <button class="btn" @click="day = today">{{ t('att.today') }}</button>
       <span class="pills"><button :class="{ on: mode === 'day' }" data-mode="day" @click="mode = 'day'">{{ t('att.by_day') }}</button>
         <button :class="{ on: mode === 'month' }" data-mode="month" @click="mode = 'month'">{{ t('att.by_month') }}</button></span>
@@ -274,7 +274,7 @@ function voidShift() {
 
 <style scoped>
 .datepick { display: inline-flex; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.datepick b { padding: 7px 12px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); min-width: 128px; text-align: center; }
+.datepick b { padding: 7px 12px; border-inline-start: 1px solid var(--line); border-inline-end: 1px solid var(--line); min-width: 128px; text-align: center; }
 .datepick button { border: 0; background: none; padding: 7px 12px; cursor: pointer; font-size: 15px; }
 .pills { display: inline-flex; background: #eceef0; border-radius: 8px; padding: 3px; }
 .pills button { border: 0; background: none; padding: 5px 13px; border-radius: 6px; font-weight: 600; font-size: 13px; color: var(--muted); cursor: pointer; }
@@ -282,11 +282,11 @@ function voidShift() {
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .kpi { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
 .kpi .l, .kpi .d { font-size: 12.5px; color: var(--muted); } .kpi .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.kpi .v small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+.kpi .v small { font-size: 13px; font-weight: 500; color: var(--muted); margin-inline-start: 4px; }
 .kpi.warn { border-color: #f0d9a8; background: #fffaf0; } .kpi.warn .v { color: var(--warn); }
 .atttable td { white-space: nowrap; vertical-align: top; } .atttable tr.off td { color: var(--muted); vertical-align: middle; }
-.atttable th.num, .atttable td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.av { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; margin-right: 10px; vertical-align: top; }
+.atttable th.num, .atttable td.num { text-align: end; font-variant-numeric: tabular-nums; }
+.av { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; margin-inline-end: 10px; vertical-align: top; }
 .who { display: inline-grid; } .sub { font-size: 12px; color: var(--muted); font-weight: 400; }
 .ln { min-height: 26px; display: flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; } .ln.void { text-decoration: line-through; color: var(--muted); }
 td.right .ln { justify-content: flex-end; }
@@ -297,17 +297,17 @@ td.right .ln { justify-content: flex-end; }
 .tl i.auto, .legend i.hatch { background: repeating-linear-gradient(45deg, #e9b9b3, #e9b9b3 4px, #f6dcd9 4px, #f6dcd9 8px); }
 .tl b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
 .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
-.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-inline-end: 5px; vertical-align: -1px; }
 table.month { border-collapse: collapse; background: #fff; width: 100%; font-size: 12px; }
 table.month th { background: #fafafa; color: var(--muted); font-weight: 600; padding: 6px 2px; border-bottom: 1px solid var(--line); text-align: center; min-width: 30px; }
-table.month th.we { color: var(--brand-dark); } table.month th.name, table.month td.name { text-align: left; padding: 0 10px; white-space: nowrap; }
-table.month td { border-bottom: 1px solid var(--line); border-left: 1px solid #f1f2f4; text-align: center; height: 34px; font-variant-numeric: tabular-nums; cursor: pointer; }
-table.month td.name { font-size: 13.5px; font-weight: 600; border-left: 0; cursor: default; }
+table.month th.we { color: var(--brand-dark); } table.month th.name, table.month td.name { text-align: start; padding: 0 10px; white-space: nowrap; }
+table.month td { border-bottom: 1px solid var(--line); border-inline-start: 1px solid #f1f2f4; text-align: center; height: 34px; font-variant-numeric: tabular-nums; cursor: pointer; }
+table.month td.name { font-size: 13.5px; font-weight: 600; border-inline-start: 0; cursor: default; }
 table.month .sum { font-weight: 700; padding: 0 8px; background: #fafafa; cursor: default; white-space: nowrap; }
 table.month td.ok { background: #e6f6ed; color: #14603f; } table.month td.long { background: #c9ecd8; color: #0f4e33; }
 table.month td.todo { background: var(--warn-soft); color: var(--warn); font-weight: 700; } table.month td.edited { background: var(--info-soft); color: var(--info); }
 .drawer-mask { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 40; }
-.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); background: #fff; z-index: 41; box-shadow: -8px 0 24px rgba(0,0,0,.15);
+.drawer { position: fixed; top: 0; inset-inline-end: 0; bottom: 0; width: min(440px, 100vw); background: #fff; z-index: 41; box-shadow: -8px 0 24px rgba(0,0,0,.15);
   padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
 .drawer .old { background: #f6f6f4; border-radius: 10px; padding: 10px 12px; font-size: 13px; display: grid; gap: 3px; }
 .drawer textarea { font: inherit; width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; resize: vertical; }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Customer login: a mobile number and a texted code, nothing else. A number
 // that has no account yet gets one when the code checks out.
+import LangButton from './LangButton.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError, get, post } from '../api'
@@ -120,8 +121,8 @@ onBeforeUnmount(() => clearInterval(timer))
     <div class="acard">
       <div class="hero">
         <div class="row between">
-          <button class="backbtn" :aria-label="t('back')" data-testid="login-back" @click="back">‹</button>
-          <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
+          <button class="backbtn" :aria-label="t('back')" data-testid="login-back" @click="back"><span class="rtl-flip">‹</span></button>
+          <LangButton class="lang" />
         </div>
         <div class="shop" v-if="store">
           <img v-if="tpl.logo_url" :src="tpl.logo_url" alt="" class="logo" />

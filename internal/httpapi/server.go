@@ -270,6 +270,7 @@ func (s *Server) Router() *gin.Engine {
 	api.POST("/otp/verify", s.limit(s.otpLimit), s.otpVerify)
 	api.GET("/customer/session", s.customerSession)
 	api.POST("/customer/logout", s.customerLogout)
+	api.PUT("/customer/lang", s.limit(s.publicWrites), s.saveCustomerLang)
 	api.GET("/customer/addresses", s.listAddresses)
 	api.POST("/customer/addresses", s.limit(s.publicWrites), s.saveAddress)
 	api.PUT("/customer/addresses/:id", s.limit(s.publicWrites), s.saveAddress)

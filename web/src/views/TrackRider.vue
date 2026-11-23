@@ -53,7 +53,7 @@ const updated = computed(() => { if (!tr.value?.located_at) return ''; const n =
             <circle r="13" fill="#fff" stroke="#2a78d6" stroke-width="3" /><text y="5" text-anchor="middle" font-size="12" font-weight="700" fill="#2a78d6">{{ t('tr.you') }}</text>
           </g>
           <g :transform="`translate(${px(rider).x},${px(rider).y})`" data-testid="rider-pin">
-            <circle r="15" fill="#d9480f" stroke="#fff" stroke-width="2.5" /><text y="5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">骑</text>
+            <circle r="15" fill="#d9480f" stroke="#fff" stroke-width="2.5" /><text y="5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">{{ t('ic.rider') }}</text>
           </g>
         </template>
       </MapCanvas>

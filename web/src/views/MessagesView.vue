@@ -210,12 +210,12 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
 .ms-setup-body h4 { margin: 10px 0 0; } .ms-setup-body textarea, .ms-q input { font: inherit; padding: 8px 10px; border: 1px solid #d6dae0; border-radius: 8px; width: 100%; }
 .ms-q { display: flex; gap: 8px; align-items: center; } .ms-q span { flex: 1; min-width: 0; overflow-wrap: anywhere; background: #f6f7f8; border-radius: 8px; padding: 6px 10px; }
 .msgs { display: grid; grid-template-columns: 320px minmax(0, 1fr) 240px; height: calc(100dvh - var(--shell-top, 0px)); background: #fff; }
-.ms-list { border-right: 1px solid var(--line); overflow-y: auto; min-width: 0; }
+.ms-list { border-inline-end: 1px solid var(--line); overflow-y: auto; min-width: 0; }
 .ms-search { padding: 12px 12px 6px; } .ms-search input { width: 100%; border: 0; background: #f1f3f5; border-radius: 10px; padding: 9px 12px; font: inherit; }
 .ms-filters { display: flex; gap: 8px; padding: 4px 12px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .ms-filters button { border: 1px solid #d6dae0; border-radius: 16px; padding: 3px 12px; font-size: 13px; background: #fff; cursor: pointer; white-space: nowrap; }
 .ms-filters button.on { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); font-weight: 600; }
-.ms-row { display: flex; gap: 12px; padding: 12px; border: 0; border-bottom: 1px solid #f0f1f3; background: none; width: 100%; text-align: left; cursor: pointer; align-items: flex-start; color: var(--ink); font: inherit; }
+.ms-row { display: flex; gap: 12px; padding: 12px; border: 0; border-bottom: 1px solid #f0f1f3; background: none; width: 100%; text-align: start; cursor: pointer; align-items: flex-start; color: var(--ink); font: inherit; }
 .ms-row.on { background: var(--brand-soft); }
 .ms-row .grow { min-width: 0; display: grid; gap: 2px; } .ms-row .tag { justify-self: start; }
 .ms-row .last { color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -226,9 +226,9 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
 .ms-chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #f4f4f4; }
 .ms-head { background: #fff; border-bottom: 1px solid var(--line); padding: 12px 16px; display: flex; gap: 12px; align-items: baseline; flex: none; }
 .ms-back { display: none; }
-.ms-acts { margin-left: auto; display: flex; gap: 12px; white-space: nowrap; } .ms-head { flex-wrap: wrap; }
+.ms-acts { margin-inline-start: auto; display: flex; gap: 12px; white-space: nowrap; } .ms-head { flex-wrap: wrap; }
 .ms-push { padding-top: 0; }
-.ms-info { border-left: 1px solid var(--line); padding: 4px 16px 16px; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
+.ms-info { border-inline-start: 1px solid var(--line); padding: 4px 16px 16px; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
 .ms-info h4 { margin: 12px 0 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
 .ms-order { background: #fafafa; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 4px; }
 .ms-info .lnk { color: var(--brand); font-size: 14px; }

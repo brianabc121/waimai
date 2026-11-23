@@ -98,7 +98,7 @@ async function submit() {
 
 <style scoped>
 .ma-place { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 0; border-radius: 10px; background: var(--gold-soft, #fbe7b3);
-  text-align: left; cursor: pointer; font: inherit; color: inherit; }
+  text-align: start; cursor: pointer; font: inherit; color: inherit; }
 .ma-place .pin { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; color: var(--brand-dark); background: #f3d9a4; }
 .ma-place .txt { flex: 1; min-width: 0; display: grid; gap: 3px; justify-items: start; }
 .ma-place .txt b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }

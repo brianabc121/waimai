@@ -114,7 +114,7 @@ async function readAll() {
 </template>
 
 <style scoped>
-.msg { display: grid; gap: 6px; text-align: left; width: 100%; cursor: pointer; }
+.msg { display: grid; gap: 6px; text-align: start; width: 100%; cursor: pointer; }
 .msg b { font-size: 14px; font-weight: 600; } .msg:not(.unread) b { font-weight: 500; color: var(--muted); }
 .mtabs { display: flex; gap: 6px; background: var(--paper); border-radius: 999px; padding: 4px; box-shadow: 0 3px 12px rgba(90, 40, 15, .08); }
 .mtabs button { flex: 1; border: 0; background: none; padding: 6px 0; border-radius: 999px; color: var(--muted); font-size: 14px; cursor: pointer; }
@@ -127,5 +127,5 @@ async function readAll() {
 .crow .last { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .crow .tag { justify-self: start; }
 .me-logo.sp { background: var(--red, #8b1a1a); color: var(--gold, #f3c86b); }
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #e5352b; margin-right: 6px; vertical-align: 1px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #e5352b; margin-inline-end: 6px; vertical-align: 1px; }
 </style>

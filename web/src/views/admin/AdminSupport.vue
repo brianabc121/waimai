@@ -166,12 +166,12 @@ const blocked = computed(() => enabled.value ? '' : t('as.off'))
 
 <style>
 .asp { display: grid; grid-template-columns: 360px minmax(0, 1fr) 260px; height: calc(100dvh - 52px); background: #fff; }
-.asp-list { border-right: 1px solid var(--line); overflow-y: auto; min-width: 0; }
+.asp-list { border-inline-end: 1px solid var(--line); overflow-y: auto; min-width: 0; }
 .asp-search { padding: 12px 12px 6px; } .asp-search input { width: 100%; border: 0; background: #f1f3f5; border-radius: 10px; padding: 9px 12px; font: inherit; }
 .asp-filters { display: flex; gap: 8px; padding: 4px 12px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; align-items: center; }
 .asp-filters button, .asp-filters select { border: 1px solid #d6dae0; border-radius: 16px; padding: 3px 12px; font-size: 13px; background: #fff; cursor: pointer; white-space: nowrap; }
 .asp-filters button.on { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); font-weight: 600; }
-.asp-row { display: flex; gap: 12px; padding: 12px; border: 0; border-bottom: 1px solid #f0f1f3; background: none; width: 100%; text-align: left; cursor: pointer; align-items: flex-start; color: var(--ink); font: inherit; }
+.asp-row { display: flex; gap: 12px; padding: 12px; border: 0; border-bottom: 1px solid #f0f1f3; background: none; width: 100%; text-align: start; cursor: pointer; align-items: flex-start; color: var(--ink); font: inherit; }
 .asp-row.on { background: var(--brand-soft); }
 .asp-row .grow { min-width: 0; display: grid; gap: 3px; }
 .asp-row .grow > .row { min-width: 0; }
@@ -183,9 +183,9 @@ const blocked = computed(() => enabled.value ? '' : t('as.off'))
 .asp-shared { font-size: 12px; color: #a3a9b2; text-align: center; padding: 14px; }
 .asp-chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #f4f4f4; }
 .asp-head { background: #fff; border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 10px; align-items: center; flex: none; flex-wrap: wrap; }
-.asp-resolve { margin-left: auto; }
+.asp-resolve { margin-inline-start: auto; }
 .asp-back { display: none; }
-.asp-info { border-left: 1px solid var(--line); padding: 4px 16px 16px; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
+.asp-info { border-inline-start: 1px solid var(--line); padding: 4px 16px 16px; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
 .asp-info h4 { margin: 12px 0 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
 .asp-info .lnk { color: var(--brand); font-size: 13px; } .asp-info .bad { color: var(--bad, #b42318); }
 @media (max-width: 1199px) { .asp { grid-template-columns: 320px minmax(0, 1fr); } .asp-info { display: none; } }

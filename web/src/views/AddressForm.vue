@@ -227,17 +227,17 @@ const titles = ['mr', 'ms'] as const
   display: flex; height: 100%; min-height: 0; position: relative; background: var(--af-bg); color: var(--af-ink); }
 .af-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .af-head { display: flex; align-items: center; padding: 14px 12px 12px; margin: 0 4px; border-bottom: 1px solid var(--af-line); flex: none; }
-.af-head b { flex: 1; text-align: center; margin-right: 40px; font-size: 19px; letter-spacing: .04em; }
+.af-head b { flex: 1; text-align: center; margin-inline-end: 40px; font-size: 19px; letter-spacing: .04em; }
 .af-back { border: 0; background: none; width: 40px; height: 36px; display: grid; place-items: center; cursor: pointer; color: var(--af-ink); padding: 0; border-radius: 8px; }
 .af-body { flex: 1; overflow-y: auto; padding: 4px 12px 16px; display: grid; gap: 10px; align-content: start; }
 .af-body h3 { font-size: 16px; margin: 10px 4px 0; }
-.af-body h3 small { font-size: 13px; font-weight: 400; color: var(--af-soft); margin-left: 8px; }
+.af-body h3 small { font-size: 13px; font-weight: 400; color: var(--af-soft); margin-inline-start: 8px; }
 .af-card { background: var(--af-card); border: 1px solid var(--af-line); border-radius: 14px; padding: 0 12px; }
 .af-row { display: flex; align-items: flex-start; padding: 12px 2px; border-top: 1px solid var(--af-line); }
 .af-card > .af-row:first-child { border-top: 0; }
 .af-row .l { width: 88px; flex: none; font-weight: 600; padding: 4px 6px 4px 0; overflow-wrap: anywhere; }
-.req { color: var(--bad); font-style: normal; margin-left: 4px; }
-.af-row .v { flex: 1; min-width: 0; border-left: 1px solid var(--af-line); padding-left: 14px; display: block; }
+.req { color: var(--bad); font-style: normal; margin-inline-start: 4px; }
+.af-row .v { flex: 1; min-width: 0; border-inline-start: 1px solid var(--af-line); padding-inline-start: 14px; display: block; }
 .af-row input:not([type=radio], [type=checkbox], [type=file]) { border: 0; padding: 4px 0; width: 100%; outline: none !important; background: none; font-size: 15px; border-radius: 0; }
 .af-row input::placeholder { color: #a99d91; }
 .af-row:focus-within .l { color: var(--brand-dark); }
@@ -245,7 +245,7 @@ const titles = ['mr', 'ms'] as const
 
 /* the place picked on the map */
 .af-place { display: flex; align-items: center; gap: 12px; width: 100%; margin: 10px 0; padding: 12px; border: 0; border-radius: 10px; background: var(--af-tint);
-  text-align: left; cursor: pointer; font: inherit; color: inherit; }
+  text-align: start; cursor: pointer; font: inherit; color: inherit; }
 .af-place .pin { width: 40px; height: 40px; border-radius: 50%; flex: none; display: grid; place-items: center; color: var(--brand-dark);
   background: color-mix(in srgb, var(--brand) 14%, #f3dfc0); }
 .af-place .txt { flex: 1; min-width: 0; display: grid; gap: 3px; justify-items: start; }
@@ -270,7 +270,7 @@ const titles = ['mr', 'ms'] as const
 
 /* telephone: the country code, then the number */
 .af-phone { display: flex; align-items: center; }
-.af-phone select { width: auto; flex: none; border: 0; border-right: 1px solid var(--af-line); border-radius: 0; background: none; padding: 4px 22px 4px 0; margin-right: 14px;
+.af-phone select { width: auto; flex: none; border: 0; border-inline-end: 1px solid var(--af-line); border-radius: 0; background: none; padding: 4px 22px 4px 0; margin-inline-end: 14px;
   font-weight: 600; font-size: 15px; cursor: pointer; appearance: none; -webkit-appearance: none;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a7b6d' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center; }
 .af-phone select:focus { outline: none; }
@@ -287,8 +287,8 @@ const titles = ['mr', 'ms'] as const
 .af-chips button.on { border-color: var(--brand); background: var(--af-tint); color: var(--brand-dark); font-weight: 600; }
 .af-default { align-items: center; justify-content: space-between; font-weight: 600; cursor: pointer; }
 .switch { appearance: none; -webkit-appearance: none; width: 46px; height: 26px; border-radius: 13px; background: #d9d2c8; position: relative; cursor: pointer; flex: none; border: 0; padding: 0; }
-.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
-.switch:checked { background: var(--brand); } .switch:checked::after { left: 23px; }
+.switch::after { content: ""; position: absolute; top: 3px; inset-inline-start: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.switch:checked { background: var(--brand); } .switch:checked::after { inset-inline-start: 23px; }
 .btn.danger { color: var(--bad); justify-self: center; }
 
 .af-foot { flex: none; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--af-line); margin: 0 4px; display: grid; gap: 10px; }
@@ -301,7 +301,7 @@ const titles = ['mr', 'ms'] as const
 .af-map { display: none; position: absolute; inset: 0; z-index: 3; background: #fff; }
 .aform.picking .af-map { display: block; }
 @media (min-width: 900px) {
-  .aform.wide .af-main { flex: 0 0 420px; border-right: 1px solid var(--af-line); }
+  .aform.wide .af-main { flex: 0 0 420px; border-inline-end: 1px solid var(--af-line); }
   .aform.wide .af-map { display: block; position: static; flex: 1; min-width: 0; }
   .aform.wide .af-map :deep(.pp-head) { display: none; }
   .aform.wide .chev { display: none; }

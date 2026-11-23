@@ -157,7 +157,7 @@ const events = computed<Ev[]>(() => {
               <polyline v-for="(r, i) in runs" :key="i" :points="line(px, r.pts)" :class="r.gap ? 'gapline' : 'actual'" :data-testid="r.gap ? 'gap-line' : 'actual-line'" />
             </template>
             <g v-if="d.store" :transform="`translate(${px(d.store).x},${px(d.store).y})`" data-testid="store-pin">
-              <circle r="14" fill="#d9480f" stroke="#fff" stroke-width="2.5" /><text y="5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">店</text>
+              <circle r="14" fill="#d9480f" stroke="#fff" stroke-width="2.5" /><text y="5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">{{ t('ic.store') }}</text>
             </g>
             <g v-for="o in stops" :key="o.order_id" :transform="`translate(${px([o.lat!, o.lng!]).x},${px([o.lat!, o.lng!]).y})`" class="stoppin" :class="o.outcome || 'pending'" :data-stop="o.public_no">
               <circle r="13" /><text y="5" text-anchor="middle" class="n">{{ o.drop_seq ?? '·' }}</text>
@@ -228,16 +228,16 @@ const events = computed<Ev[]>(() => {
 .tripbody { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
 .tripmap { position: relative; min-height: 320px; background: #eef0f2; } .tripmap :deep(.mapc) { position: absolute; inset: 0; }
 .nomap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; color: var(--muted); }
-.tripside { background: #fff; border-left: 1px solid var(--line); overflow-y: auto; }
+.tripside { background: #fff; border-inline-start: 1px solid var(--line); overflow-y: auto; }
 .tripside section { padding: 14px 18px; border-bottom: 1px solid var(--line); } .tripside section:last-child { border-bottom: 0; }
-@media (max-width: 900px) { .trip { height: auto; } .tripbody { grid-template-columns: 1fr; } .tripmap { height: 60vh; } .tripside { border-left: 0; } }
+@media (max-width: 900px) { .trip { height: auto; } .tripbody { grid-template-columns: 1fr; } .tripmap { height: 60vh; } .tripside { border-inline-start: 0; } }
 .planned { fill: none; stroke: #1d4ed8; stroke-width: 4; stroke-dasharray: 10 7; stroke-linejoin: round; }
 .actual { fill: none; stroke: #d9480f; stroke-width: 4.5; stroke-linejoin: round; stroke-linecap: round; }
 .gapline { fill: none; stroke: #d9480f; stroke-width: 3.5; stroke-dasharray: 1 8; stroke-linecap: round; }
 .stoppin circle { fill: #1f2328; stroke: #fff; stroke-width: 2.5; } .stoppin.failed circle { fill: #b45309; } .stoppin.pending circle { fill: #6b7280; }
 .stoppin .n { fill: #fff; font-size: 13px; font-weight: 700; }
 .stoppin .lbl { font-size: 13px; font-weight: 700; fill: #1f2328; paint-order: stroke; stroke: #fff; stroke-width: 4px; stroke-linejoin: round; }
-.slider { position: absolute; left: 12px; right: 64px; bottom: 26px; display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 10px; padding: 7px 12px; box-shadow: 0 2px 10px rgba(0,0,0,.18); z-index: 2; }
+.slider { position: absolute; inset-inline-start: 12px; inset-inline-end: 64px; bottom: 26px; display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 10px; padding: 7px 12px; box-shadow: 0 2px 10px rgba(0,0,0,.18); z-index: 2; }
 .slider input { flex: 1; accent-color: var(--brand); } .slider b { font-variant-numeric: tabular-nums; }
 .rt { display: flex; align-items: center; gap: 9px; padding: 5px 0; cursor: pointer; } .rt span { flex: 1; } .rt b { font-variant-numeric: tabular-nums; }
 .sw { width: 30px; height: 0; border-top: 4px solid #d9480f; } .sw.planned { border-top: 4px dashed #1d4ed8; }

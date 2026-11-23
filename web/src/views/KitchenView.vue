@@ -115,15 +115,15 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
         <div v-for="o in shown" :key="o.id" class="card stack">
           <div class="row between">
             <h2><template v-if="dine(o)">{{ t('table') }} {{ o.table_name }}</template><template v-else>{{ o.public_no }}</template>
-              <span class="tag brand" style="margin-left:4px">{{ t(o.service_type) }}</span>
-              <span class="tag info" v-if="o.scheduled_for" style="margin-left:4px">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span></h2>
+              <span class="tag brand" style="margin-inline-start:4px">{{ t(o.service_type) }}</span>
+              <span class="tag info" v-if="o.scheduled_for" style="margin-inline-start:4px">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span></h2>
             <span v-if="!dine(o)" class="tag" :class="waited(o) >= 20 ? 'bad' : waited(o) >= 10 ? 'warn' : ''">{{ waited(o) }} {{ t('min') }}</span>
             <span v-else class="small muted">{{ o.public_no }}</span>
           </div>
           <div v-if="o.note" class="banner warn small">{{ t('order_note') }}: {{ o.note }}</div>
           <div v-for="it in lines(o)" :key="it.id" class="kline" :class="it.prep_status">
             <div class="grow">
-              <div class="kname"><span v-if="baskets(o)" class="tag info" style="margin-right:4px;vertical-align:middle">{{ t('basket_short', { n: it.basket }) }}</span>{{ it.qty }} × {{ both(it.name, it.name_en) }}<span v-if="dine(o)" class="small muted" style="font-weight:400"> · {{ t('batch_n', { n: it.batch_seq }) }}</span></div>
+              <div class="kname"><span v-if="baskets(o)" class="tag info" style="margin-inline-end:4px;vertical-align:middle">{{ t('basket_short', { n: it.basket }) }}</span>{{ it.qty }} × {{ both(it.name, it.name_en) }}<span v-if="dine(o)" class="small muted" style="font-weight:400"> · {{ t('batch_n', { n: it.batch_seq }) }}</span></div>
               <div class="small" v-if="stations.length && it.needs_prep">
                 <span class="tag" :class="it.station_id === null ? 'warn' : 'info'">{{ it.station_name || t('unassigned') }}</span>
                 <select v-if="open(it)" class="mv" :value="it.station_id ?? ''" :title="t('move_to')" :aria-label="t('move_to')" @change="move(it, $event)">
@@ -170,7 +170,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
         <div v-for="o in packing" :key="o.id" class="card stack">
           <div class="row between">
             <h2>{{ o.public_no }} <span class="tag brand">{{ t(o.service_type) }}</span>
-              <span class="tag info" v-if="o.scheduled_for" style="margin-left:4px">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span></h2>
+              <span class="tag info" v-if="o.scheduled_for" style="margin-inline-start:4px">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span></h2>
             <span class="tag" :class="{ ok: o.packing_status === 'packed', warn: o.packing_status === 'ready_to_pack' }">{{ t('p.' + o.packing_status) }}</span>
           </div>
           <div v-if="o.note" class="banner warn small">{{ t('order_note') }}: {{ o.note }}</div>
@@ -213,10 +213,10 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
 </template>
 
 <style scoped>
-.kline { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: #f6f6f4; border-left: 5px solid var(--line); }
-.kline.preparing { border-left-color: var(--warn); background: var(--warn-soft); }
-.kline.ready { border-left-color: var(--ok); background: var(--ok-soft); }
+.kline { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: #f6f6f4; border-inline-start: 5px solid var(--line); }
+.kline.preparing { border-inline-start-color: var(--warn); background: var(--warn-soft); }
+.kline.ready { border-inline-start-color: var(--ok); background: var(--ok-soft); }
 .kname { font-size: 17px; font-weight: 700; }
-.mv { width: auto; padding: 2px 6px; font-size: 12px; margin-left: 6px; }
+.mv { width: auto; padding: 2px 6px; font-size: 12px; margin-inline-start: 6px; }
 .check.top { align-items: flex-start; }
 </style>

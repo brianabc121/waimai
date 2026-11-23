@@ -39,7 +39,7 @@ defineExpose({ openDay, text, single, today })
 </script>
 
 <template>
-  <span class="datepick"><button data-act="prev" @click="step(-1)">‹</button><b data-testid="period-title">{{ title }}</b><button data-act="next" :disabled="to >= today" @click="step(1)">›</button></span>
+  <span class="datepick"><button data-act="prev" @click="step(-1)"><span class="rtl-flip">‹</span></button><b data-testid="period-title">{{ title }}</b><button data-act="next" :disabled="to >= today" @click="step(1)"><span class="rtl-flip">›</span></button></span>
   <span class="pills">
     <button v-for="p in (['today', 'yesterday', 'week', 'month'] as Preset[])" :key="p" :class="{ on: preset === p }" :data-preset="p" @click="choose(p)">{{ t('kr.p.' + p) }}</button>
     <button :class="{ on: preset === 'custom' }" data-preset="custom" @click="preset = 'custom'">{{ t('kr.p.custom') }}</button>

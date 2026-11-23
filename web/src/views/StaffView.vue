@@ -137,7 +137,7 @@ const resetPw = () => act(() => post(`/merchant/branches/${bid}/staff/${f.id}/pa
             <td class="small"><i class="dot" :class="{ on: m.active && (m.open_tasks > 0 || m.active_deliveries > 0 || m.on_duty) }"></i>{{ nowText(m) }}</td>
             <td class="right">
               <button v-if="!m.active && editable(m)" class="btn small" @click="restore(m)">{{ t('st.restore') }}</button>
-              <button v-if="editable(m)" class="btn small" style="margin-left:6px" @click="edit(m)">{{ t('edit') }}</button></td>
+              <button v-if="editable(m)" class="btn small" style="margin-inline-start:6px" @click="edit(m)">{{ t('edit') }}</button></td>
           </tr>
           <tr v-if="!shown.length"><td colspan="6" class="muted" style="text-align:center;padding:24px">{{ t('st.empty') }}</td></tr>
         </tbody>
@@ -205,21 +205,21 @@ const resetPw = () => act(() => post(`/merchant/branches/${bid}/staff/${f.id}/pa
 .chips button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
 .stafftable td { white-space: nowrap; } .stafftable td[data-col=posts] { white-space: normal; }
 .stafftable tr.off td { color: var(--muted); }
-.av { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; margin-right: 10px; }
+.av { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; margin-inline-end: 10px; }
 .post { display: inline-block; padding: 2px 9px; border-radius: 6px; font-size: 12.5px; font-weight: 600; margin: 1px 4px 1px 0; }
 .post.station { background: var(--info-soft); color: var(--info); } .post.packing { background: #f1e9ff; color: #6d28d9; }
 .post.rider { background: var(--brand-soft); color: var(--brand-dark); } .post.none { background: #eef0f2; color: var(--muted); font-weight: 500; }
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #c4c9d0; margin-right: 6px; } .dot.on { background: var(--ok); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #c4c9d0; margin-inline-end: 6px; } .dot.on { background: var(--ok); }
 .drawer-mask { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 40; }
-.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); background: #fff; z-index: 41; box-shadow: -8px 0 24px rgba(0,0,0,.15);
+.drawer { position: fixed; top: 0; inset-inline-end: 0; bottom: 0; width: min(460px, 100vw); background: #fff; z-index: 41; box-shadow: -8px 0 24px rgba(0,0,0,.15);
   padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; } .two .field { margin-bottom: 8px; }
 .grp { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 12px; display: grid; gap: 8px; }
-.grp .gh b { margin-right: 6px; } .grp.locked { opacity: .55; }
+.grp .gh b { margin-inline-end: 6px; } .grp.locked { opacity: .55; }
 .opts { display: flex; flex-wrap: wrap; gap: 8px; }
 .opt { border: 1.5px solid var(--line); border-radius: 10px; padding: 7px 12px; display: flex; gap: 7px; align-items: center; font-size: 14px; background: #fff; cursor: pointer; }
 .opt i { width: 16px; height: 16px; border: 1.5px solid #9ca3af; border-radius: 4px; flex: none; position: relative; } .opt.radio i { border-radius: 50%; }
 .opt.on { border-color: var(--brand); background: var(--brand-soft); font-weight: 600; } .opt.on i { background: var(--brand); border-color: var(--brand); }
-.opt.on i::after { content: ""; position: absolute; left: 4.5px; top: 1.5px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.opt.on i::after { content: ""; position: absolute; inset-inline-start: 4.5px; top: 1.5px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .foot { margin-top: auto; display: flex; gap: 8px; align-items: center; padding-top: 6px; }
 </style>

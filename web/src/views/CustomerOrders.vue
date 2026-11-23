@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The logged-in customer's orders in every store: tabs by state, a search
 // box, one card per order with what can be done about it.
+import LangButton from './LangButton.vue'
 import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { get } from '../api'
@@ -76,7 +77,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
         <button class="ol-back" :aria-label="t('back')" data-testid="orders-back" @click="back">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7" /></svg></button>
         <h1>{{ t('ol.title') }}</h1>
-        <button class="ol-lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
+        <LangButton class="ol-lang" />
         <label class="ol-search">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg>
           <input v-model="q" type="search" maxlength="50" :placeholder="t('ol.search')" data-testid="orders-search" />
@@ -149,7 +150,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 .ol-head { position: sticky; top: 0; z-index: 10; background: var(--red-bg); color: #fff; }
 .ol-bar, .ol-tabs, .ol-list { max-width: 760px; margin: 0 auto; }
 .ol-bar { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: 'back title lang' 'search search search'; align-items: center; gap: 6px 8px; padding: 6px 12px 10px; }
-.ol-back { grid-area: back; border: 0; background: none; color: #fff; padding: 6px; margin-left: -6px; cursor: pointer; display: flex; border-radius: 50%; justify-self: start; }
+.ol-back { grid-area: back; border: 0; background: none; color: #fff; padding: 6px; margin-inline-start: -6px; cursor: pointer; display: flex; border-radius: 50%; justify-self: start; }
 .ol-bar h1 { grid-area: title; text-align: center; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ol-lang { grid-area: lang; border: 1px solid rgba(255, 255, 255, .8); background: none; color: #fff; border-radius: 6px; padding: 1px 7px; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; min-width: 36px; justify-self: end; }
 .ol-search { grid-area: search; min-width: 0; display: flex; align-items: center; gap: 8px; background: var(--paper); border-radius: 999px; padding: 0 12px; color: var(--muted); }
@@ -179,7 +180,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 .ol-items .nm { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .ol-items .qty { color: var(--muted); font-size: 12px; flex: none; }
 .ol-items .rest { color: var(--muted); font-size: 12px; }
-.ol-sum { flex: none; display: grid; align-content: center; justify-items: center; gap: 0; padding-left: 12px; border-left: 1px solid var(--line); min-width: 76px; }
+.ol-sum { flex: none; display: grid; align-content: center; justify-items: center; gap: 0; padding-inline-start: 12px; border-inline-start: 1px solid var(--line); min-width: 76px; }
 .ol-total { font-size: 17px; font-weight: 700; color: var(--red); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ol-count { color: var(--muted); font-size: 12px; }
 .ol-meta { display: flex; flex-wrap: wrap; gap: 0 8px; color: var(--muted); font-size: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
@@ -188,8 +189,8 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 .ol-more { position: relative; }
 .ol-morebtn { border: 0; background: none; color: var(--muted); padding: 6px 4px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .ol-morebtn b { letter-spacing: 1px; color: var(--ink); font-size: 11px; }
-.ol-menu { position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 5; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(60, 30, 10, .16); padding: 4px; min-width: 120px; display: grid; font-size: 13px; }
-.ol-menu button, .ol-menu a { border: 0; background: none; text-align: left; padding: 8px 12px; border-radius: 6px; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.ol-menu { position: absolute; inset-inline-start: 0; bottom: calc(100% + 4px); z-index: 5; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(60, 30, 10, .16); padding: 4px; min-width: 120px; display: grid; font-size: 13px; }
+.ol-menu button, .ol-menu a { border: 0; background: none; text-align: start; padding: 8px 12px; border-radius: 6px; color: var(--ink); cursor: pointer; white-space: nowrap; }
 .ol-menu button:hover, .ol-menu a:hover { background: var(--bg); }
 .pill { border: 1px solid #cdb9a0; background: none; color: var(--ink); border-radius: 999px; padding: 4px 14px; font-size: 13px; cursor: pointer; white-space: nowrap; min-height: 30px; }
 .pill.brand { border-color: var(--red); background: var(--red); color: #fff; font-weight: 500; padding: 4px 16px; }
@@ -201,7 +202,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 @media (max-width: 380px) {
   .ol-tabs button { padding: 4px 10px; font-size: 13.5px; }
   .ol-items img, .ol-items .ph { width: 54px; height: 36px; } .ol-items .nm { font-size: 13.5px; }
-  .ol-sum { min-width: 66px; padding-left: 10px; } .ol-total { font-size: 16px; }
+  .ol-sum { min-width: 66px; padding-inline-start: 10px; } .ol-total { font-size: 16px; }
   .pill { padding: 4px 10px; } .pill.brand { padding: 4px 12px; }
 }
 /* an iPad or a computer: the red bar is the top bar above; title, search and
@@ -211,9 +212,9 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
   .ol-head { position: static; background: none; color: var(--ink); }
   .ol-bar, .ol-tabs, .ol-list { max-width: none; }
   .ol-bar { grid-template-columns: 36px auto minmax(0, 1fr); grid-template-areas: 'back title search'; gap: 4px 12px; padding: 0 0 12px; }
-  .ol-back { color: var(--ink); margin-left: -8px; }
+  .ol-back { color: var(--ink); margin-inline-start: -8px; }
   .ol-back:hover { background: var(--gold-soft); }
-  .ol-bar h1 { text-align: left; font-size: 20px; }
+  .ol-bar h1 { text-align: start; font-size: 20px; }
   .ol-lang { display: none; }
   .ol-search { max-width: 360px; width: 100%; justify-self: end; border: 1px solid var(--line); }
   .ol-tabs { justify-content: flex-start; gap: 8px; padding: 0 0 12px; }

@@ -142,9 +142,9 @@ await owner.locator('.pills [data-preset=yesterday].on').waitFor()
 step('a period can be chosen; a bar opens its day')
 
 // English
-await owner.click('.staffbar .lang')
+await owner.click('.staffbar .lang'); await owner.click('[data-testid=lang-en]')
 await owner.locator('[data-testid=staff-tabs] :text("In-store work")').waitFor()
-await owner.click('.staffbar .lang')
+await owner.click('.staffbar .lang'); await owner.click('[data-testid=lang-zh]')
 
 // a cashier has no access
 expect((await api(desk, 'GET', `/merchant/branches/1/reports/kitchen?from=${today}&to=${today}`)).status, 403, 'a cashier cannot read the summary')

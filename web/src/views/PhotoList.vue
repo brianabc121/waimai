@@ -58,8 +58,8 @@ function move(i: number, by: number) {
         <img :src="p" alt="" />
         <button type="button" class="rm" :aria-label="t('im.remove')" data-role="remove" @click="remove(i)">×</button>
         <div v-if="modelValue.length > 1" class="mv">
-          <button type="button" :disabled="i === 0" :aria-label="t('im.earlier')" @click="move(i, -1)">‹</button>
-          <button type="button" :disabled="i === modelValue.length - 1" :aria-label="t('im.later')" @click="move(i, 1)">›</button>
+          <button type="button" :disabled="i === 0" :aria-label="t('im.earlier')" @click="move(i, -1)"><span class="rtl-flip">‹</span></button>
+          <button type="button" :disabled="i === modelValue.length - 1" :aria-label="t('im.later')" @click="move(i, 1)"><span class="rtl-flip">›</span></button>
         </div>
       </div>
       <button v-if="modelValue.length < max" type="button" class="tile add" :style="{ aspectRatio: String(ratio) }" data-role="add" :aria-label="t('im.upload')" @click="picker?.click()">＋</button>
@@ -79,8 +79,8 @@ function move(i: number, by: number) {
 .tile { position: relative; width: 76px; border-radius: 10px; overflow: hidden; background: #fafafa; }
 .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tile.add { border: 1px dashed #c9ccd1; color: #9aa0a8; font-size: 26px; cursor: pointer; padding: 0; display: grid; place-items: center; }
-.rm { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .55); color: #fff; font-size: 15px; line-height: 1; cursor: pointer; padding: 0; }
-.mv { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; }
+.rm { position: absolute; top: 3px; inset-inline-end: 3px; width: 22px; height: 22px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .55); color: #fff; font-size: 15px; line-height: 1; cursor: pointer; padding: 0; }
+.mv { position: absolute; inset-inline-start: 0; inset-inline-end: 0; bottom: 0; display: flex; justify-content: space-between; }
 .mv button { width: 26px; height: 22px; border: 0; background: rgba(0, 0, 0, .45); color: #fff; font-size: 16px; line-height: 1; cursor: pointer; padding: 0; }
 .mv button:disabled { visibility: hidden; }
 </style>

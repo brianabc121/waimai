@@ -110,13 +110,13 @@ function closeForm() { if (props.startNew && !list.value?.length) emit('close');
 .asheet { height: 78vh; max-height: 78vh; overflow: hidden; }
 .asheet.form { height: 94vh; max-height: 94vh; }
 .as-head { text-align: center; font-size: 17px; font-weight: 600; padding: 16px 44px 12px; position: relative; flex: none; }
-.as-head button { position: absolute; right: 12px; top: 10px; border: 0; background: none; font-size: 26px; color: #8b919a; cursor: pointer; width: 36px; height: 36px; }
+.as-head button { position: absolute; inset-inline-end: 12px; top: 10px; border: 0; background: none; font-size: 26px; color: #8b919a; cursor: pointer; width: 36px; height: 36px; }
 .as-list { flex: 1; overflow-y: auto; min-height: 0; }
 .as-empty { padding: 40px 16px; text-align: center; }
 .as-row { display: flex; gap: 12px; align-items: center; padding: 13px 16px; border-bottom: 1px solid #f0f1f3; }
 .as-row.pick:not(.dis) { cursor: pointer; }
 .as-row .grow { flex: 1; min-width: 0; }
-.as-row .t { font-size: 16px; font-weight: 600; } .as-row .t .tag { margin-right: 6px; font-weight: 400; }
+.as-row .t { font-size: 16px; font-weight: 600; } .as-row .t .tag { margin-inline-end: 6px; font-weight: 400; }
 .as-row .u { font-size: 14px; }
 .as-row .st { margin-top: 4px; }
 .as-row.dis .t, .as-row.dis .u { color: #9aa1ab; }
@@ -131,7 +131,7 @@ function closeForm() { if (props.startNew && !list.value?.length) emit('close');
 .ap-pin { flex: none; width: 42px; height: 42px; border-radius: 50%; background: #f9dcd6; color: var(--red); display: grid; place-items: center; }
 .ap-row .grow { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .ap-row .t { font-size: 16.5px; font-weight: 800; overflow-wrap: anywhere; }
-.ap-row .lab { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 0 8px; border-radius: 6px; background: var(--gold-soft); color: var(--red-deep); margin-right: 6px; vertical-align: 2px; }
+.ap-row .lab { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 0 8px; border-radius: 6px; background: var(--gold-soft); color: var(--red-deep); margin-inline-end: 6px; vertical-align: 2px; }
 .ap-row .u { font-size: 14.5px; }
 .ap-row .w { font-size: 13.5px; color: var(--muted); }
 .ap-edit { flex: none; display: inline-flex; align-items: center; gap: 4px; border: 1px solid #cdb9a0; background: none; border-radius: 999px; padding: 6px 12px; color: var(--ink); cursor: pointer; font-size: 14px; }

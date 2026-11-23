@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LangButton from '../LangButton.vue'
 // Profile and settings: the picture, the nickname, the language, logging out.
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -61,9 +62,9 @@ async function logout() {
 
       <div class="card me-rows">
         <div style="cursor:default"><span>{{ t('mp.language') }}</span>
-          <span class="v langseg"><button :class="{ on: locale === 'zh' }" data-testid="lang-zh" @click="setLocale('zh')">中文</button><button :class="{ on: locale === 'en' }" data-testid="lang-en" @click="setLocale('en')">English</button></span></div>
-        <a href="/terms.html" target="_blank"><span>{{ t('mp.terms') }}</span><span class="v chev">›</span></a>
-        <a href="/privacy.html" target="_blank"><span>{{ t('mp.privacy') }}</span><span class="v chev">›</span></a>
+          <span class="v"><LangButton class="btn small" /></span></div>
+        <a href="/terms.html" target="_blank"><span>{{ t('mp.terms') }}</span><span class="v chev"><span class="rtl-flip">›</span></span></a>
+        <a href="/privacy.html" target="_blank"><span>{{ t('mp.privacy') }}</span><span class="v chev"><span class="rtl-flip">›</span></span></a>
       </div>
       <button class="btn block big" style="color:var(--bad)" data-testid="profile-logout" @click="logout">{{ t('mp.logout') }}</button>
     </template>
@@ -73,8 +74,4 @@ async function logout() {
 <style scoped>
 .pic { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #eceef1; }
 .me-rows form input { flex: 1; min-width: 0; }
-.langseg { gap: 0 !important; }
-.langseg button { border: 1px solid var(--line); background: #fff; padding: 3px 10px; cursor: pointer; font-size: 12px; }
-.langseg button:first-child { border-radius: 8px 0 0 8px; } .langseg button:last-child { border-radius: 0 8px 8px 0; border-left: 0; }
-.langseg button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
 </style>

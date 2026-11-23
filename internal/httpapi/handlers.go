@@ -91,7 +91,29 @@ func (s *Server) customerSession(c *gin.Context) {
 		c.JSON(200, gin.H{"verified": false})
 		return
 	}
-	c.JSON(200, gin.H{"verified": true, "phone": cu.Phone, "customer_id": cu.ID})
+	lang, _ := s.App.CustomerLang(c, cu.ID)
+	c.JSON(200, gin.H{"verified": true, "phone": cu.Phone, "customer_id": cu.ID, "lang": lang})
+}
+
+// saveCustomerLang remembers the language a signed-in customer picked, so a
+// new phone or browser opens in it too.
+func (s *Server) saveCustomerLang(c *gin.Context) {
+	cu, err := s.customer(c)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	var in struct {
+		Lang string `json:"lang"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	if err := s.App.SaveCustomerLang(c, cu.ID, in.Lang); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"lang": in.Lang})
 }
 
 func (s *Server) customerLogout(c *gin.Context) {

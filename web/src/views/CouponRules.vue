@@ -91,13 +91,13 @@ const rate = computed(() => rule.value?.stats.issued ? Math.round(rule.value.sta
 .pill { display: inline-block; border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; }
 .pill.on { background: var(--brand-soft); color: var(--brand-dark, var(--brand)); border-color: #f0b9a0; font-weight: 700; }
 .kinds { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; justify-self: start; }
-.kinds button { border: 0; border-left: 1px solid var(--line); background: #fff; padding: 6px 14px; font: inherit; cursor: pointer; }
-.kinds button:first-child { border-left: 0; } .kinds button.on { background: var(--brand-soft); color: var(--brand-dark, var(--brand)); font-weight: 700; }
+.kinds button { border: 0; border-inline-start: 1px solid var(--line); background: #fff; padding: 6px 14px; font: inherit; cursor: pointer; }
+.kinds button:first-child { border-inline-start: 0; } .kinds button.on { background: var(--brand-soft); color: var(--brand-dark, var(--brand)); font-weight: 700; }
 .sw-row { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer; font: inherit; padding: 4px; }
 .sw-row b { color: var(--muted); } .sw-row b.on { color: var(--ok, #18794e); }
 .sw { width: 42px; height: 24px; border-radius: 12px; background: #d6dae0; position: relative; display: inline-block; }
-.sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; }
-.sw.on { background: var(--brand); } .sw.on::after { left: 21px; }
+.sw::after { content: ""; position: absolute; top: 3px; inset-inline-start: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; }
+.sw.on { background: var(--brand); } .sw.on::after { inset-inline-start: 21px; }
 .ticket { display: flex; border-radius: 12px; overflow: hidden; background: #fffaf2; border: 1px solid #ecd9b8; }
 .ticket .stub { width: 100px; flex: none; background: linear-gradient(160deg, #b8392a, #8f251b); color: #fff; display: grid; place-items: center; align-content: center; padding: 10px 4px; text-align: center; }
 .ticket .stub b { font-size: 24px; line-height: 1.1; } .ticket .stub small { font-size: 11.5px; opacity: .9; }

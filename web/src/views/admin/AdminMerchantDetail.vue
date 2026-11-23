@@ -94,7 +94,7 @@ const rolesOf = (u: MerchantUser) => [...new Set(u.roles.map(r => r.role))]
     <div v-if="fresh" class="banner ok" data-testid="new-password">
       {{ t('ad.new_password') }} · {{ fresh.name }}: <b class="mono" style="font-size:15px;user-select:all">{{ fresh.password }}</b>
       <span class="small"> · {{ t('ad.new_password_hint') }}</span>
-      <button class="btn small" style="margin-left:8px" @click="fresh = null">{{ t('back') }}</button>
+      <button class="btn small" style="margin-inline-start:8px" @click="fresh = null">{{ t('back') }}</button>
     </div>
 
     <template v-if="d && m">
@@ -157,7 +157,7 @@ const rolesOf = (u: MerchantUser) => [...new Set(u.roles.map(r => r.role))]
           <tbody>
             <tr v-for="u in d.users" :key="u.id" :data-user="u.username">
               <td class="mono">{{ u.username }}</td><td>{{ u.display_name }}</td><td>{{ storesOf(u) }}</td>
-              <td><span v-for="r in rolesOf(u)" :key="r" class="tag" :class="{ info: r === 'owner' }" style="margin-right:4px">{{ t('role.' + r) }}</span></td>
+              <td><span v-for="r in rolesOf(u)" :key="r" class="tag" :class="{ info: r === 'owner' }" style="margin-inline-end:4px">{{ t('role.' + r) }}</span></td>
               <td><span class="tag" :class="{ ok: u.active }">{{ u.active ? t('enabled') : t('disabled') }}</span></td>
               <td class="num">{{ u.last_login_at ? ago(u.last_login_at) : t('ad.never') }}</td>
               <td><div class="acts" v-if="live">

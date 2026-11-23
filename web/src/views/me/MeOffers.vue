@@ -4,7 +4,7 @@
 import { computed, ref, watch } from 'vue'
 import { get } from '../../api'
 import { couponName, couponStub, validity, whereUsable, lastDay } from '../../coupons'
-import { locale, pick, promoLabel, t } from '../../i18n'
+import { intlTag, pick, promoLabel, t } from '../../i18n'
 import type { CustomerCoupon, Promotion } from '../../types'
 import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
@@ -36,7 +36,7 @@ function only(p: Promotion): string {
 const named = (p: Promotion, currency: string) => { const n = pick(p.name, p.name_en); return n && bare(n, currency) !== bare(promoLabel(p, currency), currency) ? n : '' }
 function valid(p: Promotion): string {
   const out: string[] = []
-  out.push(p.ends_at ? t('mo.until', { d: new Date(p.ends_at).toLocaleDateString(locale.value === 'zh' ? 'zh-CN' : 'en-GB') }) : t('mo.no_end'))
+  out.push(p.ends_at ? t('mo.until', { d: new Date(p.ends_at).toLocaleDateString(intlTag() === 'en' ? 'en-GB' : intlTag()) }) : t('mo.no_end'))
   if (p.daily_start !== p.daily_end) out.push(t('mo.daily', { a: p.daily_start, b: p.daily_end }))
   return t('mo.valid', { d: out.join(' · ') })
 }
@@ -93,16 +93,16 @@ function valid(p: Promotion): string {
 .cp-tabs button.on { background: var(--red); color: #fff; font-weight: 600; }
 .cp-head { font-size: 12px; color: var(--muted); font-weight: 500; margin: 6px 4px -2px; }
 .coupon.mine .stub b { font-size: 20px; }
-.coupon.mine.store_delivery .stub { background: linear-gradient(135deg, #fdf1d6, #fbe3ad); border-right-color: #dcbf7c; color: #a8641a; }
-.coupon.mine.platform_free .stub { background: linear-gradient(135deg, #efe6ff, #e2d3fb); border-right-color: #b9a1e6; color: #5b21b6; }
+.coupon.mine.store_delivery .stub { background: linear-gradient(135deg, #fdf1d6, #fbe3ad); border-inline-end-color: #dcbf7c; color: #a8641a; }
+.coupon.mine.platform_free .stub { background: linear-gradient(135deg, #efe6ff, #e2d3fb); border-inline-end-color: #b9a1e6; color: #5b21b6; }
 .coupon.mine.gone { opacity: .6; filter: grayscale(.6); }
 .l .soon { color: #c2410c; font-weight: 500; }
 .coupon { position: relative; display: flex; align-items: stretch; background: var(--paper); border-radius: 12px; box-shadow: 0 3px 12px rgba(90, 40, 15, .08); min-width: 0; }
-.stub { flex: none; width: 28%; min-width: 92px; max-width: 150px; display: grid; justify-items: center; align-content: center; gap: 2px; padding: 12px 6px; border-radius: 12px 0 0 12px; background: linear-gradient(135deg, #fdeae4, #f9d9d3); color: var(--red); border-right: 1.500px dashed #d9a79a; position: relative; text-align: center; }
-.coupon.ship .stub { background: linear-gradient(135deg, #fdf1d6, #fbe3ad); border-right-color: #dcbf7c; }
+.stub { flex: none; width: 28%; min-width: 92px; max-width: 150px; display: grid; justify-items: center; align-content: center; gap: 2px; padding: 12px 6px; border-radius: 12px 0 0 12px; background: linear-gradient(135deg, #fdeae4, #f9d9d3); color: var(--red); border-inline-end: 1.500px dashed #d9a79a; position: relative; text-align: center; }
+.coupon.ship .stub { background: linear-gradient(135deg, #fdf1d6, #fbe3ad); border-inline-end-color: #dcbf7c; }
 .coupon.ship .stub svg { color: #b9781e; }
 /* the two notches of a ticket, where the stub tears off */
-.stub::before, .stub::after { content: ""; position: absolute; right: -8px; width: 14px; height: 14px; border-radius: 50%; background: var(--bg); }
+.stub::before, .stub::after { content: ""; position: absolute; inset-inline-end: -8px; width: 14px; height: 14px; border-radius: 50%; background: var(--bg); }
 .stub::before { top: -7px; } .stub::after { bottom: -7px; }
 .stub b { font-size: 19px; font-weight: 700; line-height: 1.2; }
 .l { flex: 1; min-width: 0; display: grid; gap: 2px; align-content: center; padding: 10px 6px 10px 14px; }
@@ -110,9 +110,9 @@ function valid(p: Promotion): string {
 .l .store { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; min-width: 0; flex-wrap: wrap; }
 .l .store em { font-style: normal; font-size: 11px; padding: 0 6px; border-radius: 4px; background: var(--gold-soft); color: #a8641a; border: 1px solid #f0d9a0; white-space: nowrap; }
 .l .small { color: var(--muted); font-size: 12px; }
-.use { flex: none; align-self: center; margin-right: 12px; display: inline-flex; align-items: center; gap: 2px; background: var(--red); color: #fff; font-weight: 500; font-size: 12px; border-radius: 999px; padding: 4px 6px 4px 12px; white-space: nowrap; }
+.use { flex: none; align-self: center; margin-inline-end: 12px; display: inline-flex; align-items: center; gap: 2px; background: var(--red); color: #fff; font-weight: 500; font-size: 12px; border-radius: 999px; padding: 4px 6px 4px 12px; white-space: nowrap; }
 .use:hover { background: var(--red-deep); }
 @media (max-width: 380px) {
-  .stub b { font-size: 17px; } .l { padding-left: 12px; } .l > b { font-size: 14px; } .use { padding: 4px 6px 4px 10px; margin-right: 8px; }
+  .stub b { font-size: 17px; } .l { padding-inline-start: 12px; } .l > b { font-size: 14px; } .use { padding: 4px 6px 4px 10px; margin-inline-end: 8px; }
 }
 </style>

@@ -96,7 +96,7 @@ const handoff = (o: Order) => run(() => post(`/merchant/orders/${o.id}/handoff`)
   <div class="section stack" data-testid="work-store">
     <div v-if="!online" class="banner warn">{{ t('offline') }}</div>
     <div v-if="error" class="banner bad">{{ error }}</div>
-    <button v-if="riderTasks" class="banner info" style="border:0;text-align:left;width:100%;cursor:pointer" data-testid="rider-busy" @click="emit('switch')">{{ t('wk.rider_busy', { n: riderTasks }) }} ›</button>
+    <button v-if="riderTasks" class="banner info" style="border:0;text-align: start;width:100%;cursor:pointer" data-testid="rider-busy" @click="emit('switch')">{{ t('wk.rider_busy', { n: riderTasks }) }} ›</button>
 
     <template v-if="tab === 'tasks'">
       <div v-if="duty.loaded" class="card duty" :class="{ on: duty.on }" data-testid="shift" :data-on="duty.on">
@@ -114,7 +114,7 @@ const handoff = (o: Order) => run(() => post(`/merchant/orders/${o.id}/handoff`)
 
       <div v-for="x in shownCooking" :key="x.it.id" class="card task" :class="x.it.prep_status" :data-task="x.it.name">
         <div><span class="q">{{ x.it.qty }} × {{ both(x.it.name, x.it.name_en) }}</span>
-          <span v-if="x.it.prep_status === 'preparing'" class="tag info" style="margin-left:6px">{{ t('i.preparing') }}</span>
+          <span v-if="x.it.prep_status === 'preparing'" class="tag info" style="margin-inline-start:6px">{{ t('i.preparing') }}</span>
           <div v-if="x.it.options.length" class="small">{{ x.it.options.map(o => both(o.name, o.name_en)).join(' · ') }}</div>
           <div v-if="x.it.note" class="small bold" style="color:var(--warn)">{{ t('note') }}：{{ x.it.note }}</div>
           <div class="src">{{ x.it.station_name }} · {{ source(x.o) }} · <span :class="{ late: x.waited >= 8 }">{{ t('wk.waited', { n: x.waited }) }}</span></div></div>
@@ -125,7 +125,7 @@ const handoff = (o: Order) => run(() => post(`/merchant/orders/${o.id}/handoff`)
       <template v-if="showPacking">
         <div v-for="o in packing" :key="o.id" class="card task" :data-pack="o.public_no">
           <div><span class="q">{{ o.public_no }}</span> <span class="tag" :class="{ ok: o.packing_status === 'packed', warn: o.packing_status === 'ready_to_pack' }">{{ t('p.' + o.packing_status) }}</span>
-            <span v-if="o.scheduled_for" class="tag info" style="margin-left:4px">{{ whenText(o.scheduled_for, o.timezone) }}</span>
+            <span v-if="o.scheduled_for" class="tag info" style="margin-inline-start:4px">{{ whenText(o.scheduled_for, o.timezone) }}</span>
             <div class="src">{{ t(o.service_type) }} ·
               <template v-if="o.packing_status === 'packed'">{{ t('bags') }} {{ o.bags }}<template v-if="o.service_type === 'pickup'"> · {{ t('pickup_code') }} <b>{{ o.pickup_code }}</b></template><template v-else> · {{ t('rider') }} {{ o.delivery?.rider_name ?? '—' }}</template></template>
               <template v-else-if="missingCount(o)">{{ t('wk.items_short', { n: missingCount(o) }) }}</template>
@@ -155,7 +155,7 @@ const handoff = (o: Order) => run(() => post(`/merchant/orders/${o.id}/handoff`)
           <div v-if="packOrder.note" class="banner warn small">{{ t('order_note') }}: {{ packOrder.note }}</div>
           <label v-for="it in live(packOrder)" :key="it.id" class="check" style="align-items:flex-start">
             <input type="checkbox" :checked="pk.ticked.has(it.id)" @change="tick(it)" />
-            <span><span v-if="packOrder.items.some(x => x.basket > 1)" class="tag info" style="margin-right:4px">{{ t('basket_short', { n: it.basket }) }}</span><b>{{ it.qty }} × {{ both(it.name, it.name_en) }}</b>
+            <span><span v-if="packOrder.items.some(x => x.basket > 1)" class="tag info" style="margin-inline-end:4px">{{ t('basket_short', { n: it.basket }) }}</span><b>{{ it.qty }} × {{ both(it.name, it.name_en) }}</b>
               <span v-if="it.options.length" class="small muted"><br />{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</span>
               <span v-if="it.note" class="small bold" style="color:var(--warn)"><br />{{ t('note') }}: {{ it.note }}</span></span>
           </label>

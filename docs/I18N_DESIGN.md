@@ -313,3 +313,12 @@ content_translations
 - Google Cloud Translation 价格：<https://cloud.google.com/translate/pricing>
 - DeepL 新增越南语、泰语：<https://www.deepl.com/en/blog/vietnamese-thai-hebrew-launch>；支持的语言：<https://developers.deepl.com/docs/getting-started/supported-languages>
 - Claude 模型价格：Anthropic 官方价格表（2026-11）
+
+## 14. 实现时的调整
+
+- **第 1 批**
+  - 简体中文在代码里的语言代码仍是 `zh`（和原来一样，老链接、老数据不用改），其他代码同第 3 节。
+  - 第 5.2 节说“服务器读 cookie 写好 `<html lang dir>`”：线上首页由 Nginx 直接发出，Go 碰不到。改成首页 `<head>` 里一段很小的脚本，在页面画出来之前读 `?lang=`、cookie、浏览器语言，写好 `lang`、`dir`，效果一样（不闪、阿拉伯文不跳），Nginx 和 Go 两种部署都适用。
+  - 原来存在浏览器 `localStorage` 里的“中文 / EN”选择，第一次打开时自动转成 cookie。
+  - 界面文字：中文、英文仍写在代码里；其余 10 种语言在 `web/src/locales/<代码>.json`，只下载当前语言那一个。繁体中文由 `npm run i18n zh-Hant` 从简体自动转换（OpenCC，台湾用词）。`npm test` 会检查每种语言是否齐全、`{占位符}` 是否和英文一致，新加界面文字时要同时补上各语言。
+  - 平台后台（`/admin`）里，非中英文的访问者看英文，页面方向也保持从左往右。
