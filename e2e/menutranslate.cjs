@@ -54,6 +54,9 @@ const own = watch(await (await browser.newContext({ viewport: { width: 1280, hei
 await signIn(own, 'owner2')
 await own.goto(BASE + '/merchant/menu')
 await own.waitForSelector(tid('open-langs'))
+// start over from an earlier run: hand the Thai name back to the service
+const reset = await own.request.put(BASE + '/api/v1/merchant/branches/2/translations', { headers: { 'X-Requested-With': 'waimai-web' }, data: { entity: 'item', entity_id: 11, field: 'name', lang: 'th', text: '' } })
+expect(reset.ok(), 'resetting the Thai name: ' + reset.status())
 // any save asks for a translation; this one changes nothing
 const r = await own.request.put(BASE + '/api/v1/merchant/branches/2/menu-langs', { headers: { 'X-Requested-With': 'waimai-web' }, data: { menu_lang: 'zh', menu_langs_off: [] } })
 expect(r.ok(), 'saving the menu language: ' + r.status())
