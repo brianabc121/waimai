@@ -199,7 +199,4 @@ async function runTrial() {
 
 <style scoped>
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: center; }
-.subtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
-.subtabs button { border: 0; background: none; padding: 9px 16px; font: inherit; font-weight: 600; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; }
-.subtabs button.on { color: var(--brand-dark, var(--brand)); border-bottom-color: var(--brand); }
 </style>

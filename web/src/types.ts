@@ -156,3 +156,22 @@ export interface CouponBatch {
 export interface ClaimableCoupon { id: number; kind: CouponKind; name: string; name_en: string; value: number; threshold: number; valid_days: number; claimed: boolean; gone: boolean }
 export interface CouponCountry { country_code: string; country: string; currency: string; stores: number; provinces: string[] }
 export interface PlatformCouponSummary { currency: string; month_spent: number; month_orders: number; open_count: number; open_value: number }
+export interface BillDiscount extends OrderDiscount { source: string }
+export interface BillOrder {
+  id: number; public_no: string; created_at: string; service_type: string; state: 'completed' | 'cancelled' | 'failed' | 'open'
+  food: number; delivery_fee: number; promotion: number; store_free: number; store_threshold: number; store_delivery: number
+  platform_free: number; paid: number; takings: number; discounts: BillDiscount[]
+}
+export interface BillList { timezone: string; from: string; to: string; currency: string; orders: BillOrder[]; sum: BillOrder; count: number; shown: number }
+export interface Settlement {
+  id: number; branch_id: number; store_name: string; store_slug: string; month: string; currency: string; orders: number; amount: number
+  status: 'pending' | 'paid'; paid_on: string | null; transfer_ref: string; paid_at: string | null
+}
+export interface BillSummary {
+  from: string; to: string; currency: string; orders: number; cancelled: number; food: number; merchant_discount: number
+  platform_discount: number; paid: number; takings: number
+  kinds: { kind: 'promotion' | CouponKind; funded_by: 'store' | 'platform'; orders: number; amount: number }[]
+  repurchase: { issued: number; used: number; sales: number }
+  days: { day: string; orders: number; food: number; discount: number; paid: number; takings: number }[]
+  settlements: Settlement[]
+}
