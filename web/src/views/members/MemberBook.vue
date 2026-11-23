@@ -3,7 +3,7 @@
 // store's members on the platform (admin). Opens a member's details and
 // order history, and edits their details.
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ApiError, get, put } from '../../api'
+import { ApiError, del, get, put } from '../../api'
 import { has, money, t } from '../../i18n'
 import { session } from '../../session'
 import '../manualStrings'
@@ -18,7 +18,9 @@ interface Member {
   expires_at: string | null; created_at: string
   branch_id: number; branch_name: string; merchant_name: string; currency: string; orders: number; spent: number; last_at: string | null
   stats?: Stats
+  address_count: number; addresses?: Address[]
 }
+interface Address { id: number; line: string; unit: string; note: string; lat: number | null; lng: number | null; uses: number; last_used_at: string; current: boolean }
 interface MemberOrder {
   id: number; public_no: string; created_at: string; channel: string; order_source: string; service_type: string
   acceptance_status: string; fulfillment_status: string; total: number; currency: string; items: string; address_line: string; linked: boolean
@@ -100,7 +102,17 @@ async function loadOrders() {
 }
 function ordersGo(p: number) { open.page = p; void loadOrders().catch(e => { open.error = errText(e) }) }
 const orderPages = computed(() => Math.max(1, Math.ceil(open.total / 10)))
-const mapLink = (m: Member) => `https://www.google.com/maps/search/?api=1&query=${m.lat},${m.lng}`
+const mapLink = (m: { lat: number | null; lng: number | null }) => `https://www.google.com/maps/search/?api=1&query=${m.lat},${m.lng}`
+async function dropAddress(a: Address) {
+  const m = open.m
+  if (!m || !confirm(t('sm.a.delete_confirm', { s: [a.line, a.unit].filter(Boolean).join(' · ') }))) return
+  try {
+    await del(`${memberPath(m)}/addresses/${a.id}`)
+    m.addresses = (m.addresses ?? []).filter(x => x.id !== a.id)
+    const row = list.items.find(x => x.id === m.id)
+    if (row) row.address_count = Math.max(0, row.address_count - 1)
+  } catch (e) { open.error = errText(e) }
+}
 function orderState(o: MemberOrder) {
   if (o.acceptance_status !== 'accepted') return t('a.' + o.acceptance_status)
   return has('f.' + o.fulfillment_status) ? t('f.' + o.fulfillment_status) : t('a.accepted')
@@ -181,7 +193,7 @@ async function save() {
             <td class="nowrap">{{ m.phone || '—' }}</td>
             <td>{{ srcText(m.source) }}<span v-if="m.contact" class="muted small"> · {{ m.contact }}</span></td>
             <td v-if="admin"><a href="#" @click.prevent="onlyStore(m.branch_id)">{{ m.branch_name }}</a><div v-if="m.merchant_name !== m.branch_name" class="muted small">{{ m.merchant_name }}</div></td>
-            <td class="mb-addr">{{ address(m) || '—' }}</td>
+            <td class="mb-addr">{{ address(m) || '—' }}<span v-if="m.address_count > 1" class="tag" :title="t('sm.a.more_title')">{{ t('sm.a.more', { n: m.address_count - 1 }) }}</span></td>
             <td class="num">{{ m.orders }}</td>
             <td class="num nowrap">{{ money(m.spent, m.currency) }}</td>
             <td class="nowrap">{{ m.last_at ? when(m.last_at) : t('sm.never') }}</td>
@@ -216,14 +228,28 @@ async function save() {
             <dt>{{ t('sm.col.phone') }}</dt><dd>{{ open.m.phone || '—' }}</dd>
             <dt>{{ t('sm.col.source') }}</dt><dd>{{ srcText(open.m.source) }}</dd>
             <template v-if="open.m.contact"><dt>{{ t('sm.d.contact') }}</dt><dd>{{ open.m.contact }}</dd></template>
-            <dt>{{ t('sm.col.address') }}</dt>
-            <dd>{{ address(open.m) || '—' }}<template v-if="open.m.address_note"><br /><span class="muted small">{{ open.m.address_note }}</span></template>
-              <template v-if="open.m.address_line"><br />
-                <a v-if="open.m.lat != null" :href="mapLink(open.m)" target="_blank" rel="noopener" class="small">{{ t('sm.d.map') }}</a>
-                <span v-else class="muted small">{{ t('sm.d.no_pin') }}</span></template></dd>
             <template v-if="open.m.note"><dt>{{ t('sm.d.note') }}</dt><dd class="pre">{{ open.m.note }}</dd></template>
             <dt>{{ t('sm.col.joined') }}</dt><dd>{{ day(open.m.created_at) }}</dd>
           </dl>
+
+          <h3>{{ t('sm.a.title', { n: open.m.addresses?.length ?? 0 }) }}</h3>
+          <div v-if="!open.m.addresses?.length" class="muted small">—</div>
+          <div v-else class="mb-addrs" data-testid="member-addr-list">
+            <div v-for="a in open.m.addresses" :key="a.id" class="mb-addr-item" :class="{ cur: a.current }" data-testid="member-addr-item">
+              <div class="row wrap small">
+                <b class="grow">{{ [a.line, a.unit].filter(Boolean).join(' · ') }}</b>
+                <span v-if="a.current" class="tag brand">{{ t('sm.a.current') }}</span>
+                <button v-else class="btn small" data-testid="member-address-delete" @click="dropAddress(a)">{{ t('sm.a.delete') }}</button>
+              </div>
+              <div v-if="a.note" class="small muted">{{ a.note }}</div>
+              <div class="row wrap small muted">
+                <span>{{ a.uses ? t('sm.a.uses', { n: a.uses }) : t('sm.a.saved') }}</span><span>· {{ day(a.last_used_at) }}</span>
+                <a v-if="a.lat != null" :href="mapLink(a)" target="_blank" rel="noopener">{{ t('sm.d.map') }}</a>
+                <span v-else>{{ t('sm.d.no_pin') }}</span>
+              </div>
+            </div>
+            <p class="muted small">{{ t('sm.a.hint') }}</p>
+          </div>
 
           <template v-if="open.m.stats">
             <h3>{{ t('sm.d.stats') }}</h3>
@@ -330,7 +356,10 @@ td .tag { white-space: nowrap; }
 .mb-stats > div { background: var(--bg); border-radius: 10px; padding: 8px 10px; display: grid; gap: 2px; min-width: 0; }
 .mb-stats b { font-size: 16px; overflow-wrap: anywhere; }
 .mb-stats span { font-size: 12px; color: var(--muted); }
-.mb-orders { display: grid; gap: 8px; }
+.mb-orders, .mb-addrs { display: grid; gap: 8px; }
+.mb-addr-item { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: grid; gap: 3px; overflow-wrap: anywhere; }
+.mb-addr-item.cur { border-color: var(--brand); background: var(--brand-soft); }
+.mb-addr .tag { margin-inline-start: 6px; }
 .mb-order { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: grid; gap: 4px; }
 .mb-items { color: #3f4650; overflow-wrap: anywhere; }
 .mb-two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }

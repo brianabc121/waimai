@@ -15,6 +15,7 @@ func (s *Server) memberRoutes(auth *gin.RouterGroup) {
 	auth.GET("/merchant/branches/:bid/members/:no", s.getMember)
 	auth.GET("/merchant/branches/:bid/members/:no/orders", s.memberOrders)
 	auth.GET("/merchant/branches/:bid/member-list", s.listMembers)
+	auth.DELETE("/merchant/branches/:bid/members/:no/addresses/:aid", s.deleteMemberAddress)
 	auth.PUT("/merchant/branches/:bid/members/:no", s.saveMember)
 	auth.GET("/merchant/branches/:bid/address-hints", s.addressHints)
 	auth.POST("/merchant/branches/:bid/staff-quotes", s.staffQuote)
@@ -158,4 +159,34 @@ func (s *Server) adminSaveMember(c *gin.Context) {
 	}
 	m, err := s.App.AdminSaveMember(c, adminActor(c), id, in)
 	reply(c, m, err)
+}
+
+func (s *Server) deleteMemberAddress(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	no, ok := memberNo(c)
+	if !ok {
+		return
+	}
+	aid, ok := idParam(c, "aid")
+	if !ok {
+		return
+	}
+	id, err := s.App.MemberIDByNo(c, bid, no)
+	if err == nil {
+		err = s.App.DeleteMemberAddress(c, id, aid)
+	}
+	reply(c, gin.H{"ok": true}, err)
+}
+
+func (s *Server) adminDeleteMemberAddress(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	if aid, ok := idParam(c, "aid"); ok {
+		reply(c, gin.H{"ok": true}, s.App.DeleteMemberAddress(c, id, aid))
+	}
 }

@@ -276,7 +276,7 @@ func upsertMember(ctx context.Context, tx pgx.Tx, branchID, staffID int64, in Me
 			return nil, err
 		}
 	}
-	return scanMember(tx.QueryRow(ctx, `INSERT INTO store_members (branch_id, member_no, status, phone, name, source,
+	m, err := scanMember(tx.QueryRow(ctx, `INSERT INTO store_members (branch_id, member_no, status, phone, name, source,
 			contact, address_line, address_unit, address_note, lat, lng, note, created_by)
 		VALUES ($1,$2,'active',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13, 0))
 		ON CONFLICT (branch_id, member_no) DO UPDATE SET status='active', expires_at=NULL, phone=EXCLUDED.phone,
@@ -286,6 +286,13 @@ func upsertMember(ctx context.Context, tx pgx.Tx, branchID, staffID int64, in Me
 			updated_at=now()
 		RETURNING `+memberCols, branchID, in.No, in.Phone, in.Name, in.Source, in.Contact, in.AddressLine,
 		in.AddressUnit, in.AddressNote, in.Lat, in.Lng, in.Note, staffID))
+	if err != nil {
+		return nil, err
+	}
+	if err := keepMemberAddress(ctx, tx, m, false); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // AddressHint is an address the store has delivered to before, offered while
@@ -323,6 +330,10 @@ func (a *App) AddressHints(ctx context.Context, branchID int64, q, phone string)
 				SELECT address_line, address_unit, address_note, lat, lng, ($3 <> '' AND phone = $3), updated_at
 				FROM store_members WHERE branch_id=$1 AND address_line <> '' AND `+liveMember+`
 					AND ($2 = '' OR address_line ILIKE '%' || $2 || '%')
+				UNION ALL
+				SELECT a.address_line, a.address_unit, a.address_note, a.lat, a.lng, ($3 <> '' AND m.phone = $3), a.last_used_at
+				FROM store_member_addresses a JOIN store_members m ON m.id = a.member_id
+				WHERE m.branch_id=$1 AND `+liveMember+` AND ($2 = '' OR a.address_line ILIKE '%' || $2 || '%')
 			) x WHERE $2 <> '' OR mine
 			ORDER BY lower(line), mine DESC, at DESC
 		) y ORDER BY mine DESC, at DESC LIMIT 8`, branchID, q, phone)
@@ -538,6 +549,11 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 		if _, err := tx.Exec(ctx, `UPDATE orders o SET customer_id = c.id FROM customers c WHERE o.id=$1 AND c.phone=$2`,
 			orderID, phone); err != nil {
 			return wrap("link customer", err)
+		}
+		if cur.ServiceType == "delivery" {
+			if err := keepMemberAddress(ctx, tx, m, true); err != nil {
+				return err
+			}
 		}
 		if t.PromotionID != 0 {
 			if err := claimPromotion(ctx, tx, b.ID, t.PromotionID, orderID, phone, t.PromotionDiscount); err != nil {

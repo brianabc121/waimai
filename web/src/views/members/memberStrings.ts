@@ -33,4 +33,9 @@ extend({
   'sm.d.by_phone_hint': ['标着“同号码”的是用这个电话自己下的单，也算进消费次数。', 'Orders marked "Same phone" were placed with this phone number and count too.'],
   'sm.o.self': ['顾客下单', 'By customer'],
   'sm.addr_changed': ['地址改了，原来的地图定位会清掉，下次代客下单时再定位。', 'The address changed, so its map pin is cleared. Pin it again on the next order.'],
+  'sm.a.title': ['收货地址（{n}）', 'Addresses ({n})'], 'sm.a.current': ['当前', 'Current'], 'sm.a.delete': ['删除', 'Delete'],
+  'sm.a.delete_confirm': ['删除地址“{s}”？', 'Delete the address "{s}"?'],
+  'sm.a.uses': ['送过 {n} 次', 'Delivered {n}×'], 'sm.a.saved': ['店员保存', 'Saved by staff'],
+  'sm.a.more': ['+{n} 个', '+{n}'], 'sm.a.more_title': ['还有别的收货地址，点详情查看', 'More addresses: open the details'],
+  'sm.a.hint': ['每次代客下单或保存资料时，新地址会自动存进来，重复的不会再存。代客下单输入地址时会优先列出这些地址。', 'Every new address used for an order or saved for the member is kept here, once. They come first when typing an address for this member.'],
 })

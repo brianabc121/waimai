@@ -2275,5 +2275,14 @@
  "sm.d.by_phone": "Mismo teléfono",
  "sm.d.by_phone_hint": "Los pedidos marcados «Mismo teléfono» se hicieron con este número y también cuentan.",
  "sm.o.self": "Del cliente",
- "sm.addr_changed": "La dirección cambió, así que se borra su punto en el mapa. Vuelve a marcarlo en el próximo pedido."
+ "sm.addr_changed": "La dirección cambió, así que se borra su punto en el mapa. Vuelve a marcarlo en el próximo pedido.",
+ "sm.a.title": "Direcciones ({n})",
+ "sm.a.current": "Actual",
+ "sm.a.delete": "Eliminar",
+ "sm.a.delete_confirm": "¿Eliminar la dirección «{s}»?",
+ "sm.a.uses": "Entregado {n} veces",
+ "sm.a.saved": "Guardada por el personal",
+ "sm.a.more": "+{n}",
+ "sm.a.more_title": "Hay más direcciones: abre los detalles",
+ "sm.a.hint": "Cada dirección nueva usada en un pedido o guardada para el miembro se conserva aquí, una sola vez. Aparecen primero al escribir una dirección para este miembro."
 }

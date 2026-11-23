@@ -85,6 +85,16 @@ await page.waitForFunction(() => document.querySelector('[data-testid=member-det
 expect(await page.locator(tid('member-detail')).innerText().then(s => s.includes('还没在地图上定位')), true, 'the old pin is cleared')
 await page.waitForFunction(n => document.querySelector(`[data-member="${n}"]`)?.textContent.includes('Lina K'), lina.no)
 step('editing saves and the list follows')
+// both addresses are kept: the new one is current, the old one can go
+await page.waitForFunction(() => document.querySelectorAll('[data-testid=member-addr-item]').length === 2)
+expect((await page.locator('[data-testid=member-addr-item].cur').innerText()).includes('88 Ayala Ave'), true, 'the new address is current')
+expect((await page.locator(`[data-member="${lina.no}"] .mb-addr .tag`).innerText()).trim(), '+1 个', 'the list says there is one more address')
+step('a member keeps every address, the latest current')
+await page.screenshot({ path: `${SHOTS}/members-08-addresses-pc.png` })
+page.once('dialog', d => d.accept())
+await page.click(tid('member-address-delete'))
+await page.waitForFunction(() => document.querySelectorAll('[data-testid=member-addr-item]').length === 1)
+step('an old address can be deleted')
 await page.screenshot({ path: `${SHOTS}/members-02-store-detail-pc.png` })
 await page.locator(tid('member-detail')).locator('.sheet-foot .btn:not(.primary)').click()
 

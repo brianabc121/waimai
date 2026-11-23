@@ -2275,5 +2275,14 @@
  "sm.d.by_phone": "Cùng số",
  "sm.d.by_phone_hint": "Đơn ghi \"Cùng số\" là đơn khách tự đặt bằng số điện thoại này, cũng được tính vào.",
  "sm.o.self": "Khách tự đặt",
- "sm.addr_changed": "Địa chỉ đã đổi nên ghim cũ trên bản đồ sẽ bị xóa. Hãy ghim lại ở lần đặt hộ sau."
+ "sm.addr_changed": "Địa chỉ đã đổi nên ghim cũ trên bản đồ sẽ bị xóa. Hãy ghim lại ở lần đặt hộ sau.",
+ "sm.a.title": "Địa chỉ giao hàng ({n})",
+ "sm.a.current": "Hiện tại",
+ "sm.a.delete": "Xóa",
+ "sm.a.delete_confirm": "Xóa địa chỉ \"{s}\"?",
+ "sm.a.uses": "Đã giao {n} lần",
+ "sm.a.saved": "Nhân viên lưu",
+ "sm.a.more": "+{n}",
+ "sm.a.more_title": "Còn địa chỉ khác, mở chi tiết để xem",
+ "sm.a.hint": "Mỗi địa chỉ mới dùng khi đặt hộ hoặc lưu thông tin đều được giữ ở đây, trùng thì không lưu lại. Khi nhập địa chỉ cho hội viên này, chúng hiện lên trước."
 }

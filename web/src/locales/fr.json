@@ -2275,5 +2275,14 @@
  "sm.d.by_phone": "Même numéro",
  "sm.d.by_phone_hint": "Les commandes marquées « Même numéro » ont été passées avec ce numéro et comptent aussi.",
  "sm.o.self": "Par le client",
- "sm.addr_changed": "L’adresse a changé : son repère sur la carte est effacé. Replacez-le à la prochaine commande."
+ "sm.addr_changed": "L’adresse a changé : son repère sur la carte est effacé. Replacez-le à la prochaine commande.",
+ "sm.a.title": "Adresses ({n})",
+ "sm.a.current": "Actuelle",
+ "sm.a.delete": "Supprimer",
+ "sm.a.delete_confirm": "Supprimer l’adresse « {s} » ?",
+ "sm.a.uses": "Livrée {n} fois",
+ "sm.a.saved": "Enregistrée par l’équipe",
+ "sm.a.more": "+{n}",
+ "sm.a.more_title": "D’autres adresses : ouvrez les détails",
+ "sm.a.hint": "Chaque nouvelle adresse utilisée pour une commande ou enregistrée pour le membre est gardée ici, une seule fois. Elles s’affichent en premier quand vous tapez une adresse pour ce membre."
 }
