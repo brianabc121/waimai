@@ -93,7 +93,7 @@ async function saved() { form.open = false; await load() }
       <table class="data">
         <tbody>
           <tr v-for="it in c.items" :key="it.id">
-            <td><b>{{ it.name }}</b><div class="muted small">{{ it.name_en }}</div></td>
+            <td><span v-if="it.code" class="tag brand" style="margin-inline-end:6px" data-testid="item-code-tag">{{ it.code }}</span><b>{{ it.name }}</b><div class="muted small">{{ it.name_en }}</div></td>
             <td class="price">{{ money(it.price, cur) }}</td>
             <td>
               <span class="tag" :class="it.published ? 'ok' : ''">{{ it.published ? t('published') : t('draft') }}</span>

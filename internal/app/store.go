@@ -226,8 +226,10 @@ type OptionGroup struct {
 }
 
 type Item struct {
-	ID                int64         `json:"id"`
-	CategoryID        int64         `json:"category_id"`
+	ID         int64 `json:"id"`
+	CategoryID int64 `json:"category_id"`
+	// Code is the short code staff type to find the dish (B1); may be empty.
+	Code              string        `json:"code"`
 	Name              string        `json:"name"`
 	NameEn            string        `json:"name_en"`
 	Description       string        `json:"description"`
@@ -313,7 +315,7 @@ func loadZones(ctx context.Context, q Querier, branchID int64, activeOnly bool) 
 // groups. publishedOnly hides drafts (customer view).
 func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly bool) ([]*Item, error) {
 	rows, err := q.Query(ctx, `SELECT id, category_id, name, name_en, description, image_url, price, published,
-		sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort, station_id, photos, details, dine_in_available
+		sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort, station_id, photos, details, dine_in_available, code
 		FROM menu_items WHERE branch_id=$1 AND NOT archived AND (published OR NOT $2) ORDER BY sort, id`,
 		branchID, publishedOnly)
 	if err != nil {
@@ -325,7 +327,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 		it := &Item{Groups: []OptionGroup{}}
 		if err := rows.Scan(&it.ID, &it.CategoryID, &it.Name, &it.NameEn, &it.Description, &it.ImageURL,
 			&it.Price, &it.Published, &it.SoldOut, &it.StockQty, &it.NeedsPrep, &it.DeliveryAvailable,
-			&it.PickupAvailable, &it.Sort, &it.StationID, &it.Photos, &it.Details, &it.DineInAvailable); err != nil {
+			&it.PickupAvailable, &it.Sort, &it.StationID, &it.Photos, &it.Details, &it.DineInAvailable, &it.Code); err != nil {
 			rows.Close()
 			return nil, err
 		}

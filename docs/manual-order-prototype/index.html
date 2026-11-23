@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>代客下单 v0.2 · 原型</title>
+<link rel="stylesheet" href="pos.css">
+</head>
+<body>
+<!-- 原型 v0.2：按 brian 旧系统（foodsir 订单下单页面）的布局重做。数据都是示意。方案见 MANUAL_ORDER_DESIGN.md。v0.1 在 v1/ -->
+<section id="s1"></section>
+<section id="s2"></section>
+<section id="s3"></section>
+<section id="s4"></section>
+
+<script>
+const IMG = '../../web/public/demo/'
+const topbar = (src = '微信') => `
+  <div class="top">
+    <span class="back">‹ 订单</span>
+    <h1>代客下单</h1><span class="store">马卡蒂小馆</span>
+    <span class="sp"></span>
+    <span class="seg2"><span class="on">午市</span><span>晚市</span></span>
+    <span class="row" style="color:#d1d5db">待接单 <span class="pill-num">3</span></span>
+    <span class="busy">出餐正常 ▾</span>
+    <span class="btn ghost">店长 owner1</span>
+  </div>`
+
+const ROWS = [
+  { code: 'B1', name: '卤肉饭', q: 2, p: 159, note: '' },
+  { code: 'A1', name: '盐酥鸡', spec: '小辣', q: 1, p: 169, note: '' },
+  { code: 'B2', name: '牛肉面', spec: '大碗', q: 1, p: 249, note: '少辣，不要香菜', sel: true,
+    addons: [['+ 加面', 1, 30], ['+ 加牛肉', 2, 120], ['+ 加卤蛋', 1, 15]] },
+  { code: 'D1', name: '冰柠檬茶', q: 2, p: 69, note: '少冰' },
+]
+const table = (rows, foot) => `
+  <div class="order">
+    <div class="thead"><span>编号</span><span>商品</span><span class="c">数量</span><span class="r">单价</span><span class="r">小计</span><span>备注</span><span class="r">操作</span></div>
+    <div class="rows">
+      ${rows.map((r, i) => `
+        <div class="tr ${r.sel ? 'sel' : ''}">
+          <span class="no">${i + 1}</span>
+          <span class="name"><span class="code">${r.code}</span><b>${r.name}</b>${r.spec ? `<span class="spec">${r.spec}</span>` : ''}</span>
+          <span class="c"><span class="qty"><i>−</i>${r.q}<i class="f">+</i></span></span>
+          <span class="r">₱${r.p}</span><span class="r b">₱${r.p * r.q}</span>
+          <span class="note-in ${r.note ? '' : 'empty'}">${r.note || '口味备注'}</span>
+          <span class="ops"><i title="复制一份">⧉</i><i class="del" title="删除">✕</i></span>
+        </div>
+        ${r.addons ? `<div class="tr sub"><span></span><div class="addons">
+          ${r.addons.map(a => `<div class="addon"><span>${a[0]}</span><span class="qty sm"><i>−</i>${a[1]}<i class="f">+</i></span><span class="r">₱${a[2]}</span></div>`).join('')}
+          <span class="addon-add">＋ 输入编号或名称加料（加面、加蛋、加肉…）</span>
+        </div></div>` : ''}`).join('')}
+    </div>
+    ${foot}
+  </div>`
+
+const foot = ({ n, fee, deal, pack, total, id, phone, addr, name, src = '微信' }) => `
+  <div class="foot">
+    <div class="tot">
+      <span><span class="k">数量</span><b style="font-size:17px">${n}</b></span>
+      <span><span class="k">包装费</span>${pack}</span>
+      <span><span class="k">配送费</span>${fee}</span>
+      <span><span class="k">优惠</span>${deal}</span>
+      <span><span class="k">总计</span><b>${total}</b></span>
+      <span class="sp" style="flex:1"></span>
+      <span class="btn copy">复制订单</span>
+    </div>
+    <div class="cust">
+      <span>会员 / Member</span><span>${id}</span>
+      <span>称呼 / Name</span><span>${name}</span>
+      <span>来源 / Source</span><span>${src}</span>
+      <span>电话 / Phone</span><span>${phone}</span>
+      <span>地址 / Address</span><span>${addr}</span>
+    </div>
+  </div>`
+
+const queue = () => `
+  <div class="queue">
+    <h3>待打印订单 <span class="pill-num">2</span></h3>
+    <div class="qi"><b>W-0108</b><span>配送 · 李小红 · ₱297</span><span class="muted">21:48 顾客下单</span></div>
+    <div class="qi"><b>W-0107</b><span>自取 · 王先生 · ₱258</span><span class="muted">21:30 代客 · 电话</span></div>
+    <h3 style="margin-top:8px">最近代客单</h3>
+    <div class="qi"><b>W-0105</b><span>陈小姐 · ₱615</span><span class="muted">20:12 · 已送达</span></div>
+    <div class="qi"><b>W-0101</b><span>Mark T. · ₱438</span><span class="muted">19:40 · 配送中</span></div>
+    <div class="qi"><b>W-0098</b><span>林先生 · ₱1,206</span><span class="muted">18:55 · 已送达</span></div>
+  </div>`
+
+// 右侧面板。opt.member: 老顾客；opt.newMember: 新号码
+const SRC = (on) => `<div class="srcs">${['微信', 'LINE', 'WhatsApp', '电话', '其他'].map(x => `<span class="${x === on ? 'on' : ''}">${x}</span>`).join('')}</div>`
+const panel = (o) => `
+  <div class="panel">
+    <div class="pscroll">
+      <div class="sec" ${o.idDrop ? 'style="position:relative"' : ''}><span class="k">会员ID</span>
+        <div class="inp ${o.idFocus ? 'focus' : ''}" style="max-width:150px;font-weight:700;font-size:15px">${o.id}${o.idFocus ? '<span style="border-left:2px solid var(--brand);height:18px"></span>' : ''}</div>
+        <span class="btn">🔍 查找</span><span class="grow"></span><span class="btn primary">＋ 新增会员</span>
+        ${o.idDrop || ''}
+      </div>
+      ${o.member ? `
+      <div class="memberbox">
+        <div class="row between"><span class="row"><b>陈小姐</b><span class="tag gold">VIP 金卡</span><span class="tag ok">已找到会员</span></span><span class="btn" style="padding:3px 10px">修改会员信息</span></div>
+        <div class="stats"><span class="k">消费次数</span><span>本周 <b>2</b></span><span>本月 <b>6</b></span><span>近三月 <b>14</b></span><span class="muted small">共 ₱8,920</span></div>
+        <div class="muted small">上次 11-18 · 常点：卤肉饭、牛肉面、冰柠檬茶 · <span style="color:var(--brand-dark);font-weight:600">再来一单</span></div>
+      </div>` : o.temp ? `
+      <div class="memberbox" style="background:#fffaf0;border-color:#f3d9a4">
+        <div class="row between"><span class="row"><b>#052304</b><span class="tag warn">临时会员</span></span><span class="muted small">⏱ 58 分钟内不补资料会自动回收</span></div>
+        <div class="muted small">新会员号已占用。填好带 * 的资料后，点“保存会员资料”，或者直接下单（下单时一起保存）。</div>
+      </div>` : `
+      <div class="memberbox"><div class="muted small">输入会员ID查找本店会员，或者点“新增会员”拿一个新会员号。</div></div>`}
+      <div class="sec"><span class="k">电话 <i class="req">*</i></span><div class="inp"><span class="cc">+63</span>${o.phone}</div></div>
+      <div class="sec"><span class="k">称呼</span><div class="inp ${o.name ? '' : 'ph'}">${o.name || '请输入称呼（选填）'}</div></div>
+      <div class="sec"><span class="k">客户来源 <i class="req">*</i></span>${SRC(o.src)}</div>
+      <div class="sec"><span class="k">联系账号</span><div class="inp ${o.contact ? '' : 'ph'}">${o.contact || '微信号 / LINE ID（选填）'}</div></div>
+      <div class="sec"><span class="k">地址 <i class="req">*</i></span>
+        <div class="btnrow"><span class="btn blue">📍 打开谷歌地图</span><span class="btn blue">配送费调整</span><span class="btn blue">到店自取</span><span class="btn blue">话术</span></div>
+      </div>
+      <div class="sec"><span class="k"></span>
+        <div class="chips">区域 ${o.member ? '<span class="tag bad">Pasay-Area1</span>' : '<span class="tag">未知</span>'}
+          配送费 ${o.member ? '<span class="tag">₱49</span>' : '<span class="tag">未知</span>'}
+          满减 ${o.member ? '<span class="tag bad">满₱500 免配送费</span>' : '<span class="tag">未知</span>'}</div>
+      </div>
+      <div class="sec" ${o.addrDrop ? 'style="position:relative"' : ''}><span class="k kt"></span>
+        <div class="inp ta ${o.addrFocus ? 'focus' : ''}">${o.addr}</div>
+        ${o.addrDrop || ''}
+      </div>
+      <div class="sec"><span class="k">会员备注</span><div class="inp ${o.member ? '' : 'ph'}">${o.member ? '不吃香菜；到楼下打电话' : '只有店员看得到'}</div></div>
+      ${o.temp ? '<div class="sec"><span class="k"></span><span class="btn" style="flex:1">保存会员资料（先不下单）</span></div>' : ''}
+      <div class="sec"><span class="k">送达</span><div class="inp">${o.member ? '预约 今天 20:30' : '尽快送达'} ▾</div><span class="k" style="width:auto">备餐</span><div class="inp" style="max-width:96px">${o.member ? '20:00 开做' : '马上'}</div></div>
+      <div class="sec"><span class="k">付款</span><div class="inp">货到付款 ▾</div><span class="k" style="width:auto">锁单</span><div class="inp" style="max-width:96px">${o.member ? '🔒 已锁' : '不锁'}</div></div>
+      <div class="sec pick"><span class="k" style="color:var(--brand-dark)">选择商品</span><div class="inp">${o.pick}<span style="border-left:2px solid var(--brand);height:18px"></span></div>
+        ${o.pickDrop || ''}
+      </div>
+      <div class="muted small" style="padding-left:80px">输入编号（B1）、菜名或拼音首字母（lrf），↑↓ 选，回车加入</div>
+    </div>
+    <span class="btn primary confirm">确认下单 · ${o.total}</span>
+  </div>`
+
+const pickDrop = `
+  <div class="drop" style="left:80px;right:0;top:40px">
+    <div class="it on"><em>D1</em> 冰柠檬茶<span class="grow"></span>₱69</div>
+    <div class="it"><em>D2</em> 珍珠奶茶<span class="grow"></span>₱119</div>
+    <div class="it"><em>D3</em> 瓶装水<span class="grow"></span>₱30</div>
+    <div class="hint">回车加入“冰柠檬茶”· 有规格的菜会先弹规格</div>
+  </div>`
+
+const addrDrop = `
+  <div class="drop" style="left:80px;right:0;top:70px">
+    <div class="grp">这个号码用过的地址</div>
+    <div class="it">（没有）</div>
+    <div class="grp">本店顾客送过的地址</div>
+    <div class="it">2621 Zamora St <em>Pasay</em><span class="grow"></span><span class="tag bad">Pasay-Area1</span></div>
+    <div class="it">Bay Garden Banyan Tower <em>Pasay</em> City<span class="grow"></span><span class="tag bad">Pasay-Area2</span></div>
+    <div class="it">2443 Park Avenue <em>Pasay</em> City<span class="grow"></span><span class="tag bad">Pasay-Area1</span></div>
+    <div class="grp">谷歌地图搜索</div>
+    <div class="it">📍 <em>Pasay</em> 69 KTV, Roxas Blvd</div>
+    <div class="it">📍 Yujinn, <em>Pasay</em></div>
+    <div class="hint">选中后自动定位，带出区域、配送费和满减标准</div>
+  </div>`
+
+const huashu = `
+  <div class="huashu" style="left:820px;top:372px">
+    <div class="row between"><b>话术（点一下复制）</b><span class="muted small">设置里可以改</span></div>
+    <div class="it">您好，这里是马卡蒂小馆，请把要点的菜和地址发给我们 😊</div>
+    <div class="it">您这单已经满 ₱500，配送费给您免了 🎉 要不要再加杯饮料？</div>
+    <div class="it">今天的限量便当已经卖完了，推荐卤肉饭，一样好吃～</div>
+    <div class="it">订单已确认，大约 35 分钟送到，到了骑手会打电话给您。</div>
+  </div>`
+
+const FULL = foot({ n: 6, pack: '₱10', fee: '<s style="color:#9ca3af">₱49</s> Free', deal: '−₱20', total: '₱1,029', id: '052303 陈小姐（VIP 金卡）', name: '陈小姐', phone: '+63 917 555 2046', addr: '2621 Zamora St, Pasay · Pasay-Area1 · 预约 20:30' })
+const member = { member: true, id: '052303', name: '陈小姐', src: '微信', contact: 'chen_mky', phone: '917 555 2046', addr: '2621 Zamora St, Pasay<br><span class="muted small">Unit 3B，门口有保安</span>', pick: 'd', total: '₱1,029' }
+
+const page = (inner, extra = '') => `<div class="pc">${topbar()}<div class="body">${inner}</div>${extra}</div>`
+
+document.getElementById('s1').innerHTML = page(table(ROWS, FULL) + panel({ ...member, pickDrop }) + queue())
+
+document.getElementById('s2').innerHTML = page(
+  table([{ code: 'B2', name: '牛肉面', spec: '大碗', q: 1, p: 249, note: '', sel: true, addons: [['+ 加卤蛋', 1, 15]] }],
+    foot({ n: 1, pack: '₱5', fee: '未知', deal: '—', total: '₱269', id: '052304（临时会员）', name: 'Mark', src: 'WhatsApp', phone: '+63 945 220 1187', addr: '—' }))
+  + panel({ temp: true, id: '052304', phone: '945 220 1187', name: 'Mark', src: 'WhatsApp', contact: '', addr: 'pasay', addrFocus: true, addrDrop, pick: '', total: '₱269' }) + queue())
+
+const idDrop = `
+  <div class="drop" style="left:80px;width:340px;top:40px">
+    <div class="it on"><em>0523</em>03　陈小姐　+63 917 555 2046<span class="grow"></span><span class="tag gold">VIP</span></div>
+    <div class="it"><em>0523</em>11　林先生　+63 918 220 4410</div>
+    <div class="it"><em>0523</em>27　Mark T.　+63 927 118 0021</div>
+    <div class="hint">也可以输入电话号码或称呼查找 · 只查本店会员</div>
+  </div>`
+document.getElementById('s3').innerHTML = page(table(ROWS.slice(0, 2), foot({ n: 3, pack: '₱10', fee: '未知', deal: '−₱20', total: '₱477', id: '—', name: '—', src: '—', phone: '—', addr: '—' }))
+  + panel({ id: '0523', idFocus: true, idDrop, phone: '', addr: '', pick: '', total: '₱477' }) + queue())
+
+document.getElementById('s4').innerHTML = page(table(ROWS, FULL) + panel({ ...member, pick: '' }) + queue(), `
+  <div class="toast">✓ 订单 W-0109 已创建，确认消息已复制</div>
+  <div class="mask"><div class="modal">
+    <h2>订单 W-0109 已创建</h2>
+    <div class="muted">已接单，厨房 20:00 开做，20:30 前送达。下面的消息已经复制，到微信里粘贴发给顾客即可。</div>
+    <div class="copytext">【马卡蒂小馆】订单确认 W-0109<br>B1 卤肉饭 ×2　₱318<br>A1 盐酥鸡（小辣）×1　₱169<br>B2 牛肉面（大碗）×1　₱249<br>　+加面 ₱30 +加牛肉×2 ₱120 +加卤蛋 ₱15<br>D1 冰柠檬茶（少冰）×2　₱138<br>包装费 ₱10　满减 −₱20　配送费 Free<br><b>总计 ₱1,029　货到付款</b><br>地址：2621 Zamora St, Pasay（Unit 3B）<br>预计 20:30 前送达<br>进度：https://waimai.example/o/7Hk2…</div>
+    <div class="row" style="justify-content:flex-end;margin-top:14px"><span class="btn">打印小票</span><span class="btn">只复制链接</span><span class="btn">再复制一次</span><span class="btn primary">下一单（Enter）</span></div>
+  </div></div>`)
+</script>
+</body>
+</html>

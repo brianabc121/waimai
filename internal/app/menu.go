@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	"regexp"
 	"slices"
 	"strings"
@@ -88,6 +89,7 @@ type OptionGroupInput struct {
 
 type ItemInput struct {
 	CategoryID  int64  `json:"category_id"`
+	Code        string `json:"code"`
 	Name        string `json:"name"`
 	NameEn      string `json:"name_en"`
 	Description string `json:"description"`
@@ -124,6 +126,10 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 	}
 	if in.Price < 0 {
 		return 0, ErrValidation("price must not be negative")
+	}
+	in.Code = strings.ToUpper(strings.TrimSpace(in.Code))
+	if len([]rune(in.Code)) > 12 || strings.ContainsAny(in.Code, " \t") {
+		return 0, ErrValidation("the code must be at most 12 characters without spaces")
 	}
 	if in.StockQty != nil && *in.StockQty < 0 {
 		return 0, ErrValidation("stock_qty must not be negative")
@@ -170,6 +176,16 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 		if !ok {
 			return ErrValidation("category not found")
 		}
+		if in.Code != "" {
+			var taken string
+			err := tx.QueryRow(ctx, `SELECT name FROM menu_items WHERE branch_id=$1 AND upper(code)=$2 AND id<>$3 AND NOT archived LIMIT 1`,
+				branchID, in.Code, id).Scan(&taken)
+			if err == nil {
+				return ErrD(http.StatusConflict, "CODE_TAKEN", "another dish already has this code", map[string]any{"name": taken})
+			} else if !isNoRows(err) {
+				return err
+			}
+		}
 		if in.StationID != nil {
 			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM kitchen_stations WHERE id=$1 AND branch_id=$2 AND active)`,
 				*in.StationID, branchID).Scan(&ok); err != nil {
@@ -182,20 +198,20 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 		var err error
 		if id == 0 {
 			err = tx.QueryRow(ctx, `INSERT INTO menu_items (branch_id, category_id, name, name_en, description,
-				image_url, price, published, sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort, station_id, photos, details, dine_in_available)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,COALESCE($18, true)) RETURNING id`,
+				image_url, price, published, sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort, station_id, photos, details, dine_in_available, code)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,COALESCE($18, true),$19) RETURNING id`,
 				branchID, in.CategoryID, in.Name, in.NameEn, in.Description, in.ImageURL, in.Price, in.Published,
 				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort, in.StationID, photos, in.Details,
-				in.DineInAvailable).Scan(&id)
+				in.DineInAvailable, in.Code).Scan(&id)
 		} else {
 			err = tx.QueryRow(ctx, `UPDATE menu_items SET category_id=$3, name=$4, name_en=$5, description=$6,
 				image_url=$7, price=$8, published=$9, sold_out=$10, stock_qty=$11, needs_prep=$12,
 				delivery_available=$13, pickup_available=$14, sort=$15, station_id=$16, photos=$17, details=$18,
-				dine_in_available=COALESCE($19, dine_in_available), updated_at=now()
+				dine_in_available=COALESCE($19, dine_in_available), code=$20, updated_at=now()
 				WHERE id=$1 AND branch_id=$2 AND NOT archived RETURNING id`,
 				id, branchID, in.CategoryID, in.Name, in.NameEn, in.Description, in.ImageURL, in.Price, in.Published,
 				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort, in.StationID, photos, in.Details,
-				in.DineInAvailable).Scan(&id)
+				in.DineInAvailable, in.Code).Scan(&id)
 		}
 		if isNoRows(err) {
 			return ErrNotFound
@@ -718,6 +734,9 @@ func (a *App) Cleanup(ctx context.Context) error {
 		}
 	}
 	if err := a.forgetOldTripPaths(ctx); err != nil {
+		return err
+	}
+	if err := recycleMembers(ctx, a.DB, 0); err != nil {
 		return err
 	}
 	if _, err := a.RemindExpiringCoupons(ctx); err != nil {

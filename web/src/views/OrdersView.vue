@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ApiError, get, post } from '../api'
-import { both, minutesSince, money, reasonText, t, whenText } from '../i18n'
+import { both, has, minutesSince, money, reasonText, t, whenText } from '../i18n'
 import { useLive } from '../live'
 import { session } from '../session'
 import type { Order, RiderInfo } from '../types'
@@ -11,6 +11,9 @@ import './translateStrings'
 import '../orders'
 import TotalsTable from './TotalsTable.vue'
 import { chatEnabled } from '../chat'
+import './manualStrings'
+
+const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 
 // "message the customer" shows only where chat is set up
 const chatOn = ref(false)
@@ -137,7 +140,10 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
         <button :class="{ on: scope === 'active' }" @click="setScope('active')">{{ t('active') }}<span v-if="scope === 'active' && pendingCount"> · {{ pendingCount }}</span></button>
         <button :class="{ on: scope === 'history' }" @click="setScope('history')">{{ t('history') }}</button>
       </div>
-      <label class="check" style="margin:0"><input type="checkbox" :checked="sound" @change="toggleSound" />{{ t('new_order_sound') }}</label>
+      <div class="row wrap">
+        <label class="check" style="margin:0"><input type="checkbox" :checked="sound" @change="toggleSound" />{{ t('new_order_sound') }}</label>
+        <router-link class="btn primary small" to="/merchant/orders/new" data-testid="manual-order-new">{{ t('vo.new') }}</router-link>
+      </div>
     </div>
     <div v-if="textsPending" class="banner warn" style="margin-bottom:12px" data-testid="store-texts-banner">{{ t('mtr.store_banner', { n: textsPending }) }}
       <router-link to="/merchant/settings">{{ t('mtr.store_go') }}</router-link></div>
@@ -154,6 +160,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <span class="muted" v-if="scope === 'active'">{{ t('waiting') }} {{ waited(o) }} {{ t('min') }}</span>
           </div>
           <div class="row wrap" style="margin-top:8px;gap:6px">
+            <span v-if="o.order_source" class="tag info" data-testid="by-staff-tag">{{ t('vo.tag', { s: srcText(o.order_source) }) }}</span>
             <span class="tag brand" v-if="o.scheduled_for">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span>
             <span class="tag" :class="accTag(o.acceptance_status)">{{ t('a.' + o.acceptance_status) }}</span>
             <span v-if="unread(o)" class="tag bad" :data-unread="o.public_no">{{ t('rd.unread') }}</span>
@@ -208,6 +215,11 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <div v-if="selected.address_note" class="small">{{ t('address_note') }}: {{ selected.address_note }}</div>
             <div v-if="selected.address_photo" class="small" data-testid="door-photo">{{ t('oc.door_photo') }} <a :href="`/api/v1/merchant/orders/${selected.id}/address-photo`" target="_blank" rel="noopener">{{ t('oc.view') }}</a></div>
             <div v-if="selected.note" class="banner warn small" style="margin-top:6px">{{ t('order_note') }}: {{ selected.note }}</div>
+            <div v-if="selected.order_source" class="small" style="margin-top:6px" data-testid="by-staff">
+              <span class="tag info">{{ t('vo.tag', { s: srcText(selected.order_source) }) }}</span>
+              <template v-if="selected.member_no"> · {{ t('vo.member_no') }} <b>{{ String(selected.member_no).padStart(6, '0') }}</b></template>
+              <template v-if="selected.placed_by"> · {{ t('vo.placed_by') }} {{ selected.placed_by }}</template></div>
+            <div v-if="selected.staff_note" class="banner info small" style="margin-top:6px">{{ t('vo.d.staff_note') }}: {{ selected.staff_note }}</div>
           </div>
 
           <div class="stack" style="border-top:1px solid var(--line);padding-top:10px">

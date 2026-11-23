@@ -33,6 +33,8 @@ export interface Item {
   // How many were ordered so far; only the customer's store page gets it.
   sold?: number
   name_tr?: string; description_tr?: string; details_tr?: string
+  // a short code staff type to find the dish, such as B1
+  code?: string
 }
 export interface Category { id: number; name: string; name_en: string; sort: number; required?: boolean; items: Item[]; name_tr?: string }
 export interface Promotion {
@@ -66,7 +68,7 @@ export interface Totals {
   // the promotion's part (quotes only); the store's and the platform's parts of discount
   promotion_discount?: number; merchant_discount: number; platform_subsidy: number
 }
-export interface LineOption { group: string; group_en: string; name: string; name_en: string; price_delta: number; group_tr?: string; name_tr?: string }
+export interface LineOption { group: string; group_en: string; name: string; name_en: string; price_delta: number; group_tr?: string; name_tr?: string; qty?: number }
 export interface OrderItem {
   id: number; item_id: number; name: string; name_en: string; name_tr?: string; unit_price: number; qty: number; line_total: number
   options: LineOption[]; note: string; needs_prep: boolean; prep_status: string
@@ -108,7 +110,17 @@ export interface Order {
   aftersale: Aftersale | null; store?: OrderStore; completed_at?: string | null
   // the promotion and each coupon taken off; the coupon this order earned (customer page only)
   discounts?: OrderDiscount[]; gift?: CustomerCoupon | null
+  // orders placed by staff for a customer: the store member, where the customer asked, who placed it, a note for staff
+  member_no?: number | null; order_source?: string; placed_by?: string; staff_note?: string
 }
+// a customer of one store, kept by the store (orders placed for a customer)
+export interface StoreMember {
+  id: number; no: number; status: 'temp' | 'active'; phone: string; name: string; source: string; contact: string
+  address_line: string; address_unit: string; address_note: string; lat: number | null; lng: number | null; note: string
+  expires_at: string | null; created_at: string
+  stats?: { week: number; month: number; quarter: number; orders: number; spent: number; last_at: string | null; favorites: string[] }
+}
+export interface AddressHint { line: string; unit: string; note: string; lat: number | null; lng: number | null; mine: boolean; zone_name: string; fee: number | null }
 export interface TableDevice { id: number; name: string; paired: boolean; paired_at: string | null }
 export interface TableSummary { id: number; order_id: number; public_no: string; guests: number; opened_at: string; total: number; item_count: number; unserved: number }
 export interface DiningTable { id: number; name: string; qr_token: string; active: boolean; sort: number; session: TableSummary | null; devices: TableDevice[] }

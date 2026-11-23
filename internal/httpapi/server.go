@@ -439,6 +439,7 @@ func (s *Server) Router() *gin.Engine {
 	s.translationRoutes(auth, admin)
 	s.uiTextRoutes(api, admin)
 	s.chatAdminRoutes(auth, admin)
+	s.memberRoutes(auth)
 
 	s.static(r)
 	return r

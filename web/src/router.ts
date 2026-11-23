@@ -34,6 +34,7 @@ export const router = createRouter({
       children: [
         { path: '', redirect: '/merchant/orders' },
         { path: 'orders', component: () => import('./views/OrdersView.vue') },
+        { path: 'orders/new', component: () => import('./views/ManualOrderView.vue') },
         { path: 'tables', component: () => import('./views/TablesView.vue') },
         { path: 'messages', component: () => import('./views/MessagesView.vue') },
         { path: 'support', component: () => import('./views/SupportDesk.vue') },

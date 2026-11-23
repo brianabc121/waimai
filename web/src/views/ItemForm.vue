@@ -3,30 +3,31 @@
 // office. `base` is the API prefix of the branch, for example
 // /merchant/branches/3 or /admin/branches/3.
 import { reactive, ref } from 'vue'
-import { post, put } from '../api'
+import { ApiError, post, put } from '../api'
 import { both, t, toMajor, toMinor } from '../i18n'
 import type { Item, Station } from '../types'
 import ImageUpload from './ImageUpload.vue'
 import PhotoList from './PhotoList.vue'
+import './manualStrings'
 
 const props = defineProps<{ item: Item | null; categoryId?: number; cats: { id: number; name: string }[]; stations: Station[]; cur: string; base: string }>()
 const emit = defineEmits<{ saved: []; close: [] }>()
 
 interface OptForm { name: string; name_en: string; extra: number; sold_out: boolean }
 interface GroupForm { name: string; name_en: string; min_select: number; max_select: number; options: OptForm[] }
-interface Form { id: number; category_id: number; name: string; name_en: string; description: string; image_url: string
+interface Form { id: number; category_id: number; code: string; name: string; name_en: string; description: string; image_url: string
   photos: string[]; details: string
   price: number; published: boolean; sold_out: boolean; limited: boolean; stock: number; needs_prep: boolean
   delivery_available: boolean; pickup_available: boolean; dine_in_available: boolean; sort: number; station_id: number | null; groups: GroupForm[] }
 
 function blank(): Form {
-  return { id: 0, category_id: 0, name: '', name_en: '', description: '', image_url: '', photos: [], details: '', price: 0, published: false, sold_out: false,
+  return { id: 0, category_id: 0, code: '', name: '', name_en: '', description: '', image_url: '', photos: [], details: '', price: 0, published: false, sold_out: false,
     limited: false, stock: 0, needs_prep: true, delivery_available: true, pickup_available: true, dine_in_available: true, sort: 0, station_id: null, groups: [] }
 }
 
 const it = props.item
 const f = reactive<Form>(it ? {
-  id: it.id, category_id: it.category_id, name: it.name, name_en: it.name_en, description: it.description, image_url: it.image_url,
+  id: it.id, category_id: it.category_id, code: it.code ?? '', name: it.name, name_en: it.name_en, description: it.description, image_url: it.image_url,
   photos: [...(it.photos ?? [])], details: it.details ?? '',
   price: toMajor(it.price), published: it.published, sold_out: it.sold_out, limited: it.stock_qty !== null, stock: it.stock_qty ?? 0,
   needs_prep: it.needs_prep, delivery_available: it.delivery_available, pickup_available: it.pickup_available, dine_in_available: it.dine_in_available ?? true, sort: it.sort, station_id: it.station_id,
@@ -38,7 +39,7 @@ const busy = ref(false)
 
 async function save() {
   const body = {
-    category_id: f.category_id, name: f.name, name_en: f.name_en, description: f.description, image_url: f.image_url, photos: f.photos, details: f.details,
+    category_id: f.category_id, code: f.code.trim().toUpperCase(), name: f.name, name_en: f.name_en, description: f.description, image_url: f.image_url, photos: f.photos, details: f.details,
     price: toMinor(f.price), published: f.published, sold_out: f.sold_out, stock_qty: f.limited ? Math.max(0, Math.floor(f.stock)) : null,
     needs_prep: f.needs_prep, delivery_available: f.delivery_available, pickup_available: f.pickup_available, dine_in_available: f.dine_in_available, sort: f.sort, station_id: f.needs_prep ? f.station_id : null,
     groups: f.groups.map(g => ({ name: g.name, name_en: g.name_en, min_select: Number(g.min_select), max_select: Number(g.max_select),
@@ -48,7 +49,9 @@ async function save() {
   try {
     await (f.id ? put(`${props.base}/items/${f.id}`, body) : post(`${props.base}/items`, body))
     emit('saved')
-  } catch (e) { error.value = (e as Error).message } finally { busy.value = false }
+  } catch (e) {
+    error.value = e instanceof ApiError && e.code === 'CODE_TAKEN' ? t('vo.code_taken', { name: e.details?.name ?? '' }) : (e as Error).message
+  } finally { busy.value = false }
 }
 </script>
 
@@ -64,6 +67,7 @@ async function save() {
           <label class="field"><span>{{ t('category') }}</span><select v-model="f.category_id">
             <option v-for="c in cats" :key="c.id" :value="c.id">{{ c.name }}</option></select></label>
           <label class="field"><span>{{ t('price') }} ({{ cur }})</span><input type="number" min="0" step="0.01" v-model.number="f.price" required /></label>
+          <label class="field"><span>{{ t('vo.code') }}</span><input v-model="f.code" maxlength="12" data-testid="item-code" :placeholder="t('vo.code_ph')" /></label>
         </div>
         <label class="field"><span>{{ t('description') }}</span><input v-model="f.description" /></label>
         <ImageUpload v-model="f.image_url" :base="base" :ratio="1" :width="800" :label="t('im.dish')" :hint="t('im.dish_hint')" testid="item-image" />
