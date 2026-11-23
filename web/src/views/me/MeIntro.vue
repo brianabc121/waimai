@@ -17,8 +17,8 @@ defineProps<{ title: string; sub?: string; icon?: string }>()
 
 <style>
 .me-intro { margin: -12px -12px 2px; padding: 6px 12px 0; position: relative; }
-/* the bar's red and pattern run on (the bar is 52px tall) and end in a curve */
-.me-intro::before { content: ""; position: absolute; inset-inline-start: 0; inset-inline-end: 0; top: 0; height: 84px; --motif-y: -52px; background: var(--red-bg); border-radius: 0 0 50% 50% / 0 0 22px 22px; }
+/* the bar's red and pattern run on (the bar is 52px tall) and end in a curve behind the card, so no red shows below it */
+.me-intro::before { content: ""; position: absolute; inset-inline-start: 0; inset-inline-end: 0; top: 0; height: 50px; --motif-y: -52px; background: var(--red-bg); border-radius: 0 0 50% 50% / 0 0 16px 16px; }
 .me-intro .info { position: relative; display: flex; align-items: center; gap: 12px; background: var(--paper); border-radius: 14px; padding: 12px 14px; box-shadow: 0 6px 18px rgba(90, 40, 15, .12); }
 .me-intro .ic { flex: none; width: 44px; height: 44px; border-radius: 50%; background: #f9dcd6; color: var(--red); display: grid; place-items: center; }
 .me-intro p { flex: 1; display: grid; gap: 2px; min-width: 0; padding-inline-start: 12px; border-inline-start: 1px solid var(--line); }

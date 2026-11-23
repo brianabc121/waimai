@@ -25,7 +25,9 @@ async function choose(l: Locale | null) {
       <circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z" />
     </svg>
     <span v-if="props.label !== 'icon'">{{ short }}</span>
-  </button>
+  <!-- the picker lives in <body> but is written inside the button, so the
+       button is the one root and takes the class and the scoped styles its
+       page gives it -->
   <Teleport to="body">
     <div v-if="open" class="lang-dim" @click.self="open = false">
       <div class="lang-sheet" role="dialog" :aria-label="t('lang')" data-testid="lang-sheet">
@@ -42,6 +44,7 @@ async function choose(l: Locale | null) {
       </div>
     </div>
   </Teleport>
+  </button>
 </template>
 
 <style scoped>
