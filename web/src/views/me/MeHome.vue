@@ -5,7 +5,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { get } from '../../api'
 import { loginRoute } from '../../customer'
-import { currencySymbol, money, pick, t } from '../../i18n'
+import { currencySymbol, money, pick, t, sn } from '../../i18n'
 import { cardStatus, shortStamp } from '../../orders'
 import type { OrderCard } from '../../types'
 import CustomerFrame from './CustomerFrame.vue'
@@ -117,7 +117,7 @@ const more = computed<Entry[]>(() => [
             <svg v-if="x.p.kind === 'free_delivery'" viewBox="0 0 28 24" width="26" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6.500h9.500v10M18.5 9.500h4l3 3.500v3.500h-2M9 16.500h6M2.5 9.500h5M4.5 12.500h4" /><circle cx="12" cy="17.5" r="1.9" /><circle cx="21" cy="17.5" r="1.9" /></svg>
             <svg v-else viewBox="0 0 28 24" width="26" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h21v3.500a2.5 2.5 0 0 0 0 5V18h-21v-3.500a2.5 2.5 0 0 0 0-5z" /><path d="M10 6.500v11" stroke-dasharray="1.6 2.2" /><path d="m15.5 15 4.5-6M15.8 9.600h.01M19.7 14.400h.01" /></svg>
             <span>{{ offerParts(x.p, x.o.currency).when }}</span>
-            <small>{{ pick(x.o.store.name, x.o.store.name_en) }}</small>
+            <small>{{ sn(x.o.store) }}</small>
           </router-link>
         </div>
       </section>
@@ -141,8 +141,8 @@ const more = computed<Entry[]>(() => [
         <div v-else-if="recent" class="panel olist">
           <router-link v-for="o in recent" :key="o.token" :to="`/o/${o.token}`" class="orow">
             <img v-if="o.items[0]?.image_url" :src="o.items[0].image_url" alt="" />
-            <span v-else class="ph">{{ pick(o.store.name, o.store.name_en).slice(0, 1) }}</span>
-            <span class="what"><b>{{ pick(o.store.name, o.store.name_en) }}</b>
+            <span v-else class="ph">{{ sn(o.store).slice(0, 1) }}</span>
+            <span class="what"><b>{{ sn(o.store) }}</b>
               <small>{{ o.items.map(i => pick(i.name, i.name_en) + (i.qty > 1 ? ' ×' + i.qty : '')).join('、') }}</small></span>
             <span class="when">{{ shortStamp(o.created_at, o.timezone) }}</span>
             <span class="st">{{ cardStatus(o) }}</span>

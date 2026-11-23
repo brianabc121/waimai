@@ -191,6 +191,9 @@ func (s *Server) customerPage(c *gin.Context, o *app.Order, err error) {
 	if err == nil {
 		err = s.App.CustomerOrderView(c, o)
 	}
+	if err == nil {
+		err = s.App.LocalizeOrderStore(c, o, reqLang(c))
+	}
 	if err != nil {
 		fail(c, err)
 		return
@@ -217,6 +220,9 @@ func (s *Server) customerOrders(c *gin.Context) {
 	}
 	before, _ := strconv.ParseInt(c.Query("before"), 10, 64)
 	page, err := s.App.CustomerOrders(c, cu.ID, c.Query("tab"), c.Query("q"), max(before, 0))
+	if err == nil {
+		err = s.App.LocalizeOrderCards(c, page, reqLang(c))
+	}
 	if err != nil {
 		fail(c, err)
 		return

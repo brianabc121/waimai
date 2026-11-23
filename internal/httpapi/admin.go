@@ -58,7 +58,7 @@ func (s *Server) adminRoutes(admin *gin.RouterGroup) {
 
 	admin.GET("/branches", s.adminListBranches)
 	admin.GET("/branches/:bid", s.adminGetBranch)
-	admin.PUT("/branches/:bid", s.adminUpdateBranch)
+	admin.PUT("/branches/:bid", s.menuChanged, s.adminUpdateBranch)
 	admin.DELETE("/branches/:bid", s.adminDeleteBranch)
 	admin.POST("/branches/:bid/users", s.adminCreateUser)
 	admin.PATCH("/users/:id", s.adminPatchUser)

@@ -4,7 +4,7 @@
 import { computed, ref, watch } from 'vue'
 import { get } from '../../api'
 import { couponName, couponStub, validity, whereUsable, lastDay } from '../../coupons'
-import { intlTag, pick, promoLabel, t } from '../../i18n'
+import { intlTag, pick, promoLabel, t, sn } from '../../i18n'
 import type { CustomerCoupon, Promotion } from '../../types'
 import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
@@ -76,7 +76,7 @@ function valid(p: Promotion): string {
         </div>
         <div class="l">
           <b>{{ offerParts(p, o.currency).when }}</b>
-          <span class="store"><span>{{ pick(o.store.name, o.store.name_en) }}</span><em v-if="only(p)">{{ only(p) }}</em></span>
+          <span class="store"><span>{{ sn(o.store) }}</span><em v-if="only(p)">{{ only(p) }}</em></span>
           <span v-if="named(p, o.currency)" class="small nm">{{ named(p, o.currency) }}</span>
           <span class="small">{{ valid(p) }}</span>
         </div>

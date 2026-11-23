@@ -7,6 +7,8 @@ export interface Branch {
   scheduling_enabled: boolean; prep_minutes: number
   // the language the menu is written in; languages whose customers get the English menu
   menu_lang?: string; menu_langs_off?: string[]
+  // the name, notice and introduction in the customer's language (customer pages)
+  name_tr?: string; notice_tr?: string; intro_tr?: string
   kitchen_slow_minutes: number; detour_percent: number; detour_meters: number
   lat: number | null; lng: number | null; zone_mode: 'list' | 'map'; zone_tolerance_m: number
   notice: string; intro: string; baskets_enabled: boolean
@@ -75,7 +77,7 @@ export interface OrderItem {
   image_url?: string
 }
 export interface Aftersale { id: number; reason: string; detail: string; status: 'open' | 'resolved' | 'declined'; reply: string; created_at: string; handled_at: string | null }
-export interface OrderStore { slug: string; name: string; name_en: string; phone: string; address: string; logo_url: string }
+export interface OrderStore { slug: string; name: string; name_en: string; name_tr?: string; phone: string; address: string; logo_url: string }
 export interface OrderCard {
   token: string; public_no: string; store: OrderStore; service_type: 'delivery' | 'pickup'; display_status: string
   created_at: string; timezone: string; total: number; currency: string; item_count: number

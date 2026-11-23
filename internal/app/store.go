@@ -67,6 +67,11 @@ type Branch struct {
 	// reading one of MenuLangsOff get the English menu (docs/I18N_DESIGN.md §6).
 	MenuLang     string   `json:"menu_lang"`
 	MenuLangsOff []string `json:"menu_langs_off"`
+	// The name, notice and introduction in the customer's language, when they
+	// differ (customer pages only).
+	NameTr   string `json:"name_tr,omitempty"`
+	NoticeTr string `json:"notice_tr,omitempty"`
+	IntroTr  string `json:"intro_tr,omitempty"`
 }
 
 var errStoreClosed = Err(http.StatusConflict, "STORE_CLOSED", "the store is not taking orders right now")

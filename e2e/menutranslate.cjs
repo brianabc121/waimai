@@ -115,6 +115,32 @@ await th.waitForSelector(tid('mall-search'))
 await th.fill(tid('mall-search'), 'ไก่ป๊อป'); await th.keyboard.press('Enter')
 await th.locator('text=ไก่ป๊อป').first().waitFor()
 step('the mall search finds the dish by its Thai name')
+
+// store details: Traditional Chinese is filled in and waits for the owner to confirm
+const H = { headers: { 'X-Requested-With': 'waimai-web' } }
+await own.request.put(BASE + '/api/v1/merchant/branches/2/store-texts', { ...H, data: { field: 'name', lang: 'zh-Hant', text: '' } })
+for (let i = 0; i < 40; i++) { // converted again in the background
+  const v = await (await own.request.get(BASE + '/api/v1/merchant/branches/2/store-texts')).json()
+  if (v.translations.some(x => x.field === 'name' && x.lang === 'zh-Hant')) break
+  await own.waitForTimeout(500)
+}
+await own.goto(BASE + '/merchant/settings')
+const card = own.locator(tid('store-text-name-zh-Hant'))
+await card.waitFor()
+await own.waitForFunction(() => document.querySelector('[data-testid=store-text-name-zh-Hant] textarea')?.value)
+await card.locator(tid('store-text-confirm')).click()
+await card.locator('.tag.ok').waitFor()
+const st = await (await own.request.get(BASE + '/api/v1/merchant/branches/2/store-texts')).json()
+expect(st.translations.some(x => x.field === 'name' && x.lang === 'zh-Hant' && x.status === 'human'), 'the confirmed name is the owner\'s')
+expect(!st.translations.some(x => x.lang === 'th'), 'store details are not put into Thai')
+await card.scrollIntoViewIfNeeded(); await own.screenshot({ path: `${SHOTS}/tr-05-store-texts.png` })
+step('the owner confirms the Traditional Chinese store name in the settings')
+const en = st.translations.find(x => x.field === 'name' && x.lang === 'en')
+if (en) {
+  await th.goto(BASE + '/s/bgc'); await th.waitForSelector('.item')
+  await th.locator(`text=${en.text}`).first().waitFor()
+  step('Thai customers see the store name in English')
+}
 } finally {
   await setProvider('')
 }

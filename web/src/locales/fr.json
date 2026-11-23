@@ -2046,5 +2046,16 @@
  "mtr.keep": "Garder",
  "mtr.save": "Enregistrer",
  "mtr.revert": "Revenir à la traduction automatique",
- "mtr.empty": "Rien ici"
+ "mtr.empty": "Rien ici",
+ "mtr.store_title": "Infos du restaurant dans d’autres langues",
+ "mtr.store_hint": "Le nom, l’annonce et la présentation du restaurant sont traduits automatiquement en chinois simplifié, anglais et chinois traditionnel, et les clients les voient tout de suite. Vérifiez et confirmez chacun, ou modifiez-le. Les clients d’autres langues voient l’anglais.",
+ "mtr.store_pending": "{n} à confirmer",
+ "mtr.store_name": "Nom du restaurant",
+ "mtr.st_confirmed": "Confirmé",
+ "mtr.st_to_confirm": "À confirmer",
+ "mtr.confirm": "Confirmer",
+ "mtr.store_banner": "{n} traductions automatiques des infos du restaurant attendent votre confirmation.",
+ "mtr.store_go": "Vérifier",
+ "mtr.store_notice": "Annonce",
+ "mtr.store_intro": "À propos du restaurant"
 }

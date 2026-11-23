@@ -5,6 +5,7 @@ import { both, extend, money, pick, t, toMajor, toMinor } from '../i18n'
 import { session } from '../session'
 import { CONTACT_FIELDS } from '../addresses'
 import type { Branch, Station, Zone } from '../types'
+import StoreTextsCard from './StoreTextsCard.vue'
 
 const bid = session.branchId!
 const branch = ref<Branch | null>(null)
@@ -12,6 +13,7 @@ const zones = ref<Zone[]>([])
 const stations = ref<Station[]>([])
 const error = ref('')
 const saved = ref(false)
+const texts = ref<InstanceType<typeof StoreTextsCard> | null>(null)
 
 const s = reactive({ name: '', name_en: '', address: '', phone: '', tax: 12, tax_inclusive: true, service: 0, packaging: 0,
   min_order: 0, accept_timeout_minutes: 10, delivery_enabled: true, pickup_enabled: true, paused: false, open_time: '00:00', close_time: '00:00', notify_sms: true, scheduling_enabled: false, prep_minutes: 30,
@@ -72,7 +74,11 @@ const saveSettings = () => run(() => put(`/merchant/branches/${bid}/settings`, {
   paused: s.paused, open_time: s.open_time, close_time: s.close_time, notify_sms: s.notify_sms,
   scheduling_enabled: s.scheduling_enabled, prep_minutes: s.prep_minutes,
   kitchen_slow_minutes: s.kitchen_slow_minutes, detour_percent: s.detour_percent, detour_meters: Math.round(s.detour_km * 1000),
-  notice: s.notice, intro: s.intro, baskets_enabled: s.baskets_enabled, contact_fields: s.contact_fields }))
+  notice: s.notice, intro: s.intro, baskets_enabled: s.baskets_enabled, contact_fields: s.contact_fields })).then(ok => {
+  // the other languages are filled in a few seconds after the save
+  if (ok) { texts.value?.load(); setTimeout(() => texts.value?.load(), 5000) }
+  return ok
+})
 
 function editStation(x: Station | null) {
   Object.assign(st, x ? { id: x.id, name: x.name, name_en: x.name_en, active: x.active } : { id: 0, name: '', name_en: '', active: true })
@@ -132,6 +138,8 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
       <label class="field"><span>{{ t('set.intro') }}</span><textarea name="intro" v-model="s.intro" rows="3" maxlength="500"></textarea></label>
       <button class="btn primary">{{ t('save') }}</button>
     </form>
+
+    <StoreTextsCard ref="texts" :base="`/merchant/branches/${bid}`" @en-name="v => s.name_en = v" />
 
     <form v-if="listing" class="card stack" data-testid="mall-listing" @submit.prevent="saveListing">
       <h2>{{ t('mls.title') }}</h2>

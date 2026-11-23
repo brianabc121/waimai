@@ -38,7 +38,10 @@ func sourceHash(s string) string {
 	return hex.EncodeToString(h[:])
 }
 
-var transEntities = []string{"category", "item", "group", "option", "promotion"}
+// storeInfoLang: the store's name, notice and introduction are kept in
+// Simplified Chinese, English and Traditional Chinese only; the merchant
+// confirms them, since a wrong store name does harm.
+func storeInfoLang(l string) bool { return l == "zh" || l == "en" || l == "zh-Hant" }
 
 // menuFields lists everything of a store that gets translated.
 func menuFields(ctx context.Context, q Querier, branchID int64) ([]transField, error) {
@@ -85,6 +88,8 @@ func menuFields(ctx context.Context, q Querier, branchID int64) ([]transField, e
 		{`SELECT o.id, o.name_en, o.name FROM options o JOIN option_groups g ON g.id = o.group_id JOIN menu_items i ON i.id = g.item_id
 			WHERE i.branch_id=$1 AND NOT i.archived ORDER BY o.sort, o.id`, []string{"option.name"}},
 		{`SELECT id, name_en, name FROM promotions WHERE branch_id=$1 AND status <> 'ended' ORDER BY id`, []string{"promotion.name"}},
+		// the store's own name and texts, in three languages only (docs/I18N_DESIGN.md §7)
+		{`SELECT id, name_en, name, notice, intro FROM branches WHERE id=$1`, []string{"branch.name", "branch.notice", "branch.intro"}},
 	}
 	for _, s := range steps {
 		if err := add(s.sql, s.fields...); err != nil {
@@ -181,7 +186,8 @@ func (a *App) TranslateMenu(ctx context.Context, branchID int64, force bool) err
 	for _, f := range fields {
 		h := sourceHash(f.Text)
 		for _, l := range Langs {
-			if l == menuLang || (l != "en" && slices.Contains(off, l)) {
+			if l == menuLang || (l != "en" && slices.Contains(off, l) && f.Entity != "branch") ||
+				(f.Entity == "branch" && !storeInfoLang(l)) {
 				continue
 			}
 			t, ok := have[f.key(l)]
@@ -330,6 +336,9 @@ func (m *menuLocale) item(it *Item) {
 
 // LocalizeStorefront fills in the menu in the customer's language.
 func (a *App) LocalizeStorefront(ctx context.Context, sf *Storefront, lang string) error {
+	if err := localizeBranch(ctx, a.DB, sf.Branch, lang); err != nil {
+		return err
+	}
 	m, err := localeFor(ctx, a.DB, sf.Branch, lang)
 	if err != nil || m == nil {
 		return err
@@ -450,12 +459,12 @@ type TranslationEdit struct {
 }
 
 var nameEnTables = map[string]string{"category": "menu_categories", "item": "menu_items", "group": "option_groups",
-	"option": "options", "promotion": "promotions"}
+	"option": "options", "promotion": "promotions", "branch": "branches"}
 
 // SaveTranslation stores the merchant's own translation of one field.
 func (a *App) SaveTranslation(ctx context.Context, branchID int64, in TranslationEdit, actor Actor) error {
 	in.Text = strings.TrimSpace(in.Text)
-	if !IsLang(in.Lang) {
+	if !IsLang(in.Lang) || (in.Entity == "branch" && !storeInfoLang(in.Lang)) {
 		return ErrValidation("unknown language")
 	}
 	if len(in.Text) > 4000 {
@@ -545,4 +554,153 @@ func (a *App) Retranslate(ctx context.Context, branchID int64) error {
 		return errNoTranslator
 	}
 	return a.QueueTranslate(ctx, branchID, true)
+}
+
+// ---- the store's name, notice and introduction ----
+
+// StoreTexts are a store's name, notice and introduction as one customer reads them.
+type StoreTexts struct{ Name, Notice, Intro string }
+
+// storeTexts picks the stores' texts for a customer reading lang (docs/I18N_DESIGN.md
+// §7): Simplified Chinese, English and Traditional Chinese readers get their own
+// version; readers of the language the store writes in get the original; everyone
+// else English, then the original. "" leaves a field as it is.
+func storeTexts(ctx context.Context, q Querier, lang string, stores []*Branch) (map[int64]StoreTexts, error) {
+	out := map[int64]StoreTexts{}
+	if len(stores) == 0 || !IsLang(lang) {
+		return out, nil
+	}
+	ids := make([]int64, len(stores))
+	for i, b := range stores {
+		ids[i] = b.ID
+	}
+	want := lang
+	if !storeInfoLang(lang) {
+		want = "en"
+	}
+	rows, err := q.Query(ctx, `SELECT entity_id, field, lang, text FROM content_translations
+		WHERE entity='branch' AND entity_id = ANY($1) AND lang IN ($2, 'en')`, ids, want)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	tr := map[string]string{}
+	for rows.Next() {
+		var id int64
+		var field, l, text string
+		if err := rows.Scan(&id, &field, &l, &text); err != nil {
+			return nil, err
+		}
+		tr[strconv.FormatInt(id, 10)+"/"+field+"/"+l] = text
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, b := range stores {
+		if lang == b.MenuLang {
+			continue
+		}
+		pick := func(field, orig, origEn string) string {
+			if strings.TrimSpace(orig) == "" {
+				return ""
+			}
+			key := strconv.FormatInt(b.ID, 10) + "/" + field + "/"
+			if s, ok := tr[key+want]; ok {
+				return s
+			}
+			if want == "zh-Hant" && b.MenuLang == "zh" {
+				return convertChinese(orig, "zh-Hant")
+			}
+			if want == "en" || b.MenuLang == "en" {
+				return origEn
+			}
+			if s, ok := tr[key+"en"]; ok {
+				return s
+			}
+			return origEn
+		}
+		out[b.ID] = StoreTexts{Name: pick("name", b.Name, b.NameEn), Notice: pick("notice", b.Notice, ""), Intro: pick("intro", b.Intro, "")}
+	}
+	return out, nil
+}
+
+// localizeBranch fills in one store's texts in the customer's language.
+func localizeBranch(ctx context.Context, q Querier, b *Branch, lang string) error {
+	t, err := storeTexts(ctx, q, lang, []*Branch{b})
+	if err != nil {
+		return err
+	}
+	x := t[b.ID]
+	b.NameTr, b.NoticeTr, b.IntroTr = x.Name, x.Notice, x.Intro
+	return nil
+}
+
+// storeNames are the stores' names in the customer's language, where they differ.
+func storeNames(ctx context.Context, q Querier, lang string, ids []int64) (map[int64]string, error) {
+	out := map[int64]string{}
+	if len(ids) == 0 || !IsLang(lang) {
+		return out, nil
+	}
+	rows, err := q.Query(ctx, `SELECT `+branchCols+` FROM branches WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return nil, err
+	}
+	var list []*Branch
+	for rows.Next() {
+		b, err := scanBranch(rows)
+		if err != nil {
+			rows.Close()
+			return nil, err
+		}
+		list = append(list, b)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	t, err := storeTexts(ctx, q, lang, list)
+	if err != nil {
+		return nil, err
+	}
+	for id, x := range t {
+		if x.Name != "" {
+			out[id] = x.Name
+		}
+	}
+	return out, nil
+}
+
+// StoreTextsView is the store's name, notice and introduction in the three
+// languages, for the settings page.
+type StoreTextsView struct {
+	MenuLang     string        `json:"menu_lang"`
+	Fields       []transField  `json:"fields"`
+	Translations []Translation `json:"translations"`
+	// Pending counts the texts the system filled in that the merchant has not confirmed.
+	Pending int `json:"pending"`
+}
+
+func (a *App) StoreTexts(ctx context.Context, branchID int64) (*StoreTextsView, error) {
+	all, err := a.MenuTranslations(ctx, branchID)
+	if err != nil {
+		return nil, err
+	}
+	out := &StoreTextsView{MenuLang: all.MenuLang, Fields: []transField{}, Translations: []Translation{}}
+	has := map[string]bool{}
+	for _, f := range all.Fields {
+		if f.Entity == "branch" {
+			out.Fields = append(out.Fields, f)
+			has[f.Field] = true
+		}
+	}
+	for _, t := range all.Translations {
+		if t.Entity != "branch" || !storeInfoLang(t.Lang) || !has[t.Field] || t.Lang == all.MenuLang {
+			continue
+		}
+		out.Translations = append(out.Translations, t)
+		if t.Status != "human" {
+			out.Pending++
+		}
+	}
+	return out, nil
 }

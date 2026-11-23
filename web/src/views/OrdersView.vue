@@ -7,6 +7,7 @@ import { session } from '../session'
 import type { Order, RiderInfo } from '../types'
 import { contactApps, contactName, contactPhone } from '../addresses'
 import './work/strings'
+import './translateStrings'
 import '../orders'
 import TotalsTable from './TotalsTable.vue'
 import { chatEnabled } from '../chat'
@@ -14,6 +15,11 @@ import { chatEnabled } from '../chat'
 // "message the customer" shows only where chat is set up
 const chatOn = ref(false)
 void chatEnabled().then(v => { chatOn.value = v })
+
+// store name, notice or introduction in another language the merchant has not
+// confirmed yet (only managers can see it; the others get nothing)
+const textsPending = ref(0)
+void get<{ pending: number }>(`/merchant/branches/${session.branchId}/store-texts`).then(v => { textsPending.value = v.pending }, () => {})
 
 const bid = session.branchId!
 const scope = ref<'active' | 'history'>('active')
@@ -133,6 +139,8 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
       </div>
       <label class="check" style="margin:0"><input type="checkbox" :checked="sound" @change="toggleSound" />{{ t('new_order_sound') }}</label>
     </div>
+    <div v-if="textsPending" class="banner warn" style="margin-bottom:12px" data-testid="store-texts-banner">{{ t('mtr.store_banner', { n: textsPending }) }}
+      <router-link to="/merchant/settings">{{ t('mtr.store_go') }}</router-link></div>
     <div v-if="!online" class="banner warn" style="margin-bottom:12px">{{ t('offline') }}</div>
     <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
 

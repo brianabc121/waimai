@@ -17,6 +17,7 @@ type OrderStore struct {
 	Slug    string `json:"slug"`
 	Name    string `json:"name"`
 	NameEn  string `json:"name_en"`
+	NameTr  string `json:"name_tr,omitempty"`
 	Phone   string `json:"phone"`
 	Address string `json:"address"`
 	LogoURL string `json:"logo_url"`
@@ -24,6 +25,7 @@ type OrderStore struct {
 
 // OrderCard is one order in the customer's list.
 type OrderCard struct {
+	branchID      int64
 	Token         string     `json:"token"`
 	PublicNo      string     `json:"public_no"`
 	Store         OrderStore `json:"store"`
@@ -88,7 +90,7 @@ func (a *App) CustomerOrders(ctx context.Context, customerID int64, tab, search 
 	rows, err := a.DB.Query(ctx, `SELECT o.id, o.token_nonce, o.public_no, o.service_type, o.acceptance_status,
 		o.fulfillment_status, o.release_at, o.completed_at, o.created_at, o.total, o.currency,
 		b.slug, b.name, b.name_en, b.phone, b.address, b.timezone, COALESCE(ct.published->>'logo_url', ''),
-		EXISTS (SELECT 1 FROM reviews r WHERE r.order_id = o.id), COALESCE(s.status, '')
+		EXISTS (SELECT 1 FROM reviews r WHERE r.order_id = o.id), COALESCE(s.status, ''), b.id
 		FROM orders o JOIN branches b ON b.id = o.branch_id
 		LEFT JOIN channel_templates ct ON ct.branch_id = b.id AND ct.channel = 'delivery'
 		LEFT JOIN order_aftersales s ON s.order_id = o.id
@@ -109,7 +111,7 @@ func (a *App) CustomerOrders(ctx context.Context, customerID int64, tab, search 
 		var releaseAt, completedAt *time.Time
 		if err := rows.Scan(&c.id, &nonce, &c.PublicNo, &c.ServiceType, &acceptance, &fulfillment, &releaseAt,
 			&completedAt, &c.CreatedAt, &c.Total, &c.Currency, &c.Store.Slug, &c.Store.Name, &c.Store.NameEn,
-			&c.Store.Phone, &c.Store.Address, &c.Timezone, &c.Store.LogoURL, &c.Reviewed, &c.Aftersale); err != nil {
+			&c.Store.Phone, &c.Store.Address, &c.Timezone, &c.Store.LogoURL, &c.Reviewed, &c.Aftersale, &c.branchID); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -157,6 +159,32 @@ func (a *App) CustomerOrders(ctx context.Context, customerID int64, tab, search 
 
 // CustomerOrderView adds to an order what only its customer's page shows:
 // the store and the dishes' pictures.
+// LocalizeOrderCards names the stores of an order list in the customer's language.
+func (a *App) LocalizeOrderCards(ctx context.Context, p *OrderCardPage, lang string) error {
+	ids := []int64{}
+	for _, c := range p.Orders {
+		ids = append(ids, c.branchID)
+	}
+	names, err := storeNames(ctx, a.DB, lang, ids)
+	if err != nil {
+		return err
+	}
+	for i := range p.Orders {
+		p.Orders[i].Store.NameTr = names[p.Orders[i].branchID]
+	}
+	return nil
+}
+
+// LocalizeOrderStore names an order's store in the customer's language.
+func (a *App) LocalizeOrderStore(ctx context.Context, o *Order, lang string) error {
+	if o.Store == nil {
+		return nil
+	}
+	names, err := storeNames(ctx, a.DB, lang, []int64{o.BranchID})
+	o.Store.NameTr = names[o.BranchID]
+	return err
+}
+
 func (a *App) CustomerOrderView(ctx context.Context, o *Order) error {
 	st := OrderStore{}
 	err := a.DB.QueryRow(ctx, `SELECT b.slug, b.name, b.name_en, b.phone, b.address, COALESCE(ct.published->>'logo_url', '')

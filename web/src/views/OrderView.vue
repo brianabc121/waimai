@@ -9,7 +9,7 @@ import { ApiError, get, post } from '../api'
 import { contactName, contactPhone } from '../addresses'
 import { prettyPhone } from '../dial'
 import { loadCustomer } from '../customer'
-import { locale, money, pick, reasonText, setLocale, t, whenText, mn } from '../i18n'
+import { locale, money, pick, reasonText, setLocale, t, whenText, mn, sn } from '../i18n'
 import { useLive } from '../live'
 import { closedStatus, finished as isFinished, orderAgain, stamp } from '../orders'
 import type { Order, OrderReview } from '../types'
@@ -62,7 +62,7 @@ const hint = computed(() => closed.value ? (order.value?.close_reason ? `${t('re
 const multi = computed(() => !!order.value?.items.some(i => i.basket > 1))
 const sorted = computed(() => [...(order.value?.items ?? [])].sort((a, b) => a.basket - b.basket || a.id - b.id))
 const store = computed(() => order.value?.store)
-const storeName = computed(() => store.value ? pick(store.value.name, store.value.name_en) : '')
+const storeName = computed(() => store.value ? sn(store.value) : '')
 
 // ---- back ----
 // From the list, back returns to it. Someone who came another way (right

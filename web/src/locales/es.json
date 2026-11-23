@@ -2046,5 +2046,16 @@
  "mtr.keep": "Mantener",
  "mtr.save": "Guardar",
  "mtr.revert": "Volver a la traducción automática",
- "mtr.empty": "No hay nada"
+ "mtr.empty": "No hay nada",
+ "mtr.store_title": "Datos de la tienda en otros idiomas",
+ "mtr.store_hint": "El nombre, el aviso y la presentación de la tienda se traducen automáticamente al chino simplificado, inglés y chino tradicional, y los clientes los ven de inmediato. Revisa y confirma cada uno, o cámbialo. Los clientes de otros idiomas ven el inglés.",
+ "mtr.store_pending": "{n} por confirmar",
+ "mtr.store_name": "Nombre de la tienda",
+ "mtr.st_confirmed": "Confirmado",
+ "mtr.st_to_confirm": "Por confirmar",
+ "mtr.confirm": "Confirmar",
+ "mtr.store_banner": "Hay {n} traducciones automáticas de los datos de tu tienda esperando tu confirmación.",
+ "mtr.store_go": "Revisar",
+ "mtr.store_notice": "Aviso",
+ "mtr.store_intro": "Sobre la tienda"
 }

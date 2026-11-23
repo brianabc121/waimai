@@ -6,7 +6,7 @@ import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { get } from '../api'
 import { loadCustomer, loginRoute } from '../customer'
-import { locale, money, pick, setLocale, t, mn } from '../i18n'
+import { locale, money, pick, setLocale, t, mn, sn } from '../i18n'
 import { cardStatus, closedStatus, finished, orderAgain, shortStamp } from '../orders'
 import type { OrderCard } from '../types'
 import CustomerFrame from './me/CustomerFrame.vue'
@@ -98,7 +98,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
           <a class="ol-name" :href="`/s/${o.store.slug}`" @click.prevent.stop="router.push(`/s/${o.store.slug}`)">
             <img v-if="o.store.logo_url" :src="o.store.logo_url" alt="" />
             <span v-else class="ph"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 3.500c-.8.9.8 1.7 0 2.600M12 3.500c-.8.9.8 1.7 0 2.600M15 3.500c-.8.9.8 1.7 0 2.6" /><path d="M4 11h16a8 8 0 0 1-5 7.400V20H9v-1.600A8 8 0 0 1 4 11z" fill="currentColor" stroke="none" /></svg></span>
-            <b>{{ pick(o.store.name, o.store.name_en) }}</b>
+            <b>{{ sn(o.store) }}</b>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7" /></svg>
           </a>
           <span class="ol-status" :class="tone(o)" data-testid="card-status">{{ cardStatus(o) }}</span>

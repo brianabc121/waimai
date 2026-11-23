@@ -8,7 +8,7 @@ import LangButton from '../LangButton.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { customer, loginRoute } from '../../customer'
-import { locale, pick, setLocale, t } from '../../i18n'
+import { locale, pick, setLocale, t, sn } from '../../i18n'
 import { catName, mall, mallHome, mallName, mallStores, regionName, shortPlace, start, type MallBanner, type MallHome, type MallList, type MallStore } from '../../mall'
 import CustomerTabs from '../me/CustomerTabs.vue'
 import { displayName, loadProfile, me } from '../me/me'
@@ -82,7 +82,7 @@ function follow(b: MallBanner) {
 // The store a banner leads to, named when it is among the stores listed here.
 const bannerStore = (b: MallBanner) => {
   const st = b.link_slug ? stores.value.find(x => x.slug === b.link_slug) : undefined
-  return st ? pick(st.name, st.name_en) : ''
+  return st ? sn(st) : ''
 }
 
 onMounted(async () => {
@@ -161,11 +161,11 @@ onBeforeUnmount(() => clearInterval(timer))
             <div>
               <router-link v-for="s in frequent" :key="s.slug" :to="`/s/${s.slug}`">
                 <img v-if="s.logo_url || s.cover_url" :src="s.logo_url || s.cover_url" alt="" />
-                <span v-else class="letter">{{ pick(s.name, s.name_en).slice(0, 1) }}</span>
-                <span>{{ pick(s.name, s.name_en) }}</span>
+                <span v-else class="letter">{{ sn(s).slice(0, 1) }}</span>
+                <span>{{ sn(s) }}</span>
               </router-link>
             </div>
-            <router-link v-if="frequent.length === 1" class="go" :to="`/s/${frequent[0].slug}`" :aria-label="pick(frequent[0].name, frequent[0].name_en)" tabindex="-1">
+            <router-link v-if="frequent.length === 1" class="go" :to="`/s/${frequent[0].slug}`" :aria-label="sn(frequent[0])" tabindex="-1">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg>
             </router-link>
           </section>

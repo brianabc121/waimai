@@ -4,7 +4,7 @@ import { computed, defineAsyncComponent, nextTick, onMounted, reactive, ref, wat
 import { useRouter } from 'vue-router'
 import { ApiError, get, post } from '../api'
 import { addLine, linePrice, useCart } from '../cart'
-import { locale, menuOriginal, money, pick, promoLabel, setLocale, t, mn, mt } from '../i18n'
+import { locale, menuOriginal, money, pick, promoLabel, setLocale, t, mn, mt, sn } from '../i18n'
 import { mallSpot } from '../mall'
 import { defaultTemplate } from '../theme'
 import { customer, customerLogout, loadCustomer, loginRoute, prettyPhone } from '../customer'
@@ -44,9 +44,9 @@ async function load() {
   try {
     const s = await get<Storefront>(`/stores/${props.slug}?lang=${locale.value}`)
     store.value = s
-    document.title = pick(s.branch.name, s.branch.name_en)
+    document.title = sn(s.branch)
     // "Home" in the bottom navigation comes back to the store last looked at.
-    rememberStore({ slug: props.slug, name: pick(s.branch.name, s.branch.name_en), currency: s.branch.currency })
+    rememberStore({ slug: props.slug, name: sn(s.branch), currency: s.branch.currency })
     void isFavorite(props.slug).then(on => { favorite.value = on }).catch(() => null)
     void loadProfile()
     // Fall back to a service the store actually offers.
@@ -106,7 +106,7 @@ async function toggleFavorite() {
     setTimeout(() => { toast.value = '' }, 2000)
   } catch { /* stays as it was */ }
 }
-const shopPin = computed(() => { const b = store.value?.branch; return b && b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng, name: pick(b.name, b.name_en), country: b.country_code } : null })
+const shopPin = computed(() => { const b = store.value?.branch; return b && b.lat != null && b.lng != null ? { lat: b.lat, lng: b.lng, name: sn(b), country: b.country_code } : null })
 
 // Promotional pictures and videos; a store without any has no such area.
 const media = computed(() => store.value?.media ?? [])
@@ -219,7 +219,7 @@ function qtyOf(it: Item) {
 }
 
 // ---- the store card ----
-const name = computed(() => store.value ? pick(store.value.branch.name, store.value.branch.name_en) : '')
+const name = computed(() => store.value ? sn(store.value.branch) : '')
 const one = (n: number) => n.toFixed(1).replace(/\.0$/, '')
 const salesText = computed(() => { const n = store.value?.sales ?? 0; return n >= 1000 ? Math.floor(n / 100) * 100 + '+' : String(n) })
 const showPromos = ref(false)
@@ -354,7 +354,7 @@ async function sendReport() {
         <div class="notice" v-if="store.branch.notice" data-testid="notice">
           <span class="lbl">{{ t('sf.notice') }}</span>
           <!-- a notice too long for the line scrolls round and round -->
-          <div ref="marq" class="marq" :class="{ run: scrolls }"><span :style="{ animationDuration: Math.max(8, store.branch.notice.length / 4) + 's' }">{{ store.branch.notice }}<template v-if="scrolls"><i></i>{{ store.branch.notice }}<i></i></template></span></div>
+          <div ref="marq" class="marq" :class="{ run: scrolls }"><span :style="{ animationDuration: Math.max(8, (store.branch.notice_tr || store.branch.notice).length / 4) + 's' }">{{ store.branch.notice_tr || store.branch.notice }}<template v-if="scrolls"><i></i>{{ store.branch.notice_tr || store.branch.notice }}<i></i></template></span></div>
         </div>
       </header>
       </div>
@@ -390,8 +390,8 @@ async function sendReport() {
             <span>{{ pick(z.name, z.name_en) }}</span><span class="price">{{ money(z.fee, cur) }}</span>
           </div>
         </section>
-        <section><h3>{{ t('sf.about') }}</h3><p :class="{ muted: !store.branch.intro }">{{ store.branch.intro || t('sf.none') }}</p></section>
-        <section><h3>{{ t('sf.notice_title') }}</h3><p :class="{ muted: !store.branch.notice }">{{ store.branch.notice || t('sf.none') }}</p></section>
+        <section><h3>{{ t('sf.about') }}</h3><p :class="{ muted: !store.branch.intro }">{{ store.branch.intro_tr || store.branch.intro || t('sf.none') }}</p></section>
+        <section><h3>{{ t('sf.notice_title') }}</h3><p :class="{ muted: !store.branch.notice }">{{ store.branch.notice_tr || store.branch.notice || t('sf.none') }}</p></section>
         <section><button class="reportbtn" data-testid="report" @click="openReport">{{ t('sf.report') }}</button></section>
       </div>
 

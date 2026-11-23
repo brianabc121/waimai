@@ -160,3 +160,67 @@ func TestMenuTranslation(t *testing.T) {
 		t.Fatalf("error kept: %q", ms.Error)
 	}
 }
+
+// The store's name and notice go into Simplified Chinese, English and
+// Traditional Chinese only; the other languages read English.
+func TestStoreTexts(t *testing.T) {
+	need(t)
+	ctx := context.Background()
+	s := newStore(t, false)
+	a := app.New(testApp.DB, "test-secret")
+	a.Translator = &markTranslator{}
+	_, err := a.DB.Exec(ctx, `UPDATE branches SET name='老王面馆', name_en='', notice='今天休息' WHERE id=$1`, s.branchID)
+	noErr(t, err)
+	noErr(t, a.TranslateMenu(ctx, s.branchID, false))
+
+	v, err := a.StoreTexts(ctx, s.branchID)
+	noErr(t, err)
+	langs := map[string]bool{}
+	for _, x := range v.Translations {
+		langs[x.Lang] = true
+	}
+	if !langs["en"] || !langs["zh-Hant"] || len(langs) != 2 {
+		t.Fatalf("store text languages %v", langs)
+	}
+	if v.Pending != 4 { // name and notice, in English and Traditional Chinese
+		t.Fatalf("pending = %d", v.Pending)
+	}
+	ms, err := a.MenuTranslations(ctx, s.branchID)
+	noErr(t, err)
+	for _, x := range ms.Translations {
+		if x.Entity == "branch" && x.Lang == "th" {
+			t.Fatal("the store's name went into Thai")
+		}
+	}
+	branch := func(lang string) *app.Branch {
+		sf, err := a.Storefront(ctx, s.slug)
+		noErr(t, err)
+		noErr(t, a.LocalizeStorefront(ctx, sf, lang))
+		return sf.Branch
+	}
+	if b := branch("th"); b.NameTr != "en:老王面馆" || b.NoticeTr != "en:今天休息" {
+		t.Fatalf("thai reader got %q / %q", b.NameTr, b.NoticeTr)
+	}
+	if b := branch("zh-Hant"); b.NameTr != "老王麵館" {
+		t.Fatalf("traditional name %q", b.NameTr)
+	}
+
+	// the merchant confirms the English name by saving it; it is also the store's name_en
+	err = a.SaveTranslation(ctx, s.branchID, app.TranslationEdit{Entity: "branch", EntityID: s.branchID, Field: "name",
+		Lang: "en", Text: "Wang's Noodles"}, s.staff)
+	noErr(t, err)
+	var en string
+	noErr(t, a.DB.QueryRow(ctx, `SELECT name_en FROM branches WHERE id=$1`, s.branchID).Scan(&en))
+	if en != "Wang's Noodles" {
+		t.Fatalf("name_en = %q", en)
+	}
+	v, err = a.StoreTexts(ctx, s.branchID)
+	noErr(t, err)
+	if v.Pending != 3 {
+		t.Fatalf("pending after confirming = %d", v.Pending)
+	}
+	if err := a.SaveTranslation(ctx, s.branchID, app.TranslationEdit{Entity: "branch", EntityID: s.branchID, Field: "name",
+		Lang: "th", Text: "x"}, s.staff); err == nil {
+		t.Fatal("a Thai store name should be refused")
+	}
+}

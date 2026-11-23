@@ -6,7 +6,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError, get, post } from '../api'
 import { loadCustomer, prettyPhone } from '../customer'
-import { extend, locale, pick, setLocale, t } from '../i18n'
+import { extend, locale, pick, setLocale, t, sn } from '../i18n'
 import { defaultTemplate, themeVars } from '../theme'
 import type { Storefront } from '../types'
 
@@ -34,7 +34,7 @@ const next = computed(() => typeof route.query.next === 'string' && route.query.
 const slug = computed(() => typeof route.query.store === 'string' ? route.query.store : '')
 const store = ref<Storefront | null>(null)
 const tpl = computed(() => store.value?.templates?.delivery ?? defaultTemplate('delivery'))
-const name = computed(() => store.value ? pick(store.value.branch.name, store.value.branch.name_en) : '')
+const name = computed(() => store.value ? sn(store.value.branch) : '')
 
 const phone = ref((localStorage.getItem('phone') || '').replace(/^\+63/, ''))
 const code = ref('')
