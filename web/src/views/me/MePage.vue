@@ -36,7 +36,7 @@ function goBack() { if (window.history.state?.back) router.back(); else void rou
 <style>
 /* type sizes for the customer's pages: body 14, secondary 12, card titles 15, the bar 17 */
 .mepage { padding-bottom: 32px; font-size: 14px; }
-.mp-bar { position: sticky; top: 0; z-index: 10; display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; height: 52px; background: var(--red); color: #fff; }
+.mp-bar { position: sticky; top: 0; z-index: 10; display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; height: 52px; background: var(--red-bg); color: #fff; }
 .mp-bar > button { border: 0; background: none; height: 52px; display: grid; place-items: center; cursor: pointer; color: #fff; }
 .mp-bar .right .btn.link { color: #fff; }
 .mp-bar > b { text-align: center; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 // One store of the marketplace. On a phone it is a row with the store's
 // picture on the left; from a tablet up it is a card with the cover on top.
-// What it says about delivery is only the fee, the minimum and the time.
+// What it says about delivery is only the fee, the minimum and the time. A
+// store near the customer that does not deliver to them is greyed and marked
+// "no delivery"; opening it starts its cart on pickup when it offers that.
 import { computed } from 'vue'
 import { money, pick, promoLabel, t } from '../../i18n'
+import { cart, useCart } from '../../cart'
 import { cartCount, distanceText, type MallCategory, type MallStore } from '../../mall'
 
 const props = defineProps<{ store: MallStore; categories: MallCategory[] }>()
@@ -21,18 +24,24 @@ const far = computed(() => s.value.distance_m != null ? distanceText(s.value.dis
 const picture = computed(() => s.value.logo_url || s.value.cover_url)
 const cover = computed(() => s.value.cover_url || s.value.logo_url)
 const isNew = computed(() => s.value.rating == null && !s.value.monthly_sales)
+const nodel = computed(() => s.value.no_delivery)
+function opened() {
+  if (nodel.value && s.value.pickup) { useCart(s.value.slug); cart.service = 'pickup' }
+}
 </script>
 
 <template>
-  <router-link :to="`/s/${s.slug}`" class="mcard" :class="{ off: !open }" data-testid="mall-store" :data-slug="s.slug">
+  <router-link :to="`/s/${s.slug}`" class="mcard" :class="{ off: !open || nodel, nodel }" data-testid="mall-store" :data-slug="s.slug" :data-nodelivery="nodel || undefined" @click="opened">
     <div class="cover" :style="cover ? { backgroundImage: `url(${cover})` } : {}">
       <span v-if="eta" class="eta">{{ eta }}</span>
+      <span v-if="nodel" class="nodtag">{{ t('ml.no_delivery') }}</span>
       <span v-if="!open" class="veil">{{ shut }}<template v-if="opens"> · {{ opens }}</template></span>
     </div>
     <div class="pic">
       <img v-if="picture" :src="picture" alt="" loading="lazy" />
       <span v-else class="bowl"><svg viewBox="0 0 24 24" width="56%" height="56%" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M9 3.500c-.8.9.8 1.7 0 2.600M12 3.500c-.8.9.8 1.7 0 2.600M15 3.500c-.8.9.8 1.7 0 2.6" /><path d="M4 11h16a8 8 0 0 1-5 7.400V20H9v-1.600A8 8 0 0 1 4 11z" fill="currentColor" stroke="none" /></svg></span>
       <span v-if="!open" class="veil">{{ shut }}</span>
+      <span v-if="nodel" class="nodtag" data-testid="mall-no-delivery">{{ t('ml.no_delivery') }}</span>
       <i v-if="inCart" class="n" data-testid="mall-cart-count"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h2.500l2 10h10l2-7H7" /><circle cx="9.5" cy="19" r="1.2" /><circle cx="16.5" cy="19" r="1.2" /></svg>{{ inCart }}</i>
     </div>
     <div class="body">
@@ -46,17 +55,19 @@ const isNew = computed(() => s.value.rating == null && !s.value.monthly_sales)
         <span v-if="far" class="ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path fill-rule="evenodd" d="M12 22s7-6.3 7-11.800a7 7 0 1 0-14 0C5 15.7 12 22 12 22zm0-9.200a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.200z" /></svg>{{ far }}</span>
         <span v-if="eta" class="etatext">{{ eta }}</span>
         <span v-if="opens" class="opens">{{ opens }}</span>
-        <template v-if="s.delivery">
+        <span v-if="nodel" class="nod">{{ t('ml.no_delivery') }}</span>
+        <template v-else-if="s.delivery">
           <span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.500h11v10h-11zM13.5 10h4l3 3.500v3h-7" /><circle cx="7" cy="17.5" r="1.8" /><circle cx="17" cy="17.5" r="1.8" /></svg>
             <template v-if="s.delivery.fee">{{ t('ml.fee_word') }} <b>{{ money(s.delivery.fee, s.currency) }}</b></template>
             <b v-else>{{ t('ml.fee_free') }}</b></span>
           <span v-if="s.delivery.min_order">{{ t('ml.min', { amt: money(s.delivery.min_order, s.currency) }) }}</span>
         </template>
-        <span v-else-if="s.min_order_from">{{ t('ml.min_from', { amt: money(s.min_order_from, s.currency) }) }}</span>
+        <span v-else-if="s.min_order_from && !nodel">{{ t('ml.min_from', { amt: money(s.min_order_from, s.currency) }) }}</span>
       </p>
       <p v-if="s.tagline" class="tagline">{{ s.tagline }}</p>
       <div class="tags">
         <span v-for="(p, i) in s.promos" :key="i" class="tag promo">{{ pick(p.name, p.name_en) || promoLabel(p, s.currency) }}</span>
+        <span v-if="nodel && s.pickup" class="tag pick">{{ t('ml.pickup_ok') }}</span>
         <span v-if="s.scheduling" class="tag gold">{{ t('ml.can_schedule') }}</span>
       </div>
       <div v-if="s.dishes.length" class="dishes">
@@ -103,6 +114,16 @@ h3 .new { flex: none; font-style: normal; font-size: 12.500px; font-weight: 600;
 .dish b { color: var(--red); }
 .off h3, .off .l1, .off .l2, .off .rate, .off .l2 b { color: #a6978a; }
 .mcard.off { box-shadow: inset 4px 0 0 #cdbda8; }
+/* near but no delivery: grey, with a ribbon across the picture */
+.nodel { background: #f6f0e7; }
+.nodel .pic img, .nodel .pic .bowl { filter: grayscale(1) opacity(.7); }
+.nodel .dish img { filter: grayscale(1) opacity(.7); }
+.pic .nodtag { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0 0 12px 12px; background: rgba(59, 31, 20, .78); color: #fff; font-size: 12px; font-weight: 700; text-align: center; padding: 2px 0; letter-spacing: 1px; }
+.nodel .pic .veil { bottom: 20px; border-radius: 12px 12px 0 0; font-size: 12px; }
+.l2 .nod { color: #8a4a3a; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+.l2 .nod::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid currentColor; background: linear-gradient(135deg, transparent 44%, currentColor 44%, currentColor 56%, transparent 56%); }
+.tag.pick { background: #fff; color: #6d5a4b; border-color: #d6c6b1; }
+.cover .nodtag { display: none; }
 
 /* the short row */
 
@@ -115,7 +136,9 @@ h3 .new { flex: none; font-style: normal; font-size: 12.500px; font-weight: 600;
   .cover .veil { position: absolute; inset: 0; background: rgba(59, 31, 20, .62); color: #fff; font-weight: 700; display: grid; place-items: center; text-align: center; padding: 0 10px; }
   .pic { width: 56px; height: 56px; margin: -34px 0 0 16px; z-index: 1; }
   .pic img, .pic .bowl { border: 3px solid var(--paper); border-radius: 12px; }
-  .pic .veil { display: none; }
+  .pic .veil, .pic .nodtag { display: none; }
+  .nodel .cover { filter: grayscale(1) opacity(.75); }
+  .cover .nodtag { display: block; position: absolute; left: 10px; top: 10px; background: rgba(59, 31, 20, .82); color: #fff; border-radius: 7px; padding: 2px 10px; font-size: 13px; font-weight: 700; letter-spacing: 1px; }
   .body { padding: 6px 16px 14px; }
   h3 { font-size: 17.500px; }
   .l1 .kinds { display: inline; }

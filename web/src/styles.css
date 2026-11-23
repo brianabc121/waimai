@@ -379,4 +379,10 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
   --red: #a02c20; --red-deep: #8f251b; --gold: #f4cf73; --gold-soft: #fbe7b3; --paper: #fffaf2;
   --ink: #3b1f14; --muted: #7b6657; --line: #e6d8c4; --bg: #f8efe1; --card: #fffaf2;
   background: var(--bg); color: var(--ink);
+  /* The red of the customer's top bars, with a gold interlocking-circle
+     pattern (七宝纹) that fades in from the left. --motif-y lines the pattern
+     up when one red block continues another. */
+  --motif: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cg fill='none' stroke='%23f4cf73' stroke-opacity='.17'%3E%3Ccircle cx='0' cy='0' r='28'/%3E%3Ccircle cx='56' cy='0' r='28'/%3E%3Ccircle cx='0' cy='56' r='28'/%3E%3Ccircle cx='56' cy='56' r='28'/%3E%3Ccircle cx='28' cy='28' r='28'/%3E%3C/g%3E%3Cg fill='%23f4cf73' fill-opacity='.3'%3E%3Cpath d='M28 25l3 3-3 3-3-3zM0 -3l3 3-3 3-3-3zM56 -3l3 3-3 3-3-3zM0 53l3 3-3 3-3-3zM56 53l3 3-3 3-3-3z'/%3E%3C/g%3E%3C/svg%3E");
+  --red-bg: linear-gradient(90deg, rgba(143, 37, 27, .8) 0, rgba(143, 37, 27, .25) 45%, rgba(143, 37, 27, 0) 75%),
+    var(--motif) 0 var(--motif-y, 0px) / 56px 56px, var(--red);
 }
