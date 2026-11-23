@@ -2102,7 +2102,7 @@
 "vo.copy_line":"再來一份",
 "vo.remove":"刪除",
 "vo.addon_ph":"輸入編號或名稱加料",
-"vo.empty":"還沒有菜。在右邊“選擇商品”裡輸入編號或菜名，回車加入。",
+"vo.empty":"還沒有菜。在「選擇商品」裡輸入編號或菜名，按 Enter 加入。",
 "vo.count":"數量",
 "vo.packaging":"包裝費",
 "vo.delivery_fee":"配送費",

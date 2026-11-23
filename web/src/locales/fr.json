@@ -2102,7 +2102,7 @@
  "vo.copy_line": "Un de plus identique",
  "vo.remove": "Retirer",
  "vo.addon_ph": "Tapez un code ou un nom pour ajouter",
- "vo.empty": "Aucun plat. Tapez un code ou un nom sous « Ajouter un plat » à droite, puis Entrée.",
+ "vo.empty": "Aucun plat. Tapez un code ou un nom sous « Ajouter un plat », puis Entrée.",
  "vo.count": "Articles",
  "vo.packaging": "Emballage",
  "vo.delivery_fee": "Livraison",

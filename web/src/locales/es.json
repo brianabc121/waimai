@@ -2102,7 +2102,7 @@
  "vo.copy_line": "Otro igual",
  "vo.remove": "Quitar",
  "vo.addon_ph": "Escribe un código o un nombre para añadir",
- "vo.empty": "Aún no hay platos. Escribe un código o un nombre en \"Añadir plato\" a la derecha y pulsa Enter.",
+ "vo.empty": "Aún no hay platos. Escribe un código o un nombre en \"Añadir plato\" y pulsa Enter.",
  "vo.count": "Artículos",
  "vo.packaging": "Envase",
  "vo.delivery_fee": "Envío",
