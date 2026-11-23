@@ -423,12 +423,12 @@ async function submit() {
 .co-pick { padding-bottom: 12px; }
 .co-whens { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
 .co-whens > :only-child { grid-column: 1 / -1; }
-.co-when { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font: inherit; color: inherit; cursor: pointer; text-align: start; }
-.co-when .ic { flex: none; color: var(--red); }
+.co-when { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 44px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font: inherit; color: inherit; cursor: pointer; text-align: start; }
+.co-when .ic { flex: none; width: 19px; height: 19px; color: var(--red); }
 .co-when .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.co-when b { font-size: 15px; font-weight: 600; line-height: 1.3; }
-.co-when small { color: var(--muted); font-size: 12px; line-height: 1.35; }
-.co-when .ok { flex: none; color: var(--red); }
+.co-when b { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.co-when small { color: var(--muted); font-size: 11px; line-height: 1.3; }
+.co-when .ok { flex: none; width: 17px; height: 17px; color: var(--red); }
 .co-when.on { border: 1.5px solid var(--red); background: var(--gold-soft); }
 .co-when.on small { color: var(--red); }
 .co-when.off { background: #f3eee7; color: #a9998a; cursor: default; } .co-when.off .ic { color: #b5a998; }
@@ -439,6 +439,8 @@ async function submit() {
 .co-shop b { flex: 1; font-size: 16px; font-weight: 600; }
 .co-tag { flex: none; border: 1px solid #cdb48a; color: #7a5a2a; background: #fbf3e3; border-radius: 6px; font-size: 11px; padding: 1px 7px; white-space: nowrap; }
 .co-basket { padding: 2px 0; }
+/* several baskets: a line between one and the next */
+.co-basket + .co-basket { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
 .co-bhead { color: var(--muted); font-size: 12px; margin: 6px 0; }
 .co-line { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
 .co-line .grow { flex: 1; min-width: 0; } .co-line .n { font-size: 15px; font-weight: 600; }
