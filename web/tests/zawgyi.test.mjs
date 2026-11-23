@@ -22,8 +22,11 @@ test('a request body is walked, other values untouched', async () => {
   assert.equal(body.name, 'ျမန္မာ', 'the original body is not changed')
 })
 
-test('only merchant and platform writes are converted', async () => {
+test('merchant, platform and customer writes are converted, sign-in and secrets are not', async () => {
   assert.equal((await fixZawgyi('/merchant/dishes', 'ျမန္မာ')).body, 'မြန်မာ')
   assert.equal((await fixZawgyi('/admin/mall/categories', 'ျမန္မာ')).body, 'မြန်မာ')
-  assert.equal((await fixZawgyi('/orders', 'ျမန္မာ')).body, 'ျမန္မာ')
+  assert.deepEqual((await fixZawgyi('/orders', { note: 'ျမန္မာ' })).body, { note: 'မြန်မာ' })
+  assert.deepEqual((await fixZawgyi('/me/addresses', { detail: 'ျမန္မာ', door_code: 'ျမန္မာ' })).body, { detail: 'မြန်မာ', door_code: 'ျမန္မာ' })
+  assert.equal((await fixZawgyi('/auth/login', 'ျမန္မာ')).body, 'ျမန္မာ')
+  assert.deepEqual((await fixZawgyi('/me/password', { password: 'ျမန္မာ' })).body, { password: 'ျမန္မာ' })
 })

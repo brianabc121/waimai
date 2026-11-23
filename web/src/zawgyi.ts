@@ -1,8 +1,8 @@
 // Burmese typed in the old Zawgyi font encoding (docs/I18N_DESIGN.md §12).
 // The system keeps Burmese in Unicode only; Zawgyi text looks right on the
-// writer's phone but turns into nonsense for everyone else. When a merchant or
-// the platform saves Burmese, Google's myanmar-tools model checks each text and
-// Zawgyi is converted to Unicode before it is sent.
+// writer's phone but turns into nonsense for everyone else. Whenever anyone
+// saves Burmese or sends it in a chat, Google's myanmar-tools model checks each
+// text and Zawgyi is converted to Unicode before it is sent.
 const burmese = /[က-႟]/
 
 // Above this the model is sure the text is Zawgyi (Google's recommended cut-off).
@@ -37,6 +37,9 @@ function hasBurmese(body: unknown): boolean {
   return false
 }
 
+// Passwords and codes are sent exactly as typed.
+const secret = /password|passwd|otp|code|token|secret/i
+
 function walk(body: unknown, t: Tools, found: string[]): unknown {
   if (typeof body === 'string') {
     if (!burmese.test(body) || t.detect(body) < sure) return body
@@ -47,7 +50,7 @@ function walk(body: unknown, t: Tools, found: string[]): unknown {
   if (Array.isArray(body)) return body.map(x => walk(x, t, found))
   if (body && typeof body === 'object') {
     const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(body)) out[k] = walk(v, t, found)
+    for (const [k, v] of Object.entries(body)) out[k] = secret.test(k) ? v : walk(v, t, found)
     return out
   }
   return body
@@ -62,10 +65,10 @@ export async function toUnicode<T>(body: T): Promise<{ body: T, converted: strin
   return { body: converted.length ? out : body, converted }
 }
 
-// fixZawgyi converts what a merchant or the platform saves. Customers' own
-// texts (notes, chat) are left as typed.
+// fixZawgyi converts what anyone saves: merchants, the platform and customers
+// (addresses, notes, reviews, feedback). Sign-in requests are left alone.
 export async function fixZawgyi<T>(path: string, body: T): Promise<{ body: T, converted: string[] }> {
-  if (!/^\/(merchant|admin)\//.test(path)) return { body, converted: [] }
+  if (/^\/auth\//.test(path)) return { body, converted: [] }
   try {
     return await toUnicode(body)
   } catch {
