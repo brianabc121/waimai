@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -55,6 +56,10 @@ type CustomerCoupon struct {
 	Status    string     `json:"status"` // available, used, expired
 	OrderID   *int64     `json:"-"`
 	UsedAt    *time.Time `json:"used_at"`
+	// Where a platform coupon works: a country, maybe one province of it.
+	Country     string `json:"country"`
+	CountryCode string `json:"country_code"`
+	Province    string `json:"province"`
 
 	scope          string
 	scopeBranchIDs []int64
@@ -103,7 +108,7 @@ func fundedBy(kind string) string {
 const couponCols = `c.id, c.kind, c.issuer, c.branch_id, COALESCE(b.slug, ''), COALESCE(b.name, ''), COALESCE(b.name_en, ''),
 	c.currency, c.name, c.name_en, c.value, c.threshold, c.source, c.issued_at, c.expires_at,
 	CASE WHEN c.status = 'used' THEN 'used' WHEN c.status = 'void' OR c.expires_at <= now() THEN 'expired' ELSE 'available' END,
-	c.order_id, c.used_at, c.scope, c.scope_branch_ids`
+	c.order_id, c.used_at, c.country, c.country_code, c.province, c.scope, c.scope_branch_ids`
 
 func queryCoupons(ctx context.Context, q Querier, where string, args ...any) ([]CustomerCoupon, error) {
 	rows, err := q.Query(ctx, `SELECT `+couponCols+` FROM customer_coupons c LEFT JOIN branches b ON b.id = c.branch_id
@@ -117,7 +122,7 @@ func queryCoupons(ctx context.Context, q Querier, where string, args ...any) ([]
 		var c CustomerCoupon
 		if err := rows.Scan(&c.ID, &c.Kind, &c.Issuer, &c.BranchID, &c.StoreSlug, &c.StoreName, &c.StoreNameEn,
 			&c.Currency, &c.Name, &c.NameEn, &c.Value, &c.Threshold, &c.Source, &c.IssuedAt, &c.ExpiresAt, &c.Status,
-			&c.OrderID, &c.UsedAt, &c.scope, &c.scopeBranchIDs); err != nil {
+			&c.OrderID, &c.UsedAt, &c.Country, &c.CountryCode, &c.Province, &c.scope, &c.scopeBranchIDs); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -131,6 +136,10 @@ func (c *CustomerCoupon) worksAt(b *Branch) bool {
 		return c.BranchID != nil && *c.BranchID == b.ID
 	}
 	if c.Currency != b.Currency {
+		return false
+	}
+	if c.CountryCode != "" && !strings.EqualFold(c.CountryCode, b.CountryCode) ||
+		c.Province != "" && !strings.EqualFold(c.Province, b.Province) {
 		return false
 	}
 	in := false

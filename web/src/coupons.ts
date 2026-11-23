@@ -16,7 +16,7 @@ extend({
   'cp.fee_off': ['配送费减{amt}', '{amt} off delivery'], 'cp.fee_over_off': ['满{th}配送费减{amt}', '{amt} off delivery over {th}'],
   'cp.fee_free': ['免配送费', 'Free delivery'], 'cp.fee_over_free': ['满{th}免配送费', 'Free delivery over {th}'],
   'cp.free_off': ['无门槛减{amt}', '{amt} off, no minimum'],
-  'cp.all_stores': ['全平台通用', 'Any store'], 'cp.platform_pays': ['平台出钱', 'Paid by the platform'],
+  'cp.all_stores': ['全平台通用', 'Any store'], 'cp.in_region': ['{r} 店铺通用', 'Any store in {r}'], 'cp.platform_pays': ['平台出钱', 'Paid by the platform'],
   'cp.until': ['{d} 前有效', 'Valid until {d}'], 'cp.soon': ['即将过期 · {d}', 'Expires soon · {d}'],
   'cp.tomorrow': ['明天过期', 'Expires tomorrow'], 'cp.today': ['今天过期', 'Expires today'],
   'cp.delivery_only': ['仅外卖可用', 'Delivery only'], 'cp.short_by': ['还差 {amt} 可用', 'Add {amt} more to use'],
@@ -56,6 +56,21 @@ extend({
   'cr.rest': ['未到期 {open} 张 · 已过期 {expired} 张 · 商家承担 {cost}', '{open} still valid · {expired} expired · cost you {cost}'],
 })
 
+extend({
+  'cb.title': ['领券活动', 'Coupons to claim'],
+  'cb.hint': ['顾客在店铺页面点“领取”拿到券，下单时自动使用。可以限制总数和每人张数。', 'Customers tap "Claim" on your page; the coupon applies by itself at checkout. Limit how many in all and per person.'],
+  'cb.new': ['新建领券活动', 'New coupon'], 'cb.name': ['名称（可不填）', 'Name (optional)'], 'cb.days': ['领取后有效天数', 'Valid for (days) after claiming'],
+  'cb.quota': ['总共发多少张', 'How many in all'], 'cb.per': ['每人最多领', 'Per customer'],
+  'cb.none': ['还没有领券活动。', 'No coupons to claim yet.'], 'cb.days_n': ['领取后 {n} 天内有效', 'valid {n} days'],
+  'cb.left': ['剩 {n} / {of} 张', '{n} of {of} left'], 'cb.no_quota': ['不限张数', 'no limit'],
+  'cb.stats': ['已领 {issued} · 已用 {used} · 商家承担 {spent}', '{issued} claimed · {used} used · cost you {spent}'],
+  'cb.st.active': ['领取中', 'Running'], 'cb.st.paused': ['已暂停', 'Paused'], 'cb.st.ended': ['已结束', 'Ended'],
+  'cb.pause': ['暂停', 'Pause'], 'cb.resume': ['继续', 'Resume'], 'cb.end': ['结束', 'End'],
+  'cb.end_confirm': ['结束后顾客不能再领，已领的券到期前仍可用。确定结束？', 'Customers can no longer claim it; coupons already claimed stay usable. End it?'],
+  'cb.claim': ['领取', 'Claim'], 'cb.claimed': ['已领取', 'Claimed'], 'cb.gone': ['已领完', 'All gone'],
+  'cb.strip': ['店铺优惠券', 'Store coupons'], 'cb.got': ['已领取，下单时自动使用', 'Claimed. It applies by itself at checkout'],
+})
+
 export const kindName = (k: CouponKind | 'promotion') => t('cp.kind.' + k)
 export const kindBadge = (k: CouponKind | 'promotion') => t('cp.short.' + k)
 
@@ -79,7 +94,18 @@ export function couponStub(c: { kind: string; value: number; threshold: number }
 }
 
 export const couponName = (c: { name: string; name_en: string; kind: CouponKind }) => pick(c.name, c.name_en) || kindName(c.kind)
-export const whereUsable = (c: CustomerCoupon) => c.issuer === 'platform' ? t('cp.all_stores') : pick(c.store_name, c.store_name_en)
+// countryName is a country in the reader's language ("PH" → "菲律宾"), else the name the map gave.
+export function countryName(code: string, fallback = ''): string {
+  try { return (code && new Intl.DisplayNames([locale.value === 'zh' ? 'zh-CN' : 'en'], { type: 'region' }).of(code.toUpperCase())) || fallback || code }
+  catch { return fallback || code }
+}
+// regionName is "菲律宾 · Metro Manila", or the country alone.
+export const regionName = (c: { country_code: string; country: string; province: string }) =>
+  [countryName(c.country_code, c.country), c.province].filter(Boolean).join(' · ')
+
+// where: a store's name, or for a platform coupon the country (and province) whose stores take it
+export const whereUsable = (c: CustomerCoupon) => c.issuer !== 'platform' ? pick(c.store_name, c.store_name_en)
+  : c.country_code ? t('cp.in_region', { r: regionName(c) }) : t('cp.all_stores')
 
 function day(iso: string): string {
   // the last moment it is valid, in the device's own words

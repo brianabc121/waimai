@@ -4,6 +4,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { get, put } from '../api'
 import { couponStub, couponTitle } from '../coupons'
+import ClaimBatches from './ClaimBatches.vue'
 import { money, t, toMajor, toMinor } from '../i18n'
 import { session } from '../session'
 import type { CouponKind, RepurchaseRule } from '../types'
@@ -77,11 +78,12 @@ const rate = computed(() => rule.value?.stats.issued ? Math.round(rule.value.sta
         <div class="muted small">{{ t('cr.rest', { open: rule.stats.open, expired: rule.stats.expired, cost: money(rule.stats.cost, cur) }) }}</div>
       </div>
     </div>
+    <ClaimBatches class="wide" :currency="cur" />
   </div>
 </template>
 
 <style scoped>
-.cr { display: grid; gap: 14px; }
+.cr { display: grid; gap: 14px; } .cr .wide { grid-column: 1 / -1; }
 @media (min-width: 900px) { .cr { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; } }
 .cr-form { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px 14px; align-items: center; }
 @media (max-width: 560px) { .cr-form { grid-template-columns: 1fr; gap: 4px; } .cr-form .l { margin-top: 8px; } }

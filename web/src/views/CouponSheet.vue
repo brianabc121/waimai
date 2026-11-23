@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The checkout's coupon picker: one coupon of each kind, all used together.
 import { computed, ref } from 'vue'
-import { couponName, couponStub, kindName, validity } from '../coupons'
+import { couponName, couponStub, kindName, validity, whereUsable } from '../coupons'
 import { money, t } from '../i18n'
 import type { CouponChoice, CouponKind } from '../types'
 
@@ -36,14 +36,14 @@ function why(c: CouponChoice): string {
       <div class="sheet-body">
         <div class="small muted sub">{{ t('cp.pick_sub') }}</div>
         <template v-for="g in groups" :key="g.kind">
-          <div class="grp"><span>{{ kindName(g.kind) }}</span><em>{{ g.kind === 'platform_free' ? t('cp.all_stores') : t('cp.n_usable', { n: g.list.filter(c => c.usable).length }) }}</em></div>
+          <div class="grp"><span>{{ kindName(g.kind) }}</span><em>{{ t('cp.n_usable', { n: g.list.filter(c => c.usable).length }) }}</em></div>
           <button v-for="c in g.list" :key="c.id" type="button" class="cp" :class="[c.kind, { off: !c.usable }]" :disabled="!c.usable"
             :data-testid="'coupon-' + c.id" :aria-pressed="picked[c.kind] === c.id" @click="toggle(c)">
             <span class="stub"><b>{{ couponStub(c, currency)[0] }}</b><small>{{ couponStub(c, currency)[1] }}</small></span>
             <span class="body">
               <b>{{ couponName(c) }}</b>
               <span v-if="!c.usable" class="why">{{ why(c) }}</span>
-              <span v-else :class="{ soon: validity(c).soon }">{{ c.kind === 'platform_free' ? t('cp.platform_pays') + ' · ' : '' }}{{ validity(c).text }}</span>
+              <span v-else :class="{ soon: validity(c).soon }">{{ c.kind === 'platform_free' ? whereUsable(c) + ' · ' : '' }}{{ validity(c).text }}</span>
             </span>
             <i class="radio" :class="{ on: picked[c.kind] === c.id }"></i>
           </button>

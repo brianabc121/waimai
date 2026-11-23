@@ -29,17 +29,21 @@ type CouponBatch struct {
 	Budget      *int64  `json:"budget"`
 	Scope       string  `json:"scope"`
 	ScopeIDs    []int64 `json:"scope_branch_ids"`
-	IssuedCount int     `json:"issued_count"`
-	Status      string  `json:"status"`
+	// CountryCode, Country and Province keep a platform batch to a place.
+	CountryCode string `json:"country_code"`
+	Country     string `json:"country"`
+	Province    string `json:"province"`
+	IssuedCount int    `json:"issued_count"`
+	Status      string `json:"status"`
 }
 
 const batchCols = `id, issuer, branch_id, kind, source, name, name_en, currency, value, threshold, valid_days, min_order,
-	monthly_cap, total_quota, per_customer, budget, scope, scope_branch_ids, issued_count, status`
+	monthly_cap, total_quota, per_customer, budget, scope, scope_branch_ids, country_code, country, province, issued_count, status`
 
 func (b *CouponBatch) scan() []any {
 	return []any{&b.ID, &b.Issuer, &b.BranchID, &b.Kind, &b.Source, &b.Name, &b.NameEn, &b.Currency, &b.Value,
 		&b.Threshold, &b.ValidDays, &b.MinOrder, &b.MonthlyCap, &b.TotalQuota, &b.PerCustomer, &b.Budget, &b.Scope,
-		&b.ScopeIDs, &b.IssuedCount, &b.Status}
+		&b.ScopeIDs, &b.CountryCode, &b.Country, &b.Province, &b.IssuedCount, &b.Status}
 }
 
 func pickName(en, zh string) string {
