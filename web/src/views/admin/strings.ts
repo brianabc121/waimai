@@ -3,7 +3,7 @@
 import { extend } from '../../i18n'
 
 extend({
-  'ad.mall': ['商城', 'Marketplace'], 'ad.chats': ['所有会话', 'All chats'],
+  'ad.mall': ['商城', 'Marketplace'], 'ad.chats': ['所有会话', 'All chats'], 'ad.support': ['平台客服', 'Platform support'],
   'adm.intro': ['商城首页按顾客的位置列出能送到的店。这里管顶部的活动图、分类，以及哪些店在商城里展示。', 'The marketplace lists the stores that deliver to where the customer is. Manage its banners, its categories and which stores show.'],
   'adm.open': ['打开商城', 'Open the marketplace'],
   'adm.banners': ['活动图', 'Banners'], 'adm.banners_hint': ['最多 5 张，按排序从小到大轮播。没有图片的用主题色显示。', 'Up to 5, shown in order. One without a picture is drawn in the theme colour.'],

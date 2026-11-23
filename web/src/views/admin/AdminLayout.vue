@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { computed, onMounted, onUnmounted } from 'vue'
 import { locale, setLocale, t } from '../../i18n'
 import { logout, session } from '../../session'
-import { loadWorkerStatus, monitor, poll } from './monitor'
+import { loadSupportUnread, loadWorkerStatus, monitor, poll } from './monitor'
 import { useShell } from '../../shell'
 
 const router = useRouter()
@@ -12,9 +12,14 @@ const route = useRoute()
 const shell = useShell('admin')
 const title = computed(() => t(String(route.meta.title ?? 'ad.title')))
 // the failed-job badge stays current on every page; errors here are shown by the page itself
-let stop = () => {}
-onMounted(() => { if (session.user?.is_platform_admin) stop = poll(() => loadWorkerStatus().catch(() => {}), 60) })
-onUnmounted(() => stop())
+// and so does the number of support messages nobody has read
+let stop = () => {}, stopSupport = () => {}
+onMounted(() => {
+  if (!session.user?.is_platform_admin) return
+  stop = poll(() => loadWorkerStatus().catch(() => {}), 60)
+  stopSupport = poll(() => loadSupportUnread().catch(() => {}), 20)
+})
+onUnmounted(() => { stop(); stopSupport() })
 async function out() { await logout(); session.loaded = true; router.replace('/login') }
 </script>
 
@@ -34,6 +39,7 @@ async function out() { await logout(); session.loaded = true; router.replace('/l
       <router-link to="/admin/items">{{ t('ad.items') }}</router-link>
       <router-link to="/admin/customers">{{ t('ad.customers') }}</router-link>
       <router-link to="/admin/mall">{{ t('ad.mall') }}</router-link>
+      <router-link to="/admin/support" data-testid="nav-support">{{ t('ad.support') }}<span v-if="monitor.supportUnread" class="badge" data-testid="support-badge">{{ monitor.supportUnread > 99 ? '99+' : monitor.supportUnread }}</span></router-link>
       <router-link to="/admin/chats" data-testid="nav-chats">{{ t('ad.chats') }}</router-link>
       <div class="grp">{{ t('ad.g_system') }}</div>
       <router-link to="/admin/settings">{{ t('ad.settings') }}</router-link>

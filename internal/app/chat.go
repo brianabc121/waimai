@@ -49,7 +49,7 @@ const (
 func customerIM(id int64) string { return "c_" + strconv.FormatInt(id, 10) }
 func branchIM(id int64) string   { return "b_" + strconv.FormatInt(id, 10) }
 
-// imParty reads c_<id> or b_<id>.
+// imParty reads c_<id>, b_<id> or the platform's p_1.
 func imParty(userID string) (kind string, id int64) {
 	if len(userID) < 3 || userID[1] != '_' {
 		return "", 0
@@ -63,6 +63,8 @@ func imParty(userID string) (kind string, id int64) {
 		return "customer", n
 	case 'b':
 		return "store", n
+	case 'p':
+		return "platform", n
 	}
 	return "", 0
 }
@@ -213,7 +215,8 @@ func (a *App) CustomerChats(ctx context.Context, customerID int64) ([]ChatThread
 
 // Unread is what the message button and the "my messages" row count.
 type Unread struct {
-	Chats   int `json:"chats"`
+	Chats   int `json:"chats"`   // including the platform's answers
+	Support int `json:"support"` // the platform's answers alone
 	Notices int `json:"notices"`
 	Total   int `json:"total"`
 }
@@ -222,7 +225,9 @@ func (a *App) CustomerUnread(ctx context.Context, customerID int64) (*Unread, er
 	var u Unread
 	err := a.DB.QueryRow(ctx, `SELECT
 		(SELECT COALESCE(sum(customer_unread),0) FROM chat_threads WHERE customer_id=$1),
-		(SELECT count(*) FROM customer_messages WHERE customer_id=$1 AND read_at IS NULL)`, customerID).Scan(&u.Chats, &u.Notices)
+		(SELECT count(*) FROM customer_messages WHERE customer_id=$1 AND read_at IS NULL),
+		(SELECT COALESCE(sum(party_unread),0) FROM support_threads WHERE customer_id=$1)`, customerID).Scan(&u.Chats, &u.Notices, &u.Support)
+	u.Chats += u.Support
 	u.Total = u.Chats + u.Notices
 	return &u, err
 }
@@ -308,6 +313,8 @@ type ChatOrder struct {
 	Open      bool      `json:"open"`
 	// Token opens the order's page; only the customer's side gets it.
 	Token string `json:"token,omitempty"`
+	// StoreName is set in a support conversation, where orders come from any store.
+	StoreName string `json:"store_name,omitempty"`
 	nonce []byte
 }
 
@@ -501,40 +508,9 @@ func (h *ChatHook) read() (*chatMsg, error) {
 	default:
 		return nil, ErrValidation("a chat is between a customer and a store")
 	}
-	switch h.ContentType {
-	case imText:
-		var c struct {
-			Content string `json:"content"`
-		}
-		if err := json.Unmarshal([]byte(h.Content), &c); err != nil {
-			return nil, ErrValidation("unreadable message")
-		}
-		m.kind, m.body = "text", strings.TrimSpace(c.Content)
-		if m.body == "" {
-			return nil, ErrValidation("the message is empty")
-		}
-		if utf8.RuneCountInString(m.body) > chatTextMax {
-			return nil, ErrValidation(fmt.Sprintf("a message can have %d characters at most", chatTextMax))
-		}
-	case imCustom:
-		// {"data": "<chatCard as JSON>"}: a picture uploaded here before, or an order
-		var c struct {
-			Data string `json:"data"`
-		}
-		var card chatCard
-		if json.Unmarshal([]byte(h.Content), &c) != nil || json.Unmarshal([]byte(c.Data), &card) != nil {
-			return nil, ErrValidation("unreadable message")
-		}
-		switch {
-		case card.T == "image" && card.Token != "":
-			m.kind, m.body = "image", card.Token
-		case card.T == "order" && card.Order > 0:
-			m.kind, m.orderID = "order", card.Order
-		default:
-			return nil, ErrValidation("this kind of message is not supported")
-		}
-	default:
-		return nil, ErrValidation("this kind of message is not supported")
+	var err error
+	if m.kind, m.body, m.orderID, err = h.content(); err != nil {
+		return nil, err
 	}
 	if m.sender == "store" {
 		var ex struct {
@@ -547,9 +523,49 @@ func (h *ChatHook) read() (*chatMsg, error) {
 	return m, nil
 }
 
+// content reads what a message carries: a text, a picture's token or an order.
+func (h *ChatHook) content() (kind, body string, orderID int64, err error) {
+	switch h.ContentType {
+	case imText:
+		var c struct {
+			Content string `json:"content"`
+		}
+		if err := json.Unmarshal([]byte(h.Content), &c); err != nil {
+			return "", "", 0, ErrValidation("unreadable message")
+		}
+		body = strings.TrimSpace(c.Content)
+		if body == "" {
+			return "", "", 0, ErrValidation("the message is empty")
+		}
+		if utf8.RuneCountInString(body) > chatTextMax {
+			return "", "", 0, ErrValidation(fmt.Sprintf("a message can have %d characters at most", chatTextMax))
+		}
+		return "text", body, 0, nil
+	case imCustom:
+		// {"data": "<chatCard as JSON>"}: a picture uploaded here before, or an order
+		var c struct {
+			Data string `json:"data"`
+		}
+		var card chatCard
+		if json.Unmarshal([]byte(h.Content), &c) != nil || json.Unmarshal([]byte(c.Data), &card) != nil {
+			return "", "", 0, ErrValidation("unreadable message")
+		}
+		switch {
+		case card.T == "image" && card.Token != "":
+			return "image", card.Token, 0, nil
+		case card.T == "order" && card.Order > 0:
+			return "order", "", card.Order, nil
+		}
+	}
+	return "", "", 0, ErrValidation("this kind of message is not supported")
+}
+
 // ChatBeforeSend answers OpenIM's question "may this message go out?". An
 // error is the reason it may not.
 func (a *App) ChatBeforeSend(ctx context.Context, h ChatHook) error {
+	if h.support() {
+		return a.supportBeforeSend(ctx, h)
+	}
 	m, err := h.read()
 	if err != nil {
 		return err
@@ -651,6 +667,9 @@ func preview(kind, body string) string {
 // ChatAfterSend keeps this system's copy of a message OpenIM has passed on.
 // A callback that comes twice is stored once.
 func (a *App) ChatAfterSend(ctx context.Context, h ChatHook) error {
+	if h.support() {
+		return a.supportAfterSend(ctx, h)
+	}
 	m, err := h.read()
 	if err != nil {
 		return nil // nothing this system keeps

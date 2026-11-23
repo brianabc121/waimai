@@ -9,6 +9,7 @@ import { chatPush, enableChatPush, setupChatPush } from '../../webpush'
 import { loadProfile } from '../me/me'
 import ChatPane from './ChatPane.vue'
 import ChatReport from './ChatReport.vue'
+import './chatpage.css'
 
 const props = defineProps<{ slug: string }>()
 const route = useRoute(), router = useRouter()
@@ -88,21 +89,3 @@ function goBack() { if (window.history.state?.back) router.back(); else void rou
       @done="reporting = false; note = t('ch.reported')" />
   </div>
 </template>
-
-<style>
-.chatpage { display: flex; flex-direction: column; height: 100dvh; min-height: 0; padding-bottom: 0; background: #f4f4f4; }
-.ch-bar { position: relative; flex: none; display: flex; align-items: center; gap: 4px; height: 52px; padding: 0 6px; background: #fff; border-bottom: 1px solid #eee; }
-.ch-bar > button { border: 0; background: none; width: 40px; height: 40px; display: grid; place-items: center; color: var(--ink); cursor: pointer; flex: none; }
-.ch-bar > b { flex: 1; min-width: 0; font-size: 16px; }
-.ch-bar .right { flex: none; }
-.ch-ttl { display: grid; line-height: 1.2; } .ch-ttl a { color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ch-ttl small { font-size: 12px; font-weight: 400; color: var(--muted); } .ch-ttl small.on { color: var(--ok, #18794e); }
-.ch-call { color: var(--ink); display: grid; place-items: center; width: 40px; height: 40px; border: 0; background: none; cursor: pointer; padding: 0; }
-.ch-tip { align-self: center; background: #eceef1; color: #4b5563; font-size: 12px; border-radius: 10px; padding: 6px 12px; max-width: 92%; text-align: center; }
-.ch-menu { position: absolute; right: 8px; top: 48px; z-index: 41; background: #fff; border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.18); display: grid; min-width: 200px; padding: 6px 0; }
-.ch-menu a, .ch-menu button { border: 0; background: none; text-align: left; padding: 11px 16px; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer; width: auto; height: auto; display: block; }
-.ch-menu .bad { color: var(--bad, #b42318); }
-.ch-menu-mask { position: fixed; inset: 0; z-index: 40; }
-.ch-push { display: flex; gap: 10px; align-items: center; justify-content: space-between; background: #fff8e1; color: #7a5200; font-size: 13px; padding: 8px 12px; border-top: 1px solid #f1e3b5; }
-.ch-tip.warn { background: #fff8e1; color: #9a6700; }
-</style>
