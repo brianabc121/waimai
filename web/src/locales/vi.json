@@ -2102,7 +2102,7 @@
  "vo.copy_line": "Thêm một phần y vậy",
  "vo.remove": "Xóa",
  "vo.addon_ph": "Nhập mã hoặc tên để thêm",
- "vo.empty": "Chưa có món. Nhập mã hoặc tên món ở mục \"Thêm món\" bên phải rồi nhấn Enter.",
+ "vo.empty": "Chưa có món. Nhập mã hoặc tên món ở mục \"Thêm món\" rồi nhấn Enter.",
  "vo.count": "Số món",
  "vo.packaging": "Phí hộp",
  "vo.delivery_fee": "Phí giao",

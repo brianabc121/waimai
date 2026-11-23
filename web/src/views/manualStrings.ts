@@ -11,7 +11,7 @@ extend({
   'vo.note_ph': ['口味备注', 'Taste note'],
   'vo.copy_line': ['再来一份', 'One more like this'], 'vo.remove': ['删除', 'Remove'],
   'vo.addon_ph': ['输入编号或名称加料', 'Type a code or name to add'],
-  'vo.empty': ['还没有菜。在右边“选择商品”里输入编号或菜名，回车加入。', 'No dishes yet. Type a code or a dish name under "Add dish" on the right and press Enter.'],
+  'vo.empty': ['还没有菜。在“选择商品”里输入编号或菜名，回车加入。', 'No dishes yet. Type a code or a dish name under "Add dish" and press Enter.'],
   'vo.count': ['数量', 'Items'], 'vo.packaging': ['包装费', 'Packaging'], 'vo.delivery_fee': ['配送费', 'Delivery'],
   'vo.discount': ['优惠', 'Discount'], 'vo.total': ['总计', 'Total'], 'vo.free': ['免费', 'Free'], 'vo.unknown': ['未知', 'Unknown'],
   'vo.copy_order': ['复制订单', 'Copy order'], 'vo.copied': ['已复制', 'Copied'],

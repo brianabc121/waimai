@@ -96,6 +96,11 @@ const hits = computed(() => {
   return [...code, ...name].slice(0, 8)
 })
 watch(pickQ, () => { pickAt.value = 0; pickOpen.value = true })
+// On a phone the list of dishes opens under the box: bring the box to the top first.
+function pickFocus(e: FocusEvent) {
+  pickOpen.value = true
+  if (window.matchMedia('(max-width: 1000px)').matches) (e.target as HTMLElement).closest('.pick')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
 function pickKey(e: KeyboardEvent) {
   if (e.key === 'ArrowDown') { pickAt.value = Math.min(pickAt.value + 1, hits.value.length - 1); e.preventDefault() }
   else if (e.key === 'ArrowUp') { pickAt.value = Math.max(pickAt.value - 1, 0); e.preventDefault() }
@@ -473,7 +478,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
       <!-- the member, the address, the dish search -->
       <section class="panel">
         <div class="pscroll">
-          <div class="sec rel">
+          <div class="sec rel idrow">
             <span class="k">{{ t('vo.member_id') }}</span>
             <input v-model="memberQ" class="inp idin" data-testid="mo-member" :placeholder="t('vo.member_ph')" @keydown="memberKey"
               @focus="memberOpen = !!memberHits.length" @blur="later(() => (memberOpen = false))" />
@@ -580,7 +585,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
           <div class="sec"><span class="k">{{ t('vo.order_note') }}</span><input v-model="orderNote" class="inp" maxlength="300" :placeholder="t('vo.order_note_ph')" /></div>
           <div class="sec"><span class="k">{{ t('vo.staff_note') }}</span><input v-model="staffNote" class="inp" maxlength="300" data-testid="mo-staff-note" :placeholder="t('vo.staff_note_ph')" /></div>
           <div class="sec pick rel"><span class="k brandc">{{ t('vo.pick') }}</span>
-            <input ref="pickInput" v-model="pickQ" class="inp" data-testid="mo-pick" autocomplete="off" @keydown="pickKey" @focus="pickOpen = true" @blur="later(() => (pickOpen = false))" />
+            <input ref="pickInput" v-model="pickQ" class="inp" data-testid="mo-pick" autocomplete="off" @keydown="pickKey" @focus="pickFocus" @blur="later(() => (pickOpen = false))" />
             <div v-if="pickOpen && pickQ.trim()" class="drop" style="left:80px;right:0;top:44px" data-testid="mo-pick-drop">
               <div v-for="(it, i) in hits" :key="it.id" class="it" :class="{ on: i === pickAt, off: it.sold_out }" @mousedown.prevent="choose(it)">
                 <em>{{ it.code }}</em> {{ both(it.name, it.name_en) }}<span class="grow"></span>
@@ -682,6 +687,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 .qty button { width: 24px; height: 24px; border-radius: 6px; border: 0; display: grid; place-items: center; background: var(--gold-soft); color: var(--brand-dark); font-weight: 700; padding: 0; }
 .qty button.f { background: var(--brand); color: #fff; }
 .qty.sm button { width: 20px; height: 20px; font-size: 12px; }
+.qty.sm button:not(.f) { background: #fff; }
 .note-in { border: 1px solid var(--edge); background: #fff; border-radius: 6px; padding: 4px 8px; font-size: 12.5px; min-height: 28px; width: 100%; min-width: 0; }
 .ops { display: flex; gap: 6px; justify-content: flex-end; }
 .ops button { width: 26px; height: 26px; border-radius: 6px; border: 0; background: var(--row); color: var(--muted); font-weight: 700; padding: 0; }
@@ -769,18 +775,55 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 @media (max-width: 1300px) {
   .mo-body { grid-template-columns: minmax(0, 1fr) 400px; }
 }
+/* Tablet and phone (H5): one column in the order staff work in: the
+   customer, then the dish search and the dishes, with the total and "place
+   order" kept at the bottom of the screen. */
 @media (max-width: 1000px) {
   .mo { height: auto; min-height: calc(100vh - var(--shell-top, 0px)); }
-  .mo-body { display: flex; flex-direction: column; }
+  .mo-body { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; }
+  .panel, .pscroll { display: contents; }
+  .pscroll > * { margin-inline: 14px; }
+  .pick { order: 2; margin-top: 8px; padding-top: 14px; border-top: 6px solid var(--row); margin-inline: 0; padding-inline: 14px; }
+  .pickhint { order: 2; margin-top: -4px; padding-inline-start: 0; }
+  .order { order: 3; border-right: 0; border-top: 1px solid var(--line); }
+  .confirmbar { order: 4; position: sticky; bottom: 0; z-index: 6; background: var(--paper); border-top: 1px solid var(--line);
+    box-shadow: 0 -6px 16px rgba(59, 31, 20, .08); padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .queue { display: none; }
+  /* fields stay clear of the bar at the bottom while typing */
+  .inp, .note-in, .addon-add input { scroll-margin-bottom: 150px; }
+  .pick { scroll-margin-top: calc(var(--shell-top, 0px) + 4px); }
+  .drop { z-index: 7; max-height: 50vh; overflow-y: auto; }
+  .sec.rel > .drop { left: 0 !important; right: 0 !important; top: 100% !important; margin-top: 4px; }
+  .sec.pick > .drop { left: 14px !important; right: 14px !important; }
   .rows { overflow: visible; }
   .thead { display: none; }
-  .tr { grid-template-columns: 24px minmax(0, 1fr) auto auto; row-gap: 6px; padding: 8px 12px; }
+  .tr { grid-template-columns: 24px minmax(0, 1fr) auto auto; row-gap: 6px; padding: 10px 12px; }
   .tr > .r:not(.b) { display: none; }
-  .tr .note-in { grid-column: 2 / 4; }
+  .tr .note-in { grid-column: 2 / 4; min-height: 34px; }
   .addons { grid-column: 1 / -1; }
-  .panel { border-right: 0; }
-  .pickhint { padding-inline-start: 0; }
+  .qty { gap: 10px; }
+  .qty button { width: 32px; height: 32px; border-radius: 8px; font-size: 16px; }
+  .qty.sm button { width: 28px; height: 28px; }
+  .ops button { width: 34px; height: 34px; }
+  .chip { padding: 6px 12px; }
+  .foot .cust { display: none; }
+  .foot { padding: 10px 14px; }
+  .tot { gap: 6px 16px; }
   .sec { flex-wrap: wrap; }
   .idin { flex: 1 0 130px; }
+}
+@media (pointer: coarse) { .pickhint { display: none; } }
+/* Phone: each label above its field, fields full width and taller. */
+@media (max-width: 767px) {
+  .sec:not(.idrow) { flex-direction: column; align-items: stretch; gap: 4px; }
+  .sec .k { width: auto; }
+  .sec .k:empty { display: none; }
+  .sec .k.kt { display: none; }
+  .inp { min-height: 42px; }
+  .idrow .grow { display: none; }
+  .idrow .btn { min-height: 42px; }
+  .btnrow .btn.blue { flex: 1 1 auto; min-height: 40px; }
+  .srcs button { padding: 7px 13px; }
+  .confirm { font-size: 16px; }
 }
 </style>
