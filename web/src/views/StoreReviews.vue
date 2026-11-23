@@ -2,7 +2,7 @@
 // The reviews tab of the store page: the score, the filters and the list.
 import { reactive, ref, watch } from 'vue'
 import { get } from '../api'
-import { locale, pick, t } from '../i18n'
+import { intlTag, pick, t } from '../i18n'
 import type { Review, ReviewPage, ReviewSummary } from '../types'
 
 const props = defineProps<{ slug: string; summary: ReviewSummary; timezone: string; delivery: boolean }>()
@@ -27,7 +27,7 @@ const one = (n: number) => n.toFixed(1).replace(/\.0$/, '')
 // 2026-11-19 18:38 on the store's clock
 function when(iso: string) {
   try { return new Date(iso).toLocaleString('sv-SE', { timeZone: props.timezone, dateStyle: 'short', timeStyle: 'short' }) }
-  catch { return new Date(iso).toLocaleString(locale.value) }
+  catch { return new Date(iso).toLocaleString(intlTag()) }
 }
 </script>
 
@@ -85,13 +85,13 @@ function when(iso: string) {
 .who { display: flex; align-items: flex-start; gap: 12px; }
 .avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; flex: none; overflow: hidden; }
 .nm { font-size: 15px; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 28px; overflow: hidden; position: relative; padding-right: 34px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 28px; overflow: hidden; position: relative; padding-inline-end: 34px; }
 .chips.open { max-height: none; }
 .chips span { border: 1px solid #c9cdd3; color: #8a8f97; border-radius: 6px; padding: 1px 7px; font-size: 13px; line-height: 22px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.chips button { position: absolute; right: 0; top: 0; width: 28px; height: 26px; border: 1px solid #c9cdd3; border-radius: 6px; background: #fff; color: #8a8f97; cursor: pointer; font-size: 11px; }
+.chips button { position: absolute; inset-inline-end: 0; top: 0; width: 28px; height: 26px; border: 1px solid #c9cdd3; border-radius: 6px; background: #fff; color: #8a8f97; cursor: pointer; font-size: 11px; }
 @media (min-width: 768px) {
   .sum { padding: 22px 24px; gap: 22px; }
   .part { min-width: 64px; }
-  .filters, .rv { padding-left: 24px; padding-right: 24px; }
+  .filters, .rv { padding-inline-start: 24px; padding-inline-end: 24px; }
 }
 </style>

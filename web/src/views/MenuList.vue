@@ -107,8 +107,8 @@ defineExpose({ scrollTo })
 .cats { display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px; position: sticky; top: var(--menu-top, 0px); background: var(--bg); z-index: 10; }
 .cats button { position: relative; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 14px; white-space: nowrap; cursor: pointer; }
 .cats button.on { border-color: var(--brand); color: var(--brand-dark); }
-.badge { display: inline-block; margin-left: 5px; vertical-align: 1px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #e5352b; color: #fff; font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; }
-.must { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 4px; background: var(--brand-soft); color: var(--brand-dark); font-size: 11px; font-weight: 600; line-height: 16px; vertical-align: middle; white-space: nowrap; }
+.badge { display: inline-block; margin-inline-start: 5px; vertical-align: 1px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #e5352b; color: #fff; font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; }
+.must { display: inline-block; margin-inline-start: 4px; padding: 0 5px; border-radius: 4px; background: var(--brand-soft); color: var(--brand-dark); font-size: 11px; font-weight: 600; line-height: 16px; vertical-align: middle; white-space: nowrap; }
 .lists { padding: 4px 14px 14px; display: flex; flex-direction: column; gap: 14px; }
 .cat { display: flex; flex-direction: column; gap: 10px; scroll-margin-top: calc(var(--menu-top, 0px) + 60px); }
 .items { display: flex; flex-direction: column; gap: 10px; }
@@ -129,8 +129,8 @@ defineExpose({ scrollTo })
 .list .cats button { border: 0; border-radius: 0; background: transparent; color: var(--muted); padding: 16px 8px; white-space: normal; font-size: 13px; line-height: 1.35; }
 .list .cats button.on { background: var(--menu-bg, #fff); color: var(--brand); font-weight: 600; }
 /* a red bar marks the category being read */
-.list .cats button.on::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--brand); }
-.list .cats .badge { position: absolute; top: 4px; right: 4px; margin: 0; }
+.list .cats button.on::before { content: ''; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 3px; background: var(--brand); }
+.list .cats .badge { position: absolute; top: 4px; inset-inline-end: 4px; margin: 0; }
 .list .cats .must { display: block; width: fit-content; margin: 3px auto 0; }
 .list .lists { flex: 1; min-width: 0; padding: 0 12px 14px; gap: 6px; }
 .list .cat { scroll-margin-top: var(--menu-top, 0px); gap: 0; }
@@ -144,7 +144,7 @@ defineExpose({ scrollTo })
 /* featured: signature strip */
 .hero { padding: 12px 14px 0; }
 .strip { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0 4px; }
-.hcard { flex: none; width: 150px; text-align: left; border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 8px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.hcard { flex: none; width: 150px; text-align: start; border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 8px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
 .hcard img, .hcard .ph { width: 100%; height: 96px; object-fit: cover; border-radius: 8px; }
 .plus { background: var(--brand); color: #fff; border-radius: 999px; padding: 0 9px; font-weight: 700; }
 

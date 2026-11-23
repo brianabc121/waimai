@@ -1,6 +1,6 @@
 // Coupons: words and helpers shared by checkout, the order page, "my offers"
 // and the merchant's coupon settings (docs/COUPON_DESIGN.md).
-import { extend, locale, money, pick, t } from './i18n'
+import { extend, intlTag, money, pick, t } from './i18n'
 import type { CouponKind, CustomerCoupon, OrderDiscount } from './types'
 
 extend({
@@ -96,7 +96,7 @@ export function couponStub(c: { kind: string; value: number; threshold: number }
 export const couponName = (c: { name: string; name_en: string; kind: CouponKind }) => pick(c.name, c.name_en) || kindName(c.kind)
 // countryName is a country in the reader's language ("PH" → "菲律宾"), else the name the map gave.
 export function countryName(code: string, fallback = ''): string {
-  try { return (code && new Intl.DisplayNames([locale.value === 'zh' ? 'zh-CN' : 'en'], { type: 'region' }).of(code.toUpperCase())) || fallback || code }
+  try { return (code && new Intl.DisplayNames([intlTag()], { type: 'region' }).of(code.toUpperCase())) || fallback || code }
   catch { return fallback || code }
 }
 // regionName is "菲律宾 · Metro Manila", or the country alone.
@@ -110,7 +110,7 @@ export const whereUsable = (c: CustomerCoupon) => c.issuer !== 'platform' ? pick
 function day(iso: string): string {
   // the last moment it is valid, in the device's own words
   const d = new Date(new Date(iso).getTime() - 1000)
-  return d.toLocaleDateString(locale.value === 'zh' ? 'zh-CN' : 'en-GB', { month: 'short', day: 'numeric' })
+  return d.toLocaleDateString(intlTag() === 'en' ? 'en-GB' : intlTag(), { month: 'short', day: 'numeric' })
 }
 export const lastDay = day
 

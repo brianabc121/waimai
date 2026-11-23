@@ -2,6 +2,7 @@
 // The customer's top bar on an iPad or a computer, in the marketplace's red:
 // the way home, to the orders and to "me", the messages and the language.
 // A phone has the bottom navigation instead, so it does not show this.
+import LangButton from '../LangButton.vue'
 import { computed } from 'vue'
 import { locale, setLocale, t } from '../../i18n'
 import { avatarUrl, displayName, me } from './me'
@@ -20,7 +21,7 @@ const unread = computed(() => me.profile ? me.profile.unread + me.profile.chat_u
         <router-link to="/me" :class="{ on: active === 'me' }" data-testid="nav-me">{{ t('cn.center') }}</router-link>
       </nav>
       <span class="grow"></span>
-      <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
+      <LangButton class="lang" />
       <router-link to="/me/messages" class="msg" :aria-label="t('me.messages')" data-testid="nav-messages">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.500c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.150-2.9-.400L5 20l.9-3.300C4.400 15.400 3.500 13.600 3.500 11.500c0-3.900 3.800-7 8.500-7z" /><path d="M8.5 11.500h.01M12 11.500h.01M15.5 11.500h.01" /></svg>
         <i v-if="unread">{{ unread > 99 ? '99+' : unread }}</i>
@@ -45,10 +46,10 @@ const unread = computed(() => me.profile ? me.profile.unread + me.profile.chat_u
   .links a:hover { opacity: 1; background: rgba(255, 255, 255, .12); }
   .links a.on { opacity: 1; background: var(--gold); color: var(--red); font-weight: 600; }
   .grow { flex: 1; }
-  .lang { border: 1px solid rgba(255, 255, 255, .7); background: none; color: #fff; border-radius: 6px; padding: 1px 8px; font-size: 12px; cursor: pointer; margin-right: -12px; }
+  .lang { border: 1px solid rgba(255, 255, 255, .7); background: none; color: #fff; border-radius: 6px; padding: 1px 8px; font-size: 12px; cursor: pointer; margin-inline-end: -12px; }
   .msg { position: relative; width: 36px; height: 36px; border-radius: 8px; background: rgba(255, 255, 255, .16); color: #fff; display: grid; place-items: center; }
-  .msg i { position: absolute; right: -6px; top: -6px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: var(--gold); color: var(--red); font-style: normal; font-size: 11px; font-weight: 700; display: grid; place-items: center; border: 1.5px solid var(--red); }
-  .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--gold); color: var(--red); font-weight: 700; display: grid; place-items: center; overflow: hidden; margin-left: -12px; }
+  .msg i { position: absolute; inset-inline-end: -6px; top: -6px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: var(--gold); color: var(--red); font-style: normal; font-size: 11px; font-weight: 700; display: grid; place-items: center; border: 1.5px solid var(--red); }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--gold); color: var(--red); font-weight: 700; display: grid; place-items: center; overflow: hidden; margin-inline-start: -12px; }
   .avatar img { width: 100%; height: 100%; object-fit: cover; }
 }
 @media (min-width: 768px) and (max-width: 1023px) {

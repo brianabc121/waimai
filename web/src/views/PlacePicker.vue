@@ -154,7 +154,7 @@ const state = computed(() => checking.value || !terms.value ? 'checking' : terms
 
 <template>
   <div class="ppick" :class="{ embedded }" data-testid="picker">
-    <div v-if="!embedded" class="pp-head"><button class="pp-back" :aria-label="t('back')" data-testid="pin-back" @click="emit('close')">‹</button><b>{{ t('pp.title') }}</b></div>
+    <div v-if="!embedded" class="pp-head"><button class="pp-back" :aria-label="t('back')" data-testid="pin-back" @click="emit('close')"><span class="rtl-flip">‹</span></button><b>{{ t('pp.title') }}</b></div>
     <MapCanvas v-if="key" ref="map" class="pp-map" :maps-key="key" :initial="initial" data-testid="pin-map" @ready="mapReady">
       <template #default="{ px }">
         <g v-if="shop" :transform="`translate(${px([shop.lat, shop.lng]).x} ${px([shop.lat, shop.lng]).y})`">
@@ -214,12 +214,12 @@ const state = computed(() => checking.value || !terms.value ? 'checking' : terms
 <style scoped>
 .ppick { display: flex; flex-direction: column; background: #fff; height: 100%; min-height: 0; }
 .pp-head { display: flex; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 17px; flex: none; }
-.pp-head b { flex: 1; text-align: center; margin-right: 34px; }
+.pp-head b { flex: 1; text-align: center; margin-inline-end: 34px; }
 .pp-back { border: 0; background: none; font-size: 28px; line-height: 1; width: 34px; cursor: pointer; color: var(--ink); }
 .pp-map { height: 38vh; min-height: 220px; max-height: 360px; flex: none; position: relative; }
 .ppick.embedded .pp-map { height: 300px; }
 .pp-tip { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); background: rgba(31, 35, 40, .88); color: #fff; font-size: 12.5px; padding: 5px 12px; border-radius: 16px; white-space: nowrap; pointer-events: none; z-index: 2; }
-.pp-me { right: 12px; bottom: 30px; width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer; font-size: 18px; color: var(--brand); }
+.pp-me { inset-inline-end: 12px; bottom: 30px; width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer; font-size: 18px; color: var(--brand); }
 .pp-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px 12px 0; }
 .pp-search { display: flex; align-items: center; gap: 8px; background: #f1f2f4; border-radius: 22px; height: 44px; padding: 0 14px; flex: none; }
 .pp-search:focus-within { background: #fff; outline: 2px solid var(--brand); }
@@ -232,7 +232,7 @@ const state = computed(() => checking.value || !terms.value ? 'checking' : terms
 .pp-listhd .btn { min-height: 34px; padding: 0 18px; font-size: 15px; }
 .pp-list { flex: 1; min-height: 80px; overflow-y: auto; margin: 0 -12px; }
 .pp-empty { padding: 14px 16px; font-size: 14px; }
-.pp-place { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; border-top: 1px solid #f0f1f3; background: #fff; padding: 11px 16px; cursor: pointer; font: inherit; color: inherit; }
+.pp-place { display: flex; align-items: center; gap: 10px; width: 100%; text-align: start; border: 0; border-top: 1px solid #f0f1f3; background: #fff; padding: 11px 16px; cursor: pointer; font: inherit; color: inherit; }
 .pp-place .grow { flex: 1; min-width: 0; display: block; }
 .pp-place .n { display: block; font-size: 15.5px; font-weight: 600; }
 .pp-place .d { display: block; font-size: 13px; color: #7b828c; }

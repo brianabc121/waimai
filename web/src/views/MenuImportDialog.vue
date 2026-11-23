@@ -91,7 +91,7 @@ const template = (menu: boolean) => `/api/v1${props.base}/menu-imports/template$
                     <div><b>{{ r.name || '—' }}</b><span v-if="r.photos.length" class="muted small"> +{{ r.photos.length }}🖼</span>
                       <div class="muted small">{{ r.name_en }}</div></div>
                   </div></td>
-                  <td class="price right"><span v-if="r.action === 'update' && r.old_price !== r.price" class="muted strike" style="margin-right:4px">{{ money(r.old_price ?? 0, cur) }}</span>{{ priceBad(r) ? '—' : money(r.price, cur) }}</td>
+                  <td class="price right"><span v-if="r.action === 'update' && r.old_price !== r.price" class="muted strike" style="margin-inline-end:4px">{{ money(r.old_price ?? 0, cur) }}</span>{{ priceBad(r) ? '—' : money(r.price, cur) }}</td>
                   <td class="small imp-specs"><template v-if="r.specs.length">{{ specText(r) }}</template>
                     <span v-else-if="r.specs_set && r.action === 'update'" class="muted">{{ t('import_none') }}</span>
                     <span v-else class="muted">{{ r.action === 'update' ? t('import_keep') : '—' }}</span></td>
@@ -124,7 +124,7 @@ label.btn.disabled { opacity: .5; pointer-events: none; }
 .imp-thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex: none; }
 .imp-thumb.empty { display: grid; place-items: center; background: var(--line, #eee); color: var(--muted, #888); font-size: 14px; }
 .imp-specs { max-width: 220px; }
-.imp-newcat { margin-left: 4px; font-size: 11px; }
+.imp-newcat { margin-inline-start: 4px; font-size: 11px; }
 .imp-ch { display: inline-flex; gap: 3px; }
 .imp-ch i { font-style: normal; font-size: 11px; padding: 1px 4px; border-radius: 4px; border: 1px solid var(--line, #ddd); }
 .imp-ch i.on { background: var(--ok-soft, #e7f6ec); border-color: transparent; color: var(--ok, #1a7f37); }

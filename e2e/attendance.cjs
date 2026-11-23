@@ -166,10 +166,10 @@ expect((await added.locator('[data-col=hours] b').innerText()).trim(), '0:00', '
 step('a voided shift stays on the record and stops counting')
 
 // ---- English ----
-await owner.click('.staffbar .lang')
+await owner.click('.staffbar .lang'); await owner.click('[data-testid=lang-en]')
 await owner.locator('[data-testid=staff-tabs] :text("Attendance")').waitFor()
 await owner.locator('.tag:has-text("Voided")').first().waitFor()
-await owner.click('.staffbar .lang')
+await owner.click('.staffbar .lang'); await owner.click('[data-testid=lang-zh]')
 step('the page is bilingual')
 
 // a cashier has no staff pages

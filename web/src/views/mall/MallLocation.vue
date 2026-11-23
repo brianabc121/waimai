@@ -63,7 +63,7 @@ function useRegion(c: MallCountry, city: MallCountry['cities'][number], district
 
     <div v-else class="sheet mloc">
       <div class="mloc-head">
-        <button v-if="step === 'cities' && !startAt" class="x back" :aria-label="t('back')" @click="step = 'list'">‹</button>
+        <button v-if="step === 'cities' && !startAt" class="x back" :aria-label="t('back')" @click="step = 'list'"><span class="rtl-flip">‹</span></button>
         <h2>{{ step === 'cities' ? t('ml.cities') : t('ml.sheet_title') }}</h2>
         <button class="x" :aria-label="t('close')" data-testid="mall-location-close" @click="emit('close')">✕</button>
       </div>
@@ -96,9 +96,9 @@ function useRegion(c: MallCountry, city: MallCountry['cities'][number], district
         </template>
 
         <button v-if="hasMap" class="row nav" data-testid="mall-map-pick" @click="step = 'map'">
-          <span class="em">🗺️</span><b class="grow">{{ t('ml.map_pick') }}</b><span class="go">›</span></button>
+          <span class="em">🗺️</span><b class="grow">{{ t('ml.map_pick') }}</b><span class="go"><span class="rtl-flip">›</span></span></button>
         <button class="row nav" data-testid="mall-cities" @click="toCities">
-          <span class="em">🏙️</span><b class="grow">{{ t('ml.browse') }}</b><small v-if="hint">{{ hint }}</small><span class="go">›</span></button>
+          <span class="em">🏙️</span><b class="grow">{{ t('ml.browse') }}</b><small v-if="hint">{{ hint }}</small><span class="go"><span class="rtl-flip">›</span></span></button>
       </div>
 
       <div v-else class="sheet-body">
@@ -108,7 +108,7 @@ function useRegion(c: MallCountry, city: MallCountry['cities'][number], district
           <p class="sec">{{ c.country || c.country_code }}</p>
           <div v-for="city in c.cities" :key="city.city" class="city">
             <button class="row" data-testid="mall-city" @click="useRegion(c, city)">
-              <b class="grow">{{ t('ml.city_all', { city: city.city }) }}</b><small>{{ t('ml.city_n', { n: city.stores }) }}</small><span class="go">›</span></button>
+              <b class="grow">{{ t('ml.city_all', { city: city.city }) }}</b><small>{{ t('ml.city_n', { n: city.stores }) }}</small><span class="go"><span class="rtl-flip">›</span></span></button>
             <div v-if="city.districts.length > 1" class="districts">
               <button v-for="d in city.districts" :key="d.district" data-testid="mall-district" @click="useRegion(c, city, d.district)">{{ d.district }} <small>{{ d.stores }}</small></button>
             </div>
@@ -128,10 +128,10 @@ function useRegion(c: MallCountry, city: MallCountry['cities'][number], district
 .mloc-head h2 { flex: 1; text-align: center; font-size: 18px; }
 .x { width: 34px; height: 34px; border: 0; background: none; color: #6b7280; font-size: 17px; cursor: pointer; border-radius: 50%; }
 .x.back { font-size: 26px; line-height: 1; }
-.mloc-head h2:first-child { padding-left: 34px; }
+.mloc-head h2:first-child { padding-inline-start: 34px; }
 .warn { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
-.find { width: 100%; display: flex; align-items: center; gap: 8px; padding: 11px 12px; border: 1px solid #d5d8dd; border-radius: 10px; background: #fff; color: #8b919a; cursor: pointer; text-align: left; }
-.row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 13px 2px; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left; cursor: pointer; }
+.find { width: 100%; display: flex; align-items: center; gap: 8px; padding: 11px 12px; border: 1px solid #d5d8dd; border-radius: 10px; background: #fff; color: #8b919a; cursor: pointer; text-align: start; }
+.row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 13px 2px; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: start; cursor: pointer; }
 .row.gps { cursor: default; }
 .row.gps.on b { color: var(--brand); }
 .row b { display: block; font-size: 15.5px; }
@@ -142,7 +142,7 @@ function useRegion(c: MallCountry, city: MallCountry['cities'][number], district
 .grow { flex: 1; min-width: 0; }
 .radio { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #c3c7ce; flex: none; }
 .radio.on { border: 6px solid var(--brand); }
-.lab { font-style: normal; font-size: 12px; background: var(--brand-soft); color: var(--brand); border-radius: 4px; padding: 1px 6px; margin-right: 7px; font-weight: 600; }
+.lab { font-style: normal; font-size: 12px; background: var(--brand-soft); color: var(--brand); border-radius: 4px; padding: 1px 6px; margin-inline-end: 7px; font-weight: 600; }
 .sec { color: #6b7280; font-size: 13px; margin: 14px 0 0; }
 .city .row { padding: 12px 2px; }
 .districts { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0 12px; border-bottom: 1px solid var(--line); }

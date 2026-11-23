@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LangButton from './LangButton.vue'
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '../api'
@@ -28,7 +29,7 @@ async function submit() {
   <div class="phone login">
     <form class="section stack" @submit.prevent="submit">
       <div class="row between"><h1>{{ t('sign_in') }}</h1>
-        <button type="button" class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button></div>
+        <LangButton class="lang" /></div>
       <div v-if="error" class="banner bad">{{ error }}</div>
       <label class="field"><span>{{ t('username') }}</span><input v-model="username" autocomplete="username" autocapitalize="none" required /></label>
       <label class="field"><span>{{ t('password') }}</span><input v-model="password" type="password" autocomplete="current-password" required /></label>

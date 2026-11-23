@@ -189,15 +189,15 @@ async function showSettlement(id: number) {
 
 <style scoped>
 .custom input { width: auto; }
-.filter { width: auto; margin-left: auto; }
-.r { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.filter { width: auto; margin-inline-start: auto; }
+.r { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bill td, .bill th { white-space: nowrap; }
 .bill tr.has { cursor: pointer; } .bill tr.off td { color: var(--muted); } .bill tr.opened td { background: #fff8f1; }
 .neg { color: #b8392a; } .plat { color: #6d28d9; }
-.chev { margin-left: 6px; color: var(--muted); }
+.chev { margin-inline-start: 6px; color: var(--muted); }
 .detail td { background: #fffaf2; padding: 6px 12px 10px; }
 .dline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 3px 0; }
-.dline .amt { margin-left: auto; color: #b8392a; }
+.dline .amt { margin-inline-start: auto; color: #b8392a; }
 .badge { display: inline-block; font-size: 12px; border-radius: 5px; padding: 1px 7px; background: #fde7d8; color: #9a3412; white-space: nowrap; }
 .badge.store_delivery { background: #fdf0d5; color: #92400e; } .badge.platform_free { background: #ede9fe; color: #5b21b6; }
 .badge.promotion { background: #e8eef7; color: #334e7a; }

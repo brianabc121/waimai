@@ -166,5 +166,5 @@ async function give() {
 .give { border-top: 1px solid var(--line); padding-top: 14px; } .give h3 { margin: 0; }
 .give textarea { width: 100%; max-width: 520px; }
 .table-wrap { overflow-x: auto; }
-.nowrap { white-space: nowrap; } .nowrap .btn { margin-left: 6px; }
+.nowrap { white-space: nowrap; } .nowrap .btn { margin-inline-start: 6px; }
 </style>

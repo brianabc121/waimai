@@ -206,9 +206,9 @@ try {
   step('the route page draws both routes, the drops and what happened; the slider shows where the rider was')
 
   // English, and no access for a cashier
-  await owner.click('.staffbar .lang')
+  await owner.click('.staffbar .lang'); await owner.click('[data-testid=lang-en]')
   await owner.locator('[data-testid=staff-tabs] :text("Rider work")').waitFor()
-  await owner.click('.staffbar .lang')
+  await owner.click('.staffbar .lang'); await owner.click('[data-testid=lang-zh]')
   expect((await api(desk, 'GET', `/merchant/branches/${bid}/reports/riders?from=${today}&to=${today}`)).status, 403, 'a cashier cannot read the summary')
   expect((await api(desk, 'GET', `/merchant/branches/${bid}/trips/${trip.id}`)).status, 403, 'a cashier cannot read a trip')
   step('the page is bilingual; a cashier cannot read it')

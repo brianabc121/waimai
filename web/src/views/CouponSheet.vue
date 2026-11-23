@@ -61,7 +61,7 @@ function why(c: CouponChoice): string {
 .sub { text-align: center; margin-top: -4px; }
 .grp { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #7b6657; margin: 6px 2px -2px; }
 .grp em { font-style: normal; font-weight: 400; }
-.cp { display: flex; align-items: stretch; border: 1px solid #ecd9b8; border-radius: 12px; overflow: hidden; background: #fff; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; width: 100%; }
+.cp { display: flex; align-items: stretch; border: 1px solid #ecd9b8; border-radius: 12px; overflow: hidden; background: #fff; padding: 0; font: inherit; color: inherit; text-align: start; cursor: pointer; width: 100%; }
 .cp .stub { width: 86px; flex: none; background: linear-gradient(160deg, #b8392a, #8f251b); color: #fff; display: grid; place-items: center; align-content: center; padding: 8px 2px; text-align: center; }
 .cp .stub b { font-size: 19px; line-height: 1.15; } .cp .stub small { font-size: 11px; opacity: .92; }
 .cp.store_delivery .stub { background: linear-gradient(160deg, #d0892c, #a8641a); }

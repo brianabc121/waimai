@@ -14,13 +14,14 @@ import (
 )
 
 // The lists under "Staff" can be downloaded as Excel with ?format=xlsx. The
-// headers follow ?lang=en, Chinese otherwise.
+// headers are in Chinese for ?lang=zh / zh-Hant, English otherwise.
 
 func wantsXLSX(c *gin.Context) bool { return c.Query("format") == "xlsx" }
 
 // words picks the language of the headers.
 func words(c *gin.Context) func(zh, en string) string {
-	en := c.Query("lang") == "en"
+	l := c.Query("lang")
+	en := l != "" && l != "zh" && l != "zh-Hant"
 	return func(zh, e string) string {
 		if en {
 			return e

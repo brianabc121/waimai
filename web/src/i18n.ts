@@ -1,13 +1,75 @@
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { detect, isLocale, langInfo, readCookie, writeCookie, type Locale } from './langs'
 
-export type Locale = 'zh' | 'en'
-export const locale = ref<Locale>((localStorage.getItem('locale') as Locale) || 'zh')
+export type { Locale } from './langs'
 
-export function setLocale(l: Locale) {
-  locale.value = l
-  localStorage.setItem('locale', l)
-  document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en'
+// The page's language. index.html already picked it (link ?lang=, cookie,
+// then the browser's languages) and put it on <html data-lang> before the
+// page painted; a language other than Chinese or English has its texts in
+// src/locales/<code>.json, loaded by initLocale() before the app mounts.
+const first = document.documentElement.dataset.lang
+export const locale = ref<Locale>(isLocale(first) ? first : readCookie() ?? detect(navigator.languages ?? [navigator.language]))
+
+// Whether the visitor chose the language themselves (the cookie is set) or it
+// follows the browser.
+export const chosen = ref(readCookie() !== null)
+
+// The platform back office speaks Chinese and English only; anyone reading
+// it in another language sees English there.
+export const adminScope = ref(false)
+export const shown = computed<Locale>(() => adminScope.value && locale.value !== 'zh' && locale.value !== 'en'
+  ? (locale.value === 'zh-Hant' ? 'zh' : 'en') : locale.value)
+
+const loaders = import.meta.glob<{ default: Record<string, string> }>('./locales/[a-z]*.json')
+const texts: Partial<Record<Locale, Record<string, string>>> = {}
+// Corrections made in the back office (see the language page); they win over
+// the texts that ship with the build.
+const fixes: Partial<Record<Locale, Record<string, string>>> = {}
+
+async function load(l: Locale) {
+  if (l === 'zh' || l === 'en' || texts[l]) return
+  const f = loaders[`./locales/${l}.json`]
+  if (f) texts[l] = (await f()).default
 }
+
+function apply(l: Locale) {
+  const html = document.documentElement
+  html.lang = langInfo(l).tag
+  html.dir = 'rtl' in langInfo(l) ? 'rtl' : 'ltr'
+  html.dataset.lang = l
+  if (l === 'my' || l === 'km') void import('./fonts')
+}
+
+export async function initLocale() {
+  await load(locale.value).catch(() => {})
+  apply(shown.value)
+  watch(shown, apply)
+}
+
+// setLocale switches the page without a reload and remembers the choice in a
+// cookie (one year). null goes back to following the browser.
+export async function setLocale(l: Locale | null) {
+  const next = l ?? detect(navigator.languages ?? [navigator.language])
+  await load(next).catch(() => {})
+  writeCookie(l)
+  try { localStorage.removeItem('locale') } catch { /* private mode */ }
+  chosen.value = l !== null
+  locale.value = next
+  for (const f of listeners) f(l)
+}
+const listeners: ((l: Locale | null) => void)[] = []
+// onLocaleChosen lets the signed-in customer's account remember the choice.
+export function onLocaleChosen(f: (l: Locale | null) => void) { listeners.push(f) }
+
+// intlTag is what Intl and toLocale*() should be given: Arabic keeps 0–9.
+export function intlTag(): string {
+  const l = shown.value
+  return l === 'ar' ? 'ar-u-nu-latn' : langInfo(l).tag
+}
+
+// isZh is true for both Chinese scripts (texts that only exist in Chinese and
+// English show the Chinese one).
+export const isZh = () => shown.value === 'zh' || shown.value === 'zh-Hant'
 
 // [zh, en]
 const dict: Record<string, [string, string]> = {
@@ -213,21 +275,47 @@ const dict: Record<string, [string, string]> = {
   'set.contact_fields_hint': ['勾选的项目会出现在顾客的“新增收货地址”页（选填），并随订单显示给门店和骑手。都不勾选就不显示。', 'The ticked ones appear on the customer\'s address form (optional) and come with the order for the store and the rider. Tick none and none are shown.'],
   cat_required: ['必选', 'Required'], cat_required_on: ['设为必选', 'Make required'], cat_required_off: ['取消必选', 'Not required'],
   cat_required_hint: ['必选分类：顾客至少要从里面选一样才能下单', 'Required: a customer must choose at least one dish from it'],
+  'pr.amount_off': ['减{amt}', '{amt} off'], 'pr.percent_off': ['{zhe}折', '{pct}% off'], 'pr.cap': ['（最多减{amt}）', ' (up to {amt})'],
+  'pr.free_delivery': ['免配送费', 'Free delivery'], 'pr.over': ['满{th}{what}', '{what} over {th}'],
+  'pr.amount_off_sp': ['减 {amt}', '{amt} off'], 'pr.percent_off_sp': ['{zhe} 折', '{pct}% off'], 'pr.cap_sp': ['，最多减 {amt}', ', up to {amt}'],
+  lang: ['语言', 'Language'], lang_auto: ['跟随浏览器', 'Same as browser'], lang_remember: ['选好后这个浏览器会记住', 'This browser will remember your choice'],
+  'ago.s': ['{n} 秒前', '{n}s ago'], 'ago.m': ['{n} 分钟前', '{n}m ago'], 'ago.h': ['{n} 小时前', '{n}h ago'],
+  'ic.bag': ['袋', 'B'], 'ic.ride': ['送', 'D'], 'ic.store': ['店', 'S'], 'ic.rider': ['骑', 'R'],
 }
 
 // extend adds the texts of a lazily loaded area (the platform back office).
 export function extend(more: Record<string, [string, string]>) { Object.assign(dict, more) }
 
+export function fixTexts(l: Locale, m: Record<string, string>) { fixes[l] = m }
+
+// has reports whether a key exists (some lists fall back to the raw code).
+export const has = (key: string) => key in dict
+
 export function t(key: string, vars: Record<string, string | number> = {}): string {
+  const l = shown.value
   const e = dict[key]
-  let s = e ? e[locale.value === 'zh' ? 0 : 1] : key
-  for (const k in vars) s = s.replace(`{${k}}`, String(vars[k]))
+  let s = fixes[l]?.[key] ?? (l === 'zh' ? e?.[0] : l === 'en' ? e?.[1] : texts[l]?.[key] ?? e?.[1]) ?? key
+  if (s.includes(', plural,')) s = plural(s, vars)
+  for (const k in vars) s = s.split(`{${k}}`).join(String(vars[k]))
   return s
 }
 
-// pick shows the name in the current language, falling back to the other one.
+// plural picks the form for a count: "{n, plural, one {# заказ} few {# заказа} other {# заказов}}".
+function plural(s: string, vars: Record<string, string | number>): string {
+  return s.replace(/\{(\w+), plural,((?:\s*[=\w]+\s*\{[^{}]*\})+)\s*\}/g, (_, name: string, body: string) => {
+    const n = Number(vars[name] ?? 0)
+    const forms: Record<string, string> = {}
+    for (const m of body.matchAll(/([=\w]+)\s*\{([^{}]*)\}/g)) forms[m[1]] = m[2]
+    let cat = 'other'
+    try { cat = new Intl.PluralRules(langInfo(shown.value).tag).select(n) } catch { /* old browser */ }
+    return (forms['=' + n] ?? forms[cat] ?? forms.other ?? '').split('#').join(String(n))
+  })
+}
+
+// pick shows a name kept in Chinese and English: Chinese readers get the
+// Chinese one, everyone else the English one, each falling back to the other.
 export function pick(zh: string, en: string): string {
-  return locale.value === 'en' ? en || zh : zh || en
+  return isZh() ? zh || en : en || zh
 }
 
 // both shows "中文 / English" for staff screens where the team is mixed.
@@ -273,17 +361,16 @@ export function money(minor: number, currency = 'PHP'): string {
 
 // promoLabel describes a promotion's rule in the current language.
 export function promoLabel(p: { kind: string; threshold: number; value: number; max_discount: number | null }, currency: string): string {
-  const zh = locale.value === 'zh'
   const th = p.threshold > 0 ? money(p.threshold, currency) : ''
   let what = ''
-  if (p.kind === 'amount_off') what = zh ? `减${money(p.value, currency)}` : `${money(p.value, currency)} off`
+  if (p.kind === 'amount_off') what = t('pr.amount_off', { amt: money(p.value, currency) })
   else if (p.kind === 'percent_off') {
     const pct = p.value / 100
-    what = zh ? `${(100 - pct) / 10}折` : `${pct}% off`
-    if (p.max_discount) what += zh ? `（最多减${money(p.max_discount, currency)}）` : ` (up to ${money(p.max_discount, currency)})`
-  } else what = zh ? '免配送费' : 'Free delivery'
+    what = t('pr.percent_off', { pct, zhe: (100 - pct) / 10 })
+    if (p.max_discount) what += t('pr.cap', { amt: money(p.max_discount, currency) })
+  } else what = t('pr.free_delivery')
   if (!th) return what
-  return zh ? `满${th}${what}` : `${what} over ${th}`
+  return t('pr.over', { th, what })
 }
 
 // whenText shows a scheduled time as "今天 18:30" / "Tomorrow 11:00", in the
@@ -294,14 +381,14 @@ export function whenText(iso: string, timeZone?: string): string {
   const time = d.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' })
   const today = day(new Date()), tomorrow = day(new Date(Date.now() + 86400000))
   const label = day(d) === today ? t('today') : day(d) === tomorrow ? t('tomorrow')
-    : d.toLocaleDateString(locale.value === 'zh' ? 'zh-CN' : 'en-US', { timeZone, month: 'short', day: 'numeric' })
+    : d.toLocaleDateString(intlTag(), { timeZone, month: 'short', day: 'numeric' })
   return `${label} ${time}`
 }
 
 // importError turns a row error code from the server into text.
 export function importError(code: string): string {
   const [k, n] = code.split(':')
-  return dict['ie.' + k] ? t('ie.' + k, { n: n ?? '' }) : code
+  return has('ie.' + k) ? t('ie.' + k, { n: n ?? '' }) : code
 }
 
 // Staff type amounts in major units; the API wants minor units.
@@ -310,7 +397,7 @@ export const toMajor = (v: number) => v / 100
 
 export function reasonText(r: string): string {
   const k = 'r.' + r
-  return dict[k] ? t(k) : r
+  return has(k) ? t(k) : r
 }
 
 export function minutesSince(iso: string): number {

@@ -102,8 +102,8 @@ watch(() => props.media.length, () => { index.value = 0; go(0, false); rest() })
       </div>
     </div>
     <template v-if="media.length > 1">
-      <button class="arrow prev" :aria-label="t('pm.prev')" @click="go(index - 1)">‹</button>
-      <button class="arrow next" :aria-label="t('pm.next')" data-testid="promo-next" @click="go(index + 1)">›</button>
+      <button class="arrow prev" :aria-label="t('pm.prev')" @click="go(index - 1)"><span class="rtl-flip">‹</span></button>
+      <button class="arrow next" :aria-label="t('pm.next')" data-testid="promo-next" @click="go(index + 1)"><span class="rtl-flip">›</span></button>
       <div class="dots"><i v-for="(m, i) in media" :key="m.id" :class="{ on: i === index }" @click="go(i)"></i></div>
     </template>
     <div v-if="label" class="label" data-testid="promo-label">{{ label }}</div>
@@ -121,13 +121,13 @@ watch(() => props.media.length, () => { index.value = 0; go(0, false); rest() })
 .play { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; margin: -30px 0 0 -30px; border: 0; border-radius: 50%; padding: 0 0 0 4px;
   background: rgba(40, 30, 24, .62); color: #fff; display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(3px); }
 .play:hover { background: rgba(40, 30, 24, .8); }
-.mute { position: absolute; left: 12px; bottom: var(--promo-foot, 12px); width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .5); color: #fff; display: grid; place-items: center; cursor: pointer; }
-.dots { position: absolute; left: 0; right: 0; bottom: calc(var(--promo-foot, 12px) + 4px); display: flex; justify-content: center; align-items: center; gap: 7px; pointer-events: none; }
+.mute { position: absolute; inset-inline-start: 12px; bottom: var(--promo-foot, 12px); width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .5); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.dots { position: absolute; inset-inline-start: 0; inset-inline-end: 0; bottom: calc(var(--promo-foot, 12px) + 4px); display: flex; justify-content: center; align-items: center; gap: 7px; pointer-events: none; }
 .dots i { width: 6px; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .75); box-shadow: 0 0 2px rgba(0, 0, 0, .4); transition: width .2s; pointer-events: auto; cursor: pointer; }
 .dots i.on { width: 20px; background: #fff; }
-.label { position: absolute; right: 12px; bottom: var(--promo-foot, 12px); max-width: 42%; padding: 3px 10px; border-radius: 999px; background: rgba(0, 0, 0, .5); font-size: 13px; line-height: 20px;
+.label { position: absolute; inset-inline-end: 12px; bottom: var(--promo-foot, 12px); max-width: 42%; padding: 3px 10px; border-radius: 999px; background: rgba(0, 0, 0, .5); font-size: 13px; line-height: 20px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .arrow { display: none; position: absolute; top: 50%; width: 36px; height: 36px; margin-top: -18px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .45); color: #fff; font-size: 24px; line-height: 1; cursor: pointer; padding: 0 0 3px; }
-.arrow.prev { left: 10px; } .arrow.next { right: 10px; }
+.arrow.prev { inset-inline-start: 10px; } .arrow.next { inset-inline-end: 10px; }
 @media (hover: hover) { .promo:hover .arrow { display: block; } }
 </style>

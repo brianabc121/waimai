@@ -142,6 +142,6 @@ const STATES = ['shown', 'hidden', 'off', 'suspended', 'no_location', 'no_zones'
 .narrow { width: 76px; }
 .table-wrap { overflow-x: auto; }
 .nowrap { white-space: nowrap; }
-.nowrap .btn { margin-left: 6px; }
+.nowrap .btn { margin-inline-start: 6px; }
 td input:not([type=checkbox]) { min-width: 76px; }
 </style>

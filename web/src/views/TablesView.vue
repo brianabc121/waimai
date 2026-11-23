@@ -303,6 +303,6 @@ async function saveTable(tb: DiningTable | null, patch: Partial<DiningTable> = {
 .tcard.busy { border-color: var(--brand); background: var(--brand-soft); }
 .tcard.off { opacity: .55; }
 .tname { font-size: 22px; }
-.gear { position: absolute; right: 8px; bottom: 6px; }
+.gear { position: absolute; inset-inline-end: 8px; bottom: 6px; }
 .sheet.big { max-width: 980px; height: 88vh; }
 </style>

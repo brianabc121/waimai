@@ -58,7 +58,7 @@ const onDuty = computed(() => riders.value.filter(r => r.on_duty).length)
     <MapCanvas v-if="key" ref="map" :maps-key="key" :initial="initial" data-testid="riders-map" @ready="ready = true">
       <template #default="{ px }">
         <g v-if="store" :transform="`translate(${px(store).x},${px(store).y})`" data-testid="store-pin">
-          <circle r="13" fill="#fff" stroke="#d9480f" stroke-width="3" /><text y="5" text-anchor="middle" font-size="13" font-weight="700" fill="#d9480f">店</text>
+          <circle r="13" fill="#fff" stroke="#d9480f" stroke-width="3" /><text y="5" text-anchor="middle" font-size="13" font-weight="700" fill="#d9480f">{{ t('ic.store') }}</text>
         </g>
         <g v-for="r in placed" :key="r.id" :transform="`translate(${px(at(r)).x},${px(at(r)).y})`" class="rpin" :class="[r.contact, { on: picked === r.id }]"
           :data-rider-pin="r.username" @click.stop="picked = r.id">
@@ -67,7 +67,7 @@ const onDuty = computed(() => riders.value.filter(r => r.on_duty).length)
         </g>
       </template>
       <template #ui>
-        <div class="mapc-float" style="top:12px;left:12px"><button type="button" class="btn small" @click="fit">{{ t('rd.fit') }}</button></div>
+        <div class="mapc-float" style="top:12px;inset-inline-start:12px"><button type="button" class="btn small" @click="fit">{{ t('rd.fit') }}</button></div>
       </template>
     </MapCanvas>
 
@@ -94,12 +94,12 @@ const onDuty = computed(() => riders.value.filter(r => r.on_duty).length)
 <style>
 .riders { display: grid; grid-template-columns: minmax(0, 1fr) 360px; height: calc(100vh - var(--shell-top, 0px)); }
 .riders.nomap { grid-template-columns: minmax(0, 560px); height: auto; }
-.riders-list { overflow: auto; background: #fff; border-left: 1px solid var(--line); }
-.riders .rrow { display: grid; gap: 3px; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: #fff; padding: 11px 16px; cursor: pointer; }
+.riders-list { overflow: auto; background: #fff; border-inline-start: 1px solid var(--line); }
+.riders .rrow { display: grid; gap: 3px; width: 100%; text-align: start; border: 0; border-top: 1px solid var(--line); background: #fff; padding: 11px 16px; cursor: pointer; }
 .riders .rrow.on { background: var(--brand-soft); } .riders .rrow.off b { color: var(--muted); }
 .riders .rpin { cursor: pointer; } .riders .rpin circle { fill: #18794e; stroke: #fff; stroke-width: 2.5; }
 .riders .rpin.lost circle { fill: #868e96; } .riders .rpin.on > circle { stroke: #1f2328; }
 .riders .rpin text { fill: #fff; font-size: 14px; font-weight: 700; pointer-events: none; }
 .riders .rpin .badge { fill: #d9480f; stroke: #fff; stroke-width: 1.5; } .riders .rpin .bt { font-size: 11px; }
-@media (max-width: 860px) { .riders { grid-template-columns: 1fr; height: auto; } .riders .mapc { height: 50vh; } .riders-list { border-left: 0; } }
+@media (max-width: 860px) { .riders { grid-template-columns: 1fr; height: auto; } .riders .mapc { height: 50vh; } .riders-list { border-inline-start: 0; } }
 </style>

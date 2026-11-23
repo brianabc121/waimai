@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LangButton from './LangButton.vue'
 import { computed, defineAsyncComponent, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError, get, post } from '../api'
@@ -323,7 +324,7 @@ async function sendReport() {
               <button class="btn small block" data-testid="logout" @click="logout">{{ t('sf.logout') }}</button>
             </div>
           </div>
-          <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
+          <LangButton class="lang" />
         </div>
         <div class="ident">
           <img v-if="tpl.logo_url" :src="tpl.logo_url" alt="" class="logo" />
@@ -560,14 +561,14 @@ async function sendReport() {
   .shop .toast { bottom: calc(96px + var(--tabs)); }
 }
 .acct { position: relative; }
-.acct-menu { position: absolute; right: 0; top: 44px; z-index: 30; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .14); padding: 12px; width: 200px; display: grid; gap: 6px; }
-.lang { color: var(--muted); margin-left: 4px; }
+.acct-menu { position: absolute; inset-inline-end: 0; top: 44px; z-index: 30; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .14); padding: 12px; width: 200px; display: grid; gap: 6px; }
+.lang { color: var(--muted); margin-inline-start: 4px; }
 .ident { display: flex; gap: 12px; align-items: flex-start; }
 .logo { width: 76px; height: 76px; border-radius: 10px; border: 1px solid var(--line); object-fit: cover; flex: none; background: var(--paper); }
 .logo.ph { display: grid; place-items: center; background: var(--brand-soft); color: var(--brand-dark); font-size: 34px; font-weight: 700; border-color: transparent; }
 .ident h1 { font-size: 20px; line-height: 1.25; overflow-wrap: anywhere; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 4px; font-size: 14px; }
-.score { color: var(--star); font-weight: 700; font-size: 15px; } .score i { font-style: normal; margin-right: 2px; }
+.score { color: var(--star); font-weight: 700; font-size: 15px; } .score i { font-style: normal; margin-inline-end: 2px; }
 .state { font-size: 12px; font-weight: 600; color: var(--ok); } .state.off { color: var(--warn); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; min-width: 0; }
 .chips span { border: 1px solid #cdbba3; color: var(--muted); border-radius: 5px; padding: 0 6px; font-size: 12px; line-height: 20px; white-space: nowrap; }
@@ -591,10 +592,10 @@ async function sendReport() {
 .still { aspect-ratio: 16 / 9; background: #1c1c1c; overflow: hidden; }
 .still img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .hero-media::before { content: ''; position: absolute; inset: 0 0 auto; height: 72px; z-index: 1; pointer-events: none; background: linear-gradient(rgba(0, 0, 0, .45), transparent); }
-.lip { position: absolute; left: 0; right: 0; bottom: -1px; height: 18px; background: var(--paper); border-radius: 18px 18px 0 0; pointer-events: none; }
+.lip { position: absolute; inset-inline-start: 0; inset-inline-end: 0; bottom: -1px; height: 18px; background: var(--paper); border-radius: 18px 18px 0 0; pointer-events: none; }
 .hero.media .shophead { padding-top: 0; }
 @media (max-width: 767.98px) {
-  .hero.media .tools { position: absolute; top: 8px; left: 12px; right: 10px; z-index: 5; color: #fff; }
+  .hero.media .tools { position: absolute; top: 8px; inset-inline-start: 12px; inset-inline-end: 10px; z-index: 5; color: #fff; }
   .hero.media .tools .ico, .hero.media .tools .lang { color: #fff; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5)); }
   .hero.media .tools .lang { border-color: rgba(255, 255, 255, .85); }
   .hero.media .tools .ico:hover, .hero.media .tools .ico.on { background: rgba(255, 255, 255, .22); }
@@ -605,8 +606,8 @@ async function sendReport() {
 .shoptabs { position: sticky; top: 0; z-index: 15; display: flex; gap: 30px; height: 50px; margin-top: 10px; padding: 0 22px; background: var(--paper); border-radius: 18px 18px 0 0; border-bottom: 1px solid var(--line); }
 .shoptabs button { position: relative; border: 0; background: none; padding: 0 2px; font-size: 16px; color: var(--muted); cursor: pointer; }
 .shoptabs button.on { color: var(--ink); font-weight: 700; }
-.shoptabs button.on::after { content: ''; position: absolute; left: 50%; bottom: 6px; width: 22px; height: 3px; margin-left: -11px; border-radius: 2px; background: var(--brand); }
-.shoptabs small { font-size: 11px; color: var(--muted); margin-left: 2px; font-weight: 400; }
+.shoptabs button.on::after { content: ''; position: absolute; left: 50%; bottom: 6px; width: 22px; height: 3px; margin-inline-start: -11px; border-radius: 2px; background: var(--brand); }
+.shoptabs small { font-size: 11px; color: var(--muted); margin-inline-start: 2px; font-weight: 400; }
 
 /* the menu fills the screen under the tabs, so the category rail runs to the bottom however few dishes there are */
 .menuwrap { background: var(--paper); min-height: calc(100vh - 50px); min-height: calc(100dvh - 50px); display: flex; flex-direction: column; }
@@ -634,7 +635,7 @@ async function sendReport() {
 .shop .bottombar.cartbar.over > div { box-shadow: none; }
 .bag { position: relative; flex: none; width: 48px; height: 48px; border: 0; border-radius: 12px; background: var(--soft-red); color: var(--red); display: grid; place-items: center; cursor: pointer; padding: 0; }
 .bag.empty { background: #f1ece4; color: #b5a998; }
-.bag .n { position: absolute; top: -7px; right: -9px; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--red); color: #fff; font-size: 12px; font-weight: 700; line-height: 20px; border: 2px solid #fff; box-sizing: content-box; }
+.bag .n { position: absolute; top: -7px; inset-inline-end: -9px; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--red); color: #fff; font-size: 12px; font-weight: 700; line-height: 20px; border: 2px solid #fff; box-sizing: content-box; }
 .sums { flex: 1; min-width: 0; cursor: pointer; }
 .line1 { display: flex; align-items: baseline; gap: 6px; min-width: 0; white-space: nowrap; }
 .amt { font-size: 20px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
@@ -687,7 +688,7 @@ async function sendReport() {
   .sidecart .got { font-size: 13px; color: var(--red); }
   .sidecart .btn.primary { background: var(--red); border-color: var(--red); }
   .sidecart .must { background: #eee; border-color: #ddd; }
-  .shoptabs { margin-right: calc(var(--gut) - 14px + 352px); }
-  .shop.solo .shoptabs { margin-right: calc(var(--gut) - 14px); }
+  .shoptabs { margin-inline-end: calc(var(--gut) - 14px + 352px); }
+  .shop.solo .shoptabs { margin-inline-end: calc(var(--gut) - 14px); }
 }
 </style>

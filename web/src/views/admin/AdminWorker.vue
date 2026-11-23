@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { get, post } from '../../api'
-import { locale, t } from '../../i18n'
+import { shown, t } from '../../i18n'
 import Pager from './Pager.vue'
 import { loadWorkerStatus, poll } from './monitor'
 import type { JobRow, JobStatus, QueueKind, WorkerStatus, WorkerTask } from './types'
@@ -71,7 +71,7 @@ const every = (s: number) => (s >= 60 ? t('ad.n_minutes', { n: Math.round(s / 60
 function wait(s: number): string {
   if (s < 60) return t('ad.n_seconds', { n: s })
   if (s < 3600) return t('ad.n_minutes', { n: Math.floor(s / 60) })
-  return locale.value === 'zh' ? `${Math.floor(s / 3600)} 小时` : `${Math.floor(s / 3600)} h`
+  return shown.value === 'zh' ? `${Math.floor(s / 3600)} 小时` : `${Math.floor(s / 3600)} h`
 }
 // "短信 3 · 菜单导入 1" for the kinds that have any
 function split(field: keyof Omit<QueueKind, 'kind'>): string {

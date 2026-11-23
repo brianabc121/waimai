@@ -189,7 +189,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
           <div>
             <div class="muted small">{{ t('customer') }}</div>
             <div data-testid="order-contact">{{ contactName(selected) }} · <a :href="'tel:' + contactPhone(selected)">{{ contactPhone(selected) }}</a>
-              <router-link v-if="chatOn && selected.service_type !== 'dine_in'" class="btn link small" style="margin-left:6px" data-testid="order-chat" :to="{ path: '/merchant/messages', query: { order: selected.id } }">{{ t('ch.contact_customer') }}</router-link>
+              <router-link v-if="chatOn && selected.service_type !== 'dine_in'" class="btn link small" style="margin-inline-start:6px" data-testid="order-chat" :to="{ path: '/merchant/messages', query: { order: selected.id } }">{{ t('ch.contact_customer') }}</router-link>
               <span v-if="selected.contact_phone && selected.contact_phone !== selected.customer_phone" class="small muted"> · {{ t('oc.ordered_by') }} {{ selected.customer_phone }}</span></div>
             <div v-if="contactApps(selected).length" class="small" data-testid="order-im">
               <span v-for="(c, i) in contactApps(selected)" :key="c.field"><template v-if="i"> · </template>{{ c.label }} <b>{{ c.value }}</b></span></div>
@@ -204,7 +204,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
 
           <div class="stack" style="border-top:1px solid var(--line);padding-top:10px">
             <div v-for="it in selected.items" :key="it.id" class="row top between">
-              <div class="grow"><span v-if="baskets(selected)" class="tag info" style="margin-right:4px">{{ t('basket_short', { n: it.basket }) }}</span><b>{{ it.qty }} ×</b> {{ both(it.name, it.name_en) }}
+              <div class="grow"><span v-if="baskets(selected)" class="tag info" style="margin-inline-end:4px">{{ t('basket_short', { n: it.basket }) }}</span><b>{{ it.qty }} ×</b> {{ both(it.name, it.name_en) }}
                 <div class="muted small" v-if="it.options.length">{{ it.options.map(o => both(o.name, o.name_en)).join(' · ') }}</div>
                 <div class="small" v-if="it.note" style="color:var(--warn)">{{ t('note') }}: {{ it.note }}</div></div>
               <span class="tag" v-if="selected.acceptance_status === 'accepted'" :class="it.prep_status === 'ready' ? 'ok' : ''">{{ t('i.' + it.prep_status) }}</span>
@@ -263,9 +263,9 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
 <style scoped>
 .desk { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 14px; align-items: start; }
 .list { display: flex; flex-direction: column; gap: 10px; }
-.ord { text-align: left; cursor: pointer; width: 100%; }
+.ord { text-align: start; cursor: pointer; width: 100%; }
 .ord.sel { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
-.ord.pend { border-left: 5px solid var(--warn); }
+.ord.pend { border-inline-start: 5px solid var(--warn); }
 .detail { position: sticky; top: calc(var(--shell-top, 0px) + 14px); max-width: 640px; }
 .nopick { text-align: center; padding: 48px 16px; }
 .backlist { display: none; align-self: flex-start; }

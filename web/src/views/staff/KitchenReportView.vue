@@ -120,7 +120,7 @@ const pages = computed(() => detail.value ? Math.max(1, Math.ceil(detail.value.i
   <div class="page srp" data-testid="kitchen-report">
     <StaffTabs />
     <div class="row wrap" style="margin-bottom:14px">
-      <span class="datepick"><button data-act="prev" @click="step(-1)">‹</button><b data-testid="kr-title">{{ title }}</b><button data-act="next" :disabled="to >= today" @click="step(1)">›</button></span>
+      <span class="datepick"><button data-act="prev" @click="step(-1)"><span class="rtl-flip">‹</span></button><b data-testid="kr-title">{{ title }}</b><button data-act="next" :disabled="to >= today" @click="step(1)"><span class="rtl-flip">›</span></button></span>
       <span class="pills">
         <button v-for="p in (['today', 'yesterday', 'week', 'month'] as Preset[])" :key="p" :class="{ on: preset === p }" :data-preset="p" @click="choose(p)">{{ t('kr.p.' + p) }}</button>
         <button :class="{ on: preset === 'custom' }" data-preset="custom" @click="preset = 'custom'">{{ t('kr.p.custom') }}</button>
@@ -197,7 +197,7 @@ const pages = computed(() => detail.value ? Math.max(1, Math.ceil(detail.value.i
               <th>{{ t('kr.c.order') }}</th><th class="num">{{ t('kr.c.took') }}</th><th>{{ t('kr.c.via') }}</th></tr></thead>
             <tbody>
               <tr v-for="d in detail.items" :key="d.id" :data-dish="d.name">
-                <td class="num" style="text-align:left;white-space:nowrap">{{ single ? '' : dayOf(d.ready_at, tz).slice(5) + ' ' }}{{ clock(d.ready_at, tz) }}</td>
+                <td class="num" style="text-align: start;white-space:nowrap">{{ single ? '' : dayOf(d.ready_at, tz).slice(5) + ' ' }}{{ clock(d.ready_at, tz) }}</td>
                 <td><b>{{ pick(d.name, d.name_en) }}</b> <span v-if="d.cancelled" class="tag">{{ t('kr.cancelled') }}</span> <span v-if="d.undo_count" class="tag warn">{{ t('kr.undone', { n: d.undo_count }) }}</span>
                   <div v-if="d.options.length || d.note" class="sub">{{ [d.options.map(o => pick(o.name, o.name_en)).join('、'), d.note && t('kr.note', { s: d.note })].filter(Boolean).join(' · ') }}</div></td>
                 <td class="num">{{ d.qty }}</td>
@@ -210,8 +210,8 @@ const pages = computed(() => detail.value ? Math.max(1, Math.ceil(detail.value.i
             </tbody>
           </table>
           <div v-if="!detail.items.length" class="empty">{{ t('kr.none') }}</div>
-          <div v-if="pages > 1" class="pager"><button class="btn small" :disabled="page <= 1" data-act="page-prev" @click="page--">‹</button>
-            <span class="sub">{{ page }} / {{ pages }}</span><button class="btn small" :disabled="page >= pages" data-act="page-next" @click="page++">›</button></div>
+          <div v-if="pages > 1" class="pager"><button class="btn small" :disabled="page <= 1" data-act="page-prev" @click="page--"><span class="rtl-flip">‹</span></button>
+            <span class="sub">{{ page }} / {{ pages }}</span><button class="btn small" :disabled="page >= pages" data-act="page-next" @click="page++"><span class="rtl-flip">›</span></button></div>
         </div>
       </div>
     </div>

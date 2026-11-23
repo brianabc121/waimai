@@ -182,7 +182,7 @@ function removeCat(c: Category) { if (confirm(t('ad.cat_delete_confirm', { name:
             <input v-model="c.name" :placeholder="t('name_zh')" />
             <input v-model="c.name_en" :placeholder="t('name_en')" />
             <input v-model.number="c.sort" type="number" style="width:64px" :title="t('ad.sort')" />
-            <span class="small muted num" style="width:28px;text-align:right">{{ c.items.length }}</span>
+            <span class="small muted num" style="width:28px;text-align: end">{{ c.items.length }}</span>
             <button class="btn small" @click="saveCat(c)">{{ t('save') }}</button>
             <button class="btn small danger" data-testid="delete-cat" @click="removeCat(c)">×</button>
           </div>

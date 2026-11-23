@@ -196,16 +196,16 @@ const stamp = (i: number) => i === 0 || list.value[i].at - list.value[i - 1].at 
 .cp-bub { background: #fff; border-radius: 14px 14px 14px 4px; padding: 8px 12px; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: 0 1px 1px rgba(0,0,0,.04); font-size: 15px; line-height: 1.45; }
 .cp-msg.me .cp-bub { background: var(--brand); color: #fff; border-radius: 14px 14px 4px 14px; }
 .cp-msg.failed .cp-bub { opacity: .6; cursor: pointer; }
-.cp-bub em { display: block; font-style: normal; font-size: 11px; opacity: .8; text-align: right; margin-top: 2px; }
+.cp-bub em { display: block; font-style: normal; font-size: 11px; opacity: .8; text-align: end; margin-top: 2px; }
 .cp-bub:has(.cp-img) { padding: 4px; background: #fff !important; }
 .cp-img { display: block; } .cp-img img { display: block; max-width: min(220px, 60vw); max-height: 260px; border-radius: 10px; object-fit: cover; }
 .cp-bub:has(.cp-order) { padding: 0; background: #fff !important; color: var(--ink) !important; }
-.cp-order { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; border: 0; background: none; font: inherit; text-align: left; padding: 10px 12px; min-width: 200px; cursor: pointer; color: inherit; }
+.cp-order { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; border: 0; background: none; font: inherit; text-align: start; padding: 10px 12px; min-width: 200px; cursor: pointer; color: inherit; }
 .cp-order small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; } .cp-order small.go { color: var(--brand-dark); } .cp-order i { font-style: normal; }
 .cp-bub:has(.cp-order) em, .cp-bub:has(.cp-img) em { color: var(--muted); padding: 0 8px 4px; }
 .cp-tool { flex: none; width: 34px; height: 38px; display: grid; place-items: center; border: 0; background: none; color: #5b6470; cursor: pointer; padding: 0; }
 .cp-orders { background: #fff; border-top: 1px solid #eee; padding: 10px 12px; display: grid; gap: 6px; max-height: 240px; overflow-y: auto; }
-.cp-orders > button { display: flex; gap: 8px; align-items: center; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; padding: 8px 10px; font: inherit; cursor: pointer; text-align: left; }
+.cp-orders > button { display: flex; gap: 8px; align-items: center; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; padding: 8px 10px; font: inherit; cursor: pointer; text-align: start; }
 .cp-state { align-self: flex-end; font-size: 11px; color: #9aa1ab; margin-top: -4px; }
 .cp-state.bad { color: var(--bad, #b42318); cursor: pointer; }
 .cp-blocked { background: #fff; border-top: 1px solid #eee; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); text-align: center; color: var(--muted); font-size: 14px; }

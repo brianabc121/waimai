@@ -81,11 +81,11 @@ async function saved() { form.open = false; await load() }
             <td class="price">{{ money(it.price, cur) }}</td>
             <td>
               <span class="tag" :class="it.published ? 'ok' : ''">{{ it.published ? t('published') : t('draft') }}</span>
-              <span class="tag bad" v-if="it.sold_out" style="margin-left:4px">{{ t('sold_out') }}</span>
-              <span class="tag info" v-if="it.stock_qty !== null" style="margin-left:4px">{{ t('stock') }} {{ it.stock_qty }}</span>
-              <span class="tag" v-if="!it.needs_prep" style="margin-left:4px">{{ t('no_prep') }}</span>
-              <span class="tag info" v-else-if="it.station_id" style="margin-left:4px">{{ stationName(it.station_id) }}</span>
-              <span class="tag warn" v-else-if="stations.length" style="margin-left:4px">{{ t('unassigned') }}</span>
+              <span class="tag bad" v-if="it.sold_out" style="margin-inline-start:4px">{{ t('sold_out') }}</span>
+              <span class="tag info" v-if="it.stock_qty !== null" style="margin-inline-start:4px">{{ t('stock') }} {{ it.stock_qty }}</span>
+              <span class="tag" v-if="!it.needs_prep" style="margin-inline-start:4px">{{ t('no_prep') }}</span>
+              <span class="tag info" v-else-if="it.station_id" style="margin-inline-start:4px">{{ stationName(it.station_id) }}</span>
+              <span class="tag warn" v-else-if="stations.length" style="margin-inline-start:4px">{{ t('unassigned') }}</span>
             </td>
             <td class="right">
               <div class="row wrap" style="justify-content:flex-end;gap:6px">

@@ -215,6 +215,6 @@ onMounted(() => { void loadFb(); void loadAp() })
 .ac-place:empty { display: none; }
 .ac-place dt { color: var(--muted); }
 .ac-place dd { margin: 0; overflow-wrap: anywhere; }
-.ac-place dd a { margin-left: 8px; }
+.ac-place dd a { margin-inline-start: 8px; }
 .reply { background: #f6f7f8; border-radius: 10px; padding: 10px 12px; font-size: 14px; white-space: pre-wrap; }
 </style>

@@ -174,9 +174,9 @@ const more = computed<Entry[]>(() => [
 .hero { padding: 6px 16px 66px; color: #fff; border-radius: 0 0 50% 50% / 0 0 26px 26px;
   background: radial-gradient(90% 70% at 70% 0%, rgba(255, 160, 120, .28) 0%, transparent 60%), var(--motif) 0 0 / 56px 56px, linear-gradient(180deg, var(--red-deep) 0%, #b23a2a 100%); }
 .tools { display: flex; align-items: center; gap: 2px; }
-.tools h1 { flex: 1; font-size: 17px; font-weight: 600; padding-left: 2px; }
+.tools h1 { flex: 1; font-size: 17px; font-weight: 600; padding-inline-start: 2px; }
 .tools button { width: 38px; height: 38px; border: 0; background: none; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: #fff; }
-.who { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: none; color: #fff; padding: 8px 2px 0; text-align: left; cursor: pointer; }
+.who { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: none; color: #fff; padding: 8px 2px 0; text-align: start; cursor: pointer; }
 .avatar { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: #fbeed3; flex: none; }
 .avatar.ph { display: grid; place-items: center; color: var(--ink); }
 .names { display: grid; gap: 1px; min-width: 0; flex: 1; }
@@ -186,8 +186,8 @@ const more = computed<Entry[]>(() => [
 
 .body { margin-top: -48px; padding: 0 12px; display: grid; gap: 16px; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); padding: 12px 0; background: var(--paper); border-radius: 14px; box-shadow: 0 6px 18px rgba(90, 40, 15, .12); margin: 0 -2px; }
-.stats button { border: 0; background: none; display: grid; gap: 2px; justify-items: center; cursor: pointer; color: var(--ink); border-left: 1px solid var(--line); padding: 2px 4px; min-width: 0; }
-.stats button:first-child { border-left: 0; }
+.stats button { border: 0; background: none; display: grid; gap: 2px; justify-items: center; cursor: pointer; color: var(--ink); border-inline-start: 1px solid var(--line); padding: 2px 4px; min-width: 0; }
+.stats button:first-child { border-inline-start: 0; }
 .stats b { font-size: 18px; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .stats .hot b { color: var(--red); }
 .stats span { font-size: 12px; color: var(--muted); }
@@ -209,16 +209,16 @@ h2 { font-size: 15px; font-weight: 600; }
 .common button { border: 0; background: none; border-radius: 12px; display: grid; gap: 4px; justify-items: center; cursor: pointer; font-size: 12px; color: var(--ink); padding: 8px 0; min-width: 0; }
 .common button:hover, .common button:active { background: var(--gold-soft); }
 .common .ic { position: relative; display: grid; color: var(--red); }
-.dot { position: absolute; top: -1px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background: #e5352b; border: 1.500px solid var(--paper); }
+.dot { position: absolute; top: -1px; inset-inline-end: -3px; width: 10px; height: 10px; border-radius: 50%; background: #e5352b; border: 1.500px solid var(--paper); }
 .rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 2px 12px; }
-.rows button { border: 0; background: none; display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 4px 0 6px; cursor: pointer; color: var(--ink); font-size: 14px; text-align: left; min-width: 0; border-top: 1px solid var(--line); }
+.rows button { border: 0; background: none; display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 4px 0 6px; cursor: pointer; color: var(--ink); font-size: 14px; text-align: start; min-width: 0; border-top: 1px solid var(--line); }
 .rows button:nth-child(-n+2) { border-top: 0; }
-.rows button:nth-child(even) { box-shadow: -1px 0 0 var(--line); padding-left: 14px; }
+.rows button:nth-child(even) { box-shadow: -1px 0 0 var(--line); padding-inline-start: 14px; }
 .rows button:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .rows button > svg:first-child { color: var(--red); flex: none; }
 .rows button span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rows .chev { flex: none; color: #b9a793; }
-@media (max-width: 370px) { .rows button { font-size: 13.5px; gap: 6px; padding-left: 4px; } .rows button:nth-child(even) { padding-left: 10px; } .ticket b { font-size: 15px; } }
+@media (max-width: 370px) { .rows button { font-size: 13.5px; gap: 6px; padding-inline-start: 4px; } .rows button:nth-child(even) { padding-inline-start: 10px; } .ticket b { font-size: 15px; } }
 /* an iPad or a computer: the red becomes a card under the top bar */
 @media (min-width: 768px) {
   .mehome.phone { max-width: none; padding-bottom: 40px; }
@@ -235,8 +235,8 @@ h2 { font-size: 15px; font-weight: 600; }
   .common button { font-size: 13px; padding: 12px 0; }
   .rows { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 4px 16px; }
   .rows button:nth-child(-n+3) { border-top: 0; }
-  .rows button:nth-child(even) { box-shadow: none; padding-left: 6px; }
-  .rows button:not(:nth-child(3n+1)) { box-shadow: -1px 0 0 var(--line); padding-left: 14px; }
+  .rows button:nth-child(even) { box-shadow: none; padding-inline-start: 6px; }
+  .rows button:not(:nth-child(3n+1)) { box-shadow: -1px 0 0 var(--line); padding-inline-start: 14px; }
   .rows button:last-child:nth-child(odd) { grid-column: auto; }
   .me-toast { bottom: 40px; }
 }

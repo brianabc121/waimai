@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Guest ordering at a table: a phone that scanned the table code (/t/:code)
 // or a tablet paired with the table (/ipad). Both add to the same bill.
+import LangButton from './LangButton.vue'
 import { computed, ref } from 'vue'
 import { ApiError, get, post } from '../api'
 import { locale, setLocale, t } from '../i18n'
@@ -108,7 +109,7 @@ const liveCount = computed(() => bill.value?.order.items.filter(i => i.prep_stat
     <div class="topbar">
       <div class="row between">
         <h1 class="row" style="gap:8px"><img v-if="tpl.logo_url" :src="tpl.logo_url" alt="" class="logo" />{{ access?.store_name ?? t('dine_in') }}<span v-if="access"> · {{ t('table') }} {{ access.table_name }}</span></h1>
-        <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
+        <LangButton class="lang" />
       </div>
       <div class="seg" v-if="phase === 'ready'" style="margin-top:10px">
         <button :class="{ on: tab === 'menu' }" @click="tab = 'menu'">{{ t('menu') }}</button>

@@ -225,7 +225,7 @@ async function submit() {
 
 <template>
   <div class="phone wide co" :data-ready="loaded || undefined">
-    <div class="topbar co-top"><router-link :to="`/s/${slug}`" :aria-label="t('back_to_menu')" class="co-back">‹</router-link><h1>{{ t('co.title') }}</h1></div>
+    <div class="topbar co-top"><router-link :to="`/s/${slug}`" :aria-label="t('back_to_menu')" class="co-back"><span class="rtl-flip">‹</span></router-link><h1>{{ t('co.title') }}</h1></div>
     <div class="section two-cols">
       <div class="stack">
       <div v-if="bothServices" class="co-seg" role="tablist" data-testid="service-toggle">
@@ -244,7 +244,7 @@ async function submit() {
             <span class="small muted">{{ whoLine(address) }}</span>
           </span>
           <span class="grow ph" v-else>{{ t(addresses.length ? 'ad.choose' : 'co.add_address') }}</span>
-          <span class="chev">›</span>
+          <span class="chev"><span class="rtl-flip">›</span></span>
         </button>
         <!-- a store whose customers pick their area by name -->
         <label v-if="delivery && store && !mapMode && store.zones.length" class="field" style="margin:12px 0 0">
@@ -297,8 +297,8 @@ async function submit() {
         </div>
         <div class="co-fees totals">
           <div class="co-row"><span>{{ t('subtotal') }}</span><span>{{ money(subtotal, cur) }}</span></div>
-          <div class="co-row" v-if="quote?.totals.packaging_fee"><span><i class="ic">袋</i>{{ t('packaging_fee') }}</span><span>{{ money(quote.totals.packaging_fee, cur) }}</span></div>
-          <div class="co-row" v-if="delivery"><span><i class="ic">送</i>{{ t('delivery_fee') }}</span>
+          <div class="co-row" v-if="quote?.totals.packaging_fee"><span><i class="ic">{{ t('ic.bag') }}</i>{{ t('packaging_fee') }}</span><span>{{ money(quote.totals.packaging_fee, cur) }}</span></div>
+          <div class="co-row" v-if="delivery"><span><i class="ic">{{ t('ic.ride') }}</i>{{ t('delivery_fee') }}</span>
             <span v-if="quote" data-testid="delivery-fee">{{ money(quote.totals.delivery_fee, cur) }}</span><span v-else class="muted">{{ t('co.fee_later') }}</span></div>
           <template v-if="quote">
             <div class="co-row" v-if="quote.totals.service_charge"><span>{{ t('service_charge') }}</span><span>{{ money(quote.totals.service_charge, cur) }}</span></div>
@@ -358,15 +358,15 @@ async function submit() {
 .co-seg button { flex: 1; border: 0; background: none; border-radius: 10px; padding: 11px 8px; font: inherit; font-size: 16px; font-weight: 600; color: #6b7280; cursor: pointer; }
 .co-seg button.on { background: var(--brand); color: #fff; }
 .co-card { border-radius: 16px; padding: 14px; border: 0; }
-.co-addr { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: none; padding: 4px 0 14px; cursor: pointer; font: inherit; color: inherit; border-bottom: 1px solid #f0f1f3; }
+.co-addr { display: flex; align-items: center; gap: 10px; width: 100%; text-align: start; border: 0; background: none; padding: 4px 0 14px; cursor: pointer; font: inherit; color: inherit; border-bottom: 1px solid #f0f1f3; }
 .co-addr .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.co-addr b { font-size: 18px; } .co-addr .tag { margin-right: 8px; font-weight: 400; vertical-align: 2px; }
+.co-addr b { font-size: 18px; } .co-addr .tag { margin-inline-end: 8px; font-weight: 400; vertical-align: 2px; }
 .co-addr .ph { color: var(--brand); font-weight: 700; font-size: 19px; padding: 6px 0; }
 .co-addr .chev { color: #8b919a; font-size: 24px; flex: none; }
 .co-pick { display: flex; flex-direction: column; gap: 3px; padding: 4px 0 14px; border-bottom: 1px solid #f0f1f3; }
 .co-pick b { font-size: 18px; }
-.co-when { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; margin-top: 12px; padding: 14px; border: 1.5px solid #d9dde3; border-radius: 12px; background: #fff; font: inherit; color: inherit; cursor: pointer; text-align: left; }
-.co-when b { font-size: 16px; } .co-when span { color: #6b7280; font-size: 14px; text-align: right; }
+.co-when { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; margin-top: 12px; padding: 14px; border: 1.5px solid #d9dde3; border-radius: 12px; background: #fff; font: inherit; color: inherit; cursor: pointer; text-align: start; }
+.co-when b { font-size: 16px; } .co-when span { color: #6b7280; font-size: 14px; text-align: end; }
 .co-when.on { border-color: var(--brand); background: #fff1e8; } .co-when.on span { color: var(--brand); font-weight: 600; }
 .co-when.off { background: #f4f5f7; color: #9aa1ab; cursor: default; }
 .co-shop { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #f0f1f3; }
@@ -380,14 +380,14 @@ async function submit() {
 .co-thumb.none { display: grid; place-items: center; background: #fdebd9; color: #c2570f; font-size: 20px; font-weight: 600; }
 .co-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; }
 .co-fees { padding: 8px 0; border-bottom: 1px solid #f0f1f3; }
-.co-fees .ic { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; background: var(--brand); color: #fff; font-size: 12px; font-style: normal; margin-right: 8px; }
+.co-fees .ic { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; background: var(--brand); color: #fff; font-size: 12px; font-style: normal; margin-inline-end: 8px; }
 .co-fees .disc span:last-child { color: var(--brand); }
 .co-fees .ic.promo { background: #d97706; width: auto; padding: 0 4px; } .co-fees .ic.store_delivery { background: #b8792a; }
 .co-fees .ic.platform_free { background: #6d28d9; width: auto; padding: 0 4px; }
 .co-fees .disc.plat span:last-child { color: #6d28d9; }
 .co-fees .off { color: var(--brand); }
 .co-coupons { display: flex; justify-content: space-between; align-items: center; width: 100%; margin: 4px 0; padding: 10px 12px; border: 1px solid #f3d7a6; background: #fff3e0; border-radius: 10px; font: inherit; color: inherit; cursor: pointer; }
-.co-coupons small { color: var(--muted); margin-left: 4px; } .co-coupons b { color: var(--brand); }
+.co-coupons small { color: var(--muted); margin-inline-start: 4px; } .co-coupons b { color: var(--brand); }
 .co-fees .sum { font-size: 17px; border-top: 1px solid #f0f1f3; margin-top: 6px; padding-top: 10px; }
 .co-meta { padding-top: 8px; }
 .co-bar { display: flex; align-items: stretch; background: #1f2329; border-radius: 999px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
@@ -397,7 +397,7 @@ async function submit() {
 .co-bar .btn.off { background: #c9cdd3; color: #6b7280; border-color: #c9cdd3; opacity: 1; }
 .co :deep(.bottombar > div), .co .bottombar > div { background: none; border-top: 0; }
 .co-slots { display: grid; gap: 8px; }
-.co-slots button { padding: 13px 14px; border: 1.5px solid #d9dde3; border-radius: 10px; background: #fff; font: inherit; text-align: left; cursor: pointer; }
+.co-slots button { padding: 13px 14px; border: 1.5px solid #d9dde3; border-radius: 10px; background: #fff; font: inherit; text-align: start; cursor: pointer; }
 .co-slots button.on { border-color: var(--brand); background: #fff1e8; color: var(--brand); font-weight: 600; }
 @media (max-width: 899px) { .co { padding-bottom: 96px; } }
 </style>

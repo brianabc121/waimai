@@ -3,7 +3,7 @@
 // Read-only; what a manager corrected shows with the reason.
 import { computed, onMounted, ref } from 'vue'
 import { get } from '../../api'
-import { t } from '../../i18n'
+import { intlTag, t } from '../../i18n'
 import { session } from '../../session'
 import { addMonths, clock, dayOf, hm, weekday } from '../staff/time'
 import './strings'
@@ -29,17 +29,18 @@ const thisMonth = computed(() => dayOf(Date.now(), tz.value).slice(0, 7))
 const step = (n: number) => data.value && load(addMonths(data.value.month + '-01', n).slice(0, 7))
 // "09:58" on the day the shift started, "11-22 01:10" when it ended on another day
 const at = (iso: string, day: string) => dayOf(iso, tz.value) === day ? clock(iso, tz.value) : `${dayOf(iso, tz.value).slice(5)} ${clock(iso, tz.value)}`
-const WD = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'], WDE = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const dayName = (d: string) => `${d.slice(5)} ${t('wk.att.wd', { zh: WD[weekday(d)], en: WDE[weekday(d)] })}`
+// the weekday's short name in the reader's language (2026-11-22 is a Sunday)
+const wd = (n: number) => new Date(Date.UTC(2026, 10, 22 + n)).toLocaleDateString(intlTag(), { weekday: 'short', timeZone: 'UTC' })
+const dayName = (d: string) => `${d.slice(5)} ${wd(weekday(d))}`
 </script>
 
 <template>
   <div class="card stack" data-testid="my-shifts">
     <div class="row between">
       <b>{{ t('wk.att.title') }}</b>
-      <span v-if="data" class="row" style="gap:10px"><button class="btn small" data-act="prev-month" @click="step(-1)">‹</button>
+      <span v-if="data" class="row" style="gap:10px"><button class="btn small" data-act="prev-month" @click="step(-1)"><span class="rtl-flip">‹</span></button>
         <b data-testid="my-month">{{ data.month }}</b>
-        <button class="btn small" data-act="next-month" :disabled="data.month >= thisMonth" @click="step(1)">›</button></span>
+        <button class="btn small" data-act="next-month" :disabled="data.month >= thisMonth" @click="step(1)"><span class="rtl-flip">›</span></button></span>
     </div>
     <div v-if="error" class="banner bad small">{{ error }}</div>
     <template v-if="data">

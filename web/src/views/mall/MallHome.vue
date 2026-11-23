@@ -4,6 +4,7 @@
 // says where that is (found by the device, changed with a tap), the top right
 // leads to the messages. A store's delivery area is never shown: a store
 // delivers there, with its fee, minimum and time, or it does not.
+import LangButton from '../LangButton.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { customer, loginRoute } from '../../customer'
@@ -115,6 +116,7 @@ onBeforeUnmount(() => clearInterval(timer))
         <nav class="mlinks">
           <router-link to="/me/favorites" class="txt wide">{{ t('ml.favorites') }}</router-link>
           <router-link to="/orders" class="txt">{{ t('ml.orders') }}</router-link>
+          <LangButton class="mlang" />
           <button class="msg" :aria-label="t('ml.messages')" data-testid="mall-messages" @click="messages">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.500c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.150-2.9-.400L5 20l.9-3.300C4.4 15.4 3.5 13.6 3.5 11.500c0-3.9 3.8-7 8.5-7z" /><path d="M8.5 11.500h.01M12 11.500h.01M15.5 11.500h.01" /></svg>
             <i v-if="me.profile && me.profile.unread + me.profile.chat_unread" data-testid="mall-unread">{{ me.profile.unread + me.profile.chat_unread > 99 ? '99+' : me.profile.unread + me.profile.chat_unread }}</i>
@@ -229,7 +231,6 @@ onBeforeUnmount(() => clearInterval(timer))
         <footer class="mfoot">
           <span>{{ t('ml.apply') }}<router-link to="/me/apply">{{ t('ml.apply_link') }} ›</router-link></span>
           <router-link to="/login" data-testid="mall-staff-login">{{ t('ml.staff_login') }}</router-link>
-          <button class="lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
         </footer>
       </main>
     </div>
@@ -244,7 +245,7 @@ onBeforeUnmount(() => clearInterval(timer))
 .mtop { position: relative; z-index: 20; background: var(--red-bg); color: #fff; }
 .mtop-in { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'loc links' 'search search'; gap: 6px 10px; align-items: center; padding: 6px 12px 10px; }
 .brand { display: none; font-size: 22px; font-weight: 800; color: #fff3da; white-space: nowrap; letter-spacing: 1px; }
-.loc { grid-area: loc; display: flex; align-items: center; gap: 4px; min-width: 0; height: 28px; border: 0; background: none; color: #fff; padding: 0; cursor: pointer; text-align: left; justify-self: start; max-width: 100%; }
+.loc { grid-area: loc; display: flex; align-items: center; gap: 4px; min-width: 0; height: 28px; border: 0; background: none; color: #fff; padding: 0; cursor: pointer; text-align: start; justify-self: start; max-width: 100%; }
 .loc svg { flex: none; }
 .loc .pin { width: 16px; height: 16px; }
 .loc .chev { width: 13px; height: 13px; opacity: .85; }
@@ -255,7 +256,7 @@ onBeforeUnmount(() => clearInterval(timer))
 .mlinks { grid-area: links; display: flex; align-items: center; gap: 18px; }
 .mlinks .txt, .mlinks .avatar { display: none; color: #fff; white-space: nowrap; }
 .msg { position: relative; border: 0; background: rgba(255, 255, 255, .16); width: 30px; height: 30px; border-radius: 8px; color: #fff; cursor: pointer; display: grid; place-items: center; padding: 0; }
-.msg i { position: absolute; right: -6px; top: -6px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: var(--gold); color: var(--red); font-style: normal; font-size: 11px; font-weight: 800; display: grid; place-items: center; border: 1.5px solid var(--red); }
+.msg i { position: absolute; inset-inline-end: -6px; top: -6px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: var(--gold); color: var(--red); font-style: normal; font-size: 11px; font-weight: 800; display: grid; place-items: center; border: 1.5px solid var(--red); }
 .avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--gold); color: var(--red) !important; font-weight: 800; place-items: center; }
 .msearch { grid-area: search; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 4px 0 12px; background: var(--paper); border-radius: 12px; color: var(--muted); }
 .msearch input { flex: 1; min-width: 0; border: 0; padding: 0; background: none; color: var(--ink); outline: none; font-size: 16px; -webkit-appearance: none; appearance: none; }
@@ -271,13 +272,13 @@ onBeforeUnmount(() => clearInterval(timer))
 .banners { position: relative; margin: -12px -12px 0; }
 .banner { position: relative; display: block; height: 150px; overflow: hidden; border-radius: 0; padding: 0; font-size: inherit; color: #fff; background: var(--motif) 0 -28px / 56px 56px, linear-gradient(180deg, var(--red), #b23a26); }
 .banner.link { cursor: pointer; }
-.banner img { position: absolute; right: 0; top: 0; height: 100%; width: 68%; object-fit: cover; -webkit-mask-image: linear-gradient(90deg, transparent, #000 42%); mask-image: linear-gradient(90deg, transparent, #000 42%); }
+.banner img { position: absolute; inset-inline-end: 0; top: 0; height: 100%; width: 68%; object-fit: cover; -webkit-mask-image: linear-gradient(90deg, transparent, #000 42%); mask-image: linear-gradient(90deg, transparent, #000 42%); }
 .banner div { position: relative; padding: 18px 16px 0; max-width: 66%; display: grid; gap: 7px; justify-items: start; text-shadow: 0 1px 6px rgba(80, 20, 10, .35); }
 .banner b { font-size: 24px; line-height: 1.15; font-weight: 900; color: #fff6e3; letter-spacing: 2px; font-family: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", STSong, serif; }
 .banner .ribbon { background: var(--gold); color: var(--red-deep); font-weight: 900; font-size: 15px; font-style: italic; padding: 2px 10px; transform: rotate(-3deg); transform-origin: left center; text-shadow: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   clip-path: polygon(0 8%, 3% 0, 97% 4%, 100% 14%, 98% 50%, 100% 88%, 96% 100%, 3% 96%, 0 86%, 2% 50%); }
 .banner em { font-style: normal; font-size: 13px; opacity: .96; letter-spacing: 1px; }
-.dots { position: absolute; left: 16px; bottom: 9px; display: flex; gap: 5px; }
+.dots { position: absolute; inset-inline-start: 16px; bottom: 9px; display: flex; gap: 5px; }
 .dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, .5); cursor: pointer; }
 .dots i.on { background: #fff; }
 
@@ -288,7 +289,7 @@ onBeforeUnmount(() => clearInterval(timer))
 
 h2 { font-size: 17px; }
 .freq { display: flex; align-items: center; gap: 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 10px 2px; min-width: 0; }
-.freq h2 { flex: none; padding-right: 14px; border-right: 1px solid #cbb9a2; }
+.freq h2 { flex: none; padding-inline-end: 14px; border-inline-end: 1px solid #cbb9a2; }
 .freq > div { flex: 1; min-width: 0; display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; }
 .freq > div::-webkit-scrollbar { display: none; }
 .freq a { flex: none; display: flex; align-items: center; gap: 10px; color: var(--ink); font-size: 16px; max-width: 220px; }
@@ -304,14 +305,14 @@ h2 { font-size: 17px; }
 .found { font-size: 14px; font-weight: 400; color: var(--muted); }
 .sorts { display: flex; align-items: center; min-height: 34px; overflow-x: auto; scrollbar-width: none; }
 .sorts::-webkit-scrollbar { display: none; }
-.sorts button { flex: none; border: 0; background: none; height: 22px; padding: 0 14px; color: var(--ink); cursor: pointer; white-space: nowrap; border-left: 1px solid #cbb9a2; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; }
-.sorts > button:first-child { border-left: 0; }
-.sorts > button.on { background: var(--red); color: #fff; font-weight: 700; height: 32px; border-radius: 9px; border-left: 0; padding: 0 16px; margin-right: 8px; }
-.sorts > button.on + button { border-left: 0; }
-.sorts > button:not(.on) + button.on { margin-left: 8px; }
-.filt { flex: none; margin-left: auto; }
+.sorts button { flex: none; border: 0; background: none; height: 22px; padding: 0 14px; color: var(--ink); cursor: pointer; white-space: nowrap; border-inline-start: 1px solid #cbb9a2; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; }
+.sorts > button:first-child { border-inline-start: 0; }
+.sorts > button.on { background: var(--red); color: #fff; font-weight: 700; height: 32px; border-radius: 9px; border-inline-start: 0; padding: 0 16px; margin-inline-end: 8px; }
+.sorts > button.on + button { border-inline-start: 0; }
+.sorts > button:not(.on) + button.on { margin-inline-start: 8px; }
+.filt { flex: none; margin-inline-start: auto; }
 .filt button.on { color: var(--red); font-weight: 700; }
-.filtmenu { position: absolute; z-index: 15; right: 12px; margin-top: 6px; background: #fff; border-radius: 12px; box-shadow: 0 8px 28px rgba(60, 30, 10, .18); padding: 12px 16px 4px; min-width: 170px; }
+.filtmenu { position: absolute; z-index: 15; inset-inline-end: 12px; margin-top: 6px; background: #fff; border-radius: 12px; box-shadow: 0 8px 28px rgba(60, 30, 10, .18); padding: 12px 16px 4px; min-width: 170px; }
 
 .grid { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .far { display: grid; gap: 10px; min-width: 0; }
@@ -328,11 +329,11 @@ h2 { font-size: 17px; }
 .state .acts { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
 .state.small { padding: 16px; display: block; }
 .mfoot { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; align-items: center; color: var(--muted); font-size: 13.500px; padding: 14px 0 6px; }
-.mfoot .lang { border: 1px solid #cbb9a2; background: none; border-radius: 12px; padding: 1px 10px; color: var(--ink); cursor: pointer; font-size: 12.500px; }
+.mlang { height: 30px; border: 1px solid rgba(244, 207, 115, .7); background: rgba(255, 255, 255, .16); border-radius: 15px; padding: 0 10px; color: #fff; cursor: pointer; font-size: 13px; }
 
 @media (max-width: 430px) {
   .sorts button { padding: 0 9px; font-size: 14.5px; }
-  .sorts > button.on { padding: 0 13px; margin-right: 6px; }
+  .sorts > button.on { padding: 0 13px; margin-inline-end: 6px; }
 }
 @media (min-width: 768px) {
   .mall { padding-bottom: 32px; }
@@ -349,7 +350,7 @@ h2 { font-size: 17px; }
   .mlinks .avatar { display: grid; }
   .mbody { max-width: 1320px; margin: 0 auto; padding: 20px 24px 0; display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 22px; align-items: start; }
   .mside { display: grid; gap: 2px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 10px; position: sticky; top: 16px; }
-  .mside button { border: 0; background: none; border-radius: 10px; padding: 9px 12px; text-align: left; cursor: pointer; display: flex; gap: 10px; align-items: center; font-weight: 600; }
+  .mside button { border: 0; background: none; border-radius: 10px; padding: 9px 12px; text-align: start; cursor: pointer; display: flex; gap: 10px; align-items: center; font-weight: 600; }
   .mside button span { font-size: 22px; line-height: 1; }
   .mside button:hover { background: var(--bg); }
   .mside button.on { background: var(--gold-soft); color: var(--red); font-weight: 800; }
@@ -362,11 +363,11 @@ h2 { font-size: 17px; }
   .banner img { width: 58%; }
   .banner div { padding: 30px 30px 0; max-width: 56%; gap: 10px; }
   .banner b { font-size: 32px; } .banner .ribbon { font-size: 19px; padding: 3px 14px; } .banner em { font-size: 15px; }
-  .dots { left: 30px; bottom: 14px; }
+  .dots { inset-inline-start: 30px; bottom: 14px; }
   .listhead { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
   .sorts { overflow: visible; }
-  .filt { position: relative; margin-left: 0; }
-  .filtmenu { right: 0; }
+  .filt { position: relative; margin-inline-start: 0; }
+  .filtmenu { inset-inline-end: 0; }
   .grid, .grid.rows { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
   .grid.rows { gap: 0 28px; }
   .skel { height: 260px; }

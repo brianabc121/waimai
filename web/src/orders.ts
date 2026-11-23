@@ -2,7 +2,7 @@
 import type { Router } from 'vue-router'
 import { get } from './api'
 import { replaceCart } from './cart'
-import { extend, locale, pick, t } from './i18n'
+import { extend, intlTag, isZh, pick, t } from './i18n'
 import type { Reorder } from './types'
 
 extend({
@@ -49,7 +49,7 @@ export function stamp(iso: string, timeZone?: string): string {
   const d = new Date(iso)
   try {
     return d.toLocaleDateString('en-CA', { timeZone }) + ' ' + d.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' })
-  } catch { return d.toLocaleString(locale.value === 'zh' ? 'zh-CN' : 'en-US') }
+  } catch { return d.toLocaleString(intlTag()) }
 }
 
 // "11月22日 19:30" / "22 Nov 19:30" on the store's clock.
@@ -57,7 +57,7 @@ export function shortStamp(iso: string, timeZone?: string): string {
   const d = new Date(iso)
   try {
     const time = d.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' })
-    if (locale.value !== 'zh') return d.toLocaleDateString('en-GB', { timeZone, day: 'numeric', month: 'short' }) + ' ' + time
+    if (!isZh()) return d.toLocaleDateString(intlTag() === 'en' ? 'en-GB' : intlTag(), { timeZone, day: 'numeric', month: 'short' }) + ' ' + time
     const [, m, day] = d.toLocaleDateString('en-CA', { timeZone }).split('-').map(Number)
     return `${m}月${day}日 ${time}`
   } catch { return stamp(iso, timeZone) }

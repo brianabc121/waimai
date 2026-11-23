@@ -2,6 +2,7 @@
 // One order as its customer sees it: where it is, what can be done about it
 // (cancel, ask for a refund, call, order again, review), what was paid, and
 // where it goes. Anyone holding the link sees it; the list needs a login.
+import LangButton from './LangButton.vue'
 import { computed, defineAsyncComponent, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError, get, post } from '../api'
@@ -144,7 +145,7 @@ async function copyNo() {
       <button class="od-back" :aria-label="t('back')" data-testid="order-back" @click="back">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7" /></svg>
         <span class="od-backtext">{{ t('od.all_orders') }}</span></button>
-      <button class="od-lang lang" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ locale === 'zh' ? 'EN' : '中文' }}</button>
+      <LangButton class="od-lang lang" />
     </header>
 
     <div v-if="missing" class="od-wrap"><div class="banner bad">{{ t('not_found') }}</div></div>
@@ -173,7 +174,7 @@ async function copyNo() {
             <span class="ic">🎁</span>
             <span class="grow"><b>{{ t('cp.gift', { what: couponTitle(order.gift, order.gift.currency) }) }}</b>
               <span>{{ t('cp.gift_sub', { store: pick(order.gift.store_name, order.gift.store_name_en) || t('cp.all_stores'), d: lastDay(order.gift.expires_at) }) }}</span></span>
-            <span class="chev">›</span>
+            <span class="chev"><span class="rtl-flip">›</span></span>
           </router-link>
           <section v-if="!closed && !finished" class="od-card">
             <ol class="steps">
@@ -294,7 +295,7 @@ async function copyNo() {
 .od { min-height: 100vh; padding-bottom: calc(env(safe-area-inset-bottom) + 28px); }
 .od-bar, .od-wrap { max-width: 760px; margin: 0 auto; }
 .od-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 2px; position: sticky; top: 0; z-index: 10; background: var(--bg); }
-.od-back { border: 0; background: none; padding: 6px 8px 6px 2px; margin-left: -2px; cursor: pointer; display: flex; align-items: center; gap: 2px; border-radius: 999px; }
+.od-back { border: 0; background: none; padding: 6px 8px 6px 2px; margin-inline-start: -2px; cursor: pointer; display: flex; align-items: center; gap: 2px; border-radius: 999px; }
 .od-backtext { display: none; font-weight: 600; }
 .od-lang { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .od-wrap { padding: 4px 12px 0; display: grid; gap: 10px; }
@@ -303,7 +304,7 @@ async function copyNo() {
 .od-acts { display: flex; gap: 8px; margin-top: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .od-acts::-webkit-scrollbar { display: none; }
 .pill { display: inline-flex; align-items: center; border: 1px solid #d1d5db; background: #fff; border-radius: 999px; padding: 8px 16px; cursor: pointer; white-space: nowrap; color: var(--ink); font-weight: 600; min-height: 40px; flex: none; }
-.pill.brand { border-color: var(--brand); color: var(--brand-dark); margin-left: auto; }
+.pill.brand { border-color: var(--brand); color: var(--brand-dark); margin-inline-start: auto; }
 .pill:disabled { opacity: .5; }
 .od-cols, .od-col { display: grid; gap: 10px; min-width: 0; align-content: start; }
 .od-col:empty { display: none; }
@@ -330,7 +331,7 @@ async function copyNo() {
 .od-iname { font-weight: 600; overflow-wrap: anywhere; }
 .od-info { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 14px; }
 .od-info dt { color: var(--muted); } .od-info dd { margin: 0; overflow-wrap: anywhere; }
-.od-copy { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 1px 10px; font-size: 12px; cursor: pointer; margin-left: 6px; }
+.od-copy { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 1px 10px; font-size: 12px; cursor: pointer; margin-inline-start: 6px; }
 /* the warm look of the customer's pages */
 .warm .od-card { background: var(--paper); box-shadow: 0 3px 12px rgba(90, 40, 15, .08); }
 .warm .pill { background: none; border-color: #cdb9a0; font-weight: 500; }

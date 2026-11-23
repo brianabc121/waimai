@@ -29,14 +29,14 @@ const home = computed(() => homePath())
 </template>
 
 <style scoped>
-.ctabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; pointer-events: none; }
+.ctabs { position: fixed; inset-inline-start: 0; inset-inline-end: 0; bottom: 0; z-index: 25; pointer-events: none; }
 .ctabs > div { pointer-events: auto; max-width: 520px; margin: 0 auto; height: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
   display: grid; grid-template-columns: repeat(3, 1fr); background: #fff; border-top: 1px solid var(--line); }
 .ctabs a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color: #8b919a; font-size: 11px; }
 .ctabs a.on { color: var(--ink); font-weight: 600; }
 .ctabs a.on svg { color: var(--brand); }
 .ic { position: relative; display: grid; }
-.dot { position: absolute; top: -1px; right: -4px; width: 9px; height: 9px; border-radius: 50%; background: #e5352b; border: 1.5px solid #fff; }
+.dot { position: absolute; top: -1px; inset-inline-end: -4px; width: 9px; height: 9px; border-radius: 50%; background: #e5352b; border: 1.5px solid #fff; }
 .ctabs a > span:last-child { line-height: 1.2; }
 /* the warm look: cream bar, the current tab on a gold pill */
 .warm .ctabs > div { background: var(--bg); border-top-color: var(--line); align-items: center; }

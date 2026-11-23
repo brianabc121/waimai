@@ -102,6 +102,6 @@ extend({
   'wk.att.none': ['这个月还没有上班记录', 'No shifts this month'], 'wk.att.now': ['上班中', 'at work'],
   'wk.att.voided': ['已作废', 'Voided'], 'wk.att.edited': ['店长改过', 'Corrected'], 'wk.att.auto': ['忘记下班，系统代下班', 'Ended by the system'],
   'wk.att.manager': ['店长', 'A manager'], 'wk.att.why': ['{who} 修改，原因：{why}。', 'Corrected by {who}: {why}. '],
-  'wk.att.was': ['原记录 {from} ~ {to}', 'First recorded as {from} ~ {to}'], 'wk.att.wd': ['{zh}', '{en}'],
+  'wk.att.was': ['原记录 {from} ~ {to}', 'First recorded as {from} ~ {to}'],
   'wk.att.note': ['只能查看。有出入请找店长修改。', 'Read-only. Ask a manager to correct anything that is wrong.'],
 })

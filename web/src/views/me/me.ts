@@ -2,7 +2,7 @@
 import { reactive } from 'vue'
 import { del, get, post, put, upload } from '../../api'
 import { customer, loadCustomer } from '../../customer'
-import { currencySymbol, extend, locale, money, t } from '../../i18n'
+import { currencySymbol, extend, intlTag, money, t } from '../../i18n'
 import type { Promotion } from '../../types'
 
 export interface Wallet { currency: string; balance: number; bonus: number }
@@ -85,7 +85,7 @@ export function maskedPhone(p: string): string {
 export const displayName = (p: Profile) => p.nickname || maskedPhone(p.phone)
 
 export function dateTime(iso: string): string {
-  return new Date(iso).toLocaleString(locale.value === 'zh' ? 'zh-CN' : 'en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+  return new Date(iso).toLocaleString(intlTag(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 // 9300 -> "93", 9350 -> "93.50": the bare number under which the currency is named.
 export function plain(minor: number): string {
@@ -203,12 +203,11 @@ extend({
 // An offer in two parts: what it gives ("减 ₱20") and when it applies ("满 ₱200 可用"),
 // in the store's currency.
 export function offerParts(p: Promotion, currency: string): { gives: string; when: string } {
-  const zh = locale.value === 'zh'
-  let gives = zh ? '免配送费' : 'Free delivery'
-  if (p.kind === 'amount_off') gives = zh ? `减 ${money(p.value, currency)}` : `${money(p.value, currency)} off`
-  else if (p.kind === 'percent_off') gives = zh ? `${(100 - p.value / 100) / 10} 折` : `${p.value / 100}% off`
+  let gives = t('pr.free_delivery')
+  if (p.kind === 'amount_off') gives = t('pr.amount_off_sp', { amt: money(p.value, currency) })
+  else if (p.kind === 'percent_off') gives = t('pr.percent_off_sp', { pct: p.value / 100, zhe: (100 - p.value / 100) / 10 })
   let when = p.threshold > 0 ? t('mo.over', { amt: money(p.threshold, currency) }) : t('mo.any')
-  if (p.kind === 'percent_off' && p.max_discount) when += zh ? `，最多减 ${money(p.max_discount, currency)}` : `, up to ${money(p.max_discount, currency)}`
+  if (p.kind === 'percent_off' && p.max_discount) when += t('pr.cap_sp', { amt: money(p.max_discount, currency) })
   return { gives, when }
 }
 

@@ -182,12 +182,12 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
 <style>
 .ax-msg .bub img { display: block; max-width: 220px; max-height: 260px; border-radius: 8px; }
 .axc { display: grid; grid-template-columns: 380px minmax(0, 1fr) 250px; height: calc(100dvh - 52px); background: #fff; }
-.ax-list { border-right: 1px solid var(--line); overflow-y: auto; min-width: 0; }
+.ax-list { border-inline-end: 1px solid var(--line); overflow-y: auto; min-width: 0; }
 .ax-search { padding: 12px 12px 6px; } .ax-search input { width: 100%; border: 0; background: #f1f3f5; border-radius: 10px; padding: 9px 12px; font: inherit; }
 .ax-filters { display: flex; gap: 8px; padding: 4px 12px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; align-items: center; }
 .ax-filters button, .ax-filters select { border: 1px solid #d6dae0; border-radius: 16px; padding: 3px 12px; font-size: 13px; background: #fff; cursor: pointer; white-space: nowrap; max-width: 150px; }
 .ax-filters button.on { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); font-weight: 600; }
-.ax-row { display: flex; gap: 12px; padding: 12px; border: 0; border-bottom: 1px solid #f0f1f3; background: none; width: 100%; text-align: left; cursor: pointer; align-items: flex-start; color: var(--ink); font: inherit; }
+.ax-row { display: flex; gap: 12px; padding: 12px; border: 0; border-bottom: 1px solid #f0f1f3; background: none; width: 100%; text-align: start; cursor: pointer; align-items: flex-start; color: var(--ink); font: inherit; }
 .ax-row.on { background: var(--brand-soft); }
 .ax-row .grow { min-width: 0; display: grid; gap: 3px; }
 .ax-row .last { color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -202,10 +202,10 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
 .ax-msg.store .bub { background: var(--brand); color: #fff; border-radius: 14px 14px 4px 14px; }
 .ax-msg em { display: block; font-style: normal; font-size: 11px; opacity: .75; margin-top: 3px; }
 .ax-note { background: #fff8e1; color: #9a6700; font-size: 13px; padding: 10px 16px; border-top: 1px solid var(--line); flex: none; }
-.ax-info { border-left: 1px solid var(--line); padding: 4px 16px 16px; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
+.ax-info { border-inline-start: 1px solid var(--line); padding: 4px 16px 16px; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
 .ax-info h4 { margin: 12px 0 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
 .ax-info .lnk { color: var(--brand); font-size: 13px; } .ax-info .btn.bad { color: var(--bad); justify-self: start; padding: 0; min-height: 28px; }
-.ax-rep { display: grid; gap: 2px; font-size: 13px; border-left: 3px solid var(--line); padding-left: 8px; overflow-wrap: anywhere; } .ax-rep.open { border-color: var(--bad, #b42318); }
+.ax-rep { display: grid; gap: 2px; font-size: 13px; border-inline-start: 3px solid var(--line); padding-inline-start: 8px; overflow-wrap: anywhere; } .ax-rep.open { border-color: var(--bad, #b42318); }
 .ax-filters button.rep { color: var(--bad, #b42318); border-color: #f1b8b2; }
 .tag.bad { background: var(--bad-soft, #fdecea); color: var(--bad, #b42318); }
 @media (max-width: 1199px) { .axc { grid-template-columns: 320px minmax(0, 1fr); } .ax-info { display: none; } }

@@ -172,7 +172,7 @@ async function saved(r: CropResult) { await save(r); stamp.value = Date.now() }
 .mcard { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 14px; align-items: start; padding: 12px; }
 .mcard.off .thumb { opacity: .45; }
 .thumb { position: relative; border-radius: 8px; overflow: hidden; }
-.no { position: absolute; left: 6px; top: 6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: rgba(0, 0, 0, .6); color: #fff; font-size: 12px; line-height: 22px; text-align: center; }
+.no { position: absolute; inset-inline-start: 6px; top: 6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: rgba(0, 0, 0, .6); color: #fff; font-size: 12px; line-height: 22px; text-align: center; }
 .info { display: grid; gap: 8px; min-width: 0; }
 .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acts { gap: 6px; }
