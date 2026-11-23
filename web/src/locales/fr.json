@@ -2294,5 +2294,6 @@
  "vo.view": "🔍 Voir",
  "vo.view_short": "Voir",
  "vo.view_hint": "Ouvrir ce lieu dans Google Maps dans une nouvelle fenêtre",
- "vo.view_none": "Pas encore de position : choisissez une suggestion ou « Ouvrir la carte »"
+ "vo.view_none": "Pas encore de position : choisissez une suggestion ou « Ouvrir la carte »",
+ "ad.default_tag": "Par défaut"
 }

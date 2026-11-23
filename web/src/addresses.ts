@@ -51,7 +51,7 @@ export const termsText = (d: DeliveryTerms, currency?: string) =>
 
 extend({
   'ad.choose': ['选择收货地址', 'Choose a delivery address'], 'ad.mine': ['我的地址', 'My addresses'],
-  'ad.new': ['新增收货地址', 'Add an address'], 'ad.edit': ['修改收货地址', 'Edit address'], 'ad.edit_short': ['编辑', 'Edit'],
+  'ad.new': ['新增收货地址', 'Add an address'], 'ad.edit': ['修改收货地址', 'Edit address'], 'ad.edit_short': ['编辑', 'Edit'], 'ad.default_tag': ['默认', 'Default'],
   'ad.empty': ['还没有保存的地址', 'No saved addresses yet'], 'ad.unit_is': ['门牌号：{unit}', 'Unit: {unit}'],
   'ad.can': ['可配送 · 配送费 {fee}', 'We deliver here · fee {fee}'], 'ad.cannot': ['不在本店配送范围', 'This store does not deliver here'],
   'ad.need_pin': ['请在地图上补一个位置', 'Place this address on the map first'],

@@ -55,18 +55,25 @@ function closeForm() { if (props.startNew && !list.value?.length) emit('close');
     <div v-else-if="!list" class="card empty">{{ t('loading') }}</div>
     <div v-else-if="!list.length" class="card empty" data-testid="address-empty">{{ t('ad.empty') }}</div>
     <div v-for="a in list ?? []" :key="a.id" class="card ap-row" data-testid="address-row">
-      <span class="ap-pin"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2zM12 21s6.5-5.8 6.5-10.6a6.5 6.5 0 0 0-13 0C5.5 15.2 12 21 12 21z" /></svg></span>
-      <div class="grow">
-        <div class="t"><span v-if="a.label" class="lab">{{ t('ad.label_' + a.label) }}</span>{{ a.place_name }}</div>
-        <div class="u">{{ t('ad.unit_is', { unit: a.unit }) }}</div>
-        <div class="w">{{ whoLine(a) }}</div>
+      <div class="ap-main">
+        <span class="ap-pin"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2zM12 21s6.5-5.8 6.5-10.6a6.5 6.5 0 0 0-13 0C5.5 15.2 12 21 12 21z" /></svg></span>
+        <div class="grow">
+          <div class="t">{{ a.place_name }}<span v-if="a.is_default" class="tg def" data-testid="address-default">{{ t('ad.default_tag') }}</span><span v-if="a.label" class="tg lab">{{ t('ad.label_' + a.label) }}</span></div>
+          <div class="u">{{ t('ad.unit_is', { unit: a.unit }) }}</div>
+          <div class="w">{{ whoLine(a) }}</div>
+        </div>
       </div>
-      <button class="ap-edit" :aria-label="t('ad.edit')" data-testid="address-edit" @click="editing = a">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m13.5 6.5 4 4" /></svg>{{ t('ad.edit_short') }}</button>
+      <div class="ap-bar">
+        <span v-if="a.photo_at" class="ap-photo" data-testid="address-has-photo">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z" /><circle cx="12" cy="13" r="3.2" /></svg>{{ t('ad.f.photo') }}</span>
+        <button class="ap-edit" :aria-label="t('ad.edit')" data-testid="address-edit" @click="editing = a">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m13.5 6.5 4 4" /></svg>{{ t('ad.edit_short') }}</button>
+      </div>
     </div>
     <div class="ap-foot">
       <div v-if="full" class="note" style="margin-bottom:8px;text-align:center">{{ t('ad.full', { n: limit }) }}</div>
-      <button class="btn primary block big" :disabled="full" data-testid="address-new" @click="editing = null">＋ {{ t('ad.new') }}</button>
+      <button class="btn primary block big ap-new" :disabled="full" data-testid="address-new" @click="editing = null">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>{{ t('ad.new') }}</button>
     </div>
     <div v-if="editing !== undefined" class="sheet-mask" @click.self="editing = undefined">
       <div class="sheet asheet form">
@@ -127,14 +134,21 @@ function closeForm() { if (props.startNew && !list.value?.length) emit('close');
 .as-foot { padding: 12px 14px calc(14px + env(safe-area-inset-bottom)); flex: none; }
 /* the page */
 .as-page { display: grid; gap: 12px; }
-.ap-row { display: flex; align-items: center; gap: 12px; padding: 14px; }
-.ap-pin { flex: none; width: 42px; height: 42px; border-radius: 50%; background: #f9dcd6; color: var(--red); display: grid; place-items: center; }
-.ap-row .grow { flex: 1; min-width: 0; display: grid; gap: 2px; }
-.ap-row .t { font-size: 16.5px; font-weight: 800; overflow-wrap: anywhere; }
-.ap-row .lab { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 0 8px; border-radius: 6px; background: var(--gold-soft); color: var(--red-deep); margin-inline-end: 6px; vertical-align: 2px; }
-.ap-row .u { font-size: 14.5px; }
-.ap-row .w { font-size: 13.5px; color: var(--muted); }
-.ap-edit { flex: none; display: inline-flex; align-items: center; gap: 4px; border: 1px solid #cdb9a0; background: none; border-radius: 999px; padding: 6px 12px; color: var(--ink); cursor: pointer; font-size: 14px; }
+.as-page .ap-row { padding: 0; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 2px 8px rgba(90, 40, 15, .05); }
+.ap-main { display: flex; align-items: flex-start; gap: 14px; padding: 14px 14px 12px; }
+.ap-pin { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--gold-soft); color: var(--red-deep); display: grid; place-items: center; }
+.ap-row .grow { flex: 1; min-width: 0; display: grid; gap: 3px; padding-top: 1px; }
+.ap-row .t { font-size: 15px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.ap-row .tg { display: inline-block; font-size: 11px; font-weight: 400; line-height: 16px; padding: 0 6px; border-radius: 5px; margin-inline-start: 6px; vertical-align: 2px; white-space: nowrap; }
+.ap-row .tg.def { color: var(--red); box-shadow: inset 0 0 0 1px currentColor; }
+.ap-row .tg.lab { background: var(--gold-soft); color: var(--red-deep); }
+.ap-row .u, .ap-row .w { font-size: 13px; line-height: 1.5; color: var(--muted); overflow-wrap: anywhere; }
+.ap-bar { display: flex; align-items: center; gap: 10px; margin: 0 14px; padding: 6px 0; border-top: 1px solid var(--line); min-height: 44px; }
+.ap-photo { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
+.ap-edit { margin-inline-start: auto; flex: none; display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; border-radius: 8px; padding: 6px 2px 6px 8px; color: var(--red); cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; }
+.ap-edit:hover { background: rgba(160, 44, 32, .06); }
+.ap-new { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; min-height: 50px; font-size: 16px; box-shadow: 0 6px 16px rgba(143, 37, 27, .22); }
+.ap-new svg { flex: none; }
 .ap-foot { margin-top: 4px; }
 /* a computer: the addresses two by two, the button below them */
 @media (min-width: 1024px) {

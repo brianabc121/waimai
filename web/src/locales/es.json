@@ -2294,5 +2294,6 @@
  "vo.view": "🔍 Ver",
  "vo.view_short": "Ver",
  "vo.view_hint": "Abrir este punto en Google Maps en una ventana nueva",
- "vo.view_none": "Aún sin ubicación: elige una sugerencia o pulsa \"Abrir mapa\""
+ "vo.view_none": "Aún sin ubicación: elige una sugerencia o pulsa \"Abrir mapa\"",
+ "ad.default_tag": "Predeterminada"
 }
