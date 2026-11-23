@@ -315,7 +315,7 @@ type ChatOrder struct {
 	Token string `json:"token,omitempty"`
 	// StoreName is set in a support conversation, where orders come from any store.
 	StoreName string `json:"store_name,omitempty"`
-	nonce []byte
+	nonce     []byte
 }
 
 func chatOrders(ctx context.Context, q Querier, branchID, customerID int64, limit int) ([]ChatOrder, error) {
