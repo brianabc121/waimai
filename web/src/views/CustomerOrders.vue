@@ -143,7 +143,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 
 <style scoped>
 .ol { min-height: 100vh; padding-bottom: calc(var(--tabbar-h, 0px) + env(safe-area-inset-bottom) + 24px); }
-.ol-head { position: sticky; top: 0; z-index: 10; background: var(--red); color: #fff; }
+.ol-head { position: sticky; top: 0; z-index: 10; background: var(--red-bg); color: #fff; }
 .ol-bar, .ol-tabs, .ol-list { max-width: 760px; margin: 0 auto; }
 .ol-bar { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: 'back title lang' 'search search search'; align-items: center; gap: 8px 8px; padding: 10px 16px 14px; }
 .ol-back { grid-area: back; border: 0; background: none; color: #fff; padding: 6px; margin-left: -8px; cursor: pointer; display: flex; border-radius: 50%; justify-self: start; }

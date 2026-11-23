@@ -16,6 +16,8 @@ export interface MallStore {
   currency: string; city: string; district: string; rating: number | null; monthly_sales: number
   status: 'open' | 'closed' | 'paused'; opens_at: string; opens_tomorrow: boolean; scheduling: boolean
   delivery: { fee: number; min_order: number; eta_minutes: number | null } | null; pickup: boolean
+  // near the customer (within 50 km) but does not deliver to them
+  no_delivery: boolean
   min_order_from: number; distance_m: number | null; promos: MallPromo[]; dishes: MallDish[]
 }
 export interface RegionRef { country_code: string; country?: string; province?: string; city: string; district: string }
@@ -72,6 +74,14 @@ export const fromAddress = (a: Address, manual: boolean): MallLoc =>
 async function nameOf(lat: number, lng: number): Promise<string> {
   const key = await mapsKey()
   return key ? placeName(key, [lat, lng]).catch(() => '') : ''
+}
+// shortPlace keeps a long address short enough for the top bar: a street
+// address the map gives in English ("2015 Donada, Manila, Kalakhang Maynila,
+// Philippines") keeps its first two parts, without plus codes or postcodes.
+export function shortPlace(name: string): string {
+  const parts = name.split(/[,，]/).map(p => p.trim())
+    .filter(p => p && !/^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3}$/i.test(p) && !/^\d{4,6}$/.test(p))
+  return parts.length > 2 ? parts.slice(0, 2).join(', ') : parts.join(', ') || name
 }
 export const regionName = (r: RegionRef | null | undefined) => r ? [r.district, r.city].filter(Boolean).join(', ') || r.country || '' : ''
 
@@ -140,7 +150,10 @@ extend({
   'ml.brand': ['外卖商城', 'Food Market'], 'ml.search_ph': ['搜索店铺或菜品', 'Search stores or dishes'], 'ml.search': ['搜索', 'Search'],
   'ml.messages': ['消息', 'Messages'], 'ml.locating': ['正在定位…', 'Finding you…'], 'ml.choose_loc': ['选择位置', 'Choose a place'],
   'ml.here': ['当前位置', 'Current location'], 'ml.all': ['全部', 'All'],
-  'ml.frequent': ['常点的店', 'Your stores'], 'ml.nearby': ['附近的店', 'Stores near you'], 'ml.nearby_n': ['{n} 家可配送', '{n} deliver here'], 'ml.deliver_to': ['配送至', 'Deliver to'],
+  'ml.frequent': ['常点的店', 'Your stores'], 'ml.nearby': ['附近的店', 'Stores near you'], 'ml.nearby_n': ['{n} 家可配送', '{n} deliver here'],
+  'ml.no_delivery': ['暂不配送', 'No delivery'], 'ml.pickup_ok': ['可到店自取', 'Pickup available'],
+  'ml.far_title': ['附近暂不配送的店', 'Nearby, no delivery to you'], 'ml.far_hint': ['50 公里内，送不到你这里，可进店看看或到店自取', 'Within 50 km. They do not deliver to you: browse, or pick up'],
+  'ml.far_only': ['这个位置暂时没有能送到的店，下面是附近的店', 'No store delivers here yet. These stores are nearby'], 'ml.deliver_to': ['配送至', 'Deliver to'],
   'ml.in_city': ['{city}的店', 'Stores in {city}'], 'ml.in_city_n': ['共 {n} 家', '{n} stores'],
   'ml.region_note': ['这里列的是开在这个城市的店。能不能送到你家，要选了收货地址才知道。', 'These are the stores in this city. Whether one delivers to you is known once you choose an address.'],
   'ml.sort_default': ['综合', 'Best match'], 'ml.sort_distance': ['距离近', 'Nearest'], 'ml.sort_rating': ['评分高', 'Top rated'], 'ml.sort_fee': ['配送费低', 'Lowest fee'],

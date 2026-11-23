@@ -16,8 +16,9 @@ defineProps<{ title: string; sub?: string; icon?: string }>()
 </template>
 
 <style>
-.me-intro { margin: -12px -12px 2px; padding: 6px 12px 0; background: linear-gradient(180deg, var(--red) 0, var(--red) 62px, transparent 62px); position: relative; }
-.me-intro::before { content: ""; position: absolute; left: 0; right: 0; top: 40px; height: 44px; background: var(--red); border-radius: 0 0 50% 50% / 0 0 22px 22px; }
+.me-intro { margin: -12px -12px 2px; padding: 6px 12px 0; position: relative; }
+/* the bar's red and pattern run on (the bar is 52px tall) and end in a curve */
+.me-intro::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 84px; --motif-y: -52px; background: var(--red-bg); border-radius: 0 0 50% 50% / 0 0 22px 22px; }
 .me-intro .info { position: relative; display: flex; align-items: center; gap: 16px; background: var(--paper); border-radius: 18px; padding: 14px 16px; box-shadow: 0 6px 18px rgba(90, 40, 15, .12); }
 .me-intro .ic { flex: none; width: 62px; height: 62px; border-radius: 50%; background: #f9dcd6; color: var(--red); display: grid; place-items: center; }
 .me-intro p { flex: 1; display: grid; gap: 4px; min-width: 0; padding-left: 16px; border-left: 1px solid var(--line); }
