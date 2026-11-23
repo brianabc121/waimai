@@ -452,18 +452,18 @@ func (a *App) MyFeedback(ctx context.Context, customerID int64) ([]Feedback, err
 // ---- applications to open a store ----
 
 type Application struct {
-	ID          int64      `json:"id"`
-	StoreName   string     `json:"store_name"`
-	ContactName string     `json:"contact_name"`
-	Phone       string     `json:"phone"`
-	City        string     `json:"city"`
-	Cuisine     string     `json:"cuisine"`
-	Note        string     `json:"note"`
+	ID          int64  `json:"id"`
+	StoreName   string `json:"store_name"`
+	ContactName string `json:"contact_name"`
+	Phone       string `json:"phone"`
+	City        string `json:"city"`
+	Cuisine     string `json:"cuisine"`
+	Note        string `json:"note"`
 	ApplicationPlace
-	Status      string     `json:"status"`
-	Reply       string     `json:"reply"`
-	DecidedAt   *time.Time `json:"decided_at"`
-	CreatedAt   time.Time  `json:"created_at"`
+	Status    string     `json:"status"`
+	Reply     string     `json:"reply"`
+	DecidedAt *time.Time `json:"decided_at"`
+	CreatedAt time.Time  `json:"created_at"`
 	// set for the platform only
 	CustomerID   int64  `json:"customer_id,omitempty"`
 	AccountPhone string `json:"account_phone,omitempty"`
