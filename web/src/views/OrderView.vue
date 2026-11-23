@@ -167,35 +167,36 @@ async function copyNo() {
 <template>
   <div class="od warm" data-testid="order-page">
    <CustomerFrame active="orders">
-    <!-- the head: red like the top of every customer page, with where the order is -->
-    <header class="od-hero" :class="{ closed, done: finished }">
-      <div class="od-bar">
-        <button class="od-back" :aria-label="t('back')" data-testid="order-back" @click="back">
-          <svg class="rtl-flip" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7" /></svg>
-          <span class="od-backtext">{{ t('od.all_orders') }}</span></button>
-        <span v-if="order" class="od-barno">{{ order.public_no }}</span>
-        <span class="od-lang"><LangButton /></span>
-      </div>
-      <div v-if="order" class="od-state">
-        <span class="od-stateic" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path :d="stateIcon" /></svg></span>
-        <div class="od-title">
-          <h1 data-testid="status">{{ finished ? t('od.done_title') + ' · ' : '' }}{{ t('s.' + status) }}</h1>
-          <p>{{ hint }}</p>
-          <p v-if="order.scheduled_for" class="od-sched" data-testid="scheduled">{{ t(order.service_type === 'delivery' ? 'deliver_at' : 'pickup_at') }} {{ whenText(order.scheduled_for, order.timezone) }}</p>
-        </div>
-        <div v-if="order.service_type === 'pickup' && !closed && !finished" class="od-code">
-          <small>{{ t('pickup_code') }}</small><b>{{ order.pickup_code }}</b>
-        </div>
-      </div>
+    <!-- the red bar of every customer page; on an iPad or a computer the red
+         bar above (CustomerNav) takes its place and this is the heading -->
+    <header class="od-bar">
+      <button class="od-back" :aria-label="t('back')" data-testid="order-back" @click="back">
+        <svg class="rtl-flip" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7" /></svg></button>
+      <b>{{ t('ol.detail') }}</b>
+      <span class="od-lang"><LangButton /></span>
     </header>
 
     <div v-if="missing" class="od-wrap"><div class="banner bad">{{ t('not_found') }}</div></div>
-    <div v-else-if="!order" class="od-wrap od-loading muted">{{ t('loading') }}</div>
+    <div v-else-if="!order" class="od-wrap muted">{{ t('loading') }}</div>
     <div v-else class="od-wrap">
       <div class="od-cols">
         <div class="od-col">
           <!-- where it is, and what can be done about it -->
-          <section class="od-card od-now">
+          <section class="od-card od-now" :class="{ closed, done: finished }" data-testid="order-state">
+            <div class="od-state">
+              <span class="od-stateic" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="stateIcon" /></svg></span>
+              <div class="od-title">
+                <div class="od-tline">
+                  <h1 data-testid="status">{{ finished ? t('od.done_title') + ' · ' : '' }}{{ t('s.' + status) }}</h1>
+                  <span class="paid" :class="order.payment_status === 'paid' ? 'ok' : 'warn'" data-testid="state-paid">{{ t(order.payment_status) }}</span>
+                </div>
+                <p>{{ hint }}</p>
+                <p v-if="order.scheduled_for" class="od-sched" data-testid="scheduled">{{ t(order.service_type === 'delivery' ? 'deliver_at' : 'pickup_at') }} {{ whenText(order.scheduled_for, order.timezone) }}</p>
+              </div>
+              <div v-if="order.service_type === 'pickup' && !closed && !finished" class="od-code">
+                <small>{{ t('pickup_code') }}</small><b>{{ order.pickup_code }}</b>
+              </div>
+            </div>
             <ol v-if="!closed && !finished" class="steps">
               <li v-for="(s, i) in steps" :key="s" :class="{ done: i < stepIndex, cur: i === stepIndex }">
                 <span class="dot"><svg v-if="i < stepIndex" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.500l4.500 4.500L19 7.500" /></svg></span>
@@ -206,19 +207,20 @@ async function copyNo() {
               <span class="grow"><small>{{ t('rider') }}</small><b>{{ order.delivery!.rider_name }}</b></span>
               <a v-if="order.delivery!.rider_phone" :href="'tel:' + order.delivery!.rider_phone">{{ order.delivery!.rider_phone }}</a>
             </div>
+            <!-- the actions: outlined, ordering again in solid red -->
             <div class="od-acts" data-testid="order-actions">
-              <button v-if="status === 'pending_acceptance'" class="act" data-testid="act-cancel" @click="cancel">
-                <i><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.shut" /></svg></i><span>{{ t('cancel_order') }}</span></button>
-              <button v-if="canAftersale" class="act" data-testid="act-aftersale" @click="as.open = true">
-                <i><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.back" /></svg></i><span>{{ t('as.apply') }}</span></button>
-              <a v-if="onTheWay && order.delivery?.rider_phone" class="act" data-testid="act-rider" :href="'tel:' + order.delivery.rider_phone">
-                <i><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.phone" /></svg></i><span>{{ t('od.call_rider') }}</span></a>
-              <router-link v-if="chatOn && store" class="act" data-testid="act-chat" :to="`/chat/${store.slug}`">
-                <i><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.chat" /></svg></i><span>{{ t('ch.contact_store') }}</span></router-link>
-              <a v-if="store?.phone" class="act" data-testid="act-store" :href="'tel:' + store.phone">
-                <i><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.phone" /></svg></i><span>{{ t('od.call_store') }}</span></a>
-              <button class="act main" data-testid="act-again" :disabled="againBusy" @click="again">
-                <i><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.again" /></svg></i><span>{{ t('ol.again') }}</span></button>
+              <button v-if="status === 'pending_acceptance'" class="btn act" data-testid="act-cancel" @click="cancel">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.shut" /></svg>{{ t('cancel_order') }}</button>
+              <button v-if="canAftersale" class="btn act" data-testid="act-aftersale" @click="as.open = true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.back" /></svg>{{ t('as.apply') }}</button>
+              <a v-if="onTheWay && order.delivery?.rider_phone" class="btn act" data-testid="act-rider" :href="'tel:' + order.delivery.rider_phone">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.phone" /></svg>{{ t('od.call_rider') }}</a>
+              <router-link v-if="chatOn && store" class="btn act" data-testid="act-chat" :to="`/chat/${store.slug}`">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.chat" /></svg>{{ t('ch.contact_store') }}</router-link>
+              <a v-if="store?.phone" class="btn act" data-testid="act-store" :href="'tel:' + store.phone">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" stroke="none"><path :d="ICONS.phone" /></svg>{{ t('od.call_store') }}</a>
+              <button class="btn act primary" data-testid="act-again" :disabled="againBusy" @click="again">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.again" /></svg>{{ t('ol.again') }}</button>
             </div>
           </section>
 
@@ -263,15 +265,15 @@ async function copyNo() {
           </section>
         </div>
 
-        <!-- what was bought, like a till receipt -->
+        <!-- what was bought: the store, the dishes, the sums -->
         <section class="od-card od-side od-receipt" data-testid="order-fees">
           <a v-if="store" class="od-store" :href="`/s/${store.slug}`" data-testid="order-store" @click.prevent="router.push(`/s/${store.slug}`)">
-            <img v-if="store.logo_url" :src="store.logo_url" alt="" /><span v-else class="ph">{{ storeName.slice(0, 1) }}</span>
+            <img v-if="store.logo_url" :src="store.logo_url" alt="" />
+            <span v-else class="ph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.bowl" /></svg></span>
             <span class="grow"><b>{{ storeName }}</b><small>{{ t('od.fees') }} · {{ t('ol.n_items', { n: itemCount }) }}</small></span>
-            <svg class="rtl-flip" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7" /></svg>
+            <svg class="rtl-flip chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7" /></svg>
           </a>
           <h2 v-else>{{ t('od.fees') }}</h2>
-          <i class="tear" aria-hidden="true"></i>
           <div class="od-items">
             <template v-for="(it, i) in sorted" :key="it.id">
               <div v-if="multi && (i === 0 || sorted[i - 1].basket !== it.basket)" class="od-basket" data-testid="basket-head">{{ t('basket_n', { n: it.basket }) }}</div>
@@ -287,21 +289,21 @@ async function copyNo() {
               </div>
             </template>
           </div>
-          <i class="tear" aria-hidden="true"></i>
           <div class="od-sums"><TotalsTable :totals="order.totals" :currency="order.currency" :delivery="order.service_type === 'delivery'" :discounts="order.discounts" /></div>
         </section>
 
         <section class="od-card od-infocard" data-testid="order-info">
           <h2>{{ t('od.info') }}</h2>
           <div v-if="order.service_type === 'delivery'" class="od-where">
-            <span class="pin"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13a2.600 2.600 0 1 0 0-5.200 2.600 2.600 0 0 0 0 5.200zM12 21s6.500-5.800 6.500-10.600a6.500 6.500 0 0 0-13 0C5.500 15.200 12 21 12 21z" /></svg></span>
+            <svg class="pin" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 2.500a7 7 0 0 0-7 7c0 5.100 7 12 7 12s7-6.900 7-12a7 7 0 0 0-7-7zm0 9.600a2.600 2.600 0 1 1 0-5.200 2.600 2.600 0 0 1 0 5.200z" /></svg>
             <div><small>{{ t('od.address') }}</small>
-              <b>{{ order.address_line }} {{ order.address_unit }}</b>
-              <span>{{ contactName(order) }} {{ prettyPhone(contactPhone(order)) }}</span>
+              <b>{{ order.address_line }}</b>
+              <b v-if="order.address_unit">{{ order.address_unit }}</b>
+              <span>{{ contactName(order) }}<i v-if="contactName(order)" class="gap"></i>{{ prettyPhone(contactPhone(order)) }}</span>
               <span v-if="order.address_note" class="note">{{ order.address_note }}</span></div>
           </div>
           <div v-else-if="store" class="od-where">
-            <span class="pin"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.bag" /></svg></span>
+            <svg class="pin" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="ICONS.bag" /></svg>
             <div><small>{{ t('od.pickup_at_store') }}</small><b>{{ storeName }}</b><span>{{ store.address }}</span></div>
           </div>
           <dl class="od-info">
@@ -341,38 +343,38 @@ async function copyNo() {
 
 <style scoped>
 /* Deep red, cream and gold like the rest of the customer's pages. Sizes: body
-   14, notes 12, card titles 15, the state 20; weights up to 600/700. */
+   14, notes 12, card titles 15–16, the state 20; weights up to 600/700. */
 .od { min-height: 100vh; font-size: 14px; padding-bottom: calc(env(safe-area-inset-bottom) + 28px); background: var(--bg); }
 
-/* the red head; on a phone the first card stands on its lower edge */
-.od-hero { color: #fff; padding: 0 16px 52px; background: var(--red-bg); border-radius: 0 0 50% 50% / 0 0 22px 22px; }
-.od-hero.closed { background: linear-gradient(180deg, #6f5a4c, #8c7464); }
-.od-bar { display: flex; align-items: center; gap: 8px; height: 52px; }
-.od-back { border: 0; background: none; color: inherit; padding: 6px 6px 6px 0; margin-inline-start: -4px; cursor: pointer; display: flex; align-items: center; gap: 2px; font-size: 14px; font-weight: 600; }
-.od-backtext { display: none; }
-.od-barno { flex: 1; text-align: center; font-size: 12px; opacity: .8; font-variant-numeric: tabular-nums; letter-spacing: .3px; }
-.od-lang :deep(.lang-btn) { border: 1px solid rgba(244, 207, 115, .7); background: rgba(255, 255, 255, .12); color: #fff; border-radius: 14px; height: 28px; padding: 0 10px; font-size: 12px; cursor: pointer; }
-.od-state { display: flex; align-items: center; gap: 12px; padding: 4px 2px 0; }
-.od-stateic { flex: none; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; color: var(--gold); background: rgba(255, 246, 227, .12); border: 1px solid rgba(244, 207, 115, .45); }
-.od-title { flex: 1; min-width: 0; display: grid; gap: 3px; }
-.od-title h1 { font-size: 20px; font-weight: 700; line-height: 1.3; color: #fff6e3; }
-.od-title p { font-size: 12px; color: rgba(255, 246, 227, .85); line-height: 1.5; }
-.od-title .od-sched { display: inline-block; justify-self: start; margin-top: 2px; padding: 1px 8px; border-radius: 6px; background: var(--gold); color: var(--red-deep); font-weight: 600; }
-.od-code { flex: none; display: grid; justify-items: center; padding: 6px 12px; border-radius: 10px; background: #fff6e3; color: var(--red); box-shadow: 0 3px 10px rgba(60, 10, 0, .2); }
-.od-code small { font-size: 11px; color: var(--muted); }
-.od-code b { font-size: 22px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+/* the red bar: back, the page's name in the middle, the language */
+.od-bar { position: sticky; top: 0; z-index: 10; display: grid; grid-template-columns: minmax(48px, auto) minmax(0, 1fr) minmax(48px, auto); align-items: center; height: 52px; padding-inline-end: 10px; background: var(--red-bg); color: #fff; }
+.od-back { justify-self: start; border: 0; background: none; color: inherit; height: 52px; width: 48px; display: grid; place-items: center; cursor: pointer; }
+.od-bar > b { text-align: center; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.od-lang { justify-self: end; }
+.od-lang :deep(.lang-btn) { border: 0; background: none; color: #fff; height: 32px; padding: 0 4px; font-size: 14px; cursor: pointer; }
 
-.od-wrap { padding: 0 12px; margin-top: -40px; position: relative; }
-.od-loading { margin-top: 0; padding-top: 16px; }
+.od-wrap { padding: 12px; }
 .od-cols, .od-col { display: grid; gap: 12px; min-width: 0; align-content: start; }
 .od-col:empty { display: none; }
-.od-card { background: var(--paper); border-radius: 14px; padding: 14px; display: grid; gap: 12px; min-width: 0; box-shadow: 0 4px 16px rgba(90, 40, 15, .08); }
-.od-card h2 { font-size: 15px; font-weight: 600; }
-.od-now { box-shadow: 0 6px 18px rgba(90, 40, 15, .13); }
+.od-card { background: var(--paper); border: 1px solid #efe2cf; border-radius: 14px; padding: 14px; display: grid; gap: 12px; min-width: 0; box-shadow: 0 3px 12px rgba(90, 40, 15, .06); }
+.od-card h2 { font-size: 16px; font-weight: 700; }
 .od-line, .od-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
+/* the state: an icon, what it is, why, and whether it is paid */
+.od-state { display: flex; align-items: center; gap: 12px; }
+.od-stateic { flex: none; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; color: var(--red); background: var(--gold-soft); border: 2px solid var(--gold); }
+.od-now.done .od-stateic { color: #2f7a3f; background: #e3f1e5; border-color: #9fd0a8; }
+.od-title { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.od-tline { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.od-title h1 { font-size: 20px; font-weight: 700; line-height: 1.3; color: var(--ink); }
+.od-title p { font-size: 13px; color: var(--ink); opacity: .85; line-height: 1.5; }
+.od-title .od-sched { justify-self: start; margin-top: 2px; padding: 1px 8px; border-radius: 6px; background: var(--gold-soft); color: var(--red-deep); font-size: 12px; font-weight: 600; opacity: 1; }
+.od-code { flex: none; display: grid; justify-items: center; padding: 6px 12px; border-radius: 10px; background: var(--red); color: #fff6e3; }
+.od-code small { font-size: 11px; opacity: .85; }
+.od-code b { font-size: 22px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+
 /* the progress */
-.steps { list-style: none; margin: 0; padding: 2px 0 0; display: flex; }
+.steps { list-style: none; margin: 0; padding: 12px 0 0; display: flex; border-top: 1px solid var(--line); }
 .steps li { flex: 1; display: grid; justify-items: center; gap: 6px; text-align: center; color: #a6978a; position: relative; padding: 0 2px; min-width: 0; }
 .steps li + li::before { content: ""; position: absolute; top: 9px; right: 50%; width: 100%; height: 2px; background: #eadcc8; }
 [dir="rtl"] .steps li + li::before { right: auto; left: 50%; }
@@ -393,17 +395,16 @@ async function copyNo() {
 .od-rider small { font-size: 11px; color: var(--muted); }
 .od-rider a { color: var(--red); font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* the actions: round icons with their names, ordering again in red */
-.od-acts { display: flex; justify-content: space-around; gap: 4px; padding-top: 12px; border-top: 1px dashed #e2d3bd; }
-.steps:not(:empty) ~ .od-acts, .od-rider ~ .od-acts { margin-top: 0; }
-.od-now > .od-acts:first-child { border-top: 0; padding-top: 0; }
-.act { flex: 1 1 0; min-width: 0; max-width: 92px; border: 0; background: none; padding: 2px 0; display: grid; justify-items: center; gap: 5px; color: var(--ink); font-size: 12px; cursor: pointer; text-decoration: none; }
-.act i { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: #f9e7dd; color: var(--red); transition: transform .15s; }
-.act span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.act:hover i { transform: translateY(-1px); }
-.act.main i { background: var(--red); color: #fff6e3; box-shadow: 0 3px 10px rgba(160, 44, 32, .3); }
-.act.main span { color: var(--red); font-weight: 600; }
-.act:disabled { opacity: .5; }
+/* the actions: two to a row, outlined in red, ordering again filled; an odd
+   last one takes the whole row */
+.od-acts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.od-acts > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+.act.btn { min-height: 44px; border-radius: 8px; border: 1px solid var(--red); background: #fff; color: var(--ink); font-size: 15px; font-weight: 600; text-decoration: none; gap: 8px; padding: 8px 10px; }
+.act.btn svg { flex: none; color: var(--red); }
+.act.btn:hover { background: #fdf3ef; }
+.act.btn.primary { background: var(--red); border-color: var(--red); color: #fff; }
+.act.btn.primary svg { color: #fff; }
+.act.btn.primary:hover:not(:disabled) { background: var(--red-deep); }
 
 .od-gift { display: flex; gap: 12px; align-items: center; background: linear-gradient(120deg, #fbe7b3, #f4cf73); border-radius: 14px; padding: 12px 14px; color: #5a2a12; text-decoration: none; }
 .od-gift .ic { width: 40px; height: 40px; border-radius: 12px; background: var(--red); display: grid; place-items: center; font-size: 20px; flex: none; }
@@ -416,80 +417,87 @@ async function copyNo() {
 .starpick button, .starpick i { border: 0; background: none; padding: 0 2px; font-size: 24px; line-height: 1; color: #e3d6c4; cursor: pointer; font-style: normal; }
 .starpick.static i { font-size: 16px; cursor: default; padding: 0 1px; }
 .starpick .on { color: var(--gold); text-shadow: 0 0 1px #c9962e; }
-.od-form { display: grid; gap: 10px; border-top: 1px dashed #e2d3bd; padding-top: 12px; }
+.od-form { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
 .od-form textarea { background: #fff; }
 
-/* the receipt: the store on top, a torn line, the dishes, another, the sums */
-.od-receipt { gap: 0; padding: 0; overflow: hidden; }
-.od-store { display: flex; align-items: center; gap: 10px; padding: 14px; color: var(--ink); text-decoration: none; }
-.od-store img, .od-store .ph { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; flex: none; }
-.od-store .ph, .od-item .ph { background: #c2401c; color: #fff3da; font-weight: 600; display: grid; place-items: center; }
-.od-store .grow { flex: 1; min-width: 0; display: grid; }
-.od-store b { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.od-store small { font-size: 12px; color: var(--muted); }
-.od-store svg { color: #b9a793; flex: none; }
+/* the store, its dishes, then the sums */
+.od-receipt { gap: 0; padding: 0 14px; }
+.od-store { display: flex; align-items: center; gap: 12px; padding: 14px 0 12px; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.od-store img, .od-store .ph { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex: none; }
+.od-store .ph { background: var(--red); color: #fff6e3; display: grid; place-items: center; }
+.od-store .grow { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.od-store b { font-size: 17px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.od-store small { font-size: 13px; color: var(--muted); }
+.od-store .chev { color: #8b7868; flex: none; }
 .od-store:hover b { color: var(--red); }
-.od-receipt > h2 { padding: 14px 14px 12px; }
-.tear { position: relative; display: block; height: 0; margin: 0 14px; border-top: 1.5px dashed #e2d3bd; }
-.tear::before, .tear::after { content: ""; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%; background: var(--bg); }
-.tear::before { inset-inline-start: -22px; } .tear::after { inset-inline-end: -22px; }
-.od-items { display: grid; gap: 12px; padding: 14px; }
+.od-receipt > h2 { padding: 14px 0 12px; border-bottom: 1px solid var(--line); }
+.od-items { display: grid; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .od-basket { font-size: 12px; font-weight: 600; color: var(--muted); padding-top: 2px; }
-.od-item { display: flex; gap: 10px; align-items: flex-start; }
-.od-item img, .od-item .ph { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; flex: none; font-size: 18px; }
-.od-item .grow { flex: 1; min-width: 0; padding-top: 2px; }
-.od-iname { font-weight: 600; overflow-wrap: anywhere; line-height: 1.4; }
+.od-item { display: flex; gap: 12px; align-items: center; }
+.od-item img, .od-item .ph { width: 64px; height: 52px; border-radius: 8px; object-fit: cover; flex: none; }
+.od-item .ph { background: #c2401c; color: #fff3da; font-weight: 600; font-size: 18px; display: grid; place-items: center; }
+.od-item .grow { flex: 1; min-width: 0; }
+.od-iname { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; line-height: 1.4; }
 .od-item .sub { font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
-.od-item .qty { flex: none; color: var(--muted); font-size: 12px; padding-top: 3px; font-variant-numeric: tabular-nums; }
-.od-item .price { flex: none; min-width: 56px; text-align: end; font-weight: 600; padding-top: 1px; font-variant-numeric: tabular-nums; }
-.od-sums { padding: 10px 14px 14px; }
-.od-receipt :deep(.totals) { margin: 0; width: 100%; border-collapse: collapse; }
-.od-receipt :deep(.totals td) { padding: 3px 0; font-size: 13px; color: var(--muted); border: 0; }
-.od-receipt :deep(.totals td:last-child) { text-align: end; color: var(--ink); font-variant-numeric: tabular-nums; }
-.od-receipt :deep(.totals tr.disc td), .od-receipt :deep(.totals tr.disc td:last-child) { color: var(--red); }
-.od-receipt :deep(.totals tr.sum td) { padding-top: 12px; border-top: 1px solid #eadcc8; color: var(--ink); font-weight: 600; font-size: 15px; }
-.od-receipt :deep(.totals tr.sum td:last-child) { color: var(--red); font-size: 20px; font-weight: 700; }
-.od-receipt :deep(.totals tr.sum + tr td) { font-size: 12px; padding-top: 0; }
+.od-item .qty { flex: none; min-width: 40px; text-align: center; color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; }
+.od-item .price { flex: none; min-width: 56px; text-align: end; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* the sums: the discounts on a gold band, the total big and red */
+.od-sums { padding: 8px 0 14px; }
+.od-receipt :deep(.totals) { margin: 0 -6px; width: calc(100% + 12px); border-collapse: separate; border-spacing: 0; }
+.od-receipt :deep(.totals td) { padding: 4px 6px; font-size: 14px; color: var(--ink); border: 0; }
+.od-receipt :deep(.totals td:last-child) { text-align: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.od-receipt :deep(.totals tr.disc td) { background: var(--gold-soft); }
+.od-receipt :deep(.totals tr.disc td:first-child) { border-radius: 6px 0 0 6px; }
+.od-receipt :deep(.totals tr.disc td:last-child) { border-radius: 0 6px 6px 0; color: var(--red); font-weight: 600; }
+[dir="rtl"] .od-receipt :deep(.totals tr.disc td:first-child) { border-radius: 0 6px 6px 0; }
+[dir="rtl"] .od-receipt :deep(.totals tr.disc td:last-child) { border-radius: 6px 0 0 6px; }
+.od-receipt :deep(.totals tr.disc + tr.disc td) { box-shadow: 0 -2px 0 var(--paper) inset; }
+.od-receipt :deep(.totals tr.sum td) { padding-top: 14px; background: linear-gradient(var(--line), var(--line)) no-repeat; background-size: calc(100% - 6px) 1px; font-weight: 700; font-size: 18px; vertical-align: baseline; }
+.od-receipt :deep(.totals tr.sum td:first-child) { background-position: right top; }
+.od-receipt :deep(.totals tr.sum td:last-child) { color: var(--red); font-size: 24px; background-position: left top; }
+[dir="rtl"] .od-receipt :deep(.totals tr.sum td:first-child) { background-position: left top; }
+[dir="rtl"] .od-receipt :deep(.totals tr.sum td:last-child) { background-position: right top; }
+.od-receipt :deep(.totals tr.sum + tr td) { font-size: 13px; padding-top: 0; color: var(--muted); }
 
 /* where it goes and the order's facts */
-.od-where { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; background: #fbf1e1; }
-.od-where .pin { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--red); color: #fff6e3; display: grid; place-items: center; }
+.od-where { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 10px; background: var(--gold-soft); }
+.od-where .pin { flex: none; color: var(--red); margin-top: 1px; }
 .od-where > div { display: grid; gap: 2px; min-width: 0; }
 .od-where small { font-size: 12px; color: var(--muted); }
-.od-where b { font-weight: 600; overflow-wrap: anywhere; }
-.od-where span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.od-where b { font-weight: 500; font-size: 15px; overflow-wrap: anywhere; }
+.od-where span { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.od-where .gap { display: inline-block; width: 10px; }
 .od-where .note { color: var(--ink); }
 .od-info { margin: 0; display: grid; }
-.od-info > div { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 9px 0; border-top: 1px dashed #eadcc8; }
-.od-info > div:first-child { border-top: 0; padding-top: 0; }
-.od-info dt { color: var(--muted); flex: none; }
-.od-info dd { margin: 0; text-align: end; overflow-wrap: anywhere; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
-.od-copy { border: 1px solid #d9c5a8; background: none; color: var(--muted); border-radius: 999px; padding: 0 9px; font-size: 11px; line-height: 20px; cursor: pointer; }
-.paid { font-size: 11px; padding: 0 7px; border-radius: 6px; line-height: 18px; }
-.paid.warn { background: var(--gold-soft); color: #9a5b12; } .paid.ok { background: #e3f1e5; color: #2f7a3f; }
+.od-info > div { display: flex; justify-content: space-between; align-items: center; gap: 14px; min-height: 44px; padding: 8px 0; border-top: 1px solid var(--line); }
+.od-info > div:first-child { border-top: 0; }
+.od-info dt { color: var(--ink); flex: none; }
+.od-info dd { margin: 0; text-align: end; overflow-wrap: anywhere; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.od-copy { border: 1px solid var(--red); background: #fff; color: var(--red); border-radius: 6px; padding: 0 10px; font-size: 12px; line-height: 24px; cursor: pointer; }
+.paid { flex: none; font-size: 12px; font-weight: 500; padding: 0 8px; border-radius: 6px; line-height: 22px; white-space: nowrap; }
+.paid.warn { background: var(--gold-soft); color: #7a4a10; } .paid.ok { background: #e3f1e5; color: #2f7a3f; }
 
-/* an iPad or a computer: the top bar above (CustomerNav) is red already, so
-   the head becomes a red card and the cards follow under it */
+/* an iPad or a computer: the red bar above (CustomerNav) is the top, so the
+   page's own bar becomes its heading */
 @media (min-width: 768px) {
   .od { padding-bottom: 40px; }
-  .od-hero { border-radius: 16px; padding: 4px 22px 22px; }
-  .od-lang, .od-barno { display: none; }
-  .od-bar { height: 40px; }
-  .od-back { color: rgba(255, 246, 227, .9); }
-  .od-backtext { display: inline; }
-  .od-state { padding: 0; gap: 16px; }
-  .od-stateic { width: 60px; height: 60px; }
-  .od-title h1 { font-size: 22px; }
-  .od-title p { font-size: 13px; }
-  .od-code { padding: 8px 18px; } .od-code b { font-size: 26px; }
-  .od-wrap { padding: 0; margin-top: 14px; }
+  .od-bar { position: static; height: auto; background: none; color: var(--ink); grid-template-columns: auto minmax(0, 1fr); gap: 4px; padding: 0 0 12px; }
+  .od-back { color: var(--ink); height: 36px; width: 36px; margin-inline-start: -8px; border-radius: 50%; }
+  .od-back:hover { background: var(--gold-soft); }
+  .od-bar > b { text-align: start; font-size: 20px; }
+  .od-lang { display: none; }
+  .od-wrap { padding: 0; }
   .od-cols { gap: 14px; }
-  .act { max-width: 110px; font-size: 13px; }
-  .act i { width: 44px; height: 44px; }
+  .od-card { padding: 16px 18px; }
+  .od-receipt { padding: 0 18px; }
+  .od-stateic { width: 54px; height: 54px; }
+  .od-title h1 { font-size: 22px; }
+  .od-acts { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .od-acts > :last-child:nth-child(odd) { grid-column: auto; }
 }
-/* a computer puts the receipt beside the state of the order */
+/* a computer puts the dishes and sums beside the state of the order */
 @media (min-width: 1024px) {
-  .od-cols { grid-template-columns: minmax(0, 1fr) minmax(320px, 380px); align-items: start; }
+  .od-cols { grid-template-columns: minmax(0, 1fr) minmax(340px, 400px); align-items: start; }
   .od-col, .od-infocard { grid-column: 1; }
   .od-side { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 16px; }
 }

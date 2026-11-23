@@ -2295,5 +2295,9 @@
  "vo.view_short": "Voir",
  "vo.view_hint": "Ouvrir ce lieu dans Google Maps dans une nouvelle fenêtre",
  "vo.view_none": "Pas encore de position : choisissez une suggestion ou « Ouvrir la carte »",
+ "co.deliver_to": "Livrer à",
+ "co.pickup_at": "Retrait au magasin",
+ "co.cod": "Paiement à la livraison",
+ "co.pay_cash": "Paiement en espèces",
  "ad.default_tag": "Par défaut"
 }

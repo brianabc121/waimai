@@ -2295,5 +2295,9 @@
  "vo.view_short": "Xem",
  "vo.view_hint": "Mở vị trí này trên Google Maps trong cửa sổ mới",
  "vo.view_none": "Chưa có tọa độ: chọn một gợi ý hoặc bấm \"Mở bản đồ\"",
+ "co.deliver_to": "Giao đến",
+ "co.pickup_at": "Nhận tại cửa hàng",
+ "co.cod": "Thanh toán khi nhận hàng",
+ "co.pay_cash": "Trả bằng tiền mặt",
  "ad.default_tag": "Mặc định"
 }
