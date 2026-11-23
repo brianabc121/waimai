@@ -396,3 +396,4 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
 [dir="rtl"] .rtl-flip { transform: scaleX(-1); }
 html[data-lang="th"] body { line-height: 1.6; }
 html[data-lang="my"] body, html[data-lang="km"] body { line-height: 1.8; }
+.zawgyi-notice { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 1000; max-width: calc(100vw - 32px); background: #1f2328; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.5; box-shadow: 0 4px 16px rgba(0,0,0,.2); }

@@ -3,6 +3,7 @@
 // is the only place that touches its SDK. The lists and the unread counts
 // come from this system's own API.
 import { reactive } from 'vue'
+import { toUnicode } from './zawgyi'
 import { ApiError, del, get, post, put, upload } from './api'
 import { shrink } from './photo'
 import { extend, t } from './i18n'
@@ -205,6 +206,7 @@ export async function history(branchId: Side, peer: string, before = ''): Promis
 // says which member of staff is writing.
 export async function sendText(branchId: Side, peer: string, text: string, extra?: { uid: number; name: string }): Promise<ChatMsg> {
   const s = await connect(branchId)
+  text = (await toUnicode(text).catch(() => ({ body: text }))).body // Zawgyi Burmese goes out as Unicode
   try {
     const m = (await s.createTextMessage(text)).data
     if (extra) m.ex = JSON.stringify(extra)
