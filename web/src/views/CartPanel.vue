@@ -55,7 +55,9 @@ function moveTo(l: CartLine, b: number) { moving.value = ''; moveLine(l, b) }
         <input type="radio" name="basket" :value="b" v-model="cart.basket" /><span>{{ t('sf.basket_n', { n: b }) }}</span>
       </label>
       <span class="grow"></span>
-      <button v-if="lines.length" class="plain" data-testid="clear-basket" @click="clear">{{ baskets.length ? t('sf.clear_basket') : t('clear') }}</button>
+      <button v-if="lines.length" class="plain clr" data-testid="clear-basket" @click="clear">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5" /></svg>
+        {{ baskets.length ? t('sf.clear_basket') : t('clear') }}</button>
     </div>
     <div class="clines">
       <p v-if="!lines.length" class="muted none">{{ cart.lines.length ? t('sf.basket_empty') : t('cart_empty') }}</p>
@@ -70,7 +72,9 @@ function moveTo(l: CartLine, b: number) { moving.value = ''; moveLine(l, b) }
           <div v-else class="pr">{{ money(linePrice(l, items)!, currency) }}</div>
         </div>
         <div class="acts">
-          <button v-if="baskets.length" class="plain" data-testid="move-basket" @click="move(l)">{{ t('sf.move_basket') }}</button>
+          <button v-if="baskets.length" class="plain mv" data-testid="move-basket" @click="move(l)">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h15l-3.5-3.5M20 16H5l3.5 3.5" /></svg>
+            {{ t('sf.move_basket') }}</button>
           <div v-if="moving === l.key" class="targets">
             <button v-for="b in baskets.filter(x => x !== l.basket)" :key="b" class="plain" @click="moveTo(l, b)">{{ t('sf.basket_n', { n: b }) }}</button>
           </div>
@@ -80,32 +84,43 @@ function moveTo(l: CartLine, b: number) { moving.value = ''; moveLine(l, b) }
     </div>
     <div class="fees" v-if="cart.lines.length">
       <div><span>{{ t('packaging_fee') }}</span><b>{{ money(store.branch.packaging_fee, currency) }}</b></div>
-      <div v-if="baskets.length" data-testid="basket-subtotal"><span>{{ t('sf.basket_subtotal') }}</span><b>{{ money(sum(lines), currency) }}</b></div>
-      <div v-if="!baskets.length || used > 1" data-testid="cart-subtotal"><span>{{ baskets.length ? t('sf.all_baskets') : t('subtotal') }}</span><b>{{ money(sum(cart.lines), currency) }}</b></div>
+      <div v-if="baskets.length" data-testid="basket-subtotal" class="sub"><span>{{ t('sf.basket_subtotal') }}</span><b>{{ money(sum(lines), currency) }}</b></div>
+      <div v-if="!baskets.length || used > 1" data-testid="cart-subtotal" class="sub"><span>{{ baskets.length ? t('sf.all_baskets') : t('subtotal') }}</span><b>{{ money(sum(cart.lines), currency) }}</b></div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .cartpanel { display: flex; flex-direction: column; min-height: 0; }
-.baskets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 12px 16px; border-bottom: 1px solid #f0f0f0; }
-.bk { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 15px; }
-.bk input { appearance: none; width: 22px; height: 22px; margin: 0; border: 1.5px solid #cfd3d9; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
-.bk input:checked { border-color: var(--brand); }
-.bk input:checked::after { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--brand); }
-.plain { border: 0; background: none; padding: 2px 0; color: #9a9ea5; font-size: 13px; cursor: pointer; }
+/* the baskets as tabs; the one being filled is outlined in red */
+.baskets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #f1ebe2; }
+.bk { position: relative; display: inline-flex; align-items: center; cursor: pointer; font-size: 14px; }
+.bk input { position: absolute; opacity: 0; pointer-events: none; }
+.bk span { padding: 0 14px; line-height: 34px; border-radius: 9px; background: #f3eee7; color: var(--muted); border: 1.5px solid transparent; }
+.bk input:checked + span { background: var(--soft-red, #fdece6); color: var(--brand); border-color: var(--brand); }
+.bk input:focus-visible + span { outline: 2px solid var(--brand); outline-offset: 2px; }
+.plain { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; padding: 2px 0; color: var(--muted); font-size: 13px; cursor: pointer; }
 .plain:hover { color: var(--ink); }
-.clines { overflow-y: auto; padding: 4px 16px; min-height: 120px; flex: 1; }
+.clines { overflow-y: auto; padding: 0 16px; min-height: 120px; flex: 1; }
 .none { text-align: center; padding: 28px 0; margin: 0; }
-.cline { display: flex; gap: 12px; padding: 10px 0; }
-.cline img, .cline .ph { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; flex: none; }
+.cline { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid #f1ebe2; }
+.cline:last-child { border-bottom: 0; }
+.cline img, .cline .ph { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; flex: none; }
+.cline > .grow { min-width: 0; }
 .ph { display: grid; place-items: center; background: var(--brand-soft); color: var(--brand-dark); font-size: 22px; font-weight: 700; }
-.nm { font-weight: 700; font-size: 15px; line-height: 1.3; }
-.pr { color: #e5462b; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
-.acts { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 6px; flex: none; }
+.nm { font-size: 15px; line-height: 1.3; color: var(--ink); }
+.pr { color: var(--price, #e5462b); font-weight: 700; font-size: 16px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.acts { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 8px; flex: none; }
 .targets { display: flex; gap: 10px; }
-.targets .plain { color: var(--brand-dark); font-weight: 600; }
-.fees { border-top: 1px solid #f0f0f0; margin: 0 16px; padding: 10px 0 12px; display: grid; gap: 8px; }
-.fees > div { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; color: #444; }
-.fees b { color: #e5462b; font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.targets .plain { color: var(--brand); font-weight: 600; }
+/* − n + in one box, the + on a light red */
+.acts .stepper { border: 1px solid #ece4d8; border-radius: 9px; overflow: hidden; background: #fff; }
+.acts .stepper button { width: 32px; height: 30px; border: 0; border-radius: 0; background: none; color: var(--muted); font-size: 18px; }
+.acts .stepper button.fill { background: var(--soft-red, #fdece6); color: var(--brand); }
+.acts .stepper > span { min-width: 30px; font-size: 14px; }
+.fees { border-top: 1px solid #f1ebe2; background: #faf7f2; padding: 12px 16px; display: grid; gap: 10px; }
+.fees > div { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--muted); }
+.fees b { font-weight: 500; font-variant-numeric: tabular-nums; }
+.fees .sub { color: var(--ink); font-size: 14px; }
+.fees .sub b { font-size: 18px; font-weight: 700; }
 </style>

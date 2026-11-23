@@ -5,10 +5,10 @@ import { ApiError, get, post } from '../api'
 import { addLine, linePrice, useCart } from '../cart'
 import { locale, money, pick, promoLabel, setLocale, t } from '../i18n'
 import { mallSpot } from '../mall'
-import { defaultTemplate, themeVars } from '../theme'
+import { defaultTemplate } from '../theme'
 import { customer, customerLogout, loadCustomer, loginRoute, prettyPhone } from '../customer'
 import { termsAt, type DeliveryTerms } from '../addresses'
-import type { Item, Storefront } from '../types'
+import type { Item, Promotion, Storefront } from '../types'
 import CartPanel from './CartPanel.vue'
 import DishDetail from './DishDetail.vue'
 import MediaCarousel from './MediaCarousel.vue'
@@ -125,9 +125,32 @@ const minimum = computed(() => cart.service === 'delivery' && store.value
   ? Math.max(store.value.branch.min_order_amount, (mapMode.value ? terms.value?.min_order : zone.value?.min_order) ?? 0) : 0)
 // Promotions for the chosen service, and a nudge towards the nearest one not yet reached.
 const promos = computed(() => (store.value?.promotions ?? []).filter(p => cart.service === 'delivery' ? p.applies_delivery : p.applies_pickup && p.kind !== 'free_delivery'))
+// Only offers running right now count on the cart bar.
+const livePromos = computed(() => promos.value.filter(p => p.live_now !== false))
 const nextPromo = computed(() => {
-  const ahead = promos.value.filter(p => p.threshold > subtotal.value).sort((a, b) => a.threshold - b.threshold)[0]
+  const ahead = livePromos.value.filter(p => p.threshold > subtotal.value).sort((a, b) => a.threshold - b.threshold)[0]
   return ahead && subtotal.value > 0 ? ahead : null
+})
+// The offer the cart already earns, worked out as the server will at checkout:
+// the one that saves the most. The delivery fee is known only once there is an
+// address, so free delivery is weighed with the fee of where the customer is.
+const deliveryFee = computed(() => cart.service === 'delivery' ? (mapMode.value ? terms.value?.fee : zone.value?.fee) ?? 0 : 0)
+function saving(p: Promotion, sub: number) {
+  if (p.kind === 'amount_off') return Math.min(p.value, sub)
+  if (p.kind === 'percent_off') return Math.min(Math.round(sub * p.value / 10000), p.max_discount ?? Infinity, sub)
+  return 0
+}
+const deal = computed(() => {
+  const sub = subtotal.value
+  let best: Promotion | null = null, bestTotal = -1
+  for (const p of livePromos.value) {
+    if (sub <= 0 || p.threshold > sub) continue
+    const total = p.kind === 'free_delivery' ? deliveryFee.value : saving(p, sub)
+    // free delivery with the fee not yet known still counts, behind any money off
+    if (total > bestTotal || (total === bestTotal && best?.kind === 'free_delivery' && p.kind !== 'free_delivery')) { best = p; bestTotal = total }
+  }
+  const off = best && best.kind !== 'free_delivery' ? saving(best, sub) : 0
+  return { promo: best, off, now: sub - off }
 })
 const hasUnavailable = computed(() => cart.lines.some(l => {
   const it = items.value.get(l.item_id)
@@ -264,7 +287,7 @@ async function sendReport() {
 </script>
 
 <template>
-  <div class="phone wide shop" :class="{ solo: tab !== 'menu' }" :style="themeVars(tpl)">
+  <div class="phone wide shop warm" :class="{ solo: tab !== 'menu' }">
     <div v-if="error" class="section stack">
       <div class="banner bad">{{ error }}</div>
       <button class="btn" @click="load">{{ t('retry') }}</button>
@@ -388,29 +411,41 @@ async function sendReport() {
           <h2>{{ t('cart') }}<span v-if="count" class="muted small"> · {{ count }}</span></h2>
           <CartPanel :store="store" :items="items" :currency="cur" :orderable="orderable" />
           <div class="foot">
+            <div v-if="count" class="sumline">
+              <b class="now">{{ money(deal.now, cur) }}</b>
+              <s v-if="deal.off" class="was">{{ money(subtotal, cur) }}</s>
+            </div>
+            <div v-if="count && deal.promo" class="got" data-testid="side-deal">{{ t('sf.got_promo', { name: promoLabel(deal.promo, cur) }) }}<template v-if="deal.off"> · {{ t('sf.saved', { amt: money(deal.off, cur) }) }}</template></div>
             <div v-if="count && minimum > subtotal" class="small muted">{{ t('below_min', { amt: money(minimum - subtotal, cur) }) }}</div>
             <div v-else-if="nextPromo" class="small" style="color:var(--brand-dark)">{{ t('more_for_promo', { amt: money(nextPromo.threshold - subtotal, cur), name: promoLabel(nextPromo, cur) }) }}</div>
             <button v-if="count && missing.length" class="btn block big must" data-testid="required-missing" @click="toRequired">{{ t('sf.required_pick') }} · {{ pick(missing[0].name, missing[0].name_en) }}</button>
-            <button v-else class="btn primary block big" data-testid="go-checkout" :disabled="blocked" @click="checkout">{{ t('checkout') }}<template v-if="count"> · {{ money(subtotal, cur) }}</template></button>
+            <button v-else class="btn primary block big" data-testid="go-checkout" :disabled="blocked" @click="checkout">{{ t('checkout') }}<template v-if="count"> · {{ money(deal.now, cur) }}</template></button>
           </div>
         </div>
       </aside>
       </div>
 
-      <!-- cart bar -->
+      <!-- cart bar: what the cart costs now, what it would have cost, the offer it earns and the next one -->
       <div class="bottombar cartbar" :class="{ over: showCart }" v-if="tab === 'menu' || count > 0 || showCart">
         <div>
           <button class="bag" :class="{ empty: !count }" :aria-label="t('cart')" data-testid="open-cart" @click="showCart = !showCart && count > 0">
-            <svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h22l-2.3 13.2a2 2 0 0 1-2 1.7H9.3a2 2 0 0 1-2-1.7z" /><path d="m11 12 4-7M21 12l-4-7M12.5 17v5M16 17v5M19.5 17v5" /></svg>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9.5h17l-1.7 9.3a1.6 1.6 0 0 1-1.6 1.3H6.8a1.6 1.6 0 0 1-1.6-1.3z" /><path d="m8.5 9.5 3-5.5M15.5 9.5l-3-5.5M9.5 13.5v3M14.5 13.5v3" /></svg>
             <span v-if="count" class="n" data-testid="cart-count">{{ count }}</span>
           </button>
-          <b class="amt" data-testid="cart-total" @click="showCart = !showCart && count > 0">{{ money(subtotal, cur) }}</b>
-          <span class="hint">
-            <template v-if="!count">{{ t('cart_empty') }}</template>
-            <span v-else-if="hasUnavailable" style="color:#ff8a80">{{ t('sf.has_unavailable') }}</span>
-            <template v-else-if="minimum > subtotal">{{ t('below_min', { amt: money(minimum - subtotal, cur) }) }}</template>
-            <template v-else-if="nextPromo">{{ t('more_for_promo', { amt: money(nextPromo.threshold - subtotal, cur), name: promoLabel(nextPromo, cur) }) }}</template>
-          </span>
+          <div class="sums" @click="showCart = !showCart && count > 0">
+            <div class="line1">
+              <b class="amt" data-testid="cart-total">{{ money(deal.now, cur) }}</b>
+              <s v-if="deal.off" class="was" data-testid="cart-was">{{ money(subtotal, cur) }}</s>
+              <span v-if="deal.promo" class="got" data-testid="cart-deal">{{ deal.off ? t('sf.saved', { amt: money(deal.off, cur) }) : promoLabel(deal.promo, cur) }}</span>
+            </div>
+            <div class="hint">
+              <template v-if="!count">{{ t('cart_empty') }}</template>
+              <span v-else-if="hasUnavailable" class="bad">{{ t('sf.has_unavailable') }}</span>
+              <template v-else-if="minimum > subtotal">{{ t('below_min', { amt: money(minimum - subtotal, cur) }) }}</template>
+              <template v-else-if="nextPromo">{{ t('more_for_promo', { amt: money(nextPromo.threshold - subtotal, cur), name: promoLabel(nextPromo, cur) }) }}</template>
+              <template v-else-if="deal.promo">{{ t('sf.got_promo', { name: promoLabel(deal.promo, cur) }) }}</template>
+            </div>
+          </div>
           <button v-if="count && missing.length" class="go must" data-testid="required-missing" @click="toRequired">{{ t('sf.required_pick') }}</button>
           <button v-else class="btn primary go" :disabled="blocked" @click="checkout">{{ !canOrder ? (store.branch.paused ? t('paused') : t('closed')) : t('checkout') }}</button>
         </div>
@@ -453,8 +488,14 @@ async function sendReport() {
       <!-- cart (C06): rises above the cart bar, which stays in reach -->
       <div class="sheet-mask cartmask" v-if="showCart" @click.self="showCart = false">
         <div class="sheet cartsheet" data-testid="cart-sheet">
-          <div class="tip"><span>{{ store.branch.baskets_enabled ? t('sf.basket_tip') : t('cart') }}</span>
-            <button :aria-label="t('close')" @click="showCart = false">×</button></div>
+          <div class="carthead">
+            <div class="grow">
+              <h2>{{ t('cart') }}<span class="cnt">{{ count }}</span></h2>
+              <p v-if="store.branch.baskets_enabled">{{ t('sf.basket_tip') }}</p>
+            </div>
+            <button class="x" :aria-label="t('close')" data-testid="close-cart" @click="showCart = false">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
+          </div>
           <CartPanel :store="store" :items="items" :currency="cur" :orderable="orderable" @empty="showCart = false" />
         </div>
       </div>
@@ -497,14 +538,16 @@ async function sendReport() {
 </template>
 
 <style scoped>
-.shop { --star: #f5a623; --menu-top: 50px; background: #f3f3f3; }
+.shop { --star: #f5a623; --menu-top: 50px; background: var(--bg);
+  /* the marketplace's colours: cream cards on a beige page, prices in the deep red */
+  --menu-bg: var(--paper); --rail-bg: #f3e6d2; --price: var(--red); --soft-red: #f9e4dc; }
 
 /* the store card */
-.shophead { background: #fff; border-radius: 0 0 18px 18px; padding: 12px 16px 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.shophead { background: var(--paper); border-radius: 0 0 18px 18px; padding: 12px 16px 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .tools { display: flex; align-items: center; gap: 6px; }
 .tools .seg.light button { padding: 5px 14px; font-size: 14px; }
 .ico { width: 38px; height: 38px; border: 0; background: none; color: var(--ink); border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
-.ico:hover, .ico.on { background: #f2f2f2; }
+.ico:hover, .ico.on { background: var(--gold-soft); }
 .ico.in { color: var(--brand); }
 .ico.fav { color: var(--star); }
 /* on a phone the customer's navigation lies under the cart bar */
@@ -513,26 +556,26 @@ async function sendReport() {
   .shoptabbar { display: block; }
   .shop { --tabs: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); padding-bottom: calc(96px + var(--tabs)); }
   .shop .bottombar.cartbar { bottom: var(--tabbar-h); }
-  .shop .cartmask { padding-bottom: calc(76px + var(--tabs)); }
+  .shop .cartmask { padding-bottom: var(--tabs); }
   .shop .toast { bottom: calc(96px + var(--tabs)); }
 }
 .acct { position: relative; }
-.acct-menu { position: absolute; right: 0; top: 44px; z-index: 30; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .14); padding: 12px; width: 200px; display: grid; gap: 6px; }
+.acct-menu { position: absolute; right: 0; top: 44px; z-index: 30; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .14); padding: 12px; width: 200px; display: grid; gap: 6px; }
 .lang { color: var(--muted); margin-left: 4px; }
 .ident { display: flex; gap: 12px; align-items: flex-start; }
-.logo { width: 76px; height: 76px; border-radius: 10px; border: 1px solid #ececec; object-fit: cover; flex: none; background: #fff; }
+.logo { width: 76px; height: 76px; border-radius: 10px; border: 1px solid var(--line); object-fit: cover; flex: none; background: var(--paper); }
 .logo.ph { display: grid; place-items: center; background: var(--brand-soft); color: var(--brand-dark); font-size: 34px; font-weight: 700; border-color: transparent; }
 .ident h1 { font-size: 20px; line-height: 1.25; overflow-wrap: anywhere; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 4px; font-size: 14px; }
 .score { color: var(--star); font-weight: 700; font-size: 15px; } .score i { font-style: normal; margin-right: 2px; }
 .state { font-size: 12px; font-weight: 600; color: var(--ok); } .state.off { color: var(--warn); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; min-width: 0; }
-.chips span { border: 1px solid #b9bdc4; color: #7d828a; border-radius: 5px; padding: 0 6px; font-size: 12px; line-height: 20px; white-space: nowrap; }
+.chips span { border: 1px solid #cdbba3; color: var(--muted); border-radius: 5px; padding: 0 6px; font-size: 12px; line-height: 20px; white-space: nowrap; }
 .chips.brand { margin: 0; flex: 1; flex-wrap: nowrap; overflow: hidden; }
 .chips.brand span { border-color: var(--brand); color: var(--brand-dark); overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .promoline { display: flex; align-items: center; gap: 8px; }
-.more { border: 0; background: none; color: #8b8f96; font-size: 14px; white-space: nowrap; cursor: pointer; padding: 0; }
-.notice { display: flex; gap: 4px; color: #a2a6ad; font-size: 14px; }
+.more { border: 0; background: none; color: var(--muted); font-size: 14px; white-space: nowrap; cursor: pointer; padding: 0; }
+.notice { display: flex; gap: 4px; color: var(--muted); font-size: 14px; }
 .notice .lbl { flex: none; }
 .marq { overflow: hidden; flex: 1; min-width: 0; white-space: nowrap; }
 .marq span { display: inline-block; }
@@ -548,7 +591,7 @@ async function sendReport() {
 .still { aspect-ratio: 16 / 9; background: #1c1c1c; overflow: hidden; }
 .still img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .hero-media::before { content: ''; position: absolute; inset: 0 0 auto; height: 72px; z-index: 1; pointer-events: none; background: linear-gradient(rgba(0, 0, 0, .45), transparent); }
-.lip { position: absolute; left: 0; right: 0; bottom: -1px; height: 18px; background: #fff; border-radius: 18px 18px 0 0; pointer-events: none; }
+.lip { position: absolute; left: 0; right: 0; bottom: -1px; height: 18px; background: var(--paper); border-radius: 18px 18px 0 0; pointer-events: none; }
 .hero.media .shophead { padding-top: 0; }
 @media (max-width: 767.98px) {
   .hero.media .tools { position: absolute; top: 8px; left: 12px; right: 10px; z-index: 5; color: #fff; }
@@ -559,56 +602,66 @@ async function sendReport() {
 }
 
 /* the three tabs */
-.shoptabs { position: sticky; top: 0; z-index: 15; display: flex; gap: 30px; height: 50px; margin-top: 10px; padding: 0 22px; background: #fff; border-radius: 18px 18px 0 0; }
-.shoptabs button { position: relative; border: 0; background: none; padding: 0 2px; font-size: 16px; color: #666; cursor: pointer; }
+.shoptabs { position: sticky; top: 0; z-index: 15; display: flex; gap: 30px; height: 50px; margin-top: 10px; padding: 0 22px; background: var(--paper); border-radius: 18px 18px 0 0; border-bottom: 1px solid var(--line); }
+.shoptabs button { position: relative; border: 0; background: none; padding: 0 2px; font-size: 16px; color: var(--muted); cursor: pointer; }
 .shoptabs button.on { color: var(--ink); font-weight: 700; }
 .shoptabs button.on::after { content: ''; position: absolute; left: 50%; bottom: 6px; width: 22px; height: 3px; margin-left: -11px; border-radius: 2px; background: var(--brand); }
-.shoptabs small { font-size: 11px; color: #8b8f96; margin-left: 2px; font-weight: 400; }
+.shoptabs small { font-size: 11px; color: var(--muted); margin-left: 2px; font-weight: 400; }
 
 /* the menu fills the screen under the tabs, so the category rail runs to the bottom however few dishes there are */
-.menuwrap { background: #fff; min-height: calc(100vh - 50px); min-height: calc(100dvh - 50px); display: flex; flex-direction: column; }
+.menuwrap { background: var(--paper); min-height: calc(100vh - 50px); min-height: calc(100dvh - 50px); display: flex; flex-direction: column; }
 .menuwrap > .menu { flex: 1; }
 .pre { padding: 10px 14px 0; } .pre:last-of-type { padding-bottom: 10px; }
-.searchbox { width: 100%; border: 0; background: #f2f2f2; border-radius: 999px; padding: 9px 16px; font-size: 15px; }
+.searchbox { width: 100%; border: 0; background: var(--rail-bg); border-radius: 999px; padding: 9px 16px; font-size: 15px; }
 
 /* the store tab */
-.about { display: grid; gap: 8px; background: #f3f3f3; }
-.about section { background: #fff; padding: 14px 18px; }
+.about { display: grid; gap: 8px; background: var(--bg); }
+.about section { background: var(--paper); padding: 14px 18px; }
 .about h3 { font-size: 15px; font-weight: 500; margin-top: 12px; }
 .about h3:first-child { margin-top: 0; }
-.about p { margin: 6px 0 0; color: #5d6168; white-space: pre-wrap; overflow-wrap: anywhere; }
-.about .zone { padding: 6px 0 0; color: #5d6168; }
+.about p { margin: 6px 0 0; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.about .zone { padding: 6px 0 0; color: var(--muted); }
 .reportbtn { border: 0; background: none; padding: 0; color: #7a1b2b; font-size: 15px; cursor: pointer; }
 
 .opt { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .opt.off { opacity: .5; }
 
-/* the black cart bar */
+/* the cart bar: a white card with the basket, the sums and the checkout button */
 .shop .bottombar.cartbar { background: none; border: 0; pointer-events: none; z-index: 30; }
 .shop .bottombar.cartbar.over { z-index: 70; }
-.shop .bottombar.cartbar > div { pointer-events: auto; display: flex; align-items: center; max-width: 560px; height: 56px; margin: 0 auto calc(10px + env(safe-area-inset-bottom)); padding: 0;
-  width: calc(100% - 24px); background: #222; color: #fff; border: 0; border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
-.bag { position: relative; flex: none; width: 62px; height: 62px; margin: -8px 0 -4px 6px; border: 4px solid #222; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; cursor: pointer; }
-.bag.empty { background: #4a4a4a; color: #bbb; }
-.bag .n { position: absolute; top: -4px; right: -6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: #e5352b; color: #fff; font-size: 13px; font-weight: 700; line-height: 22px; border: 0; }
-.amt { font-size: 22px; font-weight: 500; padding: 0 10px 0 12px; margin-left: 6px; border-left: 1px solid #555; white-space: nowrap; cursor: pointer; font-variant-numeric: tabular-nums; }
-.hint { flex: 1; min-width: 0; color: #b9b9b9; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; padding-right: 10px; }
-.go { flex: none; align-self: stretch; min-width: 104px; padding: 0 16px; border: 0; border-radius: 0 999px 999px 0; font-size: 16px; font-weight: 700; cursor: pointer; }
-.btn.go:disabled { background: #555; border-color: #555; color: #bdbdbd; opacity: 1; }
-.go.must { background: #c9c9c9; color: #222; }
+.shop .bottombar.cartbar > div { pointer-events: auto; display: flex; align-items: center; gap: 12px; max-width: 560px; height: 64px; margin: 0 auto calc(10px + env(safe-area-inset-bottom)); padding: 0 8px;
+  width: calc(100% - 24px); background: #fff; color: var(--ink); border: 0; border-radius: 14px; box-shadow: 0 4px 18px rgba(59, 31, 20, .16); }
+.shop .bottombar.cartbar.over > div { box-shadow: none; }
+.bag { position: relative; flex: none; width: 48px; height: 48px; border: 0; border-radius: 12px; background: var(--soft-red); color: var(--red); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.bag.empty { background: #f1ece4; color: #b5a998; }
+.bag .n { position: absolute; top: -7px; right: -9px; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--red); color: #fff; font-size: 12px; font-weight: 700; line-height: 20px; border: 2px solid #fff; box-sizing: content-box; }
+.sums { flex: 1; min-width: 0; cursor: pointer; }
+.line1 { display: flex; align-items: baseline; gap: 6px; min-width: 0; white-space: nowrap; }
+.amt { font-size: 20px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.was { color: #a9998a; font-size: 12px; font-variant-numeric: tabular-nums; }
+.line1 .got { min-width: 0; overflow: hidden; text-overflow: ellipsis; align-self: center; font-size: 11px; line-height: 16px; padding: 0 5px; border-radius: 4px; background: var(--soft-red); color: var(--red); font-weight: 600; }
+.hint { color: var(--muted); font-size: 12px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+.hint .bad { color: var(--bad); }
+.go { flex: none; height: 46px; min-width: 88px; padding: 0 16px; border: 0; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; }
+.btn.go { background: var(--red); border-color: var(--red); color: #fff; }
+.btn.go:disabled { background: #d9cfc3; border-color: #d9cfc3; color: #fff; opacity: 1; }
+.go.must { background: var(--gold); color: var(--red-deep); }
 
-/* the cart sheet stands on the cart bar */
-.cartmask { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
-.cartsheet { max-height: min(74vh, 640px); overflow: hidden; }
-.tip { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 44px; background: #f4f4f4; color: #333; font-size: 14px; text-align: center; position: relative; border-radius: 16px 16px 0 0; }
-.tip button { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border: 0; background: none; font-size: 24px; line-height: 1; color: #8b8f96; cursor: pointer; }
+/* the cart sheet: a header, the baskets, the dishes and the fees; the cart bar sits in its foot */
+.cartmask { padding-bottom: 0; }
+.cartsheet { max-height: min(80vh, 700px); overflow: hidden; padding-bottom: calc(74px + env(safe-area-inset-bottom)); background: #fff; }
+.carthead { display: flex; align-items: flex-start; gap: 12px; padding: 16px 16px 12px; border-bottom: 1px solid #f1ebe2; }
+.carthead h2 { font-size: 18px; display: flex; align-items: center; gap: 8px; }
+.carthead .cnt { font-size: 12px; font-weight: 500; color: var(--muted); background: #f3eee7; border-radius: 6px; padding: 0 7px; line-height: 20px; }
+.carthead p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.carthead .x { flex: none; width: 36px; height: 36px; border: 0; border-radius: 50%; background: #f3eee7; color: var(--muted); display: grid; place-items: center; cursor: pointer; padding: 0; }
 
 .toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 14px; z-index: 90; }
 
 .sidecart { display: none; }
 @media (min-width: 768px) {
   .shophead { padding: 16px var(--gut) 18px; border-radius: 0; }
-  .hero.media { display: grid; grid-template-columns: min(44%, 460px) minmax(0, 1fr); gap: 0 24px; align-items: start; background: #fff; padding: 16px var(--gut) 18px; }
+  .hero.media { display: grid; grid-template-columns: min(44%, 460px) minmax(0, 1fr); gap: 0 24px; align-items: start; background: var(--paper); padding: 16px var(--gut) 18px; }
   .hero.media .shophead { padding: 0; }
   .hero-media { --promo-foot: 12px; border-radius: 14px; overflow: hidden; }
   .hero-media::before, .lip { display: none; }
@@ -617,7 +670,8 @@ async function sendReport() {
   .shoptabs { margin: 12px calc(var(--gut) - 14px) 0; padding: 0 26px; gap: 40px; }
   .shop-main { border-radius: 0 0 14px 14px; overflow: clip; }
   .about section { padding: 16px 26px; }
-  .cartmask { padding-bottom: 96px; align-items: flex-end; }
+  .cartmask { padding: 0; align-items: flex-end; }
+  .cartsheet { border-radius: 16px 16px 0 0; }
 }
 @media (min-width: 1024px) {
   .shoptabs { border-radius: 14px 14px 0 0; }
@@ -625,7 +679,13 @@ async function sendReport() {
   .sidecart { display: block; position: sticky; top: 12px; align-self: start; margin-top: -50px; }
   .sidecart .card { display: flex; flex-direction: column; padding: 0; max-height: calc(100vh - 24px); overflow: hidden; }
   .sidecart h2 { padding: 14px 16px 0; }
-  .sidecart .foot { display: grid; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+  .sidecart .card { background: #fff; border-color: var(--line); }
+  .sidecart .foot { display: grid; gap: 6px; padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+  .sidecart .sumline { display: flex; align-items: baseline; gap: 8px; }
+  .sidecart .now { font-size: 22px; font-variant-numeric: tabular-nums; }
+  .sidecart .was { font-size: 13px; }
+  .sidecart .got { font-size: 13px; color: var(--red); }
+  .sidecart .btn.primary { background: var(--red); border-color: var(--red); }
   .sidecart .must { background: #eee; border-color: #ddd; }
   .shoptabs { margin-right: calc(var(--gut) - 14px + 352px); }
   .shop.solo .shoptabs { margin-right: calc(var(--gut) - 14px); }
