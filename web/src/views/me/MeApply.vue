@@ -50,11 +50,11 @@ async function submit() {
 </script>
 
 <template>
-  <MePage :title="t('ma.title')">
+  <MePage :title="t('ma.title')" layout="split">
     <MeIntro :title="t('mi.apply')" :sub="t('mi.apply_sub')" :icon="'M5 10.5V19h14v-8.5M3.5 7 5 4h14l1.5 3v1a2.2 2.2 0 0 1-4.25.8 2.2 2.2 0 0 1-4.25 0 2.2 2.2 0 0 1-4.25 0A2.2 2.2 0 0 1 3.5 8zM9.5 19v-4.5h5V19'" />
     <div v-if="sent" class="banner ok" data-testid="apply-sent">{{ t('ma.sent') }}</div>
     <div v-if="pending" class="banner info" data-testid="apply-pending">{{ t('ma.pending') }}</div>
-    <form v-else class="card" data-testid="apply-form" @submit.prevent="submit">
+    <form v-else class="card main" data-testid="apply-form" @submit.prevent="submit">
       <div v-if="error" class="banner bad" style="margin-bottom:12px" data-testid="apply-error">{{ error }}</div>
       <label class="field"><span>{{ t('ma.store') }} *</span><input v-model="f.store_name" maxlength="100" data-testid="apply-store" /></label>
       <label class="field"><span>{{ t('ma.contact') }} *</span><input v-model="f.contact_name" maxlength="80" data-testid="apply-contact" /></label>
@@ -79,7 +79,7 @@ async function submit() {
       <label class="field"><span>{{ t('ma.note') }}</span><textarea v-model="f.note" rows="3" maxlength="1000"></textarea></label>
       <button class="btn primary block big" :disabled="busy" data-testid="apply-submit">{{ t('ma.submit') }}</button>
     </form>
-    <template v-if="list.length">
+    <div v-if="list.length" class="side">
       <h3 class="me-sec">{{ t('ma.mine') }}</h3>
       <div v-for="a in list" :key="a.id" class="card stack" data-testid="application" :data-status="a.status">
         <div class="row between"><b>{{ a.store_name }}</b>
@@ -87,7 +87,7 @@ async function submit() {
         <div class="small muted">{{ a.contact_name }} · {{ a.phone }}<template v-if="a.place_name || a.city"> · {{ a.place_name || a.city }}</template> · {{ dateTime(a.created_at) }}</div>
         <div v-if="a.reply" class="reply"><b>{{ t('ma.reply') }}</b>：{{ a.reply }}</div>
       </div>
-    </template>
+    </div>
     <div v-if="picking" class="sheet-mask" @click.self="picking = false">
       <div class="sheet ma-sheet">
         <PlacePicker :start="start" :name="f.place_name" region @done="picked" @close="picking = false" />

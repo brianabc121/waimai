@@ -43,4 +43,6 @@ const home = computed(() => homePath())
 .warm .ctabs a { color: var(--muted); font-size: 11px; justify-self: center; min-width: 64px; height: calc(var(--tabbar-h) - 10px); border-radius: 14px; }
 .warm .ctabs a.on { background: var(--gold); color: var(--red); }
 .warm .ctabs a.on svg { color: var(--red); }
+/* an iPad or a computer has the top bar (CustomerNav) instead */
+@media (min-width: 768px) { .ctabs { display: none; } }
 </style>

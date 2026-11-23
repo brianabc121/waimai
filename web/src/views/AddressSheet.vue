@@ -136,6 +136,13 @@ function closeForm() { if (props.startNew && !list.value?.length) emit('close');
 .ap-row .w { font-size: 13.5px; color: var(--muted); }
 .ap-edit { flex: none; display: inline-flex; align-items: center; gap: 4px; border: 1px solid #cdb9a0; background: none; border-radius: 999px; padding: 6px 12px; color: var(--ink); cursor: pointer; font-size: 14px; }
 .ap-foot { margin-top: 4px; }
+/* a computer: the addresses two by two, the button below them */
+@media (min-width: 1024px) {
+  .as-page { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+  .as-page > :not(.ap-row) { grid-column: 1 / -1; }
+  .ap-foot { display: grid; justify-items: center; }
+  .ap-foot .btn { max-width: 320px; }
+}
 @media (min-width: 768px) { .asheet { height: min(640px, 86vh); } .asheet.form { height: min(700px, 90vh); } }
 @media (min-width: 900px) { .asheet.form:has(.aform.wide) { max-width: 980px; } }
 </style>

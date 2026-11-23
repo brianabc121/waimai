@@ -9,15 +9,15 @@ const open = ref(1)
 </script>
 
 <template>
-  <MePage :title="t('mh.title')" open>
+  <MePage :title="t('mh.title')" open layout="split">
     <MeIntro :title="t('mi.help')" :sub="t('mi.help_sub')" :icon="'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.7 2.2c-.8.5-1.2 1-1.2 1.9M12 16.8h.01'" />
-    <div class="card faq">
+    <div class="card faq main">
       <div v-for="n in 6" :key="n" class="qa" :class="{ on: open === n }">
         <button data-testid="help-q" @click="open = open === n ? 0 : n"><span>{{ t(`mh.q${n}`) }}</span><i>›</i></button>
         <p v-if="open === n" data-testid="help-a">{{ t(`mh.a${n}`) }}</p>
       </div>
     </div>
-    <div class="card row between"><b>{{ t('mh.still') }}</b>
+    <div class="card row between side"><b>{{ t('mh.still') }}</b>
       <router-link to="/me/feedback" class="btn small primary" data-testid="help-feedback">{{ t('mh.ask') }}</router-link></div>
   </MePage>
 </template>

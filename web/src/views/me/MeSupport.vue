@@ -21,9 +21,9 @@ const chatLink = (v: string) => /^https?:\/\//i.test(v) ? v : ''
 </script>
 
 <template>
-  <MePage :title="t('ms.title')" open>
+  <MePage :title="t('ms.title')" open layout="two">
     <MeIntro :title="t('mi.support')" :sub="t('mi.support_sub')" :icon="'M5 13v-1a7 7 0 0 1 14 0v1M5 13h2.5v5H6a1 1 0 0 1-1-1zM19 13h-2.5v5H18a1 1 0 0 0 1-1zM16.5 18c0 1.7-1.5 2.5-3.5 2.5'" />
-    <div class="card">
+    <div class="card cell">
       <h2>{{ t('ms.platform') }}</h2>
       <router-link v-if="online" to="/me/support/chat" class="btn primary block sp-online" data-testid="support-online">{{ t('sp.online') }}
         <i v-if="answers" data-testid="support-online-unread">{{ answers > 99 ? '99+' : answers }}</i></router-link>
@@ -37,7 +37,7 @@ const chatLink = (v: string) => /^https?:\/\//i.test(v) ? v : ''
       </div>
       <router-link to="/me/feedback" class="btn block" style="margin-top:12px" data-testid="support-feedback">{{ t('ms.to_feedback') }}</router-link>
     </div>
-    <div v-if="stores.length" class="card">
+    <div v-if="stores.length" class="card cell">
       <h2>{{ t('ms.stores') }}</h2>
       <p class="note">{{ t('ms.stores_hint') }}</p>
       <div class="me-rows" style="padding:0">

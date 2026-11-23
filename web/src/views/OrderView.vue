@@ -14,6 +14,7 @@ import { closedStatus, finished as isFinished, orderAgain, stamp } from '../orde
 import type { Order, OrderReview } from '../types'
 import './storeStrings'
 import TotalsTable from './TotalsTable.vue'
+import CustomerFrame from './me/CustomerFrame.vue'
 import { couponTitle, lastDay } from '../coupons'
 import { chatEnabled } from '../chat'
 
@@ -137,7 +138,8 @@ async function copyNo() {
 </script>
 
 <template>
-  <div class="od" data-testid="order-page">
+  <div class="od warm" data-testid="order-page">
+   <CustomerFrame active="orders">
     <header class="od-bar">
       <button class="od-back" :aria-label="t('back')" data-testid="order-back" @click="back">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7" /></svg>
@@ -264,6 +266,7 @@ async function copyNo() {
         </section>
       </div>
     </div>
+   </CustomerFrame>
 
     <div v-if="as.open" class="sheet-mask" data-testid="aftersale-sheet" @click.self="as.open = false">
       <form class="sheet" @submit.prevent="sendAftersale">
@@ -328,12 +331,25 @@ async function copyNo() {
 .od-info { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 14px; }
 .od-info dt { color: var(--muted); } .od-info dd { margin: 0; overflow-wrap: anywhere; }
 .od-copy { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 1px 10px; font-size: 12px; cursor: pointer; margin-left: 6px; }
-@media (min-width: 768px) { .od-bar { padding-top: 16px; } .od-backtext { display: inline; } .od-wrap { gap: 12px; } }
+/* the warm look of the customer's pages */
+.warm .od-card { background: var(--paper); box-shadow: 0 3px 12px rgba(90, 40, 15, .08); }
+.warm .pill { background: none; border-color: #cdb9a0; font-weight: 500; }
+.warm .pill.brand { background: var(--red); border-color: var(--red); color: #fff; }
+.warm .od-lang { background: none; }
+/* an iPad or a computer: the top bar above (CustomerNav) carries the language */
+@media (min-width: 768px) {
+  .od { padding-bottom: 40px; }
+  .od-bar, .od-wrap { max-width: none; }
+  .od-bar { position: static; padding: 0 0 4px; background: none; }
+  .od-lang { display: none; }
+  .od-backtext { display: inline; }
+  .od-wrap { padding: 0; gap: 12px; }
+  .od-top { padding: 0 2px 4px; }
+}
 /* a computer puts what was bought beside the state of the order */
 @media (min-width: 1024px) {
-  .od-bar, .od-wrap { max-width: 1100px; }
-  .od-cols { grid-template-columns: minmax(0, 1fr) minmax(340px, 420px); gap: 14px; align-items: start; }
+  .od-cols { grid-template-columns: minmax(0, 1fr) minmax(320px, 380px); gap: 14px; align-items: start; }
   .od-col, .od-infocard { grid-column: 1; }
-  .od-side { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 64px; }
+  .od-side { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 16px; }
 }
 </style>
