@@ -59,9 +59,9 @@ async function toggle(s: MyStore) {
 
 <style scoped>
 .list { padding: 2px 14px; }
-.store { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
-.lnk b { font-size: 16.5px; }
+.store { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.lnk b { font-size: 14px; font-weight: 600; }
 .store:last-child { border-bottom: 0; }
-.lnk { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; color: var(--ink); }
+.lnk { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; color: var(--ink); }
 .lnk .grow { display: grid; } .lnk .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

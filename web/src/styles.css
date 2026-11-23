@@ -16,6 +16,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 input, select, textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
 input[type=checkbox], input[type=radio] { width: 18px; height: 18px; padding: 0; accent-color: var(--brand); flex: none; }
+/* iPhone Safari zooms into a field whose text is under 16px: the customer's pages keep 16px there */
+@supports (-webkit-touch-callout: none) { .warm input, .warm select, .warm textarea { font-size: max(16px, 1em); } }
 label.field { display: block; margin-bottom: 12px; }
 label.field > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
 label.check { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }

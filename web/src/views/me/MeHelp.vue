@@ -25,8 +25,8 @@ const open = ref(1)
 <style scoped>
 .faq { padding: 2px 14px; }
 .qa { border-bottom: 1px solid var(--line); } .qa:last-child { border-bottom: 0; }
-.qa button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 0; background: none; padding: 14px 0; text-align: left; cursor: pointer; font-weight: 700; font-size: 15.5px; color: var(--ink); }
-.qa.on button { color: var(--red); }
-.qa i { font-style: normal; color: var(--red); font-size: 20px; line-height: 1; transition: transform .15s; } .qa.on i { transform: rotate(90deg); }
-.qa p { color: var(--muted); background: var(--bg); border-radius: 10px; padding: 10px 12px !important; margin-bottom: 12px; font-size: 14px; line-height: 1.7; padding-bottom: 14px; }
+.qa button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 0; background: none; padding: 12px 0; text-align: left; cursor: pointer; font-weight: 400; font-size: 14px; color: var(--ink); }
+.qa.on button { color: var(--red); font-weight: 500; }
+.qa i { font-style: normal; color: #b9a793; font-size: 17px; line-height: 1; transition: transform .15s; } .qa.on i { transform: rotate(90deg); }
+.qa p { color: var(--muted); background: var(--bg); border-radius: 10px; padding: 10px 12px !important; margin-bottom: 10px; font-size: 13px; line-height: 1.65; padding-bottom: 14px; }
 </style>
