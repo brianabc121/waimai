@@ -436,3 +436,47 @@ func TestDineInSameBatchSubmittedTwiceAtOnce(t *testing.T) {
 		t.Fatalf("table opened %d times", opened)
 	}
 }
+
+// A dish can be taken off the table menu while staying on delivery, and the
+// other way round; leaving the field out keeps what was set.
+func TestDineInChannelOfADish(t *testing.T) {
+	s := newStore(t, false)
+	ctx := context.Background()
+	a := testApp
+	tableID, _ := s.table(t, "A1")
+	bill, err := a.OpenTable(ctx, tableID, 1, s.staff)
+	noErr(t, err)
+	guest := app.Actor{Type: "guest"}
+	menu, err := a.AdminMenu(ctx, s.branchID)
+	noErr(t, err)
+	var tea app.Item
+	for _, c := range menu.Categories {
+		for _, it := range c.Items {
+			if it.ID == s.tea {
+				tea = it
+			}
+		}
+	}
+	save := func(dineIn *bool, delivery bool) {
+		t.Helper()
+		_, err := a.SaveItem(ctx, s.branchID, s.tea, app.ItemInput{CategoryID: tea.CategoryID, Name: tea.Name, Price: tea.Price, Published: true,
+			NeedsPrep: tea.NeedsPrep, DeliveryAvailable: delivery, PickupAvailable: delivery, DineInAvailable: dineIn})
+		noErr(t, err)
+	}
+	off, on := false, true
+	save(&off, true)
+	_, err = a.AddBatch(ctx, bill.SessionID, "qr", uniq("k"), batch(app.QuoteLineInput{ItemID: s.tea, Qty: 1}), guest)
+	wantCode(t, err, "ITEM_UNAVAILABLE")
+	_, err = a.CreateQuote(ctx, s.slug, app.QuoteInput{ServiceType: "pickup", Items: []app.QuoteLineInput{{ItemID: s.tea, Qty: 1}}}, "")
+	noErr(t, err)
+
+	save(nil, false) // an older client: dine-in stays off
+	_, err = a.AddBatch(ctx, bill.SessionID, "qr", uniq("k"), batch(app.QuoteLineInput{ItemID: s.tea, Qty: 1}), guest)
+	wantCode(t, err, "ITEM_UNAVAILABLE")
+
+	save(&on, false)
+	_, err = a.AddBatch(ctx, bill.SessionID, "qr", uniq("k"), batch(app.QuoteLineInput{ItemID: s.tea, Qty: 1}), guest)
+	noErr(t, err)
+	_, err = a.CreateQuote(ctx, s.slug, app.QuoteInput{ServiceType: "pickup", Items: []app.QuoteLineInput{{ItemID: s.tea, Qty: 1}}}, "")
+	wantCode(t, err, "ITEM_UNAVAILABLE")
+}

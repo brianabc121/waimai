@@ -244,7 +244,7 @@ func checkRequired(ctx context.Context, q Querier, branchID int64, service strin
 		WHERE c.branch_id=$1 AND c.required AND NOT c.archived AND EXISTS (
 			SELECT 1 FROM menu_items i WHERE i.category_id = c.id AND NOT i.archived AND i.published AND NOT i.sold_out
 				AND (i.stock_qty IS NULL OR i.stock_qty > 0)
-				AND CASE $2 WHEN 'delivery' THEN i.delivery_available ELSE i.pickup_available END)
+				AND CASE $2 WHEN 'delivery' THEN i.delivery_available WHEN 'dine_in' THEN i.dine_in_available ELSE i.pickup_available END)
 		ORDER BY c.sort, c.id`, branchID, service)
 	if err != nil {
 		return err
