@@ -88,15 +88,17 @@ func (a *App) chatAccount(ctx context.Context, userID, nickname string) error {
 	if a.IM == nil {
 		return ErrChatOff
 	}
-	var known bool
-	if err := a.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM chat_accounts WHERE im_user_id=$1)`, userID).Scan(&known); err != nil || known {
-		return err
+	// Remembered by this process only, not in the database: a chat server
+	// that was set up afresh (its data volumes removed) knows nobody, and
+	// the accounts are made again after the api restarts.
+	if _, known := a.chatKnown.Load(userID); known {
+		return nil
 	}
 	if err := a.IM.EnsureUser(ctx, userID, nickname); err != nil {
 		return chatDown(err)
 	}
-	_, err := a.DB.Exec(ctx, `INSERT INTO chat_accounts (im_user_id) VALUES ($1) ON CONFLICT DO NOTHING`, userID)
-	return err
+	a.chatKnown.Store(userID, true)
+	return nil
 }
 
 func (a *App) customerAccount(ctx context.Context, customerID int64) error {
