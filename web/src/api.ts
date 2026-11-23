@@ -1,11 +1,9 @@
 // Thin fetch wrapper. Every write carries X-Requested-With (the API's CSRF check).
 import { extend, t } from './i18n'
-import { checkZawgyi } from './zawgyi'
+import { fixZawgyi, notice } from './zawgyi'
 
 extend({
-  zawgyi_confirm: ['这段缅甸文看起来是旧的 Zawgyi 编码：“{text}”。其他手机上会显示成乱码，翻译也会出错。建议换成缅甸文 Unicode 输入法重新输入。\n\n点“确定”照样保存，点“取消”回去修改。',
-    'This Burmese looks like it was typed in the old Zawgyi encoding: "{text}". It shows as gibberish on other phones and cannot be translated. Please type it again with a Unicode Burmese keyboard.\n\nOK saves it anyway; Cancel goes back.'],
-  zawgyi_stopped: ['已取消保存：请用 Unicode 输入法重新输入缅甸文。', 'Not saved: please type the Burmese again with a Unicode keyboard.'],
+  zawgyi_converted: ['检测到旧的 Zawgyi 编码缅甸文，已自动转换成 Unicode 再保存：“{text}”', 'Burmese in the old Zawgyi encoding was converted to Unicode before saving: "{text}"'],
 })
 
 export class ApiError extends Error {
@@ -15,9 +13,10 @@ export class ApiError extends Error {
 }
 
 export async function api<T = any>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
-  if (method !== 'GET' && body !== undefined &&
-    !checkZawgyi(path, body, found => window.confirm(t('zawgyi_confirm', { text: found.slice(0, 40) })))) {
-    throw new ApiError(0, 'ZAWGYI', t('zawgyi_stopped'))
+  if (method !== 'GET' && body !== undefined) {
+    const z = await fixZawgyi(path, body)
+    body = z.body
+    if (z.converted.length) notice(t('zawgyi_converted', { text: z.converted[0].slice(0, 40) }))
   }
   let res: Response
   try {
