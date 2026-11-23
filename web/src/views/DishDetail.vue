@@ -4,7 +4,7 @@
 // menu. On a phone it rises from the bottom and fills the screen; from tablet
 // width up it is a dialog with the pictures beside the text.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { locale, money, pick, t, mn, mt } from '../i18n'
+import { money, t, mn, mt } from '../i18n'
 import type { Item } from '../types'
 import './storeStrings'
 
@@ -28,8 +28,18 @@ function go(i: number) {
 
 // Escape closes it, as the back gesture would.
 const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') emit('close') }
-onMounted(() => addEventListener('keydown', onKey))
-onBeforeUnmount(() => removeEventListener('keydown', onKey))
+// The store page behind stays still while the dish is open, so its scroll bar
+// does not show through and a swipe on the dish does not scroll the menu.
+let overflow = ''
+onMounted(() => {
+  addEventListener('keydown', onKey)
+  overflow = document.documentElement.style.overflow
+  document.documentElement.style.overflow = 'hidden'
+})
+onBeforeUnmount(() => {
+  removeEventListener('keydown', onKey)
+  document.documentElement.style.overflow = overflow
+})
 </script>
 
 <template>
@@ -56,7 +66,6 @@ onBeforeUnmount(() => removeEventListener('keydown', onKey))
         <div class="body">
           <div class="head">
             <h2>{{ name }}</h2>
-            <div class="en" v-if="locale === 'zh' && item.name_en">{{ item.name_en }}</div>
             <div class="stats">
               <span>{{ t('sold_n', { n: item.sold ?? 0 }) }}</span>
               <span v-if="item.stock_qty != null">{{ t('stock_n', { n: item.stock_qty }) }}</span>
@@ -95,7 +104,8 @@ onBeforeUnmount(() => removeEventListener('keydown', onKey))
 /* The dish page in the marketplace's colours: the pictures on top, a cream
    card rising over their lower edge, the price in deep red. */
 .dishmask { z-index: 65; }
-.dish { position: relative; background: var(--paper, #fffaf2); width: 100%; max-width: 520px; height: 100%; max-height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+/* on a phone it is as tall as what it shows, up to the whole screen */
+.dish { position: relative; background: var(--paper, #fffaf2); width: 100%; max-width: 520px; max-height: 100%; display: flex; flex-direction: column; overflow: hidden; border-radius: 18px 18px 0 0; }
 .x { position: absolute; top: 12px; inset-inline-end: 12px; z-index: 3; width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .92); color: var(--ink); display: grid; place-items: center; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .18); }
 .x:hover { background: #fff; }
 .gallery { position: relative; flex: none; aspect-ratio: 1; max-height: 52vh; background: #efe4d3; }
@@ -108,11 +118,10 @@ onBeforeUnmount(() => removeEventListener('keydown', onKey))
 .arrow.prev { inset-inline-start: 12px; } .arrow.next { inset-inline-end: 12px; }
 @media (hover: hover) { .gallery:hover .arrow { display: block; } }
 .thumbs { display: none; }
-.info { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; margin-top: -16px; border-radius: 18px 18px 0 0; background: var(--paper, #fffaf2); }
-.body { flex: 1; overflow-y: auto; padding: 18px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+.info { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; position: relative; margin-top: -16px; border-radius: 18px 18px 0 0; background: var(--paper, #fffaf2); }
+.body { flex: 0 1 auto; min-height: 0; overflow-y: auto; padding: 18px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
 .head { background: #fff; border: 1px solid #efe3d1; border-radius: 14px; padding: 14px 16px; }
 .head h2 { font-size: 19px; line-height: 1.3; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
-.en { color: var(--muted); font-size: 13px; margin-top: 2px; }
 .stats { display: flex; gap: 6px; margin-top: 8px; }
 .stats span { font-size: 11px; line-height: 18px; padding: 0 7px; border-radius: 5px; background: #f3e6d2; color: #6f5a49; }
 .bigprice { display: none; margin-top: 10px; color: var(--red, #a02c20); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -142,7 +151,8 @@ onBeforeUnmount(() => removeEventListener('keydown', onKey))
   .thumbs button { flex: none; width: 52px; height: 52px; padding: 0; border: 2px solid rgba(255, 255, 255, .6); border-radius: 9px; overflow: hidden; cursor: pointer; background: none; opacity: .75; }
   .thumbs button.on { border-color: #fff; opacity: 1; }
   .thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .info { margin: 0; border-radius: 0; }
+  .info { flex: 1; margin: 0; border-radius: 0; }
+  .body { flex: 1; }
   .x { background: #f3e6d2; box-shadow: none; }
   .body { padding: 24px 24px 16px; }
   .head { background: none; border: 0; padding: 0 0 12px; padding-inline-end: 44px; border-radius: 0; border-bottom: 1px solid #efe3d1; }

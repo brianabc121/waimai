@@ -5,7 +5,7 @@
 //   featured - signature dishes in a large strip, then the full list
 //   grid     - cards in columns with the picture on top
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { locale, money, pick, t, mn, mt } from '../i18n'
+import { money, pick, t, mn } from '../i18n'
 import type { Category, Item } from '../types'
 
 const props = defineProps<{ categories: Category[]; currency: string; layout: string
@@ -75,8 +75,6 @@ defineExpose({ scrollTo })
               <div v-else class="ph">{{ mn(it).slice(0, 1) }}</div>
               <div class="grow">
                 <div class="bold clamp2" :title="mn(it)">{{ mn(it) }}</div>
-                <div class="muted small" v-if="locale === 'zh' && it.name_en">{{ it.name_en }}</div>
-                <div class="muted small desc clamp2" v-if="it.description">{{ mt(it.description, it.description_tr) }}</div>
                 <div class="stats" v-if="stats">
                   <span>{{ t('sold_n', { n: it.sold ?? 0 }) }}</span>
                   <span v-if="it.stock_qty != null">{{ t('stock_n', { n: it.stock_qty }) }}</span>
@@ -158,7 +156,6 @@ defineExpose({ scrollTo })
 .grid .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); }
 .grid .item { flex-direction: column; gap: 8px; }
 .grid .item img, .grid .item .ph { width: 100%; height: 104px; }
-.grid .desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* where the menu has room (a tablet, a computer; not the phone preview in the back office):
    dishes side by side, a roomier category rail */

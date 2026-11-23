@@ -699,7 +699,11 @@ async function sendReport() {
 
 /* the offers: tickets with a red stub */
 .promosheet { background: var(--paper); max-height: min(80vh, 640px); overflow: hidden; }
-.promosheet .carthead { background: #fff; }
+.promosheet .carthead { background: var(--red-bg); color: #fff; border-bottom: 0; border-radius: inherit; border-end-start-radius: 0; border-end-end-radius: 0; }
+.promosheet .carthead h2 { color: #fff; }
+.promosheet .carthead .cnt { color: #fff; background: rgba(255, 255, 255, .2); }
+.promosheet .carthead p { color: rgba(255, 255, 255, .85); }
+.promosheet .carthead .x { background: rgba(255, 255, 255, .18); color: #fff; }
 .tickets { overflow-y: auto; padding: 14px 16px calc(18px + env(safe-area-inset-bottom)); display: grid; gap: 10px; }
 .ticket { position: relative; display: flex; min-height: 84px; background: #fff; border-radius: 12px; box-shadow: 0 1px 6px rgba(59, 31, 20, .08); overflow: hidden; }
 .stub { flex: none; width: 104px; display: grid; place-content: center; justify-items: center; gap: 2px; padding: 8px 6px; text-align: center; color: #fff; background: linear-gradient(150deg, #b8382a, var(--red)); position: relative; }

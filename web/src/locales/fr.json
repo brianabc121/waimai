@@ -918,7 +918,7 @@
  "ml.nearby": "Restaurants près de chez vous",
  "ml.nearby_n": "{n} livrent ici",
  "ml.no_delivery": "Pas de livraison",
- "ml.pickup_ok": "Retrait possible",
+ "ml.pickup_ok": "Retrait",
  "ml.far_title": "À proximité, ne livrent pas chez vous",
  "ml.far_hint": "Dans un rayon de 50 km. Ils ne livrent pas chez vous : consultez-les ou venez retirer",
  "ml.far_only": "Aucun restaurant ne livre ici pour l'instant. Ces restaurants sont à proximité",

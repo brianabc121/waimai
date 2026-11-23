@@ -918,7 +918,7 @@
  "ml.nearby": "Cửa hàng gần bạn",
  "ml.nearby_n": "{n} cửa hàng giao đến đây",
  "ml.no_delivery": "Không giao hàng",
- "ml.pickup_ok": "Có thể tự đến lấy",
+ "ml.pickup_ok": "Tự lấy",
  "ml.far_title": "Ở gần nhưng không giao đến bạn",
  "ml.far_hint": "Trong bán kính 50 km. Các cửa hàng này không giao đến bạn: bạn có thể xem hoặc tự đến lấy",
  "ml.far_only": "Chưa có cửa hàng nào giao đến đây. Đây là các cửa hàng ở gần",
