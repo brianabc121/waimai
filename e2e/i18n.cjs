@@ -28,7 +28,7 @@ const phone = (locale, extra = {}) => browser.newContext({ viewport: { width: 39
 const html = p => p.evaluate(() => ({ lang: document.documentElement.lang, dir: document.documentElement.dir, data: document.documentElement.dataset.lang }))
 const cookie = async ctx => (await ctx.cookies()).find(c => c.name === 'lang')?.value
 const ph = p => p.getAttribute(tid('mall-search'), 'placeholder')
-const pick = async (p, code) => { await p.click(tid('lang-btn')); await p.click(tid('lang-' + code)); await p.waitForFunction(c => document.documentElement.dataset.lang === c, code) }
+const pick = async (p, code) => { await p.locator(tid('lang-btn')).filter({ visible: true }).first().click(); await p.click(tid('lang-' + code)); await p.waitForFunction(c => document.documentElement.dataset.lang === c, code) }
 
 // ---- the browser's language, the first time ----
 const tw = await phone('zh-TW')
@@ -89,7 +89,7 @@ step('?lang= in a link wins and is remembered')
 const adm = watch(await (await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'th-TH', ignoreHTTPSErrors: insecure })).newPage())
 await adm.goto(BASE + '/login')
 await adm.fill('input[autocomplete=username]', 'admin'); await adm.fill('input[type=password]', 'demo1234')
-await adm.click('button[type=submit]')
+await adm.click('button.primary')
 await adm.waitForURL(/\/admin/)
 await adm.waitForSelector('.adm')
 expect((await html(adm)).lang === 'en' && (await html(adm)).dir === 'ltr', 'the back office shows English to a Thai browser')
@@ -102,13 +102,15 @@ const num = '9' + String(Math.floor(Math.random() * 1e9)).padStart(9, '0')
 await a.goto(BASE + '/account/login')
 await a.fill(tid('login-phone'), num); await a.check(tid('login-agree')); await a.click(tid('login-send'))
 await a.waitForURL(u => u.pathname !== '/account/login')
-await a.goto(BASE + '/me'); await a.waitForSelector(tid('lang-btn'))
+await a.goto(BASE + '/me/profile'); await a.locator(tid('lang-btn')).filter({ visible: true }).first().waitFor()
 await pick(a, 'vi')
 await a.waitForTimeout(300)
-const b = watch(await (await phone('en-US')).newPage())
-await b.goto(BASE + '/account/login')
-await b.fill(tid('login-phone'), num); await b.check(tid('login-agree')); await b.click(tid('login-send'))
-await b.waitForURL(u => u.pathname !== '/account/login')
+// A second browser signed in to the same account (the session cookie, but no
+// language cookie): signing in again would wait out the one-code-a-minute limit.
+const bctx = await phone('en-US')
+await bctx.addCookies((await a.context().cookies()).filter(c => c.name !== 'lang'))
+const b = watch(await bctx.newPage())
+await b.goto(BASE + '/me')
 await b.waitForFunction(() => document.documentElement.dataset.lang === 'vi')
 step('a new browser opens in the language the account chose')
 

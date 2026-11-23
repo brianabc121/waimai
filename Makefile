@@ -52,3 +52,4 @@ e2e:
 	node e2e/mall.cjs
 	node e2e/dishpage.cjs
 	node e2e/currency.cjs
+	node e2e/i18n.cjs

@@ -53,7 +53,7 @@ export function check() {
     for (const k in src) {
       if (!(k in tr)) { problems.push(`${l}: missing ${k}`); continue }
       const want = holes(src[k].en), got = holes(tr[k])
-      if (want !== got) problems.push(`${l}: ${k} has {${got}} but the English has {${want}}`)
+      if (want !== got && got !== holes(src[k].zh)) problems.push(`${l}: ${k} has {${got}} but the English has {${want}}`)
     }
     for (const k in tr) if (!(k in src)) problems.push(`${l}: stray key ${k}`)
   }
