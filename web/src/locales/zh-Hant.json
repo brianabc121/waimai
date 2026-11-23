@@ -2275,5 +2275,14 @@
 "sm.d.by_phone":"同號碼",
 "sm.d.by_phone_hint":"標著“同號碼”的是用這個電話自己下的單，也算進消費次數。",
 "sm.o.self":"顧客下單",
-"sm.addr_changed":"地址改了，原來的地圖定位會清掉，下次代客下單時再定位。"
+"sm.addr_changed":"地址改了，原來的地圖定位會清掉，下次代客下單時再定位。",
+"sm.a.title":"收貨地址（{n}）",
+"sm.a.current":"當前",
+"sm.a.delete":"刪除",
+"sm.a.delete_confirm":"刪除地址“{s}”？",
+"sm.a.uses":"送過 {n} 次",
+"sm.a.saved":"店員儲存",
+"sm.a.more":"+{n} 個",
+"sm.a.more_title":"還有別的收貨地址，點詳情檢視",
+"sm.a.hint":"每次代客下單或儲存資料時，新地址會自動存進來，重複的不會再存。代客下單輸入地址時會優先列出這些地址。"
 }

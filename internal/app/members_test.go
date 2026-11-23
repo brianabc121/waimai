@@ -254,3 +254,61 @@ func TestMemberPages(t *testing.T) {
 	_, err = a.AdminSaveMember(ctx, admin, 999999999, app.MemberInput{Phone: "+639171110003", Source: "whatsapp"})
 	wantCode(t, err, "NOT_FOUND")
 }
+
+func TestMemberAddressBook(t *testing.T) {
+	s := newStore(t, false)
+	ctx := context.Background()
+	a := testApp
+	order := func(no int, line, unit string) *app.StaffOrder {
+		t.Helper()
+		out, err := a.PlaceStaffOrder(ctx, s.branchID, s.staff, uniq("k"), app.StaffOrderInput{
+			Member:      app.MemberInput{No: no, Phone: "+639181112222", Source: "wechat", AddressLine: line, AddressUnit: unit},
+			ServiceType: "delivery", ZoneID: &s.zoneID, Items: []app.StaffLine{{ItemID: s.tea, Qty: 2}}})
+		noErr(t, err)
+		return out
+	}
+	first := order(0, "12 Rizal Ave", "5F")
+	no := first.Member.No
+	order(no, " 12 rizal ave ", "5f") // the same address, typed differently
+	order(no, "88 Ayala Ave", "")     // a new one
+	order(no, "12 Rizal Ave", "7F")   // another unit is another address
+	d, err := a.MemberByNo(ctx, s.branchID, no)
+	noErr(t, err)
+	if len(d.Addresses) != 3 {
+		t.Fatalf("addresses: %+v", d.Addresses)
+	}
+	if !d.Addresses[0].Current || d.Addresses[0].Unit != "7F" {
+		t.Fatalf("the last one is current: %+v", d.Addresses[0])
+	}
+	var rizal5 app.MemberAddress
+	for _, ad := range d.Addresses {
+		if ad.Unit == "5F" {
+			rizal5 = ad
+		}
+	}
+	if rizal5.Uses != 2 {
+		t.Fatalf("uses of the repeated address: %+v", rizal5)
+	}
+	// Ordering for pickup does not add an address; saving details does.
+	_, err = a.SaveMember(ctx, s.branchID, 0, app.MemberInput{No: no, Phone: "+639181112222", Source: "wechat", AddressLine: "1 Bonifacio St"})
+	noErr(t, err)
+	d, err = a.MemberByNo(ctx, s.branchID, no)
+	noErr(t, err)
+	if len(d.Addresses) != 4 || d.Addresses[0].Line != "1 Bonifacio St" || d.Addresses[0].Uses != 0 {
+		t.Fatalf("saved address: %+v", d.Addresses)
+	}
+	// The address book shows up when typing an address for this phone.
+	hints, err := a.AddressHints(ctx, s.branchID, "", "+639181112222")
+	noErr(t, err)
+	if len(hints) < 3 {
+		t.Fatalf("hints: %+v", hints)
+	}
+	// Any address but the current one can be removed.
+	wantCode(t, a.DeleteMemberAddress(ctx, d.ID, d.Addresses[0].ID), "NOT_FOUND")
+	noErr(t, a.DeleteMemberAddress(ctx, d.ID, rizal5.ID))
+	d, err = a.MemberByNo(ctx, s.branchID, no)
+	noErr(t, err)
+	if len(d.Addresses) != 3 {
+		t.Fatalf("after delete: %+v", d.Addresses)
+	}
+}

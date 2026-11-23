@@ -39,6 +39,9 @@ type MemberRow struct {
 	Orders       int        `json:"orders"`
 	Spent        int64      `json:"spent"`
 	LastAt       *time.Time `json:"last_at"`
+	AddressCount int        `json:"address_count"`
+	// Addresses is only filled in when one member is looked up.
+	Addresses []MemberAddress `json:"addresses,omitempty"`
 }
 
 type MemberList struct {
@@ -65,14 +68,15 @@ const memberRowFrom = `FROM store_members m
 			AND (o.member_id = m.id OR (m.phone <> '' AND o.customer_phone = m.phone))
 			AND o.acceptance_status NOT IN ('rejected','cancelled')) s ON true`
 
-const memberRowCols = `, b.id, b.name, mc.name, b.currency, s.n, s.spent, s.last`
+const memberRowCols = `, b.id, b.name, mc.name, b.currency, s.n, s.spent, s.last,
+	(SELECT count(*) FROM store_member_addresses ad WHERE ad.member_id = m.id)`
 
 func scanMemberRow(row interface{ Scan(...any) error }) (*MemberRow, error) {
 	m := &Member{}
 	r := &MemberRow{Member: m}
 	err := row.Scan(&m.ID, &m.No, &m.Status, &m.Phone, &m.Name, &m.Source, &m.Contact, &m.AddressLine,
 		&m.AddressUnit, &m.AddressNote, &m.Lat, &m.Lng, &m.Note, &m.ExpiresAt, &m.CreatedAt,
-		&r.BranchID, &r.BranchName, &r.MerchantName, &r.Currency, &r.Orders, &r.Spent, &r.LastAt)
+		&r.BranchID, &r.BranchName, &r.MerchantName, &r.Currency, &r.Orders, &r.Spent, &r.LastAt, &r.AddressCount)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	}
@@ -161,7 +165,10 @@ func (a *App) MemberDetail(ctx context.Context, id int64) (*MemberRow, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.Stats, err = memberStats(ctx, a.DB, r.BranchID, r.Member)
+	if r.Stats, err = memberStats(ctx, a.DB, r.BranchID, r.Member); err != nil {
+		return nil, err
+	}
+	r.Addresses, err = memberAddresses(ctx, a.DB, r.Member)
 	return r, err
 }
 
@@ -277,4 +284,70 @@ func (a *App) AdminSaveMember(ctx context.Context, actor AdminActor, id int64, i
 		return nil, wrap("save member", err)
 	}
 	return a.MemberDetail(ctx, id)
+}
+
+// MemberAddress is one of the addresses a member has had orders delivered
+// to, or that staff saved for them.
+type MemberAddress struct {
+	ID         int64     `json:"id"`
+	Line       string    `json:"line"`
+	Unit       string    `json:"unit"`
+	Note       string    `json:"note"`
+	Lat        *float64  `json:"lat"`
+	Lng        *float64  `json:"lng"`
+	Uses       int       `json:"uses"`
+	LastUsedAt time.Time `json:"last_used_at"`
+	// Current: the address now on the member (the one used last).
+	Current bool `json:"current"`
+}
+
+// keepMemberAddress saves the member's address in their address book unless
+// it is there already (same address and unit, ignoring case and spaces); a
+// known one takes the newer note and pin. used counts a delivery to it.
+func keepMemberAddress(ctx context.Context, q Querier, m *Member, used bool) error {
+	if strings.TrimSpace(m.AddressLine) == "" {
+		return nil
+	}
+	uses := 0
+	if used {
+		uses = 1
+	}
+	_, err := q.Exec(ctx, `INSERT INTO store_member_addresses (member_id, address_line, address_unit, address_note, lat, lng, uses)
+		VALUES ($1, btrim($2), btrim($3), $4, $5, $6, $7)
+		ON CONFLICT (member_id, lower(btrim(address_line)), lower(btrim(address_unit))) DO UPDATE SET
+			address_note = CASE WHEN EXCLUDED.address_note <> '' THEN EXCLUDED.address_note ELSE store_member_addresses.address_note END,
+			lat = COALESCE(EXCLUDED.lat, store_member_addresses.lat), lng = COALESCE(EXCLUDED.lng, store_member_addresses.lng),
+			uses = store_member_addresses.uses + EXCLUDED.uses, last_used_at = now()`,
+		m.ID, m.AddressLine, m.AddressUnit, m.AddressNote, m.Lat, m.Lng, uses)
+	return err
+}
+
+func memberAddresses(ctx context.Context, q Querier, m *Member) ([]MemberAddress, error) {
+	rows, err := q.Query(ctx, `SELECT id, address_line, address_unit, address_note, lat, lng, uses, last_used_at,
+			lower(btrim(address_line)) = lower(btrim($2)) AND lower(btrim(address_unit)) = lower(btrim($3))
+		FROM store_member_addresses WHERE member_id=$1 ORDER BY last_used_at DESC, id DESC`, m.ID, m.AddressLine, m.AddressUnit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (MemberAddress, error) {
+		var a MemberAddress
+		err := r.Scan(&a.ID, &a.Line, &a.Unit, &a.Note, &a.Lat, &a.Lng, &a.Uses, &a.LastUsedAt, &a.Current)
+		return a, err
+	})
+}
+
+// DeleteMemberAddress removes an address from a member's address book. The
+// address now on the member stays: it is the one the next order fills in.
+func (a *App) DeleteMemberAddress(ctx context.Context, memberID, addressID int64) error {
+	tag, err := a.DB.Exec(ctx, `DELETE FROM store_member_addresses ad USING store_members m
+		WHERE ad.id=$2 AND ad.member_id=$1 AND m.id=ad.member_id
+			AND NOT (lower(btrim(ad.address_line)) = lower(btrim(m.address_line))
+				AND lower(btrim(ad.address_unit)) = lower(btrim(m.address_unit)))`, memberID, addressID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
