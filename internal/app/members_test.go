@@ -166,3 +166,91 @@ func TestStaffOrderOptionQuantities(t *testing.T) {
 	_, err = a.StaffQuote(ctx, s.branchID, in)
 	wantCode(t, err, "OPTIONS_INVALID")
 }
+
+func TestMemberPages(t *testing.T) {
+	s := newStore(t, false)
+	other := newStore(t, false)
+	ctx := context.Background()
+	a := testApp
+
+	// Member 1 orders twice, member 2 is filled in but never orders, member 3 is temporary.
+	in := app.StaffOrderInput{Member: app.MemberInput{Phone: "+639171110001", Source: "wechat", Name: "Chen"},
+		ServiceType: "pickup", Items: []app.StaffLine{{ItemID: s.tea, Qty: 2}}}
+	o1, err := a.PlaceStaffOrder(ctx, s.branchID, s.staff, uniq("k"), in)
+	noErr(t, err)
+	in.Member.No = o1.Member.No
+	_, err = a.PlaceStaffOrder(ctx, s.branchID, s.staff, uniq("k"), in)
+	noErr(t, err)
+	_, err = a.SaveMember(ctx, s.branchID, 0, app.MemberInput{Phone: "+639171110002", Source: "line", Name: "Lina", AddressLine: "12 Rizal Ave"})
+	noErr(t, err)
+	tmp, err := a.NewMember(ctx, s.branchID, 0)
+	noErr(t, err)
+	elsewhere := uniq("elsewhere")
+	_, err = a.SaveMember(ctx, other.branchID, 0, app.MemberInput{Phone: "+639171110009", Source: "phone", Name: elsewhere})
+	noErr(t, err)
+
+	// A store sees its own members only, newest first, with what they ordered.
+	l, err := a.ListMembers(ctx, app.MemberFilter{BranchID: s.branchID})
+	noErr(t, err)
+	if l.Total != 3 || l.Temp != 1 || len(l.Items) != 3 || l.Items[0].ID != tmp.ID {
+		t.Fatalf("list: total %d temp %d %+v", l.Total, l.Temp, l.Items)
+	}
+	chen := l.Items[2]
+	if chen.Name != "Chen" || chen.Orders != 2 || chen.Spent != o1.Order.Totals.Total*2 || chen.LastAt == nil || chen.BranchID != s.branchID {
+		t.Fatalf("chen: %+v", chen)
+	}
+	for _, c := range []struct {
+		f    app.MemberFilter
+		want int
+	}{
+		{app.MemberFilter{Q: "lina"}, 1}, {app.MemberFilter{Q: "1110001"}, 1}, {app.MemberFilter{Q: "000002"}, 1},
+		{app.MemberFilter{Q: "rizal"}, 1}, {app.MemberFilter{Status: "temp"}, 1}, {app.MemberFilter{Status: "active"}, 2},
+		{app.MemberFilter{Source: "line"}, 1}, {app.MemberFilter{Q: elsewhere}, 0},
+	} {
+		c.f.BranchID = s.branchID
+		l, err := a.ListMembers(ctx, c.f)
+		noErr(t, err)
+		if l.Total != c.want || len(l.Items) != c.want {
+			t.Fatalf("%+v: %d", c.f, l.Total)
+		}
+	}
+	l, err = a.ListMembers(ctx, app.MemberFilter{BranchID: s.branchID, Sort: "spent", Page: app.Page{PageSize: 1}})
+	noErr(t, err)
+	if l.Total != 3 || len(l.Items) != 1 || l.Items[0].Name != "Chen" {
+		t.Fatalf("by spent: %+v", l.Items)
+	}
+
+	// The platform sees every store, and can narrow to one.
+	l, err = a.ListMembers(ctx, app.MemberFilter{Q: elsewhere})
+	noErr(t, err)
+	if l.Total != 1 || l.Items[0].BranchID != other.branchID || l.Items[0].BranchName == "" || l.Items[0].MerchantName == "" {
+		t.Fatalf("platform: %+v", l.Items)
+	}
+
+	// Details and order history.
+	d, err := a.MemberByNo(ctx, s.branchID, chen.No)
+	noErr(t, err)
+	if d.Stats == nil || d.Stats.Orders != 2 || d.Orders != 2 {
+		t.Fatalf("detail: %+v", d)
+	}
+	h, err := a.MemberOrderHistory(ctx, chen.ID, app.Page{})
+	noErr(t, err)
+	if h.Total != 2 || !h.Items[0].Linked || h.Items[0].Items == "" || h.Items[0].OrderSource != "wechat" {
+		t.Fatalf("history: %+v", h)
+	}
+	if d2, _ := a.MemberByNo(ctx, other.branchID, chen.No); d2 != nil && d2.ID == chen.ID {
+		t.Fatal("another store found this store's member")
+	}
+
+	// The platform edits a member; a temporary one becomes a member.
+	admin := adminActor(t)
+	_, err = a.AdminSaveMember(ctx, admin, tmp.ID, app.MemberInput{Phone: "12"})
+	wantCode(t, err, "PHONE_REQUIRED")
+	saved, err := a.AdminSaveMember(ctx, admin, tmp.ID, app.MemberInput{Phone: "+639171110003", Source: "whatsapp", Name: "Tess"})
+	noErr(t, err)
+	if saved.Status != "active" || saved.No != tmp.No || saved.Name != "Tess" || saved.BranchID != s.branchID {
+		t.Fatalf("admin save: %+v", saved)
+	}
+	_, err = a.AdminSaveMember(ctx, admin, 999999999, app.MemberInput{Phone: "+639171110003", Source: "whatsapp"})
+	wantCode(t, err, "NOT_FOUND")
+}

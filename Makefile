@@ -39,6 +39,7 @@ e2e:
 	node e2e/responsive.cjs
 	node e2e/storefront.cjs
 	node e2e/manualorder.cjs
+	node e2e/members.cjs
 	node e2e/menuimport.cjs
 	node e2e/coupons.cjs
 	node e2e/coupon_batches.cjs

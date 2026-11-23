@@ -40,6 +40,7 @@ async function out() { await logout(); session.loaded = true; router.replace('/l
       <router-link to="/admin/merchants">{{ t('ad.merchants') }}</router-link>
       <router-link to="/admin/items">{{ t('ad.items') }}</router-link>
       <router-link to="/admin/customers">{{ t('ad.customers') }}</router-link>
+      <router-link to="/admin/members" data-testid="nav-members">{{ t('ad.members') }}</router-link>
       <router-link to="/admin/mall">{{ t('ad.mall') }}</router-link>
       <router-link to="/admin/coupons" data-testid="nav-coupons">{{ t('ad.coupons') }}</router-link>
       <router-link to="/admin/bills" data-testid="nav-bills">{{ t('bl.nav') }}</router-link>

@@ -13,6 +13,8 @@ func (s *Server) memberRoutes(auth *gin.RouterGroup) {
 	auth.GET("/merchant/branches/:bid/members", s.searchMembers)
 	auth.POST("/merchant/branches/:bid/members", s.newMember)
 	auth.GET("/merchant/branches/:bid/members/:no", s.getMember)
+	auth.GET("/merchant/branches/:bid/members/:no/orders", s.memberOrders)
+	auth.GET("/merchant/branches/:bid/member-list", s.listMembers)
 	auth.PUT("/merchant/branches/:bid/members/:no", s.saveMember)
 	auth.GET("/merchant/branches/:bid/address-hints", s.addressHints)
 	auth.POST("/merchant/branches/:bid/staff-quotes", s.staffQuote)
@@ -48,7 +50,7 @@ func (s *Server) getMember(c *gin.Context) {
 		return
 	}
 	if no, ok := memberNo(c); ok {
-		m, err := s.App.GetMember(c, bid, no)
+		m, err := s.App.MemberByNo(c, bid, no)
 		reply(c, m, err)
 	}
 }
@@ -93,4 +95,67 @@ func (s *Server) staffOrder(c *gin.Context) {
 	}
 	out, err := s.App.PlaceStaffOrder(c, bid, staffActor(c), c.GetHeader("Idempotency-Key"), in)
 	reply(c, out, err)
+}
+
+// memberFilter reads the member list's query string.
+func memberFilter(c *gin.Context) app.MemberFilter {
+	return app.MemberFilter{Q: c.Query("q"), Status: c.Query("status"), Source: c.Query("source"),
+		Sort: c.Query("sort"), Page: queryPage(c)}
+}
+
+func (s *Server) listMembers(c *gin.Context) {
+	if bid, ok := branchScope(c, deskRoles); ok {
+		f := memberFilter(c)
+		f.BranchID = bid
+		l, err := s.App.ListMembers(c, f)
+		reply(c, l, err)
+	}
+}
+
+func (s *Server) memberOrders(c *gin.Context) {
+	bid, ok := branchScope(c, deskRoles)
+	if !ok {
+		return
+	}
+	if no, ok := memberNo(c); ok {
+		id, err := s.App.MemberIDByNo(c, bid, no)
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		l, err := s.App.MemberOrderHistory(c, id, queryPage(c))
+		reply(c, l, err)
+	}
+}
+
+// The platform's member page: every store's members.
+func (s *Server) adminListMembers(c *gin.Context) {
+	f := memberFilter(c)
+	f.BranchID, f.MerchantID = queryInt(c, "branch_id"), queryInt(c, "merchant_id")
+	l, err := s.App.ListMembers(c, f)
+	reply(c, l, err)
+}
+
+func (s *Server) adminGetMember(c *gin.Context) {
+	if id, ok := idParam(c, "id"); ok {
+		m, err := s.App.MemberDetail(c, id)
+		reply(c, m, err)
+	}
+}
+
+func (s *Server) adminMemberOrders(c *gin.Context) {
+	if id, ok := idParam(c, "id"); ok {
+		l, err := s.App.MemberOrderHistory(c, id, queryPage(c))
+		reply(c, l, err)
+	}
+}
+
+func (s *Server) adminSaveMember(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	var in app.MemberInput
+	if !ok || !bind(c, &in) {
+		return
+	}
+	m, err := s.App.AdminSaveMember(c, adminActor(c), id, in)
+	reply(c, m, err)
 }
