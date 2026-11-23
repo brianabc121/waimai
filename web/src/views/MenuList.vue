@@ -53,7 +53,7 @@ defineExpose({ scrollTo })
       <div class="strip">
         <button v-for="it in featured" :key="it.id" class="hcard" @click="$emit('add', it)">
           <img v-if="it.image_url" :src="it.image_url" alt="" /><div v-else class="ph">{{ mn(it).slice(0, 1) }}</div>
-          <div class="bold">{{ mn(it) }}</div>
+          <div class="bold clamp2" :title="mn(it)">{{ mn(it) }}</div>
           <div class="row between"><span class="price">{{ money(it.price, currency) }}</span><span class="plus">+<template v-if="qtyOf(it)"> {{ qtyOf(it) }}</template></span></div>
         </button>
       </div>
@@ -74,9 +74,9 @@ defineExpose({ scrollTo })
               <img v-if="it.image_url" :src="it.image_url" alt="" />
               <div v-else class="ph">{{ mn(it).slice(0, 1) }}</div>
               <div class="grow">
-                <div class="bold">{{ mn(it) }}</div>
+                <div class="bold clamp2" :title="mn(it)">{{ mn(it) }}</div>
                 <div class="muted small" v-if="locale === 'zh' && it.name_en">{{ it.name_en }}</div>
-                <div class="muted small desc" v-if="it.description">{{ mt(it.description, it.description_tr) }}</div>
+                <div class="muted small desc clamp2" v-if="it.description">{{ mt(it.description, it.description_tr) }}</div>
                 <div class="stats" v-if="stats">
                   <span>{{ t('sold_n', { n: it.sold ?? 0 }) }}</span>
                   <span v-if="it.stock_qty != null">{{ t('stock_n', { n: it.stock_qty }) }}</span>
@@ -117,7 +117,8 @@ defineExpose({ scrollTo })
 .item img, .item .ph { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; flex: none; }
 .item.off { opacity: .55; }
 .item > .grow { min-width: 0; display: flex; flex-direction: column; }
-.buy { margin-top: auto; padding-top: 8px; }
+.buy { margin-top: auto; padding-top: 8px; flex-wrap: wrap; gap: 6px 10px; }
+.buy .btn { margin-inline-start: auto; }
 /* "options" outlined in red on white, like the + beside it */
 .buy .btn.primary { background: #fff; color: var(--brand); border: 1.5px solid var(--brand); font-weight: 600; }
 .buy .btn.primary:hover:not(:disabled) { background: #fdf1ee; }

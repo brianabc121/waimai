@@ -101,7 +101,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
             <b>{{ sn(o.store) }}</b>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7" /></svg>
           </a>
-          <span class="ol-status" :class="tone(o)" data-testid="card-status">{{ cardStatus(o) }}</span>
+          <span class="ol-status" :class="tone(o)" data-testid="card-status" :title="cardStatus(o)">{{ cardStatus(o) }}</span>
         </div>
         <div class="ol-body">
           <ul class="ol-items">
@@ -161,16 +161,16 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 .ol-tabs::-webkit-scrollbar { display: none; }
 .ol-tabs button { flex: none; border: 0; background: none; padding: 4px 14px; border-radius: 999px; font-size: 14px; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .ol-tabs button.on { background: var(--gold); color: var(--ink); font-weight: 600; }
-.ol-list { padding: 6px 12px 0; display: grid; gap: 10px; }
+.ol-list { padding: 6px 12px 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .ol-note { text-align: center; color: var(--muted); padding: 64px 16px; font-size: 13px; }
-.ol-card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; display: grid; gap: 8px; min-width: 0; }
+.ol-card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
 .ol-store { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .ol-name { display: flex; align-items: center; gap: 8px; color: var(--ink); min-width: 0; font-size: 15px; }
 .ol-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .ol-name > svg { flex: none; color: var(--muted); }
 .ol-name img, .ol-name .ph { width: 28px; height: 28px; border-radius: 7px; object-fit: cover; flex: none; }
 .ol-name .ph { background: #c2401c; color: #fff3da; display: grid; place-items: center; }
-.ol-status { white-space: nowrap; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: #e7e2d9; color: #6d6259; }
+.ol-status { flex: 0 1 auto; max-width: 55%; word-break: keep-all; text-align: center; line-height: 1.35; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: #e7e2d9; color: #6d6259; }
 .ol-status.live { background: var(--gold-soft); color: var(--red); font-weight: 600; }
 .ol-body { display: flex; align-items: stretch; gap: 10px; }
 .ol-items { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 0; display: grid; gap: 6px; align-content: center; }
@@ -180,19 +180,19 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 .ol-items .nm { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .ol-items .qty { color: var(--muted); font-size: 12px; flex: none; }
 .ol-items .rest { color: var(--muted); font-size: 12px; }
-.ol-sum { flex: none; display: grid; align-content: center; justify-items: center; gap: 0; padding-inline-start: 12px; border-inline-start: 1px solid var(--line); min-width: 76px; }
+.ol-sum { flex: 0 1 auto; max-width: 42%; text-align: center; display: grid; align-content: center; justify-items: center; gap: 0; padding-inline-start: 12px; border-inline-start: 1px solid var(--line); min-width: 76px; }
 .ol-total { font-size: 17px; font-weight: 700; color: var(--red); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ol-count { color: var(--muted); font-size: 12px; }
 .ol-meta { display: flex; flex-wrap: wrap; gap: 0 8px; color: var(--muted); font-size: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .ol-meta i { font-style: normal; }
-.ol-acts { display: flex; align-items: center; gap: 8px; }
+.ol-acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .ol-more { position: relative; }
 .ol-morebtn { border: 0; background: none; color: var(--muted); padding: 6px 4px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .ol-morebtn b { letter-spacing: 1px; color: var(--ink); font-size: 11px; }
 .ol-menu { position: absolute; inset-inline-start: 0; bottom: calc(100% + 4px); z-index: 5; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(60, 30, 10, .16); padding: 4px; min-width: 120px; display: grid; font-size: 13px; }
 .ol-menu button, .ol-menu a { border: 0; background: none; text-align: start; padding: 8px 12px; border-radius: 6px; color: var(--ink); cursor: pointer; white-space: nowrap; }
 .ol-menu button:hover, .ol-menu a:hover { background: var(--bg); }
-.pill { border: 1px solid #cdb9a0; background: none; color: var(--ink); border-radius: 999px; padding: 4px 14px; font-size: 13px; cursor: pointer; white-space: nowrap; min-height: 30px; }
+.pill { border: 1px solid #cdb9a0; background: none; color: var(--ink); border-radius: 999px; padding: 4px 14px; font-size: 13px; cursor: pointer; word-break: keep-all; text-wrap: balance; max-width: 100%; min-height: 30px; }
 /* outlined in red on white, as every small action on the customer pages */
 .pill.brand { border-color: var(--red); background: #fff; color: var(--red); font-weight: 600; padding: 4px 16px; }
 .pill.brand:hover { background: #fdf1ee; }

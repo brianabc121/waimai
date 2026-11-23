@@ -165,8 +165,8 @@ onBeforeUnmount(() => clearInterval(timer))
           <button v-else type="submit" class="go">{{ t('ml.search') }}</button>
         </form>
         <nav class="mlinks">
-          <router-link to="/me/favorites" class="txt wide">{{ t('ml.favorites') }}</router-link>
-          <router-link to="/orders" class="txt">{{ t('ml.orders') }}</router-link>
+          <router-link to="/me/favorites" class="txt wide" :title="t('ml.favorites')">{{ t('ml.favorites') }}</router-link>
+          <router-link to="/orders" class="txt" :title="t('ml.orders')">{{ t('ml.orders') }}</router-link>
           <LangButton class="mlang" />
           <button class="msg" :aria-label="t('ml.messages')" data-testid="mall-messages" @click="messages">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.500c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.150-2.9-.400L5 20l.9-3.300C4.4 15.4 3.5 13.6 3.5 11.500c0-3.9 3.8-7 8.5-7z" /><path d="M8.5 11.500h.01M12 11.500h.01M15.5 11.500h.01" /></svg>
@@ -396,7 +396,12 @@ h2 { font-size: 17px; }
 @media (min-width: 768px) {
   .mall { padding-bottom: 32px; }
   .mtabs { display: none; }
-  .mtop-in { max-width: 1320px; margin: 0 auto; grid-template-columns: auto minmax(0, max-content) minmax(180px, 1fr) auto; grid-template-areas: 'brand loc search links'; gap: 18px; padding: 12px 24px; }
+  .mtop-in { max-width: 1320px; margin: 0 auto; grid-template-columns: minmax(0, auto) minmax(0, max-content) minmax(180px, 1fr) minmax(0, auto); grid-template-areas: 'brand loc search links'; gap: 18px; padding: 12px 24px; }
+  /* a long name or link in another language gives way with …, the search keeps its room */
+  .brand { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mlinks { min-width: 0; }
+  .mlinks .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .mlinks > .mlang, .mlinks > .msg, .mlinks > .avatar { flex: none; }
   .brand { display: block; grid-area: brand; }
   .loc { background: rgba(255, 255, 255, .14); border-radius: 10px; height: 38px; padding: 0 10px; max-width: 300px; gap: 6px; }
   .loc .pin { width: 20px; height: 20px; }
@@ -422,13 +427,21 @@ h2 { font-size: 17px; }
   .banner div { padding: 30px 30px 0; max-width: 56%; gap: 10px; }
   .banner b { font-size: 32px; } .banner .ribbon { font-size: 19px; padding: 3px 14px; } .banner em { font-size: 15px; }
   .dots { inset-inline-start: 30px; bottom: 14px; }
-  .listhead { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
-  .sorts { overflow: visible; }
+  /* the sorts beside the heading while they fit, under it when a language runs long */
+  .listhead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 16px; }
+  .listhead > h2 { min-width: 0; }
+  .sorts { overflow: visible; flex-wrap: wrap; row-gap: 6px; }
   .filt { position: relative; margin-inline-start: 0; }
   .filtmenu { inset-inline-end: 0; }
   .grid, .grid.rows { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
   .grid.rows { gap: 0 28px; }
   .skel { height: 260px; }
+}
+/* an iPad: the search gets a row of its own under the top bar, so a long
+   language never squeezes it */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .mtop-in { grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto); grid-template-areas: 'brand loc links' 'search search search'; gap: 10px 16px; }
+  .loc { max-width: none; justify-self: start; }
 }
 @media (min-width: 1200px) {
   .mlinks .txt.wide { display: block; }
