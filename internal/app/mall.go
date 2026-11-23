@@ -499,7 +499,8 @@ func (a *App) mallSearch(ctx context.Context, list []*MallStore, q string) error
 		byID[s.id] = s
 	}
 	rows, err := a.DB.Query(ctx, `SELECT branch_id, name, name_en, price, image_url FROM menu_items
-		WHERE branch_id = ANY($1) AND published AND NOT archived AND (name ILIKE $2 OR name_en ILIKE $2)
+		WHERE branch_id = ANY($1) AND published AND NOT archived AND (delivery_available OR pickup_available)
+		AND (name ILIKE $2 OR name_en ILIKE $2)
 		ORDER BY branch_id, sort, id`, storeIDs(list), like(q))
 	if err != nil {
 		return err

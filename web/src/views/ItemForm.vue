@@ -17,11 +17,11 @@ interface GroupForm { name: string; name_en: string; min_select: number; max_sel
 interface Form { id: number; category_id: number; name: string; name_en: string; description: string; image_url: string
   photos: string[]; details: string
   price: number; published: boolean; sold_out: boolean; limited: boolean; stock: number; needs_prep: boolean
-  delivery_available: boolean; pickup_available: boolean; sort: number; station_id: number | null; groups: GroupForm[] }
+  delivery_available: boolean; pickup_available: boolean; dine_in_available: boolean; sort: number; station_id: number | null; groups: GroupForm[] }
 
 function blank(): Form {
   return { id: 0, category_id: 0, name: '', name_en: '', description: '', image_url: '', photos: [], details: '', price: 0, published: false, sold_out: false,
-    limited: false, stock: 0, needs_prep: true, delivery_available: true, pickup_available: true, sort: 0, station_id: null, groups: [] }
+    limited: false, stock: 0, needs_prep: true, delivery_available: true, pickup_available: true, dine_in_available: true, sort: 0, station_id: null, groups: [] }
 }
 
 const it = props.item
@@ -29,7 +29,7 @@ const f = reactive<Form>(it ? {
   id: it.id, category_id: it.category_id, name: it.name, name_en: it.name_en, description: it.description, image_url: it.image_url,
   photos: [...(it.photos ?? [])], details: it.details ?? '',
   price: toMajor(it.price), published: it.published, sold_out: it.sold_out, limited: it.stock_qty !== null, stock: it.stock_qty ?? 0,
-  needs_prep: it.needs_prep, delivery_available: it.delivery_available, pickup_available: it.pickup_available, sort: it.sort, station_id: it.station_id,
+  needs_prep: it.needs_prep, delivery_available: it.delivery_available, pickup_available: it.pickup_available, dine_in_available: it.dine_in_available ?? true, sort: it.sort, station_id: it.station_id,
   groups: it.groups.map(g => ({ name: g.name, name_en: g.name_en, min_select: g.min_select, max_select: g.max_select,
     options: g.options.map(o => ({ name: o.name, name_en: o.name_en, extra: toMajor(o.price_delta), sold_out: o.sold_out })) })),
 } : { ...blank(), category_id: props.categoryId || props.cats[0]?.id || 0 })
@@ -40,7 +40,7 @@ async function save() {
   const body = {
     category_id: f.category_id, name: f.name, name_en: f.name_en, description: f.description, image_url: f.image_url, photos: f.photos, details: f.details,
     price: toMinor(f.price), published: f.published, sold_out: f.sold_out, stock_qty: f.limited ? Math.max(0, Math.floor(f.stock)) : null,
-    needs_prep: f.needs_prep, delivery_available: f.delivery_available, pickup_available: f.pickup_available, sort: f.sort, station_id: f.needs_prep ? f.station_id : null,
+    needs_prep: f.needs_prep, delivery_available: f.delivery_available, pickup_available: f.pickup_available, dine_in_available: f.dine_in_available, sort: f.sort, station_id: f.needs_prep ? f.station_id : null,
     groups: f.groups.map(g => ({ name: g.name, name_en: g.name_en, min_select: Number(g.min_select), max_select: Number(g.max_select),
       options: g.options.map(o => ({ name: o.name, name_en: o.name_en, price_delta: toMinor(o.extra), sold_out: o.sold_out })) })),
   }
@@ -70,11 +70,17 @@ async function save() {
         <PhotoList v-model="f.photos" :base="base" :ratio="1" :width="800" :max="8" :label="t('im.more')" :hint="t('im.more_hint')" testid="item-photos" />
         <label class="field"><span>{{ t('im.details') }}</span>
           <textarea v-model="f.details" rows="4" maxlength="2000" :placeholder="t('im.details_ph')" data-testid="item-details"></textarea></label>
+        <div class="field" data-testid="item-channels"><span>{{ t('it.channels') }}</span>
+          <div class="chans">
+            <label class="check"><input type="checkbox" v-model="f.dine_in_available" data-testid="item-dine-in" />{{ t('dine_in') }}</label>
+            <label class="check"><input type="checkbox" v-model="f.delivery_available" data-testid="item-delivery" />{{ t('it.delivery') }}</label>
+            <label class="check"><input type="checkbox" v-model="f.pickup_available" data-testid="item-pickup" />{{ t('it.pickup') }}</label>
+          </div>
+          <div v-if="!f.dine_in_available && !f.delivery_available && !f.pickup_available" class="small" style="color:var(--warn)">{{ t('it.no_channel') }}</div>
+        </div>
         <div class="grid2">
           <label class="check"><input type="checkbox" v-model="f.published" />{{ t('published') }}</label>
           <label class="check"><input type="checkbox" v-model="f.needs_prep" />{{ t('needs_prep') }}</label>
-          <label class="check"><input type="checkbox" v-model="f.delivery_available" />{{ t('delivery') }}</label>
-          <label class="check"><input type="checkbox" v-model="f.pickup_available" />{{ t('pickup') }}</label>
           <label class="check"><input type="checkbox" v-model="f.limited" />{{ t('stock') }}</label>
           <input v-if="f.limited" type="number" min="0" step="1" v-model.number="f.stock" />
         </div>
@@ -115,5 +121,6 @@ async function save() {
 </template>
 
 <style scoped>
+.chans { display: flex; flex-wrap: wrap; gap: 4px 20px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: center; }
 </style>

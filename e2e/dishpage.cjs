@@ -117,6 +117,25 @@ for (const [name, vp] of [['phone', PHONE], ['pad', PAD], ['pc', PC]]) {
 }
 step('promo media and a cover take the same height at the top, on a phone, a tablet and a computer')
 
+// ---- where a dish is offered: dine-in, delivery, pickup, all ticked by default ----
+await owner.goto(BASE + '/merchant/menu')
+await owner.click('button:has-text("新增菜品")')
+await owner.waitForSelector(tid('item-form'))
+for (const c of ['item-dine-in', 'item-delivery', 'item-pickup']) expect(await owner.isChecked(tid(c)), true, `${c} is ticked for a new dish`)
+await owner.click(`${tid('item-form')} .sheet-foot .btn:not(.primary)`)
+await owner.locator('tr', { has: owner.locator('b', { hasText: /^无盐地瓜条$/ }) }).locator('button', { hasText: '编辑' }).click()
+await owner.uncheck(tid('item-delivery')); await owner.uncheck(tid('item-pickup'))
+await shot(owner, 'dp7-item-channels')
+await save()
+const ph2 = await open(PHONE)
+await ph2.goto(BASE + '/s/bgc')
+await ph2.waitForSelector('.item')
+expect(await ph2.locator('.item:has-text("无盐地瓜条")').count(), 0, 'a dine-in-only dish is not on the delivery menu')
+await owner.locator('tr', { has: owner.locator('b', { hasText: /^无盐地瓜条$/ }) }).locator('button', { hasText: '编辑' }).click()
+await owner.check(tid('item-delivery')); await owner.check(tid('item-pickup'))
+await save()
+step('a dish only for dine-in leaves the delivery menu; new dishes are offered everywhere')
+
 // ---- put the dish back ----
 await editDish()
 await owner.click(`${tid('item-photos')} [data-role=photo]:nth-child(${had + 1}) [data-role=remove]`)

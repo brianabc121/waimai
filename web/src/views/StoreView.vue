@@ -221,15 +221,17 @@ async function toggleSearch() {
   query.value = ''
   if (searching.value) { tab.value = 'menu'; await nextTick(); searchBox.value?.focus() }
 }
+// Dishes offered only at the table are not on the delivery menu.
+const onlineCats = computed(() => (store.value?.categories ?? []).map(c => ({ ...c, items: c.items.filter(i => i.delivery_available || i.pickup_available) })))
 const shownCats = computed(() => {
-  const all = store.value?.categories ?? []
+  const all = onlineCats.value
   const q = query.value.trim().toLowerCase()
   if (!q) return all
   return all.map(c => ({ ...c, items: c.items.filter(i => (i.name + ' ' + i.name_en).toLowerCase().includes(q)) })).filter(c => c.items.length)
 })
 
 // ---- categories the order must contain something from ----
-const missing = computed(() => (store.value?.categories ?? []).filter(c => c.required && c.items.some(orderable)
+const missing = computed(() => onlineCats.value.filter(c => c.required && c.items.some(orderable)
   && !cart.lines.some(l => items.value.get(l.item_id)?.category_id === c.id)))
 const menu = ref<InstanceType<typeof MenuList> | null>(null)
 async function toRequired() {

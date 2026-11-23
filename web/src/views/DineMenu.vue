@@ -25,7 +25,9 @@ const state = reactive<Saved>(restore())
 watch(() => state.lines, () => { state.key = newKey() }, { deep: true })
 watch(state, s => sessionStorage.setItem(props.storageKey, JSON.stringify(s)), { deep: true })
 
-const items = computed(() => new Map(props.categories.flatMap(c => c.items).map(i => [i.id, i])))
+// Dishes the store does not offer at the table are left out.
+const cats = computed(() => props.categories.map(c => ({ ...c, items: c.items.filter(i => i.dine_in_available !== false) })))
+const items = computed(() => new Map(cats.value.flatMap(c => c.items).map(i => [i.id, i])))
 const count = computed(() => state.lines.reduce((n, l) => n + l.qty, 0))
 const total = computed(() => state.lines.reduce((s, l) => s + (linePrice(l, items.value) ?? 0) * l.qty, 0))
 const bad = (l: CartLine) => { const it = items.value.get(l.item_id); return !it || it.sold_out || linePrice(l, items.value) === null }
@@ -95,7 +97,7 @@ defineExpose({ clear, count })
 
 <template>
   <div>
-    <MenuList :categories="categories" :currency="currency" :layout="layout" :can-order="it => !it.sold_out" :qty-of="qtyOf"
+    <MenuList :categories="cats" :currency="currency" :layout="layout" :can-order="it => !it.sold_out" :qty-of="qtyOf"
       @add="open" @dec="it => changeQty(state.lines.findIndex(l => l.item_id === it.id), -1)" />
 
     <div class="dbar" v-if="count > 0">
