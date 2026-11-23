@@ -21,23 +21,36 @@ const (
 )
 
 // ImportRow is one spreadsheet line after parsing. Errors is empty for a row
-// that can be written.
+// that can be written. For an existing dish a blank cell keeps what the dish
+// has; the *Set flags say a cell had a value ("无" clears a picture, the
+// details or the options).
 type ImportRow struct {
-	Line        int      `json:"line"` // row number in the sheet, as Excel shows it
-	Category    string   `json:"category"`
-	Name        string   `json:"name"`
-	NameEn      string   `json:"name_en"`
-	Description string   `json:"description"`
-	Price       int64    `json:"price"`
-	Station     string   `json:"station"`
-	NeedsPrep   *bool    `json:"needs_prep"`
-	Stock       *int     `json:"stock"`
-	StockSet    bool     `json:"stock_set"` // the stock cell had a value ("不限" clears the limit)
-	Delivery    *bool    `json:"delivery"`
-	Pickup      *bool    `json:"pickup"`
-	Action      string   `json:"action"` // create or update; empty when the row has errors
-	OldPrice    *int64   `json:"old_price,omitempty"`
-	Errors      []string `json:"errors"`
+	Line        int                `json:"line"` // row number in the sheet, as Excel shows it
+	Category    string             `json:"category"`
+	Name        string             `json:"name"`
+	NameEn      string             `json:"name_en"`
+	Description string             `json:"description"`
+	Price       int64              `json:"price"`
+	Station     string             `json:"station"`
+	NeedsPrep   *bool              `json:"needs_prep"`
+	Stock       *int               `json:"stock"`
+	StockSet    bool               `json:"stock_set"` // the stock cell had a value ("不限" clears the limit)
+	Delivery    *bool              `json:"delivery"`
+	Pickup      *bool              `json:"pickup"`
+	DineIn      *bool              `json:"dine_in"`
+	Published   *bool              `json:"published"`
+	ImageURL    string             `json:"image_url"`
+	ImageSet    bool               `json:"image_set"`
+	Photos      []string           `json:"photos"`
+	PhotosSet   bool               `json:"photos_set"`
+	Details     string             `json:"details"`
+	DetailsSet  bool               `json:"details_set"`
+	Specs       []OptionGroupInput `json:"specs"`
+	SpecsSet    bool               `json:"specs_set"`
+	Action      string             `json:"action"` // create or update; empty when the row has errors
+	OldPrice    *int64             `json:"old_price,omitempty"`
+	NewCategory bool               `json:"new_category,omitempty"` // the category does not exist yet and will be made
+	Errors      []string           `json:"errors"`
 }
 
 // MenuImport is an uploaded spreadsheet and its parse result.
@@ -57,47 +70,56 @@ type MenuImport struct {
 }
 
 // Column headers, Chinese or English. Only the first three are required.
+// Headers are compared by normHeader, so "价格（PHP）*" is still 价格.
 var importColumns = map[string][]string{
 	"category":    {"分类", "category"},
-	"name":        {"菜名", "中文名", "name"},
+	"name":        {"菜名", "中文名", "商品名称", "name"},
 	"price":       {"价格", "price"},
-	"name_en":     {"英文名", "english name", "name_en"},
-	"description": {"描述", "description"},
-	"station":     {"工作台", "station"},
-	"needs_prep":  {"需要制作", "needs prep"},
-	"stock":       {"限量库存", "stock"},
+	"name_en":     {"英文名", "englishname", "name_en"},
+	"description": {"描述", "简介", "description"},
+	"specs":       {"规格", "specs", "options"},
+	"image":       {"主图", "主图链接", "图片", "image", "imageurl"},
+	"photos":      {"更多图片", "更多图片链接", "photos"},
+	"details":     {"商品详情", "详情", "details"},
+	"published":   {"上架", "published"},
+	"dine_in":     {"堂食", "dinein"},
 	"delivery":    {"外卖", "delivery"},
 	"pickup":      {"自取", "pickup"},
+	"needs_prep":  {"需要制作", "needsprep"},
+	"station":     {"工作台", "station"},
+	"stock":       {"限量库存", "库存", "stock"},
 }
 
-var importTemplateHeader = []string{"分类", "菜名", "英文名", "价格", "描述", "工作台", "需要制作", "限量库存", "外卖", "自取"}
-
-// MenuImportTemplate builds the spreadsheet merchants fill in.
-func MenuImportTemplate() ([]byte, error) {
-	f := excelize.NewFile()
-	defer f.Close()
-	const sheet = "Sheet1"
-	rows := [][]any{
-		{"炸物", "盐酥鸡", "Popcorn Chicken", 169, "现炸台式盐酥鸡", "", "是", "", "是", "是"},
-		{"饮品", "瓶装水", "Bottled Water", 30, "", "", "否", "", "是", "是"},
-		{"主食", "今日限量便当", "Daily Bento", 219.5, "每日限量", "", "是", 5, "是", "否"},
-	}
-	hdr := make([]any, len(importTemplateHeader))
-	for i, h := range importTemplateHeader {
-		hdr[i] = h
-	}
-	for i, r := range append([][]any{hdr}, rows...) {
-		cell, _ := excelize.CoordinatesToCellName(1, i+1)
-		if err := f.SetSheetRow(sheet, cell, &r); err != nil {
-			return nil, err
+// normHeader drops spaces, "*" and anything in brackets, and lowercases.
+func normHeader(s string) string {
+	var b strings.Builder
+	depth := 0
+	for _, r := range s {
+		switch r {
+		case '(', '（', '[', '【':
+			depth++
+		case ')', '）', ']', '】':
+			if depth > 0 {
+				depth--
+			}
+		case ' ', '*', '＊', '\t', '\n', '\r', '　':
+		default:
+			if depth == 0 {
+				b.WriteRune(r)
+			}
 		}
 	}
-	_ = f.SetColWidth(sheet, "A", "J", 16)
-	var buf bytes.Buffer
-	if err := f.Write(&buf); err != nil {
-		return nil, err
+	return strings.ToLower(b.String())
+}
+
+// A cell holding one of these clears the picture, details or options of an
+// existing dish (a blank cell keeps them).
+func isClear(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "无", "-", "none", "清空":
+		return true
 	}
-	return buf.Bytes(), nil
+	return false
 }
 
 // CreateMenuImport stores an uploaded .xlsx and queues it for parsing.
@@ -152,6 +174,14 @@ func (a *App) GetMenuImport(ctx context.Context, branchID, id int64) (*MenuImpor
 	if err := json.Unmarshal(rows, &m.Rows); err != nil {
 		return nil, err
 	}
+	for i := range m.Rows {
+		if m.Rows[i].Photos == nil {
+			m.Rows[i].Photos = []string{}
+		}
+		if m.Rows[i].Specs == nil {
+			m.Rows[i].Specs = []OptionGroupInput{}
+		}
+	}
 	return &m, nil
 }
 
@@ -179,9 +209,9 @@ func parseYesNo(s string) (*bool, bool) {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "":
 		return nil, true
-	case "是", "y", "yes", "true", "1", "对", "√":
+	case "是", "y", "yes", "true", "1", "对", "√", "✓":
 		return &t, true
-	case "否", "n", "no", "false", "0", "不", "×":
+	case "否", "n", "no", "false", "0", "不", "×", "✗":
 		return &f, true
 	}
 	return nil, false
@@ -201,6 +231,32 @@ func parsePrice(s string) (int64, bool) {
 		return 0, false
 	}
 	return int64(cents), true
+}
+
+// validImageRef accepts a web link or a picture already on this site.
+func validImageRef(s string) bool {
+	if len(s) > 1000 || strings.ContainsAny(s, " \t\r\n\"'<>") {
+		return false
+	}
+	l := strings.ToLower(s)
+	if strings.HasPrefix(l, "https://") || strings.HasPrefix(l, "http://") {
+		return len(s) > len("https://")
+	}
+	return strings.HasPrefix(s, "/") && !strings.HasPrefix(s, "//")
+}
+
+// splitPhotos reads the "more pictures" cell: links one per line, or
+// separated by commas, semicolons, "|" or spaces.
+func splitPhotos(s string) []string {
+	out := []string{}
+	for _, p := range strings.FieldsFunc(s, func(r rune) bool {
+		return r == '\n' || r == '\r' || r == ',' || r == '，' || r == ';' || r == '；' || r == '|' || r == ' ' || r == '\t'
+	}) {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // parseMenuSheet reads the first sheet. A file-level problem (not a
@@ -223,6 +279,12 @@ func parseMenuSheet(content []byte) ([]ImportRow, error) {
 	}
 	defer it.Close()
 
+	names := map[string]string{} // normalised header -> column key
+	for key, list := range importColumns {
+		for _, n := range list {
+			names[normHeader(n)] = key
+		}
+	}
 	col := map[string]int{}
 	out := []ImportRow{}
 	seen := map[string]int{}
@@ -246,13 +308,9 @@ func parseMenuSheet(content []byte) ([]ImportRow, error) {
 		}
 		if !header {
 			for i, c := range cells {
-				for key, names := range importColumns {
-					for _, n := range names {
-						if strings.EqualFold(c, n) {
-							if _, dup := col[key]; !dup {
-								col[key] = i
-							}
-						}
+				if key, ok := names[normHeader(c)]; ok {
+					if _, dup := col[key]; !dup {
+						col[key] = i
 					}
 				}
 			}
@@ -275,7 +333,8 @@ func parseMenuSheet(content []byte) ([]ImportRow, error) {
 			return cells[i]
 		}
 		r := ImportRow{Line: line, Category: get("category"), Name: get("name"), NameEn: get("name_en"),
-			Description: get("description"), Station: get("station"), Errors: []string{}}
+			Description: get("description"), Station: get("station"), Errors: []string{},
+			Photos: []string{}, Specs: []OptionGroupInput{}}
 		bad := func(code string) { r.Errors = append(r.Errors, code) }
 		if r.Category == "" {
 			bad("category_required")
@@ -294,14 +353,19 @@ func parseMenuSheet(content []byte) ([]ImportRow, error) {
 		} else {
 			r.Price = v
 		}
-		var ok bool
-		if r.NeedsPrep, ok = parseYesNo(get("needs_prep")); !ok {
-			bad("yes_no_invalid")
+		yesNo := false
+		for _, c := range []struct {
+			key string
+			dst **bool
+		}{{"needs_prep", &r.NeedsPrep}, {"delivery", &r.Delivery}, {"pickup", &r.Pickup},
+			{"dine_in", &r.DineIn}, {"published", &r.Published}} {
+			v, ok := parseYesNo(get(c.key))
+			if !ok {
+				yesNo = true
+			}
+			*c.dst = v
 		}
-		if r.Delivery, ok = parseYesNo(get("delivery")); !ok {
-			bad("yes_no_invalid")
-		}
-		if r.Pickup, ok = parseYesNo(get("pickup")); !ok {
+		if yesNo {
 			bad("yes_no_invalid")
 		}
 		if s := get("stock"); s != "" {
@@ -313,6 +377,52 @@ func parseMenuSheet(content []byte) ([]ImportRow, error) {
 				} else {
 					v := int(n)
 					r.Stock = &v
+				}
+			}
+		}
+		if s := get("image"); s != "" {
+			r.ImageSet = true
+			if !isClear(s) {
+				if validImageRef(s) {
+					r.ImageURL = s
+				} else {
+					bad("image_invalid")
+				}
+			}
+		}
+		if s := get("photos"); s != "" {
+			r.PhotosSet = true
+			if !isClear(s) {
+				ps := splitPhotos(s)
+				for _, p := range ps {
+					if !validImageRef(p) {
+						bad("image_invalid")
+						break
+					}
+				}
+				if len(ps) > maxItemPhotos {
+					bad(fmt.Sprintf("photos_too_many:%d", maxItemPhotos))
+				}
+				r.Photos = ps
+			}
+		}
+		if s := get("details"); s != "" {
+			r.DetailsSet = true
+			if !isClear(s) {
+				r.Details = s
+				if utf8.RuneCountInString(s) > maxItemDetails {
+					bad(fmt.Sprintf("details_too_long:%d", maxItemDetails))
+				}
+			}
+		}
+		if s := get("specs"); s != "" {
+			r.SpecsSet = true
+			if !isClear(s) {
+				groups, code := parseSpecs(s)
+				if code != "" {
+					bad(code)
+				} else {
+					r.Specs = groups
 				}
 			}
 		}
@@ -349,7 +459,7 @@ type importContext struct {
 
 func loadImportContext(ctx context.Context, q Querier, branchID int64) (*importContext, error) {
 	ic := &importContext{cats: map[string]int64{}, items: map[string]int64{}, prices: map[int64]int64{}, stations: map[string]*int64{}}
-	rows, err := q.Query(ctx, `SELECT id, name FROM menu_categories WHERE branch_id=$1 ORDER BY id DESC`, branchID)
+	rows, err := q.Query(ctx, `SELECT id, name FROM menu_categories WHERE branch_id=$1 AND NOT archived ORDER BY id DESC`, branchID)
 	if err != nil {
 		return nil, err
 	}
@@ -403,17 +513,20 @@ func (ic *importContext) resolve(r *ImportRow) int64 {
 			r.Errors = append(r.Errors, "station_unknown")
 		}
 	}
-	r.Action, r.OldPrice = "", nil
+	r.Action, r.OldPrice, r.NewCategory = "", nil, false
 	if len(r.Errors) > 0 {
 		return 0
 	}
 	r.Action = "create"
-	if cat, ok := ic.cats[r.Category]; ok {
-		if id, ok := ic.items[fmt.Sprintf("%d\x00%s", cat, r.Name)]; ok {
-			old := ic.prices[id]
-			r.Action, r.OldPrice = "update", &old
-			return id
-		}
+	cat, ok := ic.cats[r.Category]
+	if !ok {
+		r.NewCategory = true
+		return 0
+	}
+	if id, ok := ic.items[fmt.Sprintf("%d\x00%s", cat, r.Name)]; ok {
+		old := ic.prices[id]
+		r.Action, r.OldPrice = "update", &old
+		return id
 	}
 	return 0
 }
@@ -460,10 +573,32 @@ func (a *App) parseMenuImport(ctx context.Context, id int64) error {
 	})
 }
 
+// writeGroups replaces a dish's option groups.
+func writeGroups(ctx context.Context, tx pgx.Tx, itemID int64, groups []OptionGroupInput) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM option_groups WHERE item_id=$1`, itemID); err != nil {
+		return err
+	}
+	for gi, g := range groups {
+		var gid int64
+		if err := tx.QueryRow(ctx, `INSERT INTO option_groups (item_id, name, name_en, min_select, max_select, sort)
+			VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`, itemID, g.Name, g.NameEn, g.MinSelect, g.MaxSelect, gi).Scan(&gid); err != nil {
+			return err
+		}
+		for oi, o := range g.Options {
+			if _, err := tx.Exec(ctx, `INSERT INTO options (group_id, name, name_en, price_delta, sold_out, sort)
+				VALUES ($1,$2,$3,$4,$5,$6)`, gid, o.Name, o.NameEn, o.PriceDelta, o.SoldOut, oi); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // ApplyMenuImport writes the valid rows of a parsed import. New dishes are
-// created as drafts (not visible to customers until published); rows that
-// match an existing dish by category and name update it in place and keep its
-// published state. Rows with errors are skipped. The import can be applied once.
+// created as drafts unless the 上架 column says 是; rows that match an
+// existing dish by category and name update it in place, and a blank cell
+// keeps what the dish has. Rows with errors are skipped. The import can be
+// applied once.
 func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Actor) (*MenuImport, error) {
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
 		var status string
@@ -487,7 +622,7 @@ func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Act
 		if err != nil {
 			return err
 		}
-		created, updated, valid := 0, 0, 0
+		created, updated, valid, newCats := 0, 0, 0, 0
 		for i := range rows {
 			r := &rows[i]
 			kept := r.Errors[:0]
@@ -510,10 +645,15 @@ func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Act
 					return err
 				}
 				ic.cats[r.Category] = catID
+				newCats++
 			}
 			var station *int64
 			if r.Station != "" {
 				station = ic.stations[r.Station]
+			}
+			photos := r.Photos
+			if photos == nil {
+				photos = []string{}
 			}
 			if itemID == 0 {
 				needsPrep := r.NeedsPrep == nil || *r.NeedsPrep
@@ -521,12 +661,20 @@ func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Act
 					station = nil
 				}
 				if err := tx.QueryRow(ctx, `INSERT INTO menu_items (branch_id, category_id, name, name_en, description,
-					price, published, stock_qty, needs_prep, delivery_available, pickup_available, station_id, sort)
-					VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,$11,
+					price, published, stock_qty, needs_prep, delivery_available, pickup_available, dine_in_available,
+					station_id, image_url, photos, details, sort)
+					VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
 						(SELECT COALESCE(max(sort), -1) + 1 FROM menu_items WHERE category_id=$2))
-					RETURNING id`, branchID, catID, r.Name, r.NameEn, r.Description, r.Price, r.Stock, needsPrep,
-					r.Delivery == nil || *r.Delivery, r.Pickup == nil || *r.Pickup, station).Scan(&itemID); err != nil {
+					RETURNING id`, branchID, catID, r.Name, r.NameEn, r.Description, r.Price,
+					r.Published != nil && *r.Published, r.Stock, needsPrep,
+					r.Delivery == nil || *r.Delivery, r.Pickup == nil || *r.Pickup, r.DineIn == nil || *r.DineIn,
+					station, r.ImageURL, photos, r.Details).Scan(&itemID); err != nil {
 					return err
+				}
+				if len(r.Specs) > 0 {
+					if err := writeGroups(ctx, tx, itemID, r.Specs); err != nil {
+						return err
+					}
 				}
 				ic.items[fmt.Sprintf("%d\x00%s", catID, r.Name)] = itemID
 				created++
@@ -541,10 +689,21 @@ func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Act
 				pickup_available = COALESCE($7, pickup_available),
 				stock_qty = CASE WHEN $8 THEN $9 ELSE stock_qty END,
 				station_id = CASE WHEN $10 <> '' THEN $11 ELSE station_id END,
+				dine_in_available = COALESCE($13, dine_in_available),
+				published = COALESCE($14, published),
+				image_url = CASE WHEN $15 THEN $16 ELSE image_url END,
+				photos = CASE WHEN $17 THEN $18::jsonb ELSE photos END,
+				details = CASE WHEN $19 THEN $20 ELSE details END,
 				updated_at = now() WHERE id=$1 AND branch_id=$12`,
 				itemID, r.Price, r.NameEn, r.Description, r.NeedsPrep, r.Delivery, r.Pickup, r.StockSet, r.Stock,
-				r.Station, station, branchID); err != nil {
+				r.Station, station, branchID, r.DineIn, r.Published, r.ImageSet, r.ImageURL, r.PhotosSet, photos,
+				r.DetailsSet, r.Details); err != nil {
 				return err
+			}
+			if r.SpecsSet {
+				if err := writeGroups(ctx, tx, itemID, r.Specs); err != nil {
+					return err
+				}
 			}
 			updated++
 		}
@@ -554,7 +713,8 @@ func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Act
 			return err
 		}
 		if err := audit(ctx, tx, branchID, 0, actor, "menu.imported",
-			map[string]any{"import_id": id, "created": created, "updated": updated, "skipped": len(rows) - valid}); err != nil {
+			map[string]any{"import_id": id, "created": created, "updated": updated, "skipped": len(rows) - valid,
+				"new_categories": newCats}); err != nil {
 			return err
 		}
 		return branchChanged(ctx, tx, branchID)
@@ -563,4 +723,26 @@ func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Act
 		return nil, err
 	}
 	return a.GetMenuImport(ctx, branchID, id)
+}
+
+// ---- platform admins import for a store ----
+
+func (a *App) AdminCreateMenuImport(ctx context.Context, actor AdminActor, branchID int64, filename string, content []byte) (int64, error) {
+	if err := a.liveBranch(ctx, branchID); err != nil {
+		return 0, err
+	}
+	return a.CreateMenuImport(ctx, branchID, filename, content, Actor{Type: "admin", ID: actor.ID})
+}
+
+func (a *App) AdminApplyMenuImport(ctx context.Context, actor AdminActor, branchID, id int64) (*MenuImport, error) {
+	if err := a.liveBranch(ctx, branchID); err != nil {
+		return nil, err
+	}
+	m, err := a.ApplyMenuImport(ctx, branchID, id, Actor{Type: "admin", ID: actor.ID})
+	if err != nil {
+		return nil, err
+	}
+	return m, adminAudit(ctx, a.DB, actor, "menu.import", "branch", branchID, map[string]any{
+		"import_id": id, "filename": m.Filename, "created": m.CreatedCount, "updated": m.UpdatedCount,
+		"skipped": m.TotalRows - m.ValidRows})
 }

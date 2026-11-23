@@ -123,11 +123,13 @@ defineExpose({ scrollTo })
 /* list: a grey category rail on the left, dishes with a large picture on the right */
 /* the grey of the rail runs down the whole menu, however short the rail is */
 .menu.list { display: flex; flex-direction: column; }
-.list .body { flex: 1; --rail: 92px; display: flex; align-items: flex-start; background: linear-gradient(to right, #f4f4f4 var(--rail), #fff 0); }
+.list .body { flex: 1; --rail: 92px; display: flex; align-items: flex-start; background: linear-gradient(to right, var(--rail-bg, #f4f4f4) var(--rail), var(--menu-bg, #fff) 0); }
 .list .cats { flex: none; width: var(--rail); flex-direction: column; gap: 0; padding: 0 0 96px; max-height: calc(100vh - var(--menu-top, 0px)); overflow-y: auto; background: none; align-self: flex-start; scrollbar-width: none; }
 .list .cats::-webkit-scrollbar { display: none; }
-.list .cats button { border: 0; border-radius: 0; background: transparent; color: #8b8f96; padding: 16px 8px; white-space: normal; font-size: 13px; line-height: 1.35; }
-.list .cats button.on { background: #fff; color: var(--ink); font-weight: 600; }
+.list .cats button { border: 0; border-radius: 0; background: transparent; color: var(--muted); padding: 16px 8px; white-space: normal; font-size: 13px; line-height: 1.35; }
+.list .cats button.on { background: var(--menu-bg, #fff); color: var(--brand); font-weight: 600; }
+/* a red bar marks the category being read */
+.list .cats button.on::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--brand); }
 .list .cats .badge { position: absolute; top: 4px; right: 4px; margin: 0; }
 .list .cats .must { display: block; width: fit-content; margin: 3px auto 0; }
 .list .lists { flex: 1; min-width: 0; padding: 0 12px 14px; gap: 6px; }
@@ -137,7 +139,7 @@ defineExpose({ scrollTo })
 .list .item { border: 0; border-radius: 0; box-shadow: none; background: none; padding: 10px 0; gap: 12px; }
 .list .item img, .list .item .ph { width: 104px; height: 104px; }
 .list .item .bold { font-size: 16px; line-height: 1.3; }
-.list .item .price { color: #e5462b; font-size: 17px; }
+.list .item .price { color: var(--price, #e5462b); font-size: 17px; }
 
 /* featured: signature strip */
 .hero { padding: 12px 14px 0; }
