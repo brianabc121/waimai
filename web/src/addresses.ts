@@ -88,6 +88,8 @@ extend({
   'co.saved': ['已优惠 {amt}', 'You save {amt}'], 'co.short': ['还差 {amt} 起送', '{amt} more to order'],
   'co.svc_delivery': ['配送', 'Delivery'], 'co.svc_pickup': ['到店自取', 'Pickup'],
   'co.pickup_name': ['取餐人', 'Name for pickup'], 'co.account': ['登录手机号', 'Logged in as'], 'co.note_ph': ['口味、餐具等要求（选填）', 'Requests (optional)'],
+  'co.deliver_to': ['配送至', 'Deliver to'], 'co.pickup_at': ['自取门店', 'Pick up at'],
+  'co.cod': ['货到付款', 'Cash on delivery'], 'co.pay_cash': ['现金支付', 'Pay in cash'],
   'co.address_gone': ['这个地址已经不在了，请重新选择', 'That address is gone. Please choose again.'],
   'pp.title': ['选择位置', 'Choose the location'], 'pp.search': ['搜索大楼、街道或地标', 'Search a building, street or landmark'],
   'pp.results': ['搜索结果', 'Results'], 'pp.nearby': ['图钉附近的地址', 'Near the pin'], 'pp.done': ['完成', 'Done'],
