@@ -97,7 +97,7 @@ extend({
   'mz.closed': ['已补齐“{a}”和“{b}”之间的缝。', 'Closed the gap between "{a}" and "{b}".'], 'mz.undo_close': ['撤销', 'Undo'],
   'mz.tol_f': ['离最近的区域不超过（米）', 'Within this many metres of an area'], 'mz.tol_zero': ['填 0 就严格按圈，圈外一律不送。', '0 means strictly inside an area.'],
   'mz.tol_note': ['顾客不在任何圈里，但在容差以内，就按最近的区域收费和配送。注意最外圈也会跟着向外放宽这么多米。', 'A customer outside every area but within the tolerance is charged and served by the nearest. Note the outer border widens by the same amount.'],
-  'mz.region': ['国家地区', 'Region'], 'mz.region_wait': ['识别中…', 'Looking up…'],
+  'mz.region': ['国家地区', 'Region'], 'mz.currency': ['货币', 'Currency'], 'mz.currency_follows': ['跟随所在国家', 'follows the country'], 'mz.region_wait': ['识别中…', 'Looking up…'],
   'mz.region_unknown': ['没能识别所在国家，顾客搜索地址时不会限定国家。', 'Could not tell the country; customers\' address search is not limited to it.'],
   'mz.back': ['返回', 'Back'], 'mz.save': ['保存', 'Save'], 'mz.saved': ['已保存', 'Saved'],
   'mz.narrow': ['画区域请在电脑或平板上操作，手机上只能查看和修改名称、金额。', 'Draw areas on a computer or tablet. On a phone you can view them and edit names and amounts.'],

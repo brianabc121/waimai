@@ -4,7 +4,7 @@ export interface MerchantRow {
   branch_count: number; slugs: string[]; orders_today: number; orders_7d: number
 }
 export interface AdminBranch {
-  id: number; merchant_id: number; merchant_name: string; slug: string; name: string; name_en: string; timezone: string; currency: string
+  id: number; merchant_id: number; merchant_name: string; slug: string; name: string; name_en: string; timezone: string; currency: string; country_code: string
   address: string; phone: string; paused: boolean; open_now: boolean; orders_today: number; items_on_sale: number
 }
 export interface MerchantUser {

@@ -52,10 +52,26 @@ func TestMapZones(t *testing.T) {
 	if b.CountryCode != "PH" || b.City != "Makati" {
 		t.Fatalf("region lost though the store did not move: %+v", b)
 	}
+	if b.Currency != "PHP" {
+		t.Fatalf("currency of a store in the Philippines: %q", b.Currency)
+	}
+	// The store's money follows its country, and an unknown country keeps it.
+	b, err = a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: store[0], Lng: store[1], Region: &app.Region{CountryCode: "SG", Country: "Singapore"}})
+	noErr(t, err)
+	if b.Currency != "SGD" {
+		t.Fatalf("currency after moving to Singapore: %q", b.Currency)
+	}
+	b, err = a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: store[0], Lng: store[1], Region: &app.Region{CountryCode: "AQ"}})
+	noErr(t, err)
+	if b.Currency != "SGD" {
+		t.Fatalf("currency changed for a country without one: %q", b.Currency)
+	}
+	b, err = a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: store[0], Lng: store[1], Region: &app.Region{CountryCode: "PH", Country: "Philippines", City: "Makati"}})
+	noErr(t, err)
 	moved := m(5000, 5000)
 	b, err = a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: moved[0], Lng: moved[1]})
 	noErr(t, err)
-	if b.CountryCode != "" || b.City != "" {
+	if b.CountryCode != "" || b.City != "" || b.Currency != "PHP" {
 		t.Fatalf("stale region kept after the store moved: %+v", b)
 	}
 	_, err = a.SaveLocation(ctx, s.branchID, app.LocationInput{Lat: store[0], Lng: store[1]})

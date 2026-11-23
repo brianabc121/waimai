@@ -463,14 +463,19 @@ func (a *App) SaveLocation(ctx context.Context, branchID int64, in LocationInput
 		}
 	}
 	tag, err := a.DB.Exec(ctx, `UPDATE branches SET lat=$2, lng=$3, address=CASE WHEN $4 = '' THEN address ELSE $4 END,
-		country_code=$5, country=$6, province=$7, city=$8, district=$9, postal_code=$10
+		country_code=$5, country=$6, province=$7, city=$8, district=$9, postal_code=$10,
+		currency=CASE WHEN $11 = '' THEN currency ELSE $11 END
 		WHERE id=$1`, branchID, in.Lat, in.Lng, in.Address,
-		reg.CountryCode, reg.Country, reg.Province, reg.City, reg.District, reg.PostalCode)
+		reg.CountryCode, reg.Country, reg.Province, reg.City, reg.District, reg.PostalCode, CurrencyOf(reg.CountryCode))
 	if err != nil {
 		return nil, err
 	}
 	if tag.RowsAffected() == 0 {
 		return nil, ErrNotFound
+	}
+	// The currency may have followed the country: open pages reload.
+	if err := branchChanged(ctx, a.DB, branchID); err != nil {
+		return nil, err
 	}
 	return a.BranchByID(ctx, branchID)
 }

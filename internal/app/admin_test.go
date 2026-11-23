@@ -164,6 +164,15 @@ func TestAdminBranchesAndAccounts(t *testing.T) {
 	if sf.Branch.Currency != "SGD" || sf.Branch.Timezone != "Asia/Singapore" {
 		t.Fatalf("branch update not applied: %+v", sf.Branch)
 	}
+	// once the store's country is known, its currency follows the country
+	_, err = a.SaveLocation(ctx, b2, app.LocationInput{Lat: 14.55, Lng: 121.02, Region: &app.Region{CountryCode: "PH"}})
+	noErr(t, err)
+	noErr(t, a.UpdateBranch(ctx, actor, b2, app.BranchInput{Name: "Second", Slug: slug3, Timezone: "Asia/Singapore", Currency: "USD"}))
+	sf, err = a.Storefront(ctx, slug3)
+	noErr(t, err)
+	if sf.Branch.Currency != "PHP" {
+		t.Fatalf("typed currency won over the store's country: %q", sf.Branch.Currency)
+	}
 
 	// deleting a branch hides it and takes it off the owner's list
 	noErr(t, a.DeleteBranch(ctx, actor, b2))

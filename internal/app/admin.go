@@ -301,24 +301,27 @@ func (a *App) ListMerchants(ctx context.Context, f MerchantFilter) (*MerchantLis
 
 // AdminBranch is a branch as the platform sees it.
 type AdminBranch struct {
-	ID           int64      `json:"id"`
-	MerchantID   int64      `json:"merchant_id"`
-	MerchantName string     `json:"merchant_name"`
-	Slug         string     `json:"slug"`
-	Name         string     `json:"name"`
-	NameEn       string     `json:"name_en"`
-	Timezone     string     `json:"timezone"`
-	Currency     string     `json:"currency"`
-	Address      string     `json:"address"`
-	Phone        string     `json:"phone"`
-	Paused       bool       `json:"paused"`
-	OpenNow      bool       `json:"open_now"`
-	DeletedAt    *time.Time `json:"deleted_at"`
-	OrdersToday  int        `json:"orders_today"`
-	ItemsOnSale  int        `json:"items_on_sale"`
+	ID           int64  `json:"id"`
+	MerchantID   int64  `json:"merchant_id"`
+	MerchantName string `json:"merchant_name"`
+	Slug         string `json:"slug"`
+	Name         string `json:"name"`
+	NameEn       string `json:"name_en"`
+	Timezone     string `json:"timezone"`
+	Currency     string `json:"currency"`
+	// CountryCode is where the store's pin is; when its currency is known
+	// the store's currency follows it and cannot be typed.
+	CountryCode string     `json:"country_code"`
+	Address     string     `json:"address"`
+	Phone       string     `json:"phone"`
+	Paused      bool       `json:"paused"`
+	OpenNow     bool       `json:"open_now"`
+	DeletedAt   *time.Time `json:"deleted_at"`
+	OrdersToday int        `json:"orders_today"`
+	ItemsOnSale int        `json:"items_on_sale"`
 }
 
-const adminBranchCols = `b.id, b.merchant_id, m.name, b.slug, b.name, b.name_en, b.timezone, b.currency, b.address, b.phone,
+const adminBranchCols = `b.id, b.merchant_id, m.name, b.slug, b.name, b.name_en, b.timezone, b.currency, b.country_code, b.address, b.phone,
 	b.paused, b.open_time, b.close_time, b.deleted_at,
 	(SELECT count(*) FROM orders o WHERE o.branch_id = b.id AND o.created_at >= ` + localDayStart + `),
 	(SELECT count(*) FROM menu_items i WHERE i.branch_id = b.id AND NOT i.archived AND i.published)`
@@ -326,7 +329,7 @@ const adminBranchCols = `b.id, b.merchant_id, m.name, b.slug, b.name, b.name_en,
 func scanAdminBranch(row interface{ Scan(...any) error }) (*AdminBranch, error) {
 	var b AdminBranch
 	var open, closeAt string
-	err := row.Scan(&b.ID, &b.MerchantID, &b.MerchantName, &b.Slug, &b.Name, &b.NameEn, &b.Timezone, &b.Currency,
+	err := row.Scan(&b.ID, &b.MerchantID, &b.MerchantName, &b.Slug, &b.Name, &b.NameEn, &b.Timezone, &b.Currency, &b.CountryCode,
 		&b.Address, &b.Phone, &b.Paused, &open, &closeAt, &b.DeletedAt, &b.OrdersToday, &b.ItemsOnSale)
 	if isNoRows(err) {
 		return nil, ErrNotFound
@@ -729,10 +732,11 @@ func (a *App) UpdateBranch(ctx context.Context, actor AdminActor, id int64, in B
 	}
 	return a.inTx(ctx, func(tx pgx.Tx) error {
 		var before BranchInput
-		err := tx.QueryRow(ctx, `SELECT b.name, b.name_en, b.slug, b.timezone, b.currency, b.address, b.phone
+		var country string
+		err := tx.QueryRow(ctx, `SELECT b.name, b.name_en, b.slug, b.timezone, b.currency, b.address, b.phone, b.country_code
 			FROM branches b JOIN merchants m ON m.id = b.merchant_id
 			WHERE b.id=$1 AND b.deleted_at IS NULL AND m.deleted_at IS NULL FOR UPDATE OF b`, id).
-			Scan(&before.Name, &before.NameEn, &before.Slug, &before.Timezone, &before.Currency, &before.Address, &before.Phone)
+			Scan(&before.Name, &before.NameEn, &before.Slug, &before.Timezone, &before.Currency, &before.Address, &before.Phone, &country)
 		if isNoRows(err) {
 			return ErrNotFound
 		} else if err != nil {
@@ -748,8 +752,13 @@ func (a *App) UpdateBranch(ctx context.Context, actor AdminActor, id int64, in B
 				return errSlugTaken
 			}
 		}
-		if _, err := tx.Exec(ctx, `UPDATE branches SET name=$2, name_en=$3, slug=$4, timezone=$5, currency=$6,
-			address=$7, phone=$8 WHERE id=$1`, id, in.Name, in.NameEn, in.Slug, in.Timezone, in.Currency,
+		// A store whose country is known pays in that country's money;
+		// the currency typed here only counts until its location is set.
+		if c := CurrencyOf(country); c != "" {
+			in.Currency = c
+		}
+		if _, err := tx.Exec(ctx, `UPDATE branches SET name=$2, name_en=$3, slug=$4, timezone=$5,
+			currency=$6, address=$7, phone=$8 WHERE id=$1`, id, in.Name, in.NameEn, in.Slug, in.Timezone, in.Currency,
 			in.Address, in.Phone); err != nil {
 			return err
 		}

@@ -226,12 +226,40 @@ export function both(zh: string, en: string): string {
   return en && en !== zh ? `${zh} / ${en}` : zh
 }
 
-const symbols: Record<string, string> = { PHP: '₱', USD: '$', CNY: '¥', SGD: 'S$', MYR: 'RM', THB: '฿' }
+// Every amount is kept in hundredths of the store's currency, whichever it
+// is; the currency only changes how it is shown. A store's currency follows
+// the country it stands in (set by the server).
+// Symbols people read without doubt in the region; others come from Intl.
+const symbols: Record<string, string> = {
+  PHP: '₱', USD: '$', CNY: '¥', JPY: '¥', SGD: 'S$', MYR: 'RM', THB: '฿', HKD: 'HK$', TWD: 'NT$', MOP: 'MOP$',
+  AUD: 'A$', NZD: 'NZ$', CAD: 'C$', IDR: 'Rp', VND: '₫', KRW: '₩', INR: '₹', EUR: '€', GBP: '£', BND: 'B$',
+  KHR: '៛', LAK: '₭', MMK: 'K', AED: 'AED ', SAR: 'SAR ',
+}
+const shapes = new Map<string, { symbol: string; digits: number }>()
+function shape(currency: string): { symbol: string; digits: number } {
+  let s = shapes.get(currency)
+  if (s) return s
+  s = { symbol: symbols[currency] ?? '', digits: 2 }
+  try {
+    const f = new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay: 'narrowSymbol' })
+    s.digits = Math.min(2, f.resolvedOptions().maximumFractionDigits ?? 2)
+    if (!s.symbol) {
+      const sym = f.formatToParts(0).find(p => p.type === 'currency')?.value ?? ''
+      s.symbol = !sym || sym === currency ? currency + ' ' : /\p{L}$/u.test(sym) ? sym + ' ' : sym
+    }
+  } catch { if (!s.symbol) s.symbol = currency + ' ' }
+  shapes.set(currency, s)
+  return s
+}
+
+// currencySymbol is what goes in front of an amount: "₱", "S$", "RM".
+export const currencySymbol = (currency = 'PHP') => shape(currency).symbol.trim()
 
 export function money(minor: number, currency = 'PHP'): string {
-  const v = minor / 100
-  const s = Number.isInteger(v) ? String(v) : v.toFixed(2)
-  return (symbols[currency] ?? currency + ' ') + s.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  const { symbol, digits } = shape(currency || 'PHP')
+  const v = Math.abs(minor) / 100
+  const s = digits === 0 ? String(Math.round(v)) : Number.isInteger(v) ? String(v) : v.toFixed(2)
+  return (minor < 0 ? '-' : '') + symbol + s.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
 // promoLabel describes a promotion's rule in the current language.

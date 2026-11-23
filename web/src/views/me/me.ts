@@ -2,7 +2,7 @@
 import { reactive } from 'vue'
 import { del, get, post, put, upload } from '../../api'
 import { customer, loadCustomer } from '../../customer'
-import { extend, locale, money, t } from '../../i18n'
+import { currencySymbol, extend, locale, money, t } from '../../i18n'
 import type { Promotion } from '../../types'
 
 export interface Wallet { currency: string; balance: number; bonus: number }
@@ -191,7 +191,8 @@ extend({
     'For now they are only recorded: the platform adds to the balance (refunds, for example) and rewards come from campaigns. Neither can be spent on an order until online payment is available.'],
 })
 
-// An offer in two parts: what it gives ("减 ₱20") and when it applies ("满 ₱200 可用").
+// An offer in two parts: what it gives ("减 ₱20") and when it applies ("满 ₱200 可用"),
+// in the store's currency.
 export function offerParts(p: Promotion, currency: string): { gives: string; when: string } {
   const zh = locale.value === 'zh'
   let gives = zh ? '免配送费' : 'Free delivery'
@@ -201,3 +202,7 @@ export function offerParts(p: Promotion, currency: string): { gives: string; whe
   if (p.kind === 'percent_off' && p.max_discount) when += zh ? `，最多减 ${money(p.max_discount, currency)}` : `, up to ${money(p.max_discount, currency)}`
   return { gives, when }
 }
+
+// bare drops spaces and the currency's symbol, so that "满200减20" and
+// "满₱200减₱20" read as the same offer.
+export const bare = (s: string, currency: string) => s.split(currencySymbol(currency)).join('').replace(/[\s$¥₱]/g, '')

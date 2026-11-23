@@ -49,3 +49,4 @@ e2e:
 	node e2e/media.cjs
 	node e2e/mall.cjs
 	node e2e/dishpage.cjs
+	node e2e/currency.cjs

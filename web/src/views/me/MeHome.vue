@@ -4,7 +4,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginRoute } from '../../customer'
-import { money, pick, t } from '../../i18n'
+import { currencySymbol, pick, t } from '../../i18n'
 import CustomerTabs from './CustomerTabs.vue'
 import { avatarUrl, displayName, homeStore, loadProfile, me, myOffers, offerParts, plain, type StoreOffers } from './me'
 
@@ -20,7 +20,7 @@ const wallet = computed(() => {
   const ws = profile.value?.wallets ?? []
   return ws.find(w => w.currency === home?.currency) ?? ws[0] ?? { currency: home?.currency ?? 'PHP', balance: 0, bonus: 0 }
 })
-const symbol = computed(() => money(0, wallet.value.currency).replace(/0$/, '').trim())
+const symbol = computed(() => currencySymbol(wallet.value.currency))
 const offerCount = computed(() => offers.value.reduce((n, o) => n + o.promotions.length, 0))
 const firstOffers = computed(() => offers.value.flatMap(o => o.promotions.map(p => ({ p, o }))).slice(0, 2))
 
