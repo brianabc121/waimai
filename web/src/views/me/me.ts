@@ -19,7 +19,12 @@ export interface MyReview {
 }
 export interface Message { id: number; kind: 'order' | 'service' | 'wallet'; title: string; title_en: string; body: string; body_en: string; link: string; created_at: string; read: boolean }
 export interface Feedback { id: number; kind: string; content: string; contact: string; reply: string; replied_at: string | null; created_at: string }
-export interface Application {
+// Where a store that applies is: picked on the map, with the country and region read off it.
+export interface ApplicationPlace {
+  country_code: string; country: string; province: string; district: string; postal_code: string
+  place_name: string; place_address: string; unit: string; lat: number | null; lng: number | null
+}
+export interface Application extends ApplicationPlace {
   id: number; store_name: string; contact_name: string; phone: string; city: string; cuisine: string; note: string
   status: 'pending' | 'approved' | 'rejected'; reply: string; decided_at: string | null; created_at: string
 }
@@ -49,8 +54,11 @@ export const myMessages = (offset = 0) => get<{ messages: Message[]; more: boole
 export const readMessages = (id = 0) => post('/customer/messages/read', { id })
 export const myFeedback = () => get<{ feedback: Feedback[] }>('/customer/feedback').then(r => r.feedback)
 export const sendFeedback = (f: { kind: string; content: string; contact: string }) => post<Feedback>('/customer/feedback', f)
+// "Poblacion, Makati, Metro Manila, Philippines"
+export const placeLine = (p: Partial<ApplicationPlace> & { city?: string }) =>
+  [p.district, p.city, p.province, p.country].filter((x, i, all) => x && all.indexOf(x) === i).join(', ')
 export const myApplications = () => get<{ applications: Application[] }>('/customer/applications').then(r => r.applications)
-export const sendApplication = (a: Record<string, string>) => post<Application>('/customer/applications', a)
+export const sendApplication = (a: Record<string, string | number | null>) => post<Application>('/customer/applications', a)
 export const walletEntries = (account: string) => get<{ entries: WalletEntry[] }>(`/customer/wallet/${account}`).then(r => r.entries)
 export const platformInfo = () => get<PlatformInfo>('/platform/info')
 
@@ -144,6 +152,9 @@ extend({
   'ma.title': ['商家入驻', 'Open a store'], 'ma.intro': ['想在平台上开店接单？留下店铺信息，平台审核后会联系你开通商家账号。',
     'Want to take orders on the platform? Leave your details; after a review we will contact you to set up your account.'],
   'ma.store': ['店铺名称', 'Store name'], 'ma.contact': ['联系人', 'Contact person'], 'ma.phone': ['联系电话', 'Phone'], 'ma.city': ['所在城市 / 地区', 'City or area'],
+  'ma.place': ['店铺地址', 'Store address'], 'ma.place_ph': ['在地图上选择店铺地址', 'Pick the store on the map'],
+  'ma.unit': ['门牌号', 'Unit'], 'ma.unit_ph': ['楼层、铺位号（选填）', 'Floor, shop no. (optional)'],
+  'ma.e.place': ['请在地图上选择店铺地址', 'Pick where the store is on the map'], 'ma.e.city': ['请填写所在城市 / 地区', 'Enter the city or area'],
   'ma.cuisine': ['经营品类', 'What you sell'], 'ma.cuisine_ph': ['例如：中餐、奶茶、烧烤', 'e.g. Chinese food, milk tea'], 'ma.note': ['补充说明', 'Anything else'],
   'ma.submit': ['提交申请', 'Send application'], 'ma.sent': ['申请已提交，请留意“我的消息”', 'Application sent. Watch your messages.'],
   'ma.mine': ['我的申请', 'My applications'], 'ma.s_pending': ['审核中', 'In review'], 'ma.s_approved': ['已通过', 'Approved'], 'ma.s_rejected': ['未通过', 'Not approved'],

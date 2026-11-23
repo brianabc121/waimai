@@ -13,6 +13,9 @@ extend({
   'ac.open': ['待回复', 'Open'], 'ac.replied': ['已回复', 'Replied'], 'ac.pending': ['待审核', 'Pending'], 'ac.approved': ['已通过', 'Approved'], 'ac.rejected': ['未通过', 'Rejected'],
   'ac.customer': ['顾客', 'Customer'], 'ac.content': ['内容', 'Note'], 'ac.contact': ['联系方式', 'Contact'], 'ac.reply': ['回复', 'Reply'], 'ac.send': ['发送回复', 'Send reply'],
   'ac.reply_ph': ['回复会出现在顾客的“我的消息”里', 'The reply shows up in the customer\'s messages'],
+  'ac.p.country': ['国家/地区', 'Country'], 'ac.p.province': ['省份', 'Province'], 'ac.p.area': ['地区', 'Area'],
+  'ac.p.address': ['详细地址', 'Address'], 'ac.p.point': ['经纬度', 'Coordinates'], 'ac.p.map': ['在谷歌地图查看', 'Open in Google Maps'],
+  'ac.p.city': ['城市（手填）', 'City (typed)'], 'ac.p.postal': ['邮编', 'Postal code'], 'ac.p.cuisine': ['经营品类', 'What they sell'],
   'ac.store': ['店铺', 'Store'], 'ac.who': ['联系人', 'Contact'], 'ac.city': ['城市 / 品类', 'City / food'], 'ac.approve': ['通过', 'Approve'], 'ac.reject': ['不通过', 'Turn down'],
   'ac.decide_ph': ['给申请人的话（不通过时必填）', 'A word to the applicant (required when turning down)'],
   'ac.approve_hint': ['通过只是通知申请人，商户账号还要到“商户”里新建。', 'Approving only tells the applicant. Create the merchant under Merchants.'],
@@ -30,7 +33,8 @@ extend({
 })
 
 interface Fb { id: number; kind: string; content: string; contact: string; reply: string; replied_at: string | null; created_at: string; phone: string; member_no: string }
-interface App { id: number; store_name: string; contact_name: string; phone: string; city: string; cuisine: string; note: string; status: string; reply: string; created_at: string; account_phone: string }
+interface App { id: number; store_name: string; contact_name: string; phone: string; city: string; cuisine: string; note: string; status: string; reply: string; created_at: string; account_phone: string
+  country_code: string; country: string; province: string; district: string; postal_code: string; place_name: string; place_address: string; unit: string; lat: number | null; lng: number | null }
 interface Wallet { currency: string; balance: number; bonus: number }
 interface Cust { id: number; member_no: string; phone: string; nickname: string; orders: number; created_at: string; wallets: Wallet[] }
 
@@ -54,6 +58,20 @@ const ap = reactive({ items: [] as App[], total: 0, pending: 0, status: 'pending
 async function loadAp() {
   try { Object.assign(ap, await get('/admin/applications' + qs({ status: ap.status, page: ap.page, page_size: SIZE }))); error.value = '' } catch (e) { fail(e) }
 }
+// Where the store is, one line per part; an application from before the map shows the city typed by hand.
+function placeRows(x: App): [string, string][] {
+  if (x.lat == null || x.lng == null) return [['ac.p.city', x.city]].filter(r => r[1]) as [string, string][]
+  const street = [x.place_name, x.place_address !== x.place_name ? x.place_address : '', x.unit].filter(Boolean).join(' · ')
+  const rows: [string, string][] = [
+    ['ac.p.country', x.country ? `${x.country}${x.country_code ? ` (${x.country_code})` : ''}` : x.country_code],
+    ['ac.p.province', x.province], ['ac.p.area', [x.city, x.district].filter(Boolean).join(' · ')],
+    ['ac.p.address', street],
+  ]
+  if (x.postal_code) rows.push(['ac.p.postal', x.postal_code])
+  return rows.map(([k, v]) => [k, v || '—'])
+}
+const mapLink = (x: App) => `https://www.google.com/maps/search/?api=1&query=${x.lat},${x.lng}`
+
 async function decide(x: App, status: string) {
   try { await post(`/admin/applications/${x.id}/decide`, { status, reply: replies[-x.id] ?? '' }); delete replies[-x.id]; await loadAp() } catch (e) { fail(e) }
 }
@@ -125,8 +143,14 @@ onMounted(() => { void loadFb(); void loadAp() })
       <div v-for="x in ap.items" :key="x.id" class="card stack" data-testid="ac-application">
         <div class="row wrap"><b>{{ x.store_name }}</b><span class="tag" :class="{ ok: x.status === 'approved', bad: x.status === 'rejected', warn: x.status === 'pending' }">{{ t('ac.' + x.status) }}</span>
           <span class="grow"></span><span class="small muted">{{ fmtDateTime(x.created_at) }}</span></div>
-        <div class="small">{{ t('ac.who') }}: {{ x.contact_name }} · {{ x.phone }}<template v-if="x.city || x.cuisine"> · {{ [x.city, x.cuisine].filter(Boolean).join(' / ') }}</template>
+        <div class="small">{{ t('ac.who') }}: {{ x.contact_name }} · {{ x.phone }}<template v-if="x.cuisine"> · {{ x.cuisine }}</template>
           <span class="muted"> · {{ t('ac.customer') }} {{ x.account_phone }}</span></div>
+        <dl class="ac-place" data-testid="ac-place">
+          <template v-for="[k, v] in placeRows(x)" :key="k"><dt>{{ t(k) }}</dt><dd :data-testid="k.replace(/\./g, '-')">{{ v }}</dd></template>
+          <template v-if="x.lat != null && x.lng != null"><dt>{{ t('ac.p.point') }}</dt>
+            <dd data-testid="ac-p-point">{{ x.lat.toFixed(6) }}, {{ x.lng!.toFixed(6) }}
+              <a :href="mapLink(x)" target="_blank" rel="noopener" class="small">{{ t('ac.p.map') }}</a></dd></template>
+        </dl>
         <p v-if="x.note" style="white-space:pre-wrap">{{ x.note }}</p>
         <div v-if="x.status !== 'pending'" class="reply" v-show="x.reply">{{ x.reply }}</div>
         <div v-else class="row top wrap">
@@ -187,5 +211,10 @@ onMounted(() => { void loadFb(); void loadAp() })
 .tabs button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 7px 16px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
 .tabs button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
 .badge { background: #e5352b; color: #fff; border-radius: 999px; font-size: 12px; padding: 0 7px; line-height: 18px; }
+.ac-place { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; padding: 10px 12px; background: var(--bg); border-radius: 10px; font-size: 14px; }
+.ac-place:empty { display: none; }
+.ac-place dt { color: var(--muted); }
+.ac-place dd { margin: 0; overflow-wrap: anywhere; }
+.ac-place dd a { margin-left: 8px; }
 .reply { background: #f6f7f8; border-radius: 10px; padding: 10px 12px; font-size: 14px; white-space: pre-wrap; }
 </style>

@@ -7,11 +7,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { termsAt, type DeliveryTerms } from '../addresses'
 import { money, t } from '../i18n'
-import { mapsKey, storeScope, type Place } from '../maps'
+import { mapsKey, storeScope, type Place, type Region } from '../maps'
 import type { LatLng, View } from '../geo'
 import MapCanvas from './MapCanvas.vue'
 
-export interface Picked { lat: number; lng: number; name: string; address: string }
+// region: the country and region at the point (in English), when it was asked for
+export interface Picked { lat: number; lng: number; name: string; address: string; region?: Region | null }
 
 const props = defineProps<{
   // the store whose delivery is asked about; without one nothing is said about delivery
@@ -22,6 +23,8 @@ const props = defineProps<{
   embedded?: boolean; pickup?: boolean
   // keepable: an out-of-range spot may still be chosen (for the address book)
   keepable?: boolean
+  // region: also say which country and region the point is in
+  region?: boolean
 }>()
 const emit = defineEmits<{ done: [p: Picked, terms: DeliveryTerms | null]; close: []; pickup: [] }>()
 
@@ -133,11 +136,18 @@ function locateMe() {
 
 const blocked = computed(() => !!props.slug && !props.keepable && (!terms.value || !terms.value.deliverable))
 const ready = computed(() => !!at.value && !!chosen.value && !typing.value && !checking.value && !blocked.value)
-function done() {
-  if (!ready.value || !at.value || !chosen.value) return
-  const c = chosen.value
+const resolving = ref(false)
+async function done() {
+  if (!ready.value || !at.value || !chosen.value || resolving.value) return
+  const c = chosen.value, p = at.value
   const pinOnly = c.label === t('pp.pin_only')
-  emit('done', { lat: at.value[0], lng: at.value[1], name: pinOnly ? (c.detail || c.label) : c.label, address: pinOnly ? '' : (c.detail ?? '') }, terms.value)
+  const out: Picked = { lat: p[0], lng: p[1], name: pinOnly ? (c.detail || c.label) : c.label, address: pinOnly ? '' : (c.detail ?? '') }
+  if (props.region) {
+    resolving.value = true
+    out.region = await (map.value?.resolve(p) ?? Promise.resolve(null)).catch(() => null)
+    resolving.value = false
+  }
+  emit('done', out, terms.value)
 }
 const state = computed(() => checking.value || !terms.value ? 'checking' : terms.value.deliverable ? 'in' : 'out')
 </script>
@@ -184,7 +194,7 @@ const state = computed(() => checking.value || !terms.value ? 'checking' : terms
       </template>
       <div class="pp-listhd">
         <span class="muted">📍 {{ t(typing ? 'pp.results' : 'pp.nearby') }}</span>
-        <button type="button" class="btn primary small" :disabled="!ready" data-testid="pin-confirm" @click="done">{{ t('pp.done') }}</button>
+        <button type="button" class="btn primary small" :disabled="!ready || resolving" data-testid="pin-confirm" @click="done">{{ t('pp.done') }}</button>
       </div>
       <div class="pp-list" data-testid="pin-list">
         <div v-if="looking && !list.length" class="muted pp-empty">{{ t('pp.looking') }}</div>

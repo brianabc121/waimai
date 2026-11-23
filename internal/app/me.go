@@ -459,6 +459,7 @@ type Application struct {
 	City        string     `json:"city"`
 	Cuisine     string     `json:"cuisine"`
 	Note        string     `json:"note"`
+	ApplicationPlace
 	Status      string     `json:"status"`
 	Reply       string     `json:"reply"`
 	DecidedAt   *time.Time `json:"decided_at"`
@@ -468,6 +469,22 @@ type Application struct {
 	AccountPhone string `json:"account_phone,omitempty"`
 }
 
+// ApplicationPlace is where the store is: a point picked on the map, the
+// country and region read off the map there (in English), the place and
+// street the applicant chose, and the floor or unit they typed.
+type ApplicationPlace struct {
+	CountryCode  string   `json:"country_code"`
+	Country      string   `json:"country"`
+	Province     string   `json:"province"`
+	District     string   `json:"district"`
+	PostalCode   string   `json:"postal_code"`
+	PlaceName    string   `json:"place_name"`
+	PlaceAddress string   `json:"place_address"`
+	Unit         string   `json:"unit"`
+	Lat          *float64 `json:"lat"`
+	Lng          *float64 `json:"lng"`
+}
+
 type ApplicationInput struct {
 	StoreName   string `json:"store_name"`
 	ContactName string `json:"contact_name"`
@@ -475,23 +492,31 @@ type ApplicationInput struct {
 	City        string `json:"city"`
 	Cuisine     string `json:"cuisine"`
 	Note        string `json:"note"`
+	ApplicationPlace
 }
 
-const applicationCols = `p.id, p.store_name, p.contact_name, p.phone, p.city, p.cuisine, p.note, p.status, p.reply,
-	p.decided_at, p.created_at`
+const applicationCols = `p.id, p.store_name, p.contact_name, p.phone, p.city, p.cuisine, p.note,
+	p.country_code, p.country, p.province, p.district, p.postal_code, p.place_name, p.place_address, p.unit, p.lat, p.lng,
+	p.status, p.reply, p.decided_at, p.created_at`
 
 func scanApplication(r pgx.Row, extra ...any) (Application, error) {
 	var p Application
-	dest := append([]any{&p.ID, &p.StoreName, &p.ContactName, &p.Phone, &p.City, &p.Cuisine, &p.Note, &p.Status, &p.Reply,
-		&p.DecidedAt, &p.CreatedAt}, extra...)
+	l := &p.ApplicationPlace
+	dest := append([]any{&p.ID, &p.StoreName, &p.ContactName, &p.Phone, &p.City, &p.Cuisine, &p.Note,
+		&l.CountryCode, &l.Country, &l.Province, &l.District, &l.PostalCode, &l.PlaceName, &l.PlaceAddress, &l.Unit, &l.Lat, &l.Lng,
+		&p.Status, &p.Reply, &p.DecidedAt, &p.CreatedAt}, extra...)
 	return p, r.Scan(dest...)
 }
 
 func (a *App) SubmitApplication(ctx context.Context, customerID int64, in ApplicationInput) (*Application, error) {
-	for _, s := range []*string{&in.StoreName, &in.ContactName, &in.Phone, &in.City, &in.Cuisine, &in.Note} {
+	l := &in.ApplicationPlace
+	for _, s := range []*string{&in.StoreName, &in.ContactName, &in.Phone, &in.City, &in.Cuisine, &in.Note,
+		&l.CountryCode, &l.Country, &l.Province, &l.District, &l.PostalCode, &l.PlaceName, &l.PlaceAddress, &l.Unit} {
 		*s = strings.TrimSpace(*s)
 	}
+	l.CountryCode = strings.ToUpper(l.CountryCode)
 	n := utf8.RuneCountInString
+	pinned := l.Lat != nil && l.Lng != nil
 	switch {
 	case in.StoreName == "" || n(in.StoreName) > 100:
 		return nil, ErrValidation("enter the name of the store")
@@ -499,7 +524,12 @@ func (a *App) SubmitApplication(ctx context.Context, customerID int64, in Applic
 		return nil, ErrValidation("enter who to contact")
 	case in.Phone == "" || n(in.Phone) > 40:
 		return nil, ErrValidation("enter a phone number")
-	case n(in.City) > 100 || n(in.Cuisine) > 100 || n(in.Note) > 1000:
+	case (l.Lat == nil) != (l.Lng == nil) || pinned && !validLatLng(LatLng{*l.Lat, *l.Lng}):
+		return nil, ErrValidation("pick where the store is on the map")
+	case !pinned && in.City == "":
+		return nil, ErrValidation("say where the store is")
+	case n(in.City) > 100 || n(in.Cuisine) > 100 || n(in.Note) > 1000 || n(l.CountryCode) > 2 || n(l.Country) > 100 ||
+		n(l.Province) > 100 || n(l.District) > 100 || n(l.PostalCode) > 20 || n(l.PlaceName) > 200 || n(l.PlaceAddress) > 300 || n(l.Unit) > 100:
 		return nil, ErrValidation("one of the fields is too long")
 	}
 	var pending bool
@@ -514,8 +544,11 @@ func (a *App) SubmitApplication(ctx context.Context, customerID int64, in Applic
 		return nil, err
 	}
 	p, err := scanApplication(a.DB.QueryRow(ctx, `INSERT INTO merchant_applications AS p
-		(customer_id, store_name, contact_name, phone, city, cuisine, note) VALUES ($1,$2,$3,$4,$5,$6,$7)
-		RETURNING `+applicationCols, customerID, in.StoreName, in.ContactName, in.Phone, in.City, in.Cuisine, in.Note))
+		(customer_id, store_name, contact_name, phone, city, cuisine, note,
+		 country_code, country, province, district, postal_code, place_name, place_address, unit, lat, lng)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		RETURNING `+applicationCols, customerID, in.StoreName, in.ContactName, in.Phone, in.City, in.Cuisine, in.Note,
+		l.CountryCode, l.Country, l.Province, l.District, l.PostalCode, l.PlaceName, l.PlaceAddress, l.Unit, l.Lat, l.Lng))
 	return &p, err
 }
 
