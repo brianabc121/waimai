@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -1146,16 +1147,39 @@ func (s *Server) trialPromotions(c *gin.Context) {
 // ---- menu import (Excel) ----
 
 func (s *Server) menuImportTemplate(c *gin.Context) {
-	if _, ok := branchScope(c, managerRoles); !ok {
+	bid, ok := branchScope(c, managerRoles)
+	if !ok {
 		return
 	}
-	b, err := app.MenuImportTemplate()
+	sendMenuTemplate(c, s.App, bid)
+}
+
+// sendMenuTemplate sends the store's template; ?with=menu fills in every
+// current dish so the file can be edited and imported back.
+func sendMenuTemplate(c *gin.Context, a *app.App, bid int64) {
+	withMenu := c.Query("with") == "menu"
+	b, err := a.MenuTemplate(c, bid, withMenu)
 	if err != nil {
 		fail(c, err)
 		return
 	}
-	c.Header("Content-Disposition", `attachment; filename="menu-template.xlsx"`)
+	name := "menu-template.xlsx"
+	if withMenu {
+		name = "menu-" + time.Now().Format("20060102") + ".xlsx"
+	}
+	c.Header("Content-Disposition", `attachment; filename="`+name+`"`)
 	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", b)
+}
+
+// readImportFile reads the .xlsx request body, capped before it is read.
+func readImportFile(c *gin.Context) ([]byte, bool) {
+	const limit = 2 << 20
+	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, limit+1))
+	if err != nil || len(body) > limit {
+		fail(c, app.Err(http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", "the file is larger than 2 MB"))
+		return nil, false
+	}
+	return body, true
 }
 
 // uploadMenuImport takes the .xlsx as the raw request body; the file name
@@ -1165,10 +1189,8 @@ func (s *Server) uploadMenuImport(c *gin.Context) {
 	if !ok {
 		return
 	}
-	const limit = 2 << 20
-	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, limit+1))
-	if err != nil || len(body) > limit {
-		fail(c, app.Err(http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", "the file is larger than 2 MB"))
+	body, ok := readImportFile(c)
+	if !ok {
 		return
 	}
 	id, err := s.App.CreateMenuImport(c, bid, c.Query("filename"), body, staffActor(c))

@@ -109,8 +109,12 @@ export interface BatchLine { item_id: number; qty: number; option_ids: number[];
 export interface Quote { id: string; currency: string; service_type: string; zone_name: string; zone_distance_m: number | null; scheduled_for: string | null; totals: Totals; expires_at: string
   coupons: AppliedCoupon[]; coupon_choices: CouponChoice[]
   lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string; basket?: number }[] }
+export interface ImportSpecGroup { name: string; min_select: number; max_select: number; options: { name: string; price_delta: number }[] }
 export interface ImportRow {
   line: number; category: string; name: string; name_en: string; description: string; price: number; station: string
+  published: boolean | null; dine_in: boolean | null; delivery: boolean | null; pickup: boolean | null
+  image_url: string; image_set: boolean; photos: string[]; photos_set: boolean; details: string; details_set: boolean
+  specs: ImportSpecGroup[]; specs_set: boolean; new_category?: boolean
   action: string; old_price?: number; errors: string[]
 }
 export interface MenuImport {

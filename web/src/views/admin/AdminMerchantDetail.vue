@@ -139,6 +139,7 @@ const rolesOf = (u: MerchantUser) => [...new Set(u.roles.map(r => r.role))]
               <td><div class="acts" v-if="live">
                 <button class="btn small" @click="editBranch(b)">{{ t('edit') }}</button>
                 <router-link class="btn small" :to="{ path: '/admin/items', query: { merchant_id: b.merchant_id, branch_id: b.id } }">{{ t('ad.items') }}</router-link>
+                <router-link class="btn small" data-testid="branch-import" :to="{ path: '/admin/items', query: { merchant_id: b.merchant_id, branch_id: b.id, import: '1' } }">{{ t('ad.import_menu') }}</router-link>
                 <button class="btn small" data-testid="view-store" @click="viewStore(b)">{{ t('ad.view_store') }} ↗</button>
                 <button class="btn small danger" @click="removeBranch(b)">{{ t('delete') }}</button>
               </div></td>
