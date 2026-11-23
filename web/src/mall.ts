@@ -153,7 +153,7 @@ extend({
   'ml.messages': ['消息', 'Messages'], 'ml.locating': ['正在定位…', 'Finding you…'], 'ml.choose_loc': ['选择位置', 'Choose a place'],
   'ml.here': ['当前位置', 'Current location'], 'ml.all': ['全部', 'All'],
   'ml.frequent': ['常点的店', 'Your stores'], 'ml.nearby': ['附近的店', 'Stores near you'], 'ml.nearby_n': ['{n} 家可配送', '{n} deliver here'],
-  'ml.no_delivery': ['暂不配送', 'No delivery'], 'ml.pickup_ok': ['可到店自取', 'Pickup available'],
+  'ml.no_delivery': ['暂不配送', 'No delivery'], 'ml.pickup_ok': ['自取', 'Pickup'],
   'ml.far_title': ['附近暂不配送的店', 'Nearby, no delivery to you'], 'ml.far_hint': ['50 公里内，送不到你这里，可进店看看或到店自取', 'Within 50 km. They do not deliver to you: browse, or pick up'],
   'ml.far_only': ['这个位置暂时没有能送到的店，下面是附近的店', 'No store delivers here yet. These stores are nearby'], 'ml.deliver_to': ['配送至', 'Deliver to'],
   'ml.in_city': ['{city}的店', 'Stores in {city}'], 'ml.in_city_n': ['共 {n} 家', '{n} stores'],

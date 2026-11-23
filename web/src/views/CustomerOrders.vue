@@ -175,7 +175,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 .ol-body { display: flex; align-items: stretch; gap: 10px; }
 .ol-items { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 0; display: grid; gap: 6px; align-content: center; }
 .ol-items li { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.ol-items img, .ol-items .ph { width: 64px; height: 40px; border-radius: 6px; object-fit: cover; flex: none; }
+.ol-items img, .ol-items .ph { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex: none; }
 .ol-items .ph { background: var(--gold-soft); color: #b98a3a; display: grid; place-items: center; }
 .ol-items .nm { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .ol-items .qty { color: var(--muted); font-size: 12px; flex: none; }
@@ -202,7 +202,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 .ol-end::before, .ol-end::after { content: ""; width: 48px; height: 1px; background: #cdbda8; }
 @media (max-width: 380px) {
   .ol-tabs button { padding: 4px 10px; font-size: 13.5px; }
-  .ol-items img, .ol-items .ph { width: 54px; height: 36px; } .ol-items .nm { font-size: 13.5px; }
+  .ol-items img, .ol-items .ph { width: 40px; height: 40px; } .ol-items .nm { font-size: 13.5px; }
   .ol-sum { min-width: 66px; padding-inline-start: 10px; } .ol-total { font-size: 16px; }
   .pill { padding: 4px 10px; } .pill.brand { padding: 4px 12px; }
 }

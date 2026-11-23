@@ -54,6 +54,7 @@ function opened() {
         <span v-if="eta" class="etatext">{{ eta }}</span>
         <span v-if="opens" class="opens">{{ opens }}</span>
         <span v-if="nodel" class="nod" data-testid="mall-no-delivery">{{ t('ml.no_delivery') }}</span>
+        <span v-if="nodel && s.pickup" class="pk" data-testid="mall-pickup-ok">{{ t('ml.pickup_ok') }}</span>
         <template v-else-if="s.delivery">
           <span class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.500h11v10h-11zM13.5 10h4l3 3.500v3h-7" /><circle cx="7" cy="17.5" r="1.8" /><circle cx="17" cy="17.5" r="1.8" /></svg>
             <template v-if="s.delivery.fee">{{ t('ml.fee_word') }} <b>{{ money(s.delivery.fee, s.currency) }}</b></template>
@@ -65,7 +66,6 @@ function opened() {
       <p v-if="s.tagline" class="tagline">{{ s.tagline }}</p>
       <div class="tags">
         <span v-for="(p, i) in s.promos" :key="i" class="tag promo">{{ pick(p.name, p.name_en) || promoLabel(p, s.currency) }}</span>
-        <span v-if="nodel && s.pickup" class="tag pick">{{ t('ml.pickup_ok') }}</span>
         <span v-if="s.scheduling" class="tag gold">{{ t('ml.can_schedule') }}</span>
       </div>
       <div v-if="s.dishes.length" class="dishes">
@@ -113,9 +113,10 @@ h3 .new { flex: none; font-style: normal; font-size: 12.500px; font-weight: 600;
 .off h3, .off .l1, .off .l2, .off .rate, .off .l2 b { color: #a6978a; }
 .mcard.off { box-shadow: inset 4px 0 0 #cdbda8; }
 /* near but no delivery: same colours as the others, only marked in the line below the name */
-.l2 .nod { color: #8a4a3a; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
-.l2 .nod::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid currentColor; background: linear-gradient(135deg, transparent 44%, currentColor 44%, currentColor 56%, transparent 56%); }
-.tag.pick { background: #fff; color: #6d5a4b; border-color: #d6c6b1; }
+.l2 .nod { color: #8a4a3a; font-weight: 700; font-size: 12.5px; display: inline-flex; align-items: center; gap: 4px; }
+.l2 .nod::before { content: ""; width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid currentColor; background: linear-gradient(135deg, transparent 44%, currentColor 44%, currentColor 56%, transparent 56%); }
+/* pickup still works: a small chip right after "no delivery", no divider between */
+.l2 > .pk { margin-inline-start: 6px; padding: 0 6px; border: 1px solid #d6c6b1; border-radius: 5px; background: #fff; color: #6d5a4b; font-size: 11px; line-height: 17px; font-weight: 600; white-space: nowrap; }
 
 /* the short row */
 
