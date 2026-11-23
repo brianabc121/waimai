@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '../bills'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { get, post } from '../api'
@@ -89,6 +90,7 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
         <router-link v-if="manager" to="/merchant/media">{{ t('promo_media') }}</router-link>
         <router-link v-if="manager" to="/merchant/promos">{{ t('promos') }}</router-link>
         <router-link v-if="manager" to="/merchant/cash">{{ t('cash') }}</router-link>
+        <router-link v-if="manager" to="/merchant/bills" data-testid="nav-bills">{{ t('bl.nav') }}</router-link>
         <router-link v-if="desk" to="/merchant/riders">{{ t('riders') }}</router-link>
         <router-link v-if="manager" to="/merchant/delivery-map">{{ t('delivery_map') }}</router-link>
         <router-link v-if="manager" to="/merchant/staff">{{ t('staff') }}</router-link>

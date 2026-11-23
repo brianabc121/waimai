@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import './strings'
+import '../../bills'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, onMounted, onUnmounted } from 'vue'
 import { locale, setLocale, t } from '../../i18n'
@@ -40,6 +41,7 @@ async function out() { await logout(); session.loaded = true; router.replace('/l
       <router-link to="/admin/customers">{{ t('ad.customers') }}</router-link>
       <router-link to="/admin/mall">{{ t('ad.mall') }}</router-link>
       <router-link to="/admin/coupons" data-testid="nav-coupons">{{ t('ad.coupons') }}</router-link>
+      <router-link to="/admin/bills" data-testid="nav-bills">{{ t('bl.nav') }}</router-link>
       <router-link to="/admin/support" data-testid="nav-support">{{ t('ad.support') }}<span v-if="monitor.supportUnread" class="badge" data-testid="support-badge">{{ monitor.supportUnread > 99 ? '99+' : monitor.supportUnread }}</span></router-link>
       <router-link to="/admin/chats" data-testid="nav-chats">{{ t('ad.chats') }}</router-link>
       <div class="grp">{{ t('ad.g_system') }}</div>

@@ -718,5 +718,8 @@ func (a *App) Cleanup(ctx context.Context) error {
 	if _, err := a.RemindExpiringCoupons(ctx); err != nil {
 		return err
 	}
+	if _, err := a.MakeSettlements(ctx); err != nil {
+		return err
+	}
 	return a.endLongShifts(ctx)
 }
