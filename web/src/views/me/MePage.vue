@@ -65,7 +65,7 @@ function goBack() { if (window.history.state?.back) router.back(); else void rou
 .mepage input, .mepage textarea, .mepage select { background: #fff; border-color: var(--line); border-radius: 10px; }
 .mepage label.field > span { color: var(--ink); font-weight: 500; font-size: 13px; }
 .mepage .pill { flex: none; border: 1px solid #cdb9a0; background: none; color: var(--ink); border-radius: 999px; padding: 3px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; }
-.mepage .pill.red { border-color: var(--red); background: var(--red); color: #fff; }
+.mepage .pill.red { border-color: var(--red); background: #fff; color: var(--red); font-weight: 600; }
 .mepage .me-go { justify-self: start; color: var(--red); font-weight: 500; font-size: 13px; }
 .mepage .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 13px; }
 .mepage .note { font-size: 12px; color: var(--muted); line-height: 1.6; }

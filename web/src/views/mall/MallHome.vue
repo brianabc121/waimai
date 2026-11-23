@@ -365,7 +365,7 @@ h2 { font-size: 17px; }
 .sorts::-webkit-scrollbar { display: none; }
 .sorts button { flex: none; border: 0; background: none; height: 22px; padding: 0 14px; color: var(--ink); cursor: pointer; white-space: nowrap; border-inline-start: 1px solid #cbb9a2; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; }
 .sorts > button:first-child { border-inline-start: 0; }
-.sorts > button.on { background: var(--red); color: #fff; font-weight: 700; height: 32px; border-radius: 9px; border-inline-start: 0; padding: 0 16px; margin-inline-end: 8px; }
+.sorts > button.on { background: #fff; color: var(--red); box-shadow: inset 0 0 0 1.5px var(--red); font-weight: 700; height: 32px; border-radius: 9px; border-inline-start: 0; padding: 0 16px; margin-inline-end: 8px; }
 .sorts > button.on + button { border-inline-start: 0; }
 .sorts > button:not(.on) + button.on { margin-inline-start: 8px; }
 .filt { flex: none; margin-inline-start: auto; }

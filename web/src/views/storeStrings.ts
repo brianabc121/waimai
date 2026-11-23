@@ -6,6 +6,7 @@ extend({
   'sf.tab_menu': ['选购', 'Order'], 'sf.tab_reviews': ['评价', 'Reviews'], 'sf.tab_store': ['商家', 'Store'],
   'sf.no_rating': ['暂无评分', 'No ratings yet'], 'sf.sales': ['销量 {n} 单', '{n} orders'],
   'sf.own_delivery': ['门店配送', 'Store delivery'], 'sf.self_pickup': ['到店自取', 'Pickup'], 'sf.cod': ['货到付款', 'Cash on delivery'],
+  'sf.promo_over': ['满{th}可用', 'Orders over {th}'], 'sf.promo_any': ['无门槛', 'No minimum'], 'sf.promo_hours': ['每天 {from}–{to}', 'Daily {from}–{to}'], 'sf.promo_paused': ['当前时段不可用', 'Not running right now'], 'sf.promo_tip': ['结算时自动使用最划算的一项', 'The best offer is applied at checkout'],
   'sf.promos_n': ['{n} 个优惠', '{n} offers'], 'sf.promos': ['优惠活动', 'Offers'],
   'sf.notice': ['公告：', 'Notice: '],
   'sf.mt_note': ['菜单由机器翻译', 'This menu was machine translated'], 'sf.mt_original': ['正在看商家原文', 'Showing the menu as the store wrote it'],

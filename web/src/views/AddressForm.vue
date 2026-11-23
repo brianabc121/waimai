@@ -132,7 +132,8 @@ const titles = ['mr', 'ms'] as const
               <template v-if="f.place_name">
                 <b>{{ f.place_name }}</b>
                 <span class="sub" v-if="f.place_address">{{ f.place_address }}</span>
-                <span v-if="terms" class="tag" :class="terms.deliverable ? 'ok' : 'bad'" data-testid="af-terms">{{ termsText(terms, currency) }}</span>
+                <!-- only a warning: a spot the store delivers to needs no label -->
+                <span v-if="terms && !terms.deliverable" class="tag bad" data-testid="af-terms">{{ termsText(terms, currency) }}</span>
               </template>
               <span v-else class="sub">{{ t('ad.f.place_ph') }}</span>
             </span>

@@ -193,8 +193,9 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 .ol-menu button, .ol-menu a { border: 0; background: none; text-align: start; padding: 8px 12px; border-radius: 6px; color: var(--ink); cursor: pointer; white-space: nowrap; }
 .ol-menu button:hover, .ol-menu a:hover { background: var(--bg); }
 .pill { border: 1px solid #cdb9a0; background: none; color: var(--ink); border-radius: 999px; padding: 4px 14px; font-size: 13px; cursor: pointer; white-space: nowrap; min-height: 30px; }
-.pill.brand { border-color: var(--red); background: var(--red); color: #fff; font-weight: 500; padding: 4px 16px; }
-.pill.brand:hover { background: var(--red-deep); }
+/* outlined in red on white, as every small action on the customer pages */
+.pill.brand { border-color: var(--red); background: #fff; color: var(--red); font-weight: 600; padding: 4px 16px; }
+.pill.brand:hover { background: #fdf1ee; }
 .pill:disabled { opacity: .5; }
 .ol-foot { text-align: center; padding: 8px 0 6px; }
 .ol-end { display: flex; align-items: center; justify-content: center; gap: 14px; color: var(--muted); font-size: 12px; }

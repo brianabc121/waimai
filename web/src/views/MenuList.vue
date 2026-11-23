@@ -109,6 +109,7 @@ defineExpose({ scrollTo })
 .cats button.on { border-color: var(--brand); color: var(--brand-dark); }
 .badge { display: inline-block; margin-inline-start: 5px; vertical-align: 1px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #e5352b; color: #fff; font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; }
 .must { display: inline-block; margin-inline-start: 4px; padding: 0 5px; border-radius: 4px; background: var(--brand-soft); color: var(--brand-dark); font-size: 11px; font-weight: 600; line-height: 16px; vertical-align: middle; white-space: nowrap; }
+.body { padding-bottom: var(--menu-pad, 0px); }
 .lists { padding: 4px 14px 14px; display: flex; flex-direction: column; gap: 14px; }
 .cat { display: flex; flex-direction: column; gap: 10px; scroll-margin-top: calc(var(--menu-top, 0px) + 60px); }
 .items { display: flex; flex-direction: column; gap: 10px; }
@@ -117,6 +118,10 @@ defineExpose({ scrollTo })
 .item.off { opacity: .55; }
 .item > .grow { min-width: 0; display: flex; flex-direction: column; }
 .buy { margin-top: auto; padding-top: 8px; }
+/* "options" outlined in red on white, like the + beside it */
+.buy .btn.primary { background: #fff; color: var(--brand); border: 1.5px solid var(--brand); font-weight: 600; }
+.buy .btn.primary:hover:not(:disabled) { background: #fdf1ee; }
+.buy .stepper button.fill { background: #fff; color: var(--brand); border: 1.5px solid var(--brand); }
 .stats { display: flex; flex-direction: column; color: #8a94a3; font-size: 12px; line-height: 1.5; margin-top: 2px; }
 .ph { display: grid; place-items: center; background: var(--brand-soft); color: var(--brand-dark); font-size: 28px; font-weight: 700; border-radius: 8px; }
 
