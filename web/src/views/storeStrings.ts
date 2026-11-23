@@ -20,6 +20,7 @@ extend({
   'sf.basket_n': ['购物篮{n}', 'Basket {n}'], 'sf.clear_basket': ['清空购物篮', 'Empty basket'], 'sf.clear_basket_confirm': ['确定清空这个购物篮？', 'Empty this basket?'],
   'sf.move_basket': ['移动购物篮', 'Move'], 'sf.move_to': ['移到', 'Move to'],
   'sf.basket_subtotal': ['购物篮小计', 'Basket subtotal'], 'sf.all_baskets': ['全部购物篮合计', 'All baskets'],
+  'sf.got_promo': ['已享「{name}」', 'Got "{name}"'], 'sf.saved': ['已减 {amt}', '{amt} off'],
   'sf.basket_empty': ['这个购物篮是空的', 'This basket is empty'],
   'sf.rating_title': ['商家评价', 'Rating'], 'sf.taste': ['味道', 'Taste'], 'sf.packaging': ['包装', 'Packaging'], 'sf.delivery_score': ['配送', 'Delivery'],
   'sf.f_all': ['全部', 'All'], 'sf.f_latest': ['最新', 'Recent'], 'sf.f_good': ['好评', 'Good'], 'sf.f_bad': ['差评', 'Bad'],
