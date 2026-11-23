@@ -97,6 +97,9 @@ await phone.waitForSelector(`${tid('chat-msg')}[data-mine=false]:has-text("${mor
 await desk.waitForSelector(`${tid('chat-msg')}[data-mine=false]:has-text("${more}")`)
 expect(await desk.locator(tid('chat-down')).count() === 0, 'the first device was signed out by the second')
 await phone.screenshot({ path: `${SHOTS}/chat-desk-phone.png` })
+// a page left open on the conversation reads every later message at once,
+// and then nothing is unread for the reminder steps below
+await phone.close()
 step('two members of staff are on line at once and both get the next message')
 
 // ---- a picture, quick replies, an order card ----

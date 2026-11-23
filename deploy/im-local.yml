@@ -1,0 +1,18 @@
+# Chat on a development machine where the api runs outside Docker
+# ("make run" or "go run ./cmd/api") and the pages come from "npm run dev":
+# OpenIM is reachable on this machine's 10001 (messages) and 10002 (its API),
+# and calls the api back on this machine's port 8080.
+#
+#   docker compose -f docker-compose.yml -f deploy/im-local.yml --profile im up -d openim-server
+#
+# docs/DEPLOY.md section 19 has the whole recipe. Never use this on a server:
+# the two ports must not be open to the internet.
+services:
+  openim-server:
+    ports:
+      - "127.0.0.1:10001:10001"
+      - "127.0.0.1:10002:10002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      IMENV_WEBHOOKS_URL: http://host.docker.internal:8080/im-hooks/${OPENIM_HOOK_KEY:-}

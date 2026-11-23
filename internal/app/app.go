@@ -65,6 +65,8 @@ type App struct {
 	Translator Translator
 	// IM is the chat server (OpenIM). Nil turns chat off.
 	IM IM
+	// chatKnown holds the chat accounts made since this process started (chat.go).
+	chatKnown *sync.Map
 
 	// The four fields above are rebuilt when an administrator saves a key
 	// (settings.go); mu guards them. base is the configuration from the
@@ -87,7 +89,7 @@ func (a *App) forCustomer(b *Branch) *Branch {
 }
 
 func New(pool *pgxpool.Pool, secret string) *App {
-	return &App{DB: pool, Secret: []byte(secret), SMS: LogSMS{}, mu: &sync.RWMutex{}, fixed: &sysFixCache{}}
+	return &App{DB: pool, Secret: []byte(secret), SMS: LogSMS{}, mu: &sync.RWMutex{}, fixed: &sysFixCache{}, chatKnown: &sync.Map{}}
 }
 
 // Error is a business error with a stable code that the HTTP layer maps 1:1.

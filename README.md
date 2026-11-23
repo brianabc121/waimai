@@ -26,6 +26,8 @@ make run                        # 单进程启动：接口、后台任务和前�
 
 前端开发时可以另开一个终端运行 `cd web && npm run dev`，Vite 会把 `/api` 代理到 `:8080`。
 
+顾客和商家的聊天默认是关的，要另外启动 OpenIM，做法见 `docs/DEPLOY.md` 第 19 节。
+
 用 Docker Compose 启动全部服务：
 
 ```bash

@@ -535,9 +535,42 @@ base64 -w0 workbench.jks > workbench.jks.txt
 
 以后每次 `docker compose up` 都要带 `--profile im`，否则聊天的容器不会跟着启动（页面会提示“聊天暂时不可用”，下单不受影响）。
 
+**本机开发时开通聊天**
+
+上面是用 Docker Compose 跑整套系统的做法（本机也一样，开 http://localhost:8000）。如果你在本机用 `make run` 或 `go run ./cmd/api` 跑接口、用 `npm run dev` 跑页面，OpenIM 还是用 Docker 起，但要多带一个 `deploy/im-local.yml`，让它在本机开出 10001、10002 两个端口，并把回调打回本机的 8080：
+
+1. 在 `.env` 里加：
+
+   ```
+   OPENIM_SECRET=……（至少 16 位，openssl rand -hex 24）
+   OPENIM_HOOK_KEY=……（至少 16 位）
+   ```
+
+2. 只启动 OpenIM 和它用的几个容器：
+
+   ```
+   docker compose -f docker-compose.yml -f deploy/im-local.yml --profile im up -d openim-server
+   ```
+
+   等 `docker compose ps openim-server` 显示 `healthy`（一两分钟）。
+
+3. 启动接口时带上这三个变量（和 `.env` 里的值一样），端口要是 8080：
+
+   ```
+   export OPENIM_API_URL=http://localhost:10002
+   export OPENIM_SECRET=……
+   export OPENIM_HOOK_KEY=……
+   make run
+   ```
+
+4. 另开一个终端 `cd web && npm run dev`，打开 http://localhost:5173 。聊天要从这里进：`make run` 自己在 8080 提供的页面不会转发 `/im/`，聊天会显示连接不上。
+
+聊天页显示“聊天功能暂时没有开通”，说明接口启动时没读到 `OPENIM_API_URL`；显示“聊天暂时不可用”，说明读到了但连不上 OpenIM（没启动、还没 healthy，或地址写错）。
+
 **要知道的几件事**
 
 - `OPENIM_SECRET` 是给聊天登录签名的，`OPENIM_HOOK_KEY` 保护 OpenIM 回调我们后端的入口。两个都至少 16 位，太短的话 api 容器会拒绝启动。改了 `OPENIM_SECRET` 之后已经打开的聊天页要刷新一次。
+- 如果删掉了 OpenIM 的数据卷重新装，要重启一次 api 容器，让它重新在 OpenIM 里建好顾客和门店的账号。
 - `IM_STORE_PASSWORD` 只在第一次创建数据卷时生效，之后改它不会改已有数据库的密码。
 - 如果前面有 Caddy 之类的 TLS 代理，不用加配置：聊天的两个路径 `/im/ws` 和 `/im/api` 都在同一个域名下，由 web 容器转发。代理要支持 WebSocket（Caddy 默认支持）。
 - 聊天内容我们自己的数据库里有一份副本（平台“所有会话”读的就是它），随 PostgreSQL 一起备份。OpenIM 那边的原件在数据卷 `im-mongo` 里，要完整恢复聊天页里的历史就也备份它：`docker compose exec im-mongo mongodump -u root -p "$IM_STORE_PASSWORD" --authenticationDatabase admin --archive > im.archive`。
