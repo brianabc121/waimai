@@ -2,6 +2,7 @@
 import LangButton from './LangButton.vue'
 import '../bills'
 import './members/memberStrings'
+import './addresses/deliveryStrings'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { get, post } from '../api'
@@ -85,6 +86,7 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
       <div class="shell-links">
         <router-link v-if="desk" to="/merchant/orders">{{ t('orders') }}</router-link>
         <router-link v-if="desk" to="/merchant/members" data-testid="nav-members">{{ t('sm.title') }}</router-link>
+        <router-link v-if="desk" to="/merchant/addresses" data-testid="nav-addresses">{{ t('da.title') }}</router-link>
         <router-link v-if="desk" to="/merchant/tables">{{ t('tables') }}</router-link>
         <router-link v-if="desk || inStore" to="/kitchen">{{ t('kitchen') }}</router-link>
         <router-link v-if="desk" to="/merchant/messages" data-testid="nav-messages" @click="countChats">{{ t('ch.nav') }}<span v-if="chatUnread" class="navnum" data-testid="nav-chat-unread">{{ chatUnread > 99 ? '99+' : chatUnread }}</span></router-link>

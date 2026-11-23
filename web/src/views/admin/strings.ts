@@ -4,6 +4,7 @@ import { extend } from '../../i18n'
 
 extend({
   'ad.addresses': ['地址库', 'Address book'],
+  'ad.delivery': ['送餐地址', 'Delivery addresses'],
   'ab.intro': ['商家代客下单时填过、并在地图上定过位的地址，按店铺所在的国家 / 省份 / 地区存在这里，写法不同但其实相同的地址只存一条。代客下单输入地址时先从这里推荐。', 'Addresses staff put on orders with a map position, kept per country / province / city of the store; one entry however it was written. The order desk suggests these first.'],
   'ab.country': ['国家', 'Country'], 'ab.country_code': ['国家代码', 'Country code'], 'ab.province': ['省份', 'Province'], 'ab.city': ['地区', 'City'],
   'ab.all': ['全部', 'All'], 'ab.unknown': ['未知', 'Unknown'],

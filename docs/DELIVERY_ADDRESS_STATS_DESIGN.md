@@ -189,3 +189,13 @@ brian 说“打开谷歌地图把所有送餐地址标注出来”。谷歌地�
 - [Uber Eats Manager 2025 年 4 月更新](https://merchants.ubereats.com/us/en/resources/articles/product-highlights/merchant-updates-april-2025)
 - [谷歌 HeatmapLayer 文档（弃用说明）](https://developers.google.com/maps/documentation/javascript/heatmaplayer)、[Google Maps and deck.gl HeatmapLayer 示例](https://developers.google.com/maps/documentation/javascript/examples/deckgl-heatmap)、[Stadia Maps：Google Maps heatmap deprecated](https://stadiamaps.com/blog/google-maps-heatmap-deprecated-maplibre-migration/)
 - [美团商家版 App Store 介绍](https://apps.apple.com/cn/app/%E7%BE%8E%E5%9B%A2%E5%A4%96%E5%8D%96%E5%95%86%E5%AE%B6%E7%89%88-%E7%AE%A1%E5%AE%B6%E5%90%8E%E5%8F%B0/id869802614)
+
+## 10. 实现说明（2026-11-23，brian 确认后一次做完两批）
+
+- 第 6 节 8 条取舍全部按推荐。
+- 后端 `internal/app/delivery_stats.go`、`internal/httpapi/delivery_stats.go`，迁移 00052 两个部分索引。“同一个客户”按电话号码认（没有电话时按顾客账号），不是按会员号，这样顾客自己下的单和店员代客下的单能对上同一个人。
+- 前端 `web/src/views/addresses/`：`DeliveryAddressBook.vue`（三个标签，商家端和平台共用）、`DeliveryMap.vue`（地图）、`heat.ts`（聚合和热力图绘制）、`deliveryStrings.ts`（文案前缀 `da.`，12 种语言）。商家端菜单“客户地址”在“会员管理”下面，平台后台菜单“送餐地址”在“地址库”下面。
+- 日期快捷按钮的“今天”按门店时区算（平台看全部时用多数门店的时区），和服务器的统计口径一致。
+- 地图：缩小时 56 像素网格内的点合并成一个带总数的圆，点一下放大；地图停下 0.12 秒后按屏幕范围重画热力图。平台选“全部门店”时不显示配送区，门店多于 3 家时不写店名，避免挤在一起。
+- 测试：Go `TestDeliveryStats`、`TestDeliveryStatsOverHTTP`；浏览器 `e2e/deliverystats.cjs`（API 用 `GOOGLE_MAPS_API_KEY=stub`，已加进 `make e2e`）。
+- 没验证：真实谷歌底图下的效果，等配好密钥后看。
