@@ -177,6 +177,9 @@ func (s *Server) customerDevice(c *gin.Context) {
 		return
 	}
 	id, err := s.App.AddCustomerDevice(c, cu.ID, in.Token)
+	if err == nil {
+		err = s.App.SetDeviceLang(c, false, id, reqLang(c))
+	}
 	reply(c, gin.H{"id": id}, err)
 }
 

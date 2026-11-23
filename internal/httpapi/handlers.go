@@ -1338,6 +1338,9 @@ func (s *Server) registerDevice(c *gin.Context) {
 		return
 	}
 	d, err := s.App.RegisterDevice(c, currentUser(c).ID, in.Platform, in.Token, in.AppVersion, sessionToken(c))
+	if err == nil {
+		err = s.App.SetDeviceLang(c, true, d.ID, reqLang(c))
+	}
 	if err != nil {
 		fail(c, err)
 		return

@@ -4,6 +4,8 @@ WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY web ./
+# the server's own texts, listed on the platform's language page (web/vite.config.ts)
+COPY internal/app/systexts /internal/app/systexts
 RUN npm run build
 
 FROM nginx:1.27-alpine

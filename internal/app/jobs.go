@@ -29,38 +29,33 @@ func enqueue(ctx context.Context, tx pgx.Tx, kind string, payload any) error {
 	return err
 }
 
-// customerMessages are the status texts sent to customers, Chinese then English.
-var customerMessages = map[string][2]string{
-	"accepted":         {"商家已接单，正在备餐", "The store accepted your order and is preparing it"},
-	"out_for_delivery": {"骑手已取餐，正在配送", "Your order is on the way"},
-	"ready_for_pickup": {"可以取餐了", "Your order is ready for pickup"},
-	"rejected":         {"商家未能接单，订单已关闭", "The store could not take your order"},
-	"cancelled":        {"订单已取消", "Your order was cancelled"},
-}
-
 // notifyCustomer leaves a message in the customer's message box and, when the
-// branch has customer notifications switched on, enqueues a status SMS. The message is only sent if
-// the business change commits.
+// branch has customer notifications switched on, enqueues a status SMS in the
+// language the customer ordered in (docs/I18N_DESIGN.md §10). The message is
+// only sent if the business change commits.
 func (a *App) notifyCustomer(ctx context.Context, tx pgx.Tx, orderID int64, event string) error {
-	text, ok := customerMessages[event]
-	if !ok {
+	key := "sys.order." + event
+	if _, ok := sysTexts[key]; !ok {
 		return nil
 	}
 	var enabled bool
-	var store, phone, publicNo, pickupCode string
+	var branchID int64
+	var store, phone, publicNo, pickupCode, lang string
 	var nonce []byte
 	var customerID *int64
-	if err := tx.QueryRow(ctx, `SELECT b.notify_sms, b.name, o.customer_phone, o.public_no, o.pickup_code, o.token_nonce,
-		o.customer_id FROM orders o JOIN branches b ON b.id = o.branch_id WHERE o.id=$1`, orderID).
-		Scan(&enabled, &store, &phone, &publicNo, &pickupCode, &nonce, &customerID); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT b.id, b.notify_sms, b.name, o.customer_phone, o.public_no, o.pickup_code, o.token_nonce,
+		o.customer_id, o.customer_lang FROM orders o JOIN branches b ON b.id = o.branch_id WHERE o.id=$1`, orderID).
+		Scan(&branchID, &enabled, &store, &phone, &publicNo, &pickupCode, &nonce, &customerID, &lang); err != nil {
 		return err
 	}
 	// The customer's message box gets every update, whether or not the store texts.
 	if customerID != nil {
-		m := Message{Kind: "order", Title: text[0], TitleEn: text[1], Body: store + " · " + publicNo, Link: "/o/" + a.orderToken(nonce)}
+		m := Message{Kind: "order", Title: sysTexts[key]["zh"], TitleEn: sysTexts[key]["en"], Body: store + " · " + publicNo,
+			Link: "/o/" + a.orderToken(nonce), Key: "order." + event, Args: map[string]string{"store": store, "no": publicNo}}
 		m.BodyEn = m.Body
 		if event == "ready_for_pickup" {
 			m.Body, m.BodyEn = m.Body+" · 取餐号 "+pickupCode, m.BodyEn+" · pickup code "+pickupCode
+			m.Args["code"] = pickupCode
 		}
 		if err := tell(ctx, tx, *customerID, m); err != nil {
 			return err
@@ -69,9 +64,12 @@ func (a *App) notifyCustomer(ctx context.Context, tx pgx.Tx, orderID int64, even
 	if !enabled {
 		return nil
 	}
-	msg := fmt.Sprintf("【%s】%s %s。%s.", store, publicNo, text[0], text[1])
+	if names, err := storeNames(ctx, tx, lang, []int64{branchID}); err == nil && names[branchID] != "" {
+		store = names[branchID]
+	}
+	msg := a.sysText(ctx, lang, "sys.sms.order", "store", store, "no", publicNo, "status", a.sysText(ctx, lang, key))
 	if event == "ready_for_pickup" {
-		msg += fmt.Sprintf(" 取餐号 Pickup code: %s.", pickupCode)
+		msg += " " + a.sysText(ctx, lang, "sys.sms.pickup", "code", pickupCode)
 	}
 	if a.PublicBaseURL != "" {
 		msg += " " + strings.TrimRight(a.PublicBaseURL, "/") + "/o/" + a.orderToken(nonce)

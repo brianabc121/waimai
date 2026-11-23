@@ -222,7 +222,7 @@ func TestCustomerNotificationsAndRetry(t *testing.T) {
 	var attempts int
 	noErr(t, a.DB.QueryRow(ctx, `SELECT status, attempts FROM jobs WHERE payload->>'message' LIKE '%' || $1 || '%'
 		ORDER BY id DESC LIMIT 1`, // order numbers repeat across stores and test runs
-		o.PublicNo+" 商家已接单").Scan(&status, &attempts))
+		o.PublicNo+": The store accepted").Scan(&status, &attempts))
 	if status != "pending" || attempts != 1 {
 		t.Fatalf("failed job should be pending for retry: %s attempts=%d", status, attempts)
 	}
@@ -231,7 +231,7 @@ func TestCustomerNotificationsAndRetry(t *testing.T) {
 	noErr(t, err)
 	noErr(t, a.RunJobs(ctx))
 	sent := fake.forPhone(phone)
-	if len(sent) != 1 || !strings.Contains(sent[0], "商家已接单") || !strings.Contains(sent[0], "https://example.test/o/") {
+	if len(sent) != 1 || !strings.Contains(sent[0], "The store accepted your order") || !strings.Contains(sent[0], "https://example.test/o/") {
 		t.Fatalf("after retry: %v", sent)
 	}
 	// running again sends nothing twice
@@ -251,7 +251,7 @@ func TestCustomerNotificationsAndRetry(t *testing.T) {
 	_ = o3
 	noErr(t, a.RunJobs(ctx))
 	sent = fake.forPhone(phone)
-	if len(sent) != 2 || !strings.Contains(sent[1], "商家未能接单") {
+	if len(sent) != 2 || !strings.Contains(sent[1], "The store could not take your order") {
 		t.Fatalf("after reject: %v", sent)
 	}
 }

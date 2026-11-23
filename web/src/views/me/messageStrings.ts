@@ -1,0 +1,30 @@
+// Texts of "My messages", kept as a key and values (docs/I18N_DESIGN.md §10), [zh, en].
+import { extend } from '../../i18n'
+
+extend({
+  'msg.order.accepted': ['商家已接单，正在备餐', 'The store accepted your order and is preparing it'],
+  'msg.order.accepted.body': ['{store} · {no}', '{store} · {no}'],
+  'msg.order.out_for_delivery': ['骑手已取餐，正在配送', 'Your order is on the way'],
+  'msg.order.out_for_delivery.body': ['{store} · {no}', '{store} · {no}'],
+  'msg.order.ready_for_pickup': ['可以取餐了', 'Your order is ready for pickup'],
+  'msg.order.ready_for_pickup.body': ['{store} · {no} · 取餐号 {code}', '{store} · {no} · pickup code {code}'],
+  'msg.order.rejected': ['商家未能接单，订单已关闭', 'The store could not take your order'],
+  'msg.order.rejected.body': ['{store} · {no}', '{store} · {no}'],
+  'msg.order.cancelled': ['订单已取消', 'Your order was cancelled'],
+  'msg.order.cancelled.body': ['{store} · {no}', '{store} · {no}'],
+  'msg.order.delivered': ['订单已送达，欢迎评价', 'Your order was delivered. Tell us how it was.'],
+  'msg.order.delivered.body': ['{store} · {no}', '{store} · {no}'],
+  'msg.welcome_gift': ['新人礼：{amount}无门槛券已放入你的账户', 'Welcome gift: {amount} off your first orders'],
+  'msg.welcome_gift.body': ['全平台通用，下单时自动使用', 'Any store; it applies by itself at checkout'],
+  'msg.platform_coupon': ['平台送你一张{amount}无门槛券', 'A {amount} coupon from us'],
+  'msg.store_coupon': ['{store}送你一张{coupon}', '{store} sent you a coupon: {coupon}'],
+  'msg.store_coupon.body': ['{day}前在本店下单可用', 'Use it at this store by {day}'],
+  'msg.coupon_expiring': ['你的{coupon}快过期了', 'Your coupon expires soon: {coupon}'],
+  'msg.any_store': ['全平台通用', 'Any store on the platform'],
+  'msg.feedback_reply': ['你的意见反馈有回复了', 'We replied to your feedback'],
+  'msg.apply_approved': ['商家入驻申请已通过：{store}', 'Your application was approved: {store}'],
+  'msg.wallet_added.balance': ['余额增加了', 'Money was added to your balance'],
+  'msg.wallet_added.bonus': ['奖励金增加了', 'Rewards were added to your account'],
+  'msg.wallet_taken.balance': ['余额减少了', 'Money was taken from your balance'],
+  'msg.wallet_taken.bonus': ['奖励金减少了', 'Rewards were taken from your account'],
+})

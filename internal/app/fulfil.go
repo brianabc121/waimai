@@ -593,7 +593,7 @@ func (a *App) RiderDeliver(ctx context.Context, taskID, riderID, collected int64
 		if err := a.giftRepurchase(ctx, tx, o.ID); err != nil {
 			return err
 		}
-		if err := a.tellOrder(ctx, tx, o.ID, "订单已送达，欢迎评价", "Your order was delivered. Tell us how it was."); err != nil {
+		if err := a.tellOrder(ctx, tx, o.ID, "order.delivered", "订单已送达，欢迎评价", "Your order was delivered. Tell us how it was."); err != nil {
 			return err
 		}
 		if err := audit(ctx, tx, o.BranchID, o.ID, Actor{Type: "rider", ID: riderID}, "delivery.delivered",

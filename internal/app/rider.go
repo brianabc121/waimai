@@ -178,6 +178,7 @@ type Device struct {
 	UserID   int64  `json:"-"`
 	Platform string `json:"platform"`
 	Token    string `json:"-"`
+	Lang     string `json:"-"`
 }
 
 // RegisterDevice records where to push for this user. A token that was
@@ -221,6 +222,36 @@ type PushMessage struct {
 	Body  string `json:"body"`
 	Tag   string `json:"tag,omitempty"`
 	URL   string `json:"url,omitempty"`
+	// TitleKey and BodyKey name system texts ("sys.push.…"); each device gets
+	// them in its own language, in place of Title and Body.
+	TitleKey string `json:"title_key,omitempty"`
+	BodyKey  string `json:"body_key,omitempty"`
+}
+
+// in fills in the message's texts in one language.
+func (m PushMessage) in(ctx context.Context, a *App, lang string) PushMessage {
+	if m.TitleKey != "" {
+		m.Title = a.sysText(ctx, lang, m.TitleKey)
+	}
+	if m.BodyKey != "" {
+		m.Body = a.sysText(ctx, lang, m.BodyKey)
+	}
+	m.TitleKey, m.BodyKey = "", ""
+	return m
+}
+
+// SetDeviceLang remembers the language a device registered in (staff: true
+// for a staff or rider device, false for a customer's browser).
+func (a *App) SetDeviceLang(ctx context.Context, staff bool, id int64, lang string) error {
+	if !IsLang(lang) {
+		return nil
+	}
+	table := "customer_devices"
+	if staff {
+		table = "rider_devices"
+	}
+	_, err := a.DB.Exec(ctx, `UPDATE `+table+` SET lang=$2 WHERE id=$1`, id, lang)
+	return err
 }
 
 // ErrPushGone tells the caller that the device no longer exists.
@@ -236,19 +267,10 @@ type pushJob struct {
 	Message PushMessage `json:"message"`
 }
 
-// riderPushTexts are the reminders sent to riders, Chinese then English.
-var riderPushTexts = map[string][2]string{
-	"assigned":   {"新配送单", "New delivery"},
-	"reassigned": {"配送单已改派给别人", "Delivery reassigned to someone else"},
-	"cancelled":  {"配送单已取消", "Delivery cancelled"},
-	"packed":     {"可以取餐了", "Ready to collect"},
-}
-
 // pushRider enqueues a reminder for a rider in the caller's transaction, so
 // that it is only sent if the change commits.
 func (a *App) pushRider(ctx context.Context, tx pgx.Tx, riderID, orderID int64, event string) error {
-	text, ok := riderPushTexts[event]
-	if !ok || riderID == 0 {
+	if _, ok := sysTexts["sys.push.rider."+event]; !ok || riderID == 0 {
 		return nil
 	}
 	var has bool
@@ -262,21 +284,21 @@ func (a *App) pushRider(ctx context.Context, tx pgx.Tx, riderID, orderID int64, 
 	}
 	body := strings.TrimSpace(no + " " + strings.TrimSpace(line+" "+unit))
 	return enqueue(ctx, tx, "push", pushJob{UserID: riderID, Message: PushMessage{
-		Title: text[0] + " " + text[1], Body: body, Tag: fmt.Sprintf("order-%d", orderID), URL: "/work"}})
+		TitleKey: "sys.push.rider." + event, Body: body, Tag: fmt.Sprintf("order-%d", orderID), URL: "/work"}})
 }
 
 // sendPush delivers one queued reminder to every device of the user. Devices
 // the push service no longer knows are forgotten. It fails, and is retried,
 // only when no device could be reached.
 func (a *App) sendPush(ctx context.Context, p pushJob) error {
-	rows, err := a.DB.Query(ctx, `SELECT d.id, d.user_id, d.platform, d.token FROM rider_devices d
+	rows, err := a.DB.Query(ctx, `SELECT d.id, d.user_id, d.platform, d.token, d.lang FROM rider_devices d
 		JOIN users u ON u.id = d.user_id WHERE d.user_id=$1 AND u.active ORDER BY d.id`, p.UserID)
 	if err != nil {
 		return err
 	}
 	devices, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Device, error) {
 		var d Device
-		return d, r.Scan(&d.ID, &d.UserID, &d.Platform, &d.Token)
+		return d, r.Scan(&d.ID, &d.UserID, &d.Platform, &d.Token, &d.Lang)
 	})
 	if err != nil {
 		return err
@@ -289,7 +311,7 @@ func (a *App) sendPush(ctx context.Context, p pushJob) error {
 			continue // this platform is not set up on this server
 		}
 		sendCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-		err := sender.Send(sendCtx, d, p.Message)
+		err := sender.Send(sendCtx, d, p.Message.in(ctx, a, d.Lang))
 		cancel()
 		switch {
 		case err == nil:

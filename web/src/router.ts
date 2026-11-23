@@ -74,6 +74,7 @@ export const router = createRouter({
         { path: 'chats', component: () => import('./views/admin/AdminChats.vue'), meta: { title: 'ad.chats' } },
         { path: 'worker', component: () => import('./views/admin/AdminWorker.vue'), meta: { title: 'ad.worker' } },
         { path: 'settings', component: () => import('./views/admin/AdminSettings.vue'), meta: { title: 'ad.settings' } },
+        { path: 'i18n', component: () => import('./views/admin/AdminI18n.vue'), meta: { title: 'ad.i18n.nav' } },
         { path: 'audit', component: () => import('./views/admin/AdminAudit.vue'), meta: { title: 'ad.audit' } },
       ],
     },

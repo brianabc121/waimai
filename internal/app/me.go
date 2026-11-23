@@ -321,17 +321,26 @@ type Message struct {
 	Link      string    `json:"link"`
 	CreatedAt time.Time `json:"created_at"`
 	Read      bool      `json:"read"`
+	// Key names the text in the customer's language ("msg." + Key in the web
+	// app) and Args fills it in; Title and Body are the Chinese and English
+	// fallback.
+	Key  string            `json:"key,omitempty"`
+	Args map[string]string `json:"args,omitempty"`
 }
 
 // tell leaves a message for a customer, in the caller's transaction.
 func tell(ctx context.Context, q Querier, customerID int64, m Message) error {
-	_, err := q.Exec(ctx, `INSERT INTO customer_messages (customer_id, kind, title, title_en, body, body_en, link)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)`, customerID, m.Kind, m.Title, m.TitleEn, m.Body, m.BodyEn, m.Link)
+	args := m.Args
+	if args == nil {
+		args = map[string]string{}
+	}
+	_, err := q.Exec(ctx, `INSERT INTO customer_messages (customer_id, kind, title, title_en, body, body_en, link, msg_key, msg_args)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, customerID, m.Kind, m.Title, m.TitleEn, m.Body, m.BodyEn, m.Link, m.Key, args)
 	return err
 }
 
 // tellOrder leaves a message about an order for the customer who placed it.
-func (a *App) tellOrder(ctx context.Context, tx pgx.Tx, orderID int64, zh, en string) error {
+func (a *App) tellOrder(ctx context.Context, tx pgx.Tx, orderID int64, key, zh, en string) error {
 	var customerID *int64
 	var store, publicNo string
 	var nonce []byte
@@ -342,21 +351,22 @@ func (a *App) tellOrder(ctx context.Context, tx pgx.Tx, orderID int64, zh, en st
 	}
 	body := store + " · " + publicNo
 	return tell(ctx, tx, *customerID, Message{Kind: "order", Title: zh, TitleEn: en, Body: body, BodyEn: body,
-		Link: "/o/" + a.orderToken(nonce)})
+		Link: "/o/" + a.orderToken(nonce), Key: key, Args: map[string]string{"store": store, "no": publicNo}})
 }
 
 func (a *App) MyMessages(ctx context.Context, customerID int64, offset int) ([]Message, bool, error) {
 	if offset < 0 || offset > 10000 {
 		return nil, false, ErrValidation("offset out of range")
 	}
-	rows, err := a.DB.Query(ctx, `SELECT id, kind, title, title_en, body, body_en, link, created_at, read_at IS NOT NULL
+	rows, err := a.DB.Query(ctx, `SELECT id, kind, title, title_en, body, body_en, link, created_at, read_at IS NOT NULL,
+			msg_key, msg_args
 		FROM customer_messages WHERE customer_id=$1 ORDER BY id DESC LIMIT $2 OFFSET $3`, customerID, myPageSize+1, offset)
 	if err != nil {
 		return nil, false, err
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Message, error) {
 		var m Message
-		return m, r.Scan(&m.ID, &m.Kind, &m.Title, &m.TitleEn, &m.Body, &m.BodyEn, &m.Link, &m.CreatedAt, &m.Read)
+		return m, r.Scan(&m.ID, &m.Kind, &m.Title, &m.TitleEn, &m.Body, &m.BodyEn, &m.Link, &m.CreatedAt, &m.Read, &m.Key, &m.Args)
 	})
 	if err != nil {
 		return nil, false, err

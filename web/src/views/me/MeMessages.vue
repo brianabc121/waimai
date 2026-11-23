@@ -4,10 +4,10 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { customerChats, day, lastLine, listen, connect, type ChatThread } from '../../chat'
-import { pick, t } from '../../i18n'
+import { t } from '../../i18n'
 import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
-import { dateTime, describe, me, myMessages, readMessages, type Message } from './me'
+import { dateTime, describe, me, messageText, myMessages, readMessages, type Message } from './me'
 
 const route = useRoute(), router = useRouter()
 
@@ -105,8 +105,8 @@ async function readAll() {
       <button v-for="m in list ?? []" :key="m.id" class="card msg" :class="{ unread: !m.read }" data-testid="msg" :data-kind="m.kind" @click="open(m)">
         <div class="row between"><span class="tag" :class="m.kind === 'order' ? 'brand' : m.kind === 'wallet' ? 'ok' : 'info'">{{ t('mm.kind_' + m.kind) }}</span>
           <span class="small muted">{{ dateTime(m.created_at) }}</span></div>
-        <b><i v-if="!m.read" class="dot"></i>{{ pick(m.title, m.title_en) }}</b>
-        <p v-if="m.body" class="small muted" style="white-space:pre-wrap">{{ pick(m.body, m.body_en) }}</p>
+        <b><i v-if="!m.read" class="dot"></i>{{ messageText(m).title }}</b>
+        <p v-if="messageText(m).body" class="small muted" style="white-space:pre-wrap">{{ messageText(m).body }}</p>
       </button>
       <button v-if="more" class="btn block" @click="load()">{{ t('mm.load_more') }}</button>
     </template>
