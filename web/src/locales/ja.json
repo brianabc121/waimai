@@ -2298,5 +2298,6 @@
  "co.deliver_to": "お届け先",
  "co.pickup_at": "受け取り店舗",
  "co.cod": "代金引換",
- "co.pay_cash": "現金払い"
+ "co.pay_cash": "現金払い",
+ "ad.default_tag": "デフォルト"
 }

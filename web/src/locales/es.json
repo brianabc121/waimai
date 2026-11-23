@@ -2298,5 +2298,6 @@
  "co.deliver_to": "Entregar en",
  "co.pickup_at": "Recoger en",
  "co.cod": "Pago contra entrega",
- "co.pay_cash": "Pago en efectivo"
+ "co.pay_cash": "Pago en efectivo",
+ "ad.default_tag": "Predeterminada"
 }

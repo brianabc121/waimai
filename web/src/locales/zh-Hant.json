@@ -4,6 +4,7 @@
 "ad.new":"新增收貨地址",
 "ad.edit":"修改收貨地址",
 "ad.edit_short":"編輯",
+"ad.default_tag":"預設",
 "ad.empty":"還沒有儲存的地址",
 "ad.unit_is":"門牌號：{unit}",
 "ad.can":"可配送 · 配送費 {fee}",
