@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>复购优惠券和券账单 · 原型</title>
+<link rel="stylesheet" href="coupon.css">
+</head>
+<body>
+<!-- 原型：复购礼券、四种券叠加、账单和平台券结算。数据都是示意。方案见 ../COUPON_DESIGN.md -->
+
+<!-- ============ 1 商家端：优惠 > 优惠券 > 复购礼券 ============ -->
+<section id="merchant-coupons">
+  <div class="pc">
+    <div class="pc-nav"><b>马卡蒂小馆</b><span>订单</span><span>桌台</span><span>后厨</span><span>消息</span><span>菜单</span><span>模板</span><span>宣传物料</span><span class="on">优惠</span><span>核款</span><span>账单<i class="new">新</i></span><span>骑手</span><span>配送地图</span><span>员工</span><span>设置</span><span class="me">陈店长 ▾</span></div>
+    <div class="pc-body">
+      <h1>优惠</h1>
+      <div class="subnav"><span>活动</span><span class="on">优惠券<i class="new">新</i></span></div>
+      <div style="display:grid;grid-template-columns:1fr 380px;gap:14px">
+        <div class="panel">
+          <div class="row between" style="margin-bottom:14px"><div><h2>复购礼券</h2><div class="muted small">顾客在本店第一次完成订单后，自动送一张券，下次点餐可以用。每人只送一次。</div></div><span class="row" style="gap:8px"><b style="color:var(--ok)">已开启</b><i class="sw on"></i></span></div>
+          <div class="form">
+            <div class="l">送给谁</div><div><span class="seg"><span class="on">第一次在本店完成订单的顾客</span></span><div class="h">外卖送达、自取已取餐才算完成。取消、拒单的不送。</div></div>
+            <div class="l">首单菜品至少</div><div><span class="inp">₱ 0</span> <span class="h">0 表示不限。可以防止有人下很小的单来换券</span></div>
+            <div class="l">送什么券</div><div><span class="seg"><span class="on">无门槛券</span><span>满减券</span><span>满减配送费券</span></span></div>
+            <div class="l">面额</div><div><span class="inp">减 ₱ 20</span></div>
+            <div class="l">有效期</div><div><span class="inp">30</span> 天 <span class="h">送出那天算第 1 天，可填 1 到 90 天</span></div>
+            <div class="l">每月最多送</div><div><span class="inp" style="color:#9aa1ab">不限</span> 张 <span class="h">送满后暂停，下个月 1 号自动恢复</span></div>
+            <div class="l">顾客收到时</div><div class="small muted">站内消息：“马卡蒂小馆送你一张 ₱20 无门槛券，12 月 22 日前可用”。到期前 3 天再提醒一次。</div>
+          </div>
+          <div class="row" style="margin-top:16px;gap:8px"><a class="btn primary">保存</a><a class="btn">取消</a><span class="muted small">改了面额或有效期，只影响以后送出的券</span></div>
+        </div>
+        <div style="display:grid;gap:14px;align-content:start">
+          <div class="panel"><div class="muted small" style="margin-bottom:8px">顾客看到的样子</div>
+            <div class="ticket"><div class="stub"><b>₱20</b><small>无门槛</small></div><div class="body"><b>马卡蒂小馆 复购礼券</b><span>任意金额可用 · 外卖、自取</span><span>2026-12-22 前有效</span></div></div></div>
+          <div class="panel"><div class="row between"><h2>本月效果</h2><span class="muted small">11 月 1 日到今天</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+              <div><div class="muted small">送出</div><div class="b num" style="font-size:22px">128 张</div></div>
+              <div><div class="muted small">已使用</div><div class="b num" style="font-size:22px">41 张</div></div>
+              <div><div class="muted small">用券率</div><div class="b num" style="font-size:22px;color:var(--ok)">32%</div></div>
+              <div><div class="muted small">用券订单菜品金额</div><div class="b num" style="font-size:22px">₱12,710</div></div>
+            </div>
+            <div class="muted small" style="margin-top:8px">未到期 63 张 · 已过期 24 张 · 商家承担 ₱820</div></div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:14px">
+        <div class="row between" style="margin-bottom:10px"><div><h2>店铺领券 <span class="tag info">第二批</span></h2><div class="muted small">建一批券，顾客在点餐页点“领券”领到账号上</div></div><a class="btn">＋ 新建一批券</a></div>
+        <div class="wrap"><table class="t">
+          <tr><th>券</th><th>种类</th><th class="r">数量</th><th class="r">已领</th><th class="r">已用</th><th>每人</th><th>领取后有效</th><th>状态</th><th></th></tr>
+          <tr><td><b>满 ₱400 减 ₱40</b></td><td><span class="tag brand">商家满减券</span></td><td class="r">200</td><td class="r">96</td><td class="r">26</td><td>限领 1 张</td><td>7 天</td><td><span class="tag ok">进行中</span></td><td class="r"><a class="btn small">暂停</a></td></tr>
+          <tr><td><b>满 ₱200 配送费减 ₱40</b></td><td><span class="tag warn">满减配送费券</span></td><td class="r">不限</td><td class="r">152</td><td class="r">33</td><td>限领 1 张</td><td>7 天</td><td><span class="tag ok">进行中</span></td><td class="r"><a class="btn small">暂停</a></td></tr>
+        </table></div>
+      </div>
+    </div>
+  </div>
+  <div class="caption"><b>商家端“优惠”页新增“优惠券”标签。</b>复购礼券默认首单完成后送 ₱20 无门槛券、30 天有效；右边是顾客看到的样子和本月效果。下面的“店铺领券”推荐放第二批。</div>
+</section>
+
+<!-- ============ 2 顾客结算页：叠加用券 ============ -->
+<section id="checkout">
+  <div class="phones">
+    <div>
+      <div class="phone">
+        <div class="ptop"><span class="back">‹</span><span class="ttl">确认订单</span></div>
+        <div class="pscroll">
+          <div class="pcard"><div class="b">送到 Salcedo Village, Tower 2 12F</div><div class="small" style="color:var(--muted)">Maria · 0917 *** 4521 · 预计 35 分钟送达</div></div>
+          <div class="pcard">
+            <div class="b" style="margin-bottom:6px">马卡蒂小馆</div>
+            <div class="fee"><span>菜品（4 件）</span><span class="v">₱500</span></div>
+            <div class="fee"><span>包装费</span><span class="v">₱10</span></div>
+            <div class="fee"><span>配送费</span><span class="v">₱60</span></div>
+            <div class="sep"></div>
+            <div class="fee cp"><span><i class="ic a">活动</i>满 ₱300 减 ₱30</span><span class="v">−₱30</span></div>
+            <div class="couprow"><span>优惠券 <span class="small" style="color:var(--muted)">已选 4 张</span></span><span><b>共减 ₱115</b> <span class="chev">›</span></span></div>
+            <div class="fee cp"><span><i class="ic">店</i>满 ₱400 减 ₱40</span><span class="v">−₱40</span></div>
+            <div class="fee cp"><span><i class="ic">店</i>复购礼券 无门槛</span><span class="v">−₱20</span></div>
+            <div class="fee cp"><span><i class="ic s">运</i>配送费减 ₱30</span><span class="v">−₱30</span></div>
+            <div class="fee pf"><span><i class="ic p">平台</i>新客券 无门槛</span><span class="v">−₱25</span></div>
+            <div class="sep"></div>
+            <div class="fee"><span class="b">共优惠</span><span class="v b" style="color:var(--red)">₱145</span></div>
+            <div class="fee"><span class="b">实付</span><span class="v b" style="font-size:18px">₱425</span></div>
+          </div>
+          <div class="note">平台券由平台出钱，不影响商家的营业额和税。货到付款，骑手收 ₱425。</div>
+        </div>
+        <div class="submit"><div class="amt"><b>₱425</b><br><small>已优惠 ₱145</small></div><div class="go">提交订单</div></div>
+      </div>
+      <div class="caption" style="max-width:390px"><b>结算页：</b>系统默认每种券各选一张最省的，每张券单独一行，平台券用紫色标出。</div>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="ptop"><span class="back">‹</span><span class="ttl">确认订单</span></div>
+        <div class="pscroll" style="filter:blur(.5px)"><div class="pcard" style="height:120px"></div><div class="pcard" style="height:420px"></div></div>
+        <div class="dim"></div>
+        <div class="sheet">
+          <div class="hd">选择优惠券<span>×</span></div>
+          <div class="small" style="text-align:center;color:var(--muted);margin-top:-6px">每种券可以各用一张，一起叠加</div>
+          <div class="grp"><span>商家满减券</span><em>2 张可用</em></div>
+          <div class="mt"><div class="stub"><b>₱40</b><small>满 ₱400</small></div><div class="body"><b>满 ₱400 减 ₱40</b><span>马卡蒂小馆 · 11-29 前</span></div><div class="act"><i class="radio on"></i></div></div>
+          <div class="mt off"><div class="stub"><b>₱80</b><small>满 ₱580</small></div><div class="body"><b>满 ₱580 减 ₱80</b><span class="why">还差 ₱80 可用</span></div><div class="act"><i class="radio"></i></div></div>
+          <div class="grp"><span>商家无门槛券</span><em>1 张</em></div>
+          <div class="mt"><div class="stub"><b>₱20</b><small>无门槛</small></div><div class="body"><b>复购礼券</b><span class="soon">明天过期</span></div><div class="act"><i class="radio on"></i></div></div>
+          <div class="grp"><span>满减配送费券</span><em>1 张</em></div>
+          <div class="mt ship"><div class="stub"><b>₱30</b><small>配送费</small></div><div class="body"><b>满 ₱200 配送费减 ₱30</b><span>仅外卖 · 12-05 前</span></div><div class="act"><i class="radio on"></i></div></div>
+          <div class="grp"><span>平台无门槛券</span><em>全平台通用</em></div>
+          <div class="mt plat"><div class="stub"><b>₱25</b><small>无门槛</small></div><div class="body"><b>平台新客券</b><span>平台出钱 · 12-06 前</span></div><div class="act"><i class="radio on"></i></div></div>
+          <div class="pbtn" style="margin-top:4px">确定，共减 ₱115</div>
+        </div>
+      </div>
+      <div class="caption" style="max-width:390px"><b>选券弹层：</b>按四种券分组，每组单选；用不了的变灰并写原因，快过期的标出来。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3 顾客：我的优惠 + 订单完成送券 ============ -->
+<section id="my-coupons">
+  <div class="phones">
+    <div>
+      <div class="phone">
+        <div class="ptop"><span class="back">‹</span><span class="ttl">我的优惠</span></div>
+        <div class="ptabs"><span class="on">可用 (4)</span><span>已使用</span><span>已过期</span></div>
+        <div class="pscroll">
+          <div class="mt"><div class="stub"><b>₱20</b><small>无门槛</small></div><div class="body"><b>复购礼券</b><span>马卡蒂小馆</span><span class="soon">即将过期 · 明天 23:59</span></div><div class="act"><span class="use">去使用</span></div></div>
+          <div class="mt plat"><div class="stub"><b>₱25</b><small>无门槛</small></div><div class="body"><b>平台新客券</b><span>全平台通用</span><span>2026-12-06 前</span></div><div class="act"><span class="use">去使用</span></div></div>
+          <div class="mt"><div class="stub"><b>₱40</b><small>满 ₱400</small></div><div class="body"><b>满 ₱400 减 ₱40</b><span>马卡蒂小馆</span><span>2026-11-29 前</span></div><div class="act"><span class="use">去使用</span></div></div>
+          <div class="mt ship"><div class="stub"><b>₱30</b><small>配送费</small></div><div class="body"><b>满 ₱200 配送费减 ₱30</b><span>BGC 轻食 · 仅外卖</span><span>2026-12-05 前</span></div><div class="act"><span class="use">去使用</span></div></div>
+          <div class="ph">店铺活动（下单自动生效，无需领取）</div>
+          <div class="pcard row between"><div><b>满 ₱300 减 ₱30</b><div class="small" style="color:var(--muted)">马卡蒂小馆 · 每天 11:00–14:00</div></div><span class="use" style="background:#fff;color:var(--red);border:1px solid var(--red);border-radius:14px;padding:3px 10px;font-size:13px;font-weight:700">去看看</span></div>
+          <div class="pcard row between"><div><b>免配送费</b><div class="small" style="color:var(--muted)">BGC 轻食 · 满 ₱500</div></div><span class="use" style="background:#fff;color:var(--red);border:1px solid var(--red);border-radius:14px;padding:3px 10px;font-size:13px;font-weight:700">去看看</span></div>
+        </div>
+      </div>
+      <div class="caption" style="max-width:390px"><b>我的优惠：</b>分可用 / 已使用 / 已过期，快过期的排在前面并标红；现有的店铺活动放到最下面。</div>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="okhead"><div class="small" style="opacity:.85">订单 W2311-0042</div><h2>已送达</h2><div class="small" style="opacity:.9">马卡蒂小馆 · 11 月 23 日 12:41</div></div>
+        <div class="pscroll overlap">
+          <div class="gift"><div class="ic">🎁</div><div class="grow"><b>送你一张 ₱20 无门槛券</b><br><span>马卡蒂小馆复购礼券 · 12 月 22 日前下单可用</span></div><span class="chev" style="color:#7a3b14">›</span></div>
+          <div class="pcard">
+            <div class="b" style="margin-bottom:6px">费用明细</div>
+            <div class="fee"><span>菜品</span><span class="v">₱280</span></div>
+            <div class="fee"><span>包装费</span><span class="v">₱10</span></div>
+            <div class="fee"><span>配送费</span><span class="v">₱60</span></div>
+            <div class="fee pf"><span><i class="ic p">平台</i>新客券 无门槛</span><span class="v">−₱25</span></div>
+            <div class="sep"></div>
+            <div class="fee"><span class="b">实付</span><span class="v b">₱325</span></div>
+          </div>
+          <div class="pcard"><div class="row between"><b>评价这一单</b><span style="color:#d8a94a;font-size:20px;letter-spacing:2px">☆☆☆☆☆</span></div></div>
+          <div class="row" style="gap:10px"><div class="pbtn grow" style="background:#fff;color:var(--red);border:1px solid var(--red)">联系商家</div><div class="pbtn grow">再来一单</div></div>
+        </div>
+      </div>
+      <div class="caption" style="max-width:390px"><b>首单完成：</b>订单详情顶部显示送了什么券，同时发一条站内消息。用过的券在费用明细里单独一行。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4 商家端账单：订单明细 ============ -->
+<section id="bill-orders">
+  <div class="pc">
+    <div class="pc-nav"><b>马卡蒂小馆</b><span>订单</span><span>桌台</span><span>后厨</span><span>消息</span><span>菜单</span><span>模板</span><span>宣传物料</span><span>优惠</span><span>核款</span><span class="on">账单</span><span>骑手</span><span>配送地图</span><span>员工</span><span>设置</span><span class="me">陈店长 ▾</span></div>
+    <div class="pc-body">
+      <h1>账单</h1>
+      <div class="subnav"><span class="on">订单明细</span><span>汇总</span></div>
+      <div class="bar"><div class="pills"><span>今天</span><span>昨天</span><span>本周</span><span class="on">本月</span><span>自选</span></div><span class="datebox">2026-11-01 至 2026-11-23</span>
+        <span class="sel">全部订单</span><span class="sel">所有优惠</span><span class="sp"></span><a class="btn">导出 Excel</a></div>
+      <div class="wrap"><table class="t">
+        <tr><th>订单号 / 时间</th><th>方式</th><th class="r">菜品原价</th><th class="r">包装费</th><th class="r">配送费</th><th class="r">门店活动</th><th class="r">商家券</th><th class="r">配送费券</th><th class="r">平台券</th><th class="r">顾客实付</th><th class="r">商家应收</th><th>状态</th></tr>
+        <tr class="open"><td><b>W2311-0087</b> <span class="muted">▾</span><div class="sub">11-23 12:18</div></td><td>外卖</td><td class="r">500</td><td class="r">10</td><td class="r">60</td><td class="r neg">−30</td><td class="r neg">−60</td><td class="r neg">−30</td><td class="r pl">−25</td><td class="r b">425</td><td class="r b">450</td><td><span class="tag ok">已完成</span></td></tr>
+        <tr class="detail"><td colspan="12"><div class="coupons-in">
+          <div class="cin"><span class="tag" style="background:#fff4e5;color:#b45309">门店活动</span><b>满 ₱300 减 ₱30</b><span class="muted">商家承担 · −₱30</span></div>
+          <div class="cin"><span class="tag brand">商家满减券</span><b>满 ₱400 减 ₱40</b><span class="muted">店铺领券 · C-58213 · −₱40</span></div>
+          <div class="cin"><span class="tag brand">商家无门槛券</span><b>复购礼券 ₱20</b><span class="muted">来自订单 W2311-0019 · C-57702 · −₱20</span></div>
+          <div class="cin"><span class="tag warn">满减配送费券</span><b>满 ₱200 配送费减 ₱30</b><span class="muted">店铺领券 · C-58007 · −₱30</span></div>
+        </div><div class="coupons-in" style="grid-template-columns:1fr 3fr"><div class="cin plat"><span class="tag plat">平台无门槛券</span><b>平台新客券 ₱25</b><span class="muted">平台承担，月底补给你 · −₱25</span></div><div class="small muted" style="align-self:center">商家应收 ₱450 = 顾客实付 ₱425 + 平台补 ₱25</div></div></td></tr>
+        <tr><td><b>W2311-0086</b><div class="sub">11-23 11:52</div></td><td>自取</td><td class="r">260</td><td class="r">10</td><td class="r z">0</td><td class="r z">0</td><td class="r neg">−20</td><td class="r z">0</td><td class="r z">0</td><td class="r b">250</td><td class="r b">250</td><td><span class="tag ok">已完成</span></td></tr>
+        <tr><td><b>W2311-0085</b><div class="sub">11-23 11:40</div></td><td>外卖</td><td class="r">180</td><td class="r">10</td><td class="r">60</td><td class="r z">0</td><td class="r z">0</td><td class="r z">0</td><td class="r pl">−25</td><td class="r b">225</td><td class="r b">250</td><td><span class="tag ok">已完成</span></td></tr>
+        <tr><td><b>W2311-0084</b><div class="sub">11-23 11:31</div></td><td>外卖</td><td class="r">420</td><td class="r">10</td><td class="r">60</td><td class="r neg">−30</td><td class="r neg">−40</td><td class="r neg">−60</td><td class="r z">0</td><td class="r b">360</td><td class="r b">360</td><td><span class="tag ok">已完成</span></td></tr>
+        <tr class="off"><td><b>W2311-0083</b><div class="sub">11-23 11:20</div></td><td>外卖</td><td class="r">320</td><td class="r">10</td><td class="r">60</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">0</td><td class="r">0</td><td><span class="tag">顾客取消</span><div class="sub">券已退回</div></td></tr>
+        <tr><td><b>W2311-0082</b><div class="sub">11-23 11:05</div></td><td>外卖</td><td class="r">150</td><td class="r">10</td><td class="r">60</td><td class="r z">0</td><td class="r z">0</td><td class="r z">0</td><td class="r z">0</td><td class="r b">220</td><td class="r b">220</td><td><span class="tag ok">已完成</span></td></tr>
+        <tr class="total"><td colspan="2">本月合计（已完成 312 单）</td><td class="r">98,640</td><td class="r">3,120</td><td class="r">14,880</td><td class="r neg">−3,540</td><td class="r neg">−1,860</td><td class="r neg">−1,320</td><td class="r pl">−1,425</td><td class="r">108,495</td><td class="r">109,920</td><td></td></tr>
+      </table></div>
+      <div class="muted small" style="margin-top:8px">金额单位 ₱。商家券 = 商家无门槛券 + 商家满减券。商家应收 = 顾客实付 + 平台券（平台月底补给你）。点订单号展开看每张券。</div>
+    </div>
+  </div>
+  <div class="caption"><b>账单 · 订单明细：</b>每单一行，四种优惠分列，平台券用紫色；点开一单能看到每张券的名称、券号、来源和金额。取消的单变灰，金额按 0 算。</div>
+</section>
+
+<!-- ============ 5 商家端账单：汇总 ============ -->
+<section id="bill-summary">
+  <div class="pc">
+    <div class="pc-nav"><b>马卡蒂小馆</b><span>订单</span><span>桌台</span><span>后厨</span><span>消息</span><span>菜单</span><span>模板</span><span>宣传物料</span><span>优惠</span><span>核款</span><span class="on">账单</span><span>骑手</span><span>配送地图</span><span>员工</span><span>设置</span><span class="me">陈店长 ▾</span></div>
+    <div class="pc-body">
+      <h1>账单</h1>
+      <div class="subnav"><span>订单明细</span><span class="on">汇总</span></div>
+      <div class="bar"><div class="pills"><span>今天</span><span>昨天</span><span>本周</span><span class="on">本月</span><span>自选</span></div><span class="datebox">2026-11-01 至 2026-11-23</span><span class="sp"></span><a class="btn">导出 Excel</a></div>
+      <div class="kpis">
+        <div class="kpi"><div class="l">已完成订单</div><div class="v">312<small style="font-size:13px;color:var(--muted)"> 单</small></div><div class="d">外卖 248 · 自取 64</div></div>
+        <div class="kpi"><div class="l">菜品原价合计</div><div class="v">₱98,640</div><div class="d">另有包装费 ₱3,120、配送费 ₱14,880</div></div>
+        <div class="kpi"><div class="l">优惠合计</div><div class="v">₱8,145</div><div class="d">商家 ₱6,720 · 平台 ₱1,425</div></div>
+        <div class="kpi"><div class="l">顾客实付合计</div><div class="v">₱108,495</div><div class="d">你实际收到的现金</div></div>
+        <div class="kpi hl"><div class="l">平台应补给你</div><div class="v">₱1,425</div><div class="d">12 月 1 日出结算单</div></div>
+        <div class="kpi ok"><div class="l">商家实际收入</div><div class="v">₱109,920</div><div class="d">顾客实付 + 平台补</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1.45fr 1fr;gap:14px">
+        <div class="panel" style="padding:14px 16px">
+          <h2 style="margin-bottom:10px">各种优惠</h2>
+          <div class="wrap"><table class="t">
+            <tr><th>种类</th><th class="r">用了多少单</th><th class="r">合计减</th><th class="r">平均每单</th><th class="r">占菜品原价</th><th>谁承担</th></tr>
+            <tr><td>门店活动</td><td class="r">118</td><td class="r">₱3,540</td><td class="r">₱30</td><td class="r">3.6%</td><td><span class="tag brand">商家</span></td></tr>
+            <tr><td>商家无门槛券</td><td class="r">41</td><td class="r">₱820</td><td class="r">₱20</td><td class="r">0.8%</td><td><span class="tag brand">商家</span></td></tr>
+            <tr><td>商家满减券</td><td class="r">26</td><td class="r">₱1,040</td><td class="r">₱40</td><td class="r">1.1%</td><td><span class="tag brand">商家</span></td></tr>
+            <tr><td>满减配送费券</td><td class="r">33</td><td class="r">₱1,320</td><td class="r">₱40</td><td class="r">1.3%</td><td><span class="tag brand">商家</span></td></tr>
+            <tr><td><b class="pl">平台无门槛券</b></td><td class="r">57</td><td class="r pl">₱1,425</td><td class="r">₱25</td><td class="r">1.4%</td><td><span class="tag plat">平台</span></td></tr>
+            <tr class="total"><td>合计</td><td class="r">164 单用了优惠</td><td class="r">₱8,145</td><td class="r">₱50</td><td class="r">8.3%</td><td class="small">商家 ₱6,720 · 平台 ₱1,425</td></tr>
+          </table></div>
+          <div class="muted small" style="margin-top:6px">一单可以同时用几种优惠，所以各行单数加起来比 164 多。</div>
+        </div>
+        <div style="display:grid;gap:14px;align-content:start">
+          <div class="panel" style="padding:14px 16px"><h2>复购礼券效果</h2>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px">
+              <div><div class="muted small">送出</div><div class="b num" style="font-size:19px">128</div></div>
+              <div><div class="muted small">已用</div><div class="b num" style="font-size:19px">41</div></div>
+              <div><div class="muted small">用券率</div><div class="b num" style="font-size:19px;color:var(--ok)">32%</div></div>
+              <div><div class="muted small">带来菜品金额</div><div class="b num" style="font-size:19px">₱12,710</div></div>
+            </div></div>
+          <div class="panel" style="padding:14px 16px"><h2 style="margin-bottom:10px">平台券补贴结算</h2>
+            <div class="wrap"><table class="t">
+              <tr><th>月份</th><th class="r">单数</th><th class="r">金额</th><th>状态</th></tr>
+              <tr><td>2026-11</td><td class="r">57</td><td class="r pl">₱1,425</td><td><span class="tag">本月进行中</span><div class="sub">12 月 1 日出结算单</div></td></tr>
+              <tr><td>2026-10</td><td class="r">49</td><td class="r pl">₱1,225</td><td><span class="tag ok">已付款</span><div class="sub">11-05 · 转账单号 BPI-2611050231</div></td></tr>
+            </table></div>
+            <div class="row" style="margin-top:8px;gap:8px"><a class="btn small">查看结算单</a><a class="btn small">有疑问，联系平台</a></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="caption"><b>账单 · 汇总：</b>每种优惠一行，写用了多少单、减了多少、谁承担；右边是复购礼券的效果和平台券补贴结算单的状态。</div>
+</section>
+
+<!-- ============ 6 平台后台：平台券 + 补贴结算 ============ -->
+<section id="admin">
+  <div class="pc admin">
+    <div class="pc-nav"><b>平台后台</b><span>总览</span><span>API</span><span>商户</span><span>商品</span><span>顾客服务</span><span>商城</span><span>客服</span><span class="on">平台券<i class="new">新</i></span><span>账单<i class="new">新</i></span><span>Worker</span><span>设置</span><span class="me">管理员 ▾</span></div>
+    <div class="pc-body">
+      <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+        <div class="kpi hl"><div class="l">本月平台券花费</div><div class="v">₱4,960</div><div class="d">已完成订单里用掉的平台券</div></div>
+        <div class="kpi"><div class="l">本月用券订单</div><div class="v">198</div><div class="d">占全平台完成订单 14%</div></div>
+        <div class="kpi"><div class="l">已发出未使用</div><div class="v">731 张</div><div class="d">最多还会花 ₱18,275</div></div>
+        <div class="kpi" style="border-color:#f0d9a8;background:#fffaf0"><div class="l">待付款结算单</div><div class="v" style="color:var(--warn)">2 张</div><div class="d">10 月 · 合计 ₱2,825</div></div>
+      </div>
+      <div class="panel">
+        <div class="row between" style="margin-bottom:10px"><h2>平台券</h2><a class="btn primary">＋ 新建一批平台券</a></div>
+        <div class="wrap"><table class="t">
+          <tr><th>名称</th><th class="r">面额</th><th>发放方式</th><th>适用店铺</th><th>有效期</th><th class="r">已发</th><th class="r">已用</th><th class="r">已花费 / 预算</th><th>状态</th><th></th></tr>
+          <tr><td><b>平台新客券</b></td><td class="r">₱25</td><td>新顾客第一次登录自动发</td><td>所有比索店铺</td><td>领到后 14 天</td><td class="r">1,240</td><td class="r">486</td><td class="r">₱12,150 / ₱30,000<div style="height:5px;background:#eee;border-radius:3px;margin-top:4px"><i style="display:block;height:5px;width:40%;background:var(--plat);border-radius:3px"></i></div></td><td><span class="tag ok">发放中</span></td><td class="r"><a class="btn small">暂停</a></td></tr>
+          <tr><td><b>客诉补偿</b></td><td class="r">₱30</td><td>手工发给指定手机号</td><td>所有比索店铺</td><td>领到后 30 天</td><td class="r">18</td><td class="r">9</td><td class="r">₱270 / ₱3,000</td><td><span class="tag ok">发放中</span></td><td class="r"><a class="btn small">再发几张</a></td></tr>
+          <tr><td><b>雨季关怀</b></td><td class="r">₱20</td><td>手工发给全部顾客</td><td>除了 BGC 轻食</td><td>2026-10-01 至 10-31</td><td class="r">2,600</td><td class="r">412</td><td class="r">₱8,240 / ₱10,000</td><td><span class="tag">已结束</span></td><td></td></tr>
+        </table></div>
+      </div>
+      <div class="panel">
+        <div class="row between" style="margin-bottom:10px"><h2>平台券补贴结算单</h2><div class="row" style="gap:8px"><span class="sel">2026-10</span><span class="sel">全部状态</span><a class="btn">导出 Excel</a></div></div>
+        <div class="wrap"><table class="t">
+          <tr><th>结算单号</th><th>店铺</th><th>月份</th><th class="r">完成订单</th><th class="r">平台应补</th><th>状态</th><th>付款日期 / 转账单号</th><th></th></tr>
+          <tr><td>ST-202610-003</td><td><b>奎松美食坊</b></td><td>2026-10</td><td class="r">82</td><td class="r pl">₱2,050</td><td><span class="tag warn">待付款</span></td><td class="muted">—</td><td class="r"><a class="btn small">明细</a> <a class="btn small primary">标记已付款</a></td></tr>
+          <tr><td>ST-202610-002</td><td><b>BGC 轻食</b></td><td>2026-10</td><td class="r">31</td><td class="r pl">₱775</td><td><span class="tag warn">待付款</span></td><td class="muted">—</td><td class="r"><a class="btn small">明细</a> <a class="btn small primary">标记已付款</a></td></tr>
+          <tr><td>ST-202610-001</td><td><b>马卡蒂小馆</b></td><td>2026-10</td><td class="r">49</td><td class="r pl">₱1,225</td><td><span class="tag ok">已付款</span></td><td>2026-11-05 · BPI-2611050231</td><td class="r"><a class="btn small">明细</a></td></tr>
+        </table></div>
+        <div class="muted small" style="margin-top:6px">每月 1 号按门店当地时间生成上个月的结算单，只算已完成订单。平台线下转账后在这里标记，商家账单页同步显示“已付款”。</div>
+      </div>
+    </div>
+  </div>
+  <div class="caption"><b>平台后台：</b>新增“平台券”（建券、新客自动发、手工发、预算）和“账单”（每月给每家店出平台券补贴结算单，转账后标记已付款）。</div>
+</section>
+</body>
+</html>
