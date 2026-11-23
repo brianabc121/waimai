@@ -113,8 +113,14 @@ func TestCustomerCenterOverHTTP(t *testing.T) {
 	}
 
 	// an application to open a store
-	app1 := map[string]string{"store_name": "阿红小馆", "contact_name": "阿红", "phone": "0917 555 0000", "city": "Makati"}
+	app1 := map[string]any{"store_name": "阿红小馆", "contact_name": "阿红", "phone": "0917 555 0000", "city": "Makati",
+		"country_code": "ph", "country": "Philippines", "province": "Metro Manila", "district": "Poblacion",
+		"place_name": "Greenbelt 3", "place_address": "Ayala Center, Makati", "unit": "2F 铺位 12", "lat": 14.5528, "lng": 121.0213}
 	cust.want(422, "VALIDATION", "POST", "/customer/applications", map[string]string{"store_name": "x"})
+	// where the store is: a point on the map, or at least a city typed by hand
+	cust.want(422, "VALIDATION", "POST", "/customer/applications", map[string]any{"store_name": "x", "contact_name": "y", "phone": "1"})
+	cust.want(422, "VALIDATION", "POST", "/customer/applications", map[string]any{"store_name": "x", "contact_name": "y", "phone": "1", "lat": 14.5})
+	cust.want(422, "VALIDATION", "POST", "/customer/applications", map[string]any{"store_name": "x", "contact_name": "y", "phone": "1", "lat": 95, "lng": 121})
 	ap := cust.want(200, "", "POST", "/customer/applications", app1)
 	cust.want(409, "APPLICATION_PENDING", "POST", "/customer/applications", app1)
 	admin.want(422, "VALIDATION", "POST", fmt.Sprintf("/admin/applications/%v/decide", ap["id"]), map[string]string{"status": "rejected"})
@@ -123,6 +129,9 @@ func TestCustomerCenterOverHTTP(t *testing.T) {
 	aps := list(cust.want(200, "", "GET", "/customer/applications", nil), "applications")
 	if len(aps) != 1 || aps[0].(map[string]any)["status"] != "approved" {
 		t.Fatalf("my applications: %v", aps)
+	}
+	if a := aps[0].(map[string]any); a["country_code"] != "PH" || a["province"] != "Metro Manila" || a["unit"] != "2F 铺位 12" || a["lat"] != 14.5528 || a["lng"] != 121.0213 {
+		t.Fatalf("where the store is: %v", a)
 	}
 
 	// the wallet is a ledger only the platform writes
