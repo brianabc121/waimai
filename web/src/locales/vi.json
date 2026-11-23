@@ -2057,5 +2057,7 @@
  "mtr.store_banner": "Có {n} bản dịch tự động thông tin cửa hàng đang chờ bạn xác nhận.",
  "mtr.store_go": "Kiểm tra",
  "mtr.store_notice": "Thông báo",
- "mtr.store_intro": "Giới thiệu cửa hàng"
+ "mtr.store_intro": "Giới thiệu cửa hàng",
+ "zawgyi_confirm": "Đoạn tiếng Miến Điện này có vẻ được gõ bằng mã Zawgyi cũ: \"{text}\". Nó sẽ hiển thị lỗi trên điện thoại khác và không dịch được. Hãy gõ lại bằng bàn phím Miến Điện Unicode.\n\nOK để vẫn lưu; Hủy để quay lại sửa.",
+ "zawgyi_stopped": "Chưa lưu: hãy gõ lại tiếng Miến Điện bằng bàn phím Unicode."
 }

@@ -224,3 +224,56 @@ func TestStoreTexts(t *testing.T) {
 		t.Fatal("a Thai store name should be refused")
 	}
 }
+
+// The mall's categories and banners are translated into every language.
+func TestPlatformTranslation(t *testing.T) {
+	need(t)
+	ctx := context.Background()
+	a := app.New(testApp.DB, "test-secret")
+	a.Translator = &markTranslator{}
+	var bid int64
+	noErr(t, a.DB.QueryRow(ctx, `INSERT INTO mall_banners (title, subtitle, sort, active) VALUES ('新店开业', '满减', 99, true)
+		RETURNING id`).Scan(&bid))
+	t.Cleanup(func() { _, _ = a.DB.Exec(ctx, `DELETE FROM mall_banners WHERE id=$1`, bid) })
+	noErr(t, a.TranslatePlatform(ctx, false))
+
+	home := func(lang string) *app.MallHome {
+		h, err := a.MallHome(ctx)
+		noErr(t, err)
+		noErr(t, a.LocalizeMallHome(ctx, h, lang))
+		return h
+	}
+	h := home("th")
+	var ban *app.MallBanner
+	for i := range h.Banners {
+		if h.Banners[i].ID == bid {
+			ban = &h.Banners[i]
+		}
+	}
+	if ban == nil || ban.TitleTr != "th:新店开业" || ban.SubtitleTr != "th:满减" {
+		t.Fatalf("thai banner %+v", ban)
+	}
+	if len(h.Categories) == 0 || h.Categories[0].NameTr != "th:"+h.Categories[0].Name {
+		t.Fatalf("thai category %+v", h.Categories)
+	}
+	// English typed by the platform is used as it is
+	for _, c := range home("en").Categories {
+		if c.NameEn != "" && c.NameTr != c.NameEn {
+			t.Fatalf("english category %q, typed %q", c.NameTr, c.NameEn)
+		}
+	}
+	for _, b := range home("zh").Banners {
+		if b.TitleTr != "" {
+			t.Fatalf("the original language got %q", b.TitleTr)
+		}
+	}
+	// a deleted banner loses its translations
+	_, err := a.DB.Exec(ctx, `DELETE FROM mall_banners WHERE id=$1`, bid)
+	noErr(t, err)
+	noErr(t, a.TranslatePlatform(ctx, false))
+	var n int
+	noErr(t, a.DB.QueryRow(ctx, `SELECT count(*) FROM content_translations WHERE entity='mall_banner' AND entity_id=$1`, bid).Scan(&n))
+	if n != 0 {
+		t.Fatalf("%d translations of a deleted banner", n)
+	}
+}

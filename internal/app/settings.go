@@ -284,7 +284,7 @@ func (a *App) WatchSettings(ctx context.Context, logf func(string, ...any)) {
 		}
 		changed, err := a.SettingsChanged(ctx)
 		if err == nil && changed {
-			if err = a.ReloadSettings(ctx); err == nil {
+			if err = a.reloadKeys(ctx); err == nil {
 				logf("settings: keys changed in the back office, now in use")
 			}
 		}
@@ -292,6 +292,34 @@ func (a *App) WatchSettings(ctx context.Context, logf func(string, ...any)) {
 			logf("settings: %v", err)
 		}
 	}
+}
+
+// freshSettings reads the keys again if they were saved since, so a job right
+// after the platform set up a service uses it.
+func (a *App) freshSettings(ctx context.Context) {
+	if changed, err := a.SettingsChanged(ctx); err == nil && changed {
+		_ = a.reloadKeys(ctx)
+	}
+}
+
+// reloadKeys puts saved keys in use. When a translation service was just set
+// up or changed, the mall's own texts are translated with it.
+func (a *App) reloadKeys(ctx context.Context) error {
+	before := translatorName(a.translator())
+	if err := a.ReloadSettings(ctx); err != nil {
+		return err
+	}
+	if now := translatorName(a.translator()); now != "" && now != before {
+		return a.QueueTranslatePlatform(ctx)
+	}
+	return nil
+}
+
+func translatorName(t Translator) string {
+	if t == nil {
+		return ""
+	}
+	return t.Name()
 }
 
 // SettingsChanged reports whether keys were saved since this process last read them.

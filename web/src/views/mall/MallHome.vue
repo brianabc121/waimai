@@ -8,8 +8,8 @@ import LangButton from '../LangButton.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { customer, loginRoute } from '../../customer'
-import { locale, pick, setLocale, t, sn } from '../../i18n'
-import { catName, mall, mallHome, mallName, mallStores, regionName, shortPlace, start, type MallBanner, type MallHome, type MallList, type MallStore } from '../../mall'
+import { locale, setLocale, t, sn } from '../../i18n'
+import { bannerSub, bannerTitle, catName, mall, mallHome, mallName, mallStores, regionName, shortPlace, start, type MallBanner, type MallHome, type MallList, type MallStore } from '../../mall'
 import CustomerTabs from '../me/CustomerTabs.vue'
 import { displayName, loadProfile, me } from '../me/me'
 import MallLocation from './MallLocation.vue'
@@ -85,9 +85,13 @@ const bannerStore = (b: MallBanner) => {
   return st ? sn(st) : ''
 }
 
+function loadHome() { void mallHome().then(h => { home.value = h; document.title = mallName(h) }).catch(() => null) }
+// categories and banners come in the customer's language
+watch(locale, loadHome)
+
 onMounted(async () => {
   document.title = t('ml.brand')
-  void mallHome().then(h => { home.value = h; document.title = mallName(h) }).catch(() => null)
+  loadHome()
   void loadProfile()
   timer = window.setInterval(() => { if (banners.value.length > 1) slide.value = (slide.value + 1) % banners.value.length }, 5000)
   if (loc.value) void load()
@@ -143,8 +147,8 @@ onBeforeUnmount(() => clearInterval(timer))
             <a v-for="(b, i) in banners" v-show="i === slide" :key="b.id" class="banner" :class="{ link: b.link_slug || b.link_url }" :aria-label="t('ml.banner')" @click="follow(b)">
               <img v-if="b.image_url" :src="b.image_url" alt="" />
               <div>
-                <b>{{ pick(b.title, b.title_en) }}</b>
-                <span v-if="pick(b.subtitle, b.subtitle_en)" class="ribbon">{{ pick(b.subtitle, b.subtitle_en) }}</span>
+                <b>{{ bannerTitle(b) }}</b>
+                <span v-if="bannerSub(b)" class="ribbon">{{ bannerSub(b) }}</span>
                 <em v-if="bannerStore(b)">{{ bannerStore(b) }}</em>
               </div>
             </a>

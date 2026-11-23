@@ -130,7 +130,7 @@ func loadTranslations(ctx context.Context, q Querier, branchID int64, langs []st
 	return out, rows.Err()
 }
 
-func upsertTranslation(ctx context.Context, q Querier, branchID int64, f transField, lang, text, status, provider string,
+func upsertTranslation(ctx context.Context, q Querier, branchID any, f transField, lang, text, status, provider string,
 	by *int64) error {
 	_, err := q.Exec(ctx, `INSERT INTO content_translations (entity, entity_id, field, lang, branch_id, text, status,
 			source_hash, provider, updated_by, updated_at)
@@ -182,19 +182,29 @@ func (a *App) TranslateMenu(ctx context.Context, branchID int64, force bool) err
 	if err != nil {
 		return err
 	}
+	skip := func(f transField, l string) bool {
+		return l == menuLang || (l != "en" && slices.Contains(off, l) && f.Entity != "branch") ||
+			(f.Entity == "branch" && !storeInfoLang(l))
+	}
+	return a.translateDone(ctx, branchID, a.syncTranslations(ctx, branchID, menuLang, fields, have, skip, force))
+}
+
+// syncTranslations brings the translations of fields up to date. owner is the
+// store's id, or nil for the platform's own texts.
+func (a *App) syncTranslations(ctx context.Context, owner any, from string, fields []transField,
+	have map[string]Translation, skip func(transField, string) bool, force bool) error {
 	todo := map[string][]transField{}
 	for _, f := range fields {
 		h := sourceHash(f.Text)
 		for _, l := range Langs {
-			if l == menuLang || (l != "en" && slices.Contains(off, l) && f.Entity != "branch") ||
-				(f.Entity == "branch" && !storeInfoLang(l)) {
+			if skip(f, l) {
 				continue
 			}
 			t, ok := have[f.key(l)]
-			// The English name typed on the item form is the merchant's own.
+			// The English typed on the form is the writer's own.
 			if l == "en" && f.En != "" {
 				if !ok || t.Text != f.En || t.hash != h || t.Status != "human" {
-					if err := upsertTranslation(ctx, a.DB, branchID, f, "en", f.En, "human", "", nil); err != nil {
+					if err := upsertTranslation(ctx, a.DB, owner, f, "en", f.En, "human", "", nil); err != nil {
 						return err
 					}
 				}
@@ -216,9 +226,9 @@ func (a *App) TranslateMenu(ctx context.Context, branchID int64, force bool) err
 					continue
 				}
 			}
-			if (l == "zh-Hant" && menuLang == "zh") || (l == "zh" && menuLang == "zh-Hant") {
+			if (l == "zh-Hant" && from == "zh") || (l == "zh" && from == "zh-Hant") {
 				if s := convertChinese(f.Text, l); s != "" {
-					if err := upsertTranslation(ctx, a.DB, branchID, f, l, s, "converted", "opencc", nil); err != nil {
+					if err := upsertTranslation(ctx, a.DB, owner, f, l, s, "converted", "opencc", nil); err != nil {
 						return err
 					}
 				}
@@ -229,7 +239,7 @@ func (a *App) TranslateMenu(ctx context.Context, branchID int64, force bool) err
 	}
 	tr := a.translator()
 	if tr == nil || len(todo) == 0 {
-		return a.translateDone(ctx, branchID, nil)
+		return nil
 	}
 	for _, l := range Langs {
 		list := todo[l]
@@ -239,18 +249,18 @@ func (a *App) TranslateMenu(ctx context.Context, branchID int64, force bool) err
 			for i, f := range part {
 				texts[i] = f.Text
 			}
-			out, err := tr.Translate(ctx, menuLang, l, texts)
+			out, err := tr.Translate(ctx, from, l, texts)
 			if err != nil {
-				return a.translateDone(ctx, branchID, err)
+				return err
 			}
 			for i, f := range part {
-				if err := upsertTranslation(ctx, a.DB, branchID, f, l, out[i], "machine", tr.Name(), nil); err != nil {
+				if err := upsertTranslation(ctx, a.DB, owner, f, l, out[i], "machine", tr.Name(), nil); err != nil {
 					return err
 				}
 			}
 		}
 	}
-	return a.translateDone(ctx, branchID, nil)
+	return nil
 }
 
 // translateDone notes on the store whether the last run failed, so the

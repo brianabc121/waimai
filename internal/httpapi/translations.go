@@ -36,6 +36,15 @@ func (s *Server) menuChanged(c *gin.Context) {
 	}
 }
 
+// platformChanged queues translating the mall's categories and banners after
+// the platform changes them.
+func (s *Server) platformChanged(c *gin.Context) {
+	c.Next()
+	if c.Writer.Status() < 300 {
+		_ = s.App.QueueTranslatePlatform(c)
+	}
+}
+
 func (s *Server) translationRoutes(auth, admin *gin.RouterGroup) {
 	// the merchant's own store
 	auth.GET("/merchant/branches/:bid/translations", s.withBranch(managerRoles, s.getTranslations))

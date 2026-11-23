@@ -71,9 +71,9 @@ async function saved() { form.open = false; await load() }
 
 <template>
   <div class="page stack">
-    <div class="row between">
+    <div class="row between wrap">
       <h1>{{ t('menu_admin') }}</h1>
-      <div class="row" v-if="manager">
+      <div class="row wrap" v-if="manager">
         <button class="btn" :title="t('mtr.open_hint')" data-testid="open-langs" @click="showLangs(null)">{{ t('mtr.open') }}</button>
         <button class="btn" data-testid="open-import" @click="importing = true">{{ t('import_excel') }}</button>
         <button class="btn" @click="newCategory">{{ t('new_category') }}</button>

@@ -116,6 +116,18 @@ await th.fill(tid('mall-search'), 'ไก่ป๊อป'); await th.keyboard.pr
 await th.locator('text=ไก่ป๊อป').first().waitFor()
 step('the mall search finds the dish by its Thai name')
 
+// the mall's own categories follow once the platform has a translation service
+let cat = null
+for (let i = 0; i < 90 && !cat; i++) {
+  const h = await (await th.request.get(BASE + '/api/v1/mall/home?lang=th')).json()
+  cat = h.categories.find(c => (c.name_tr || '').startsWith('[th] '))
+  if (!cat) await th.waitForTimeout(1000)
+}
+expect(cat, 'the mall categories were not translated into Thai')
+await th.goto(BASE + '/'); await th.waitForSelector(tid('mall-search'))
+await th.locator(`text=${cat.name_tr}`).filter({ visible: true }).first().waitFor()
+step('the mall categories are shown in Thai')
+
 // store details: Traditional Chinese is filled in and waits for the owner to confirm
 const H = { headers: { 'X-Requested-With': 'waimai-web' } }
 await own.request.put(BASE + '/api/v1/merchant/branches/2/store-texts', { ...H, data: { field: 'name', lang: 'zh-Hant', text: '' } })

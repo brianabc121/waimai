@@ -109,6 +109,8 @@
 "pp.me":"用我現在的位置",
 "pp.me_denied":"沒有拿到定位，請在地圖上手動選位置",
 "pp.to_pickup":"改為到店自取",
+"zawgyi_confirm":"這段緬甸文看起來是舊的 Zawgyi 編碼：“{text}”。其他手機上會顯示成亂碼，翻譯也會出錯。建議換成緬甸文 Unicode 輸入法重新輸入。\n\n點“確定”照樣儲存，點“取消”回去修改。",
+"zawgyi_stopped":"已取消儲存：請用 Unicode 輸入法重新輸入緬甸文。",
 "bl.nav":"賬單",
 "bl.tab_orders":"訂單明細",
 "bl.tab_sum":"彙總",

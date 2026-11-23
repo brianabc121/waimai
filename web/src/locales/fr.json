@@ -2057,5 +2057,7 @@
  "mtr.store_banner": "{n} traductions automatiques des infos du restaurant attendent votre confirmation.",
  "mtr.store_go": "Vérifier",
  "mtr.store_notice": "Annonce",
- "mtr.store_intro": "À propos du restaurant"
+ "mtr.store_intro": "À propos du restaurant",
+ "zawgyi_confirm": "Ce texte birman semble saisi avec l’ancien encodage Zawgyi : « {text} ». Il s’affiche en caractères illisibles sur les autres téléphones et ne peut pas être traduit. Saisissez-le de nouveau avec un clavier birman Unicode.\n\nOK enregistre quand même ; Annuler permet de corriger.",
+ "zawgyi_stopped": "Non enregistré : saisissez de nouveau le birman avec un clavier Unicode."
 }

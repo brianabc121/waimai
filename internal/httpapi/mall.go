@@ -22,6 +22,9 @@ func (s *Server) mallRoutes(api *gin.RouterGroup) {
 
 func (s *Server) mallHome(c *gin.Context) {
 	h, err := s.App.MallHome(c)
+	if err == nil {
+		err = s.App.LocalizeMallHome(c, h, reqLang(c))
+	}
 	reply(c, h, err)
 }
 
@@ -91,10 +94,10 @@ func (s *Server) saveMallListing(c *gin.Context) {
 func (s *Server) mallAdminRoutes(admin *gin.RouterGroup) {
 	admin.GET("/mall", s.adminMall)
 	admin.PUT("/mall/stores/:id", s.adminHideStore)
-	admin.PUT("/mall/categories/:id", s.adminSaveMallCategory)
-	admin.POST("/mall/banners", s.adminSaveBanner)
-	admin.PUT("/mall/banners/:id", s.adminSaveBanner)
-	admin.DELETE("/mall/banners/:id", s.adminDeleteBanner)
+	admin.PUT("/mall/categories/:id", s.platformChanged, s.adminSaveMallCategory)
+	admin.POST("/mall/banners", s.platformChanged, s.adminSaveBanner)
+	admin.PUT("/mall/banners/:id", s.platformChanged, s.adminSaveBanner)
+	admin.DELETE("/mall/banners/:id", s.platformChanged, s.adminDeleteBanner)
 	admin.POST("/mall/banners/:id/image", s.adminBannerImage)
 	admin.DELETE("/mall/banners/:id/image", s.adminBannerImage)
 }

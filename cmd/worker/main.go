@@ -27,5 +27,9 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 	go a.WatchSettings(ctx, log.Printf)
+	// the mall's own texts, in case they changed before translation was set up
+	if err := a.QueueTranslatePlatform(ctx); err != nil {
+		log.Printf("translate platform: %v", err)
+	}
 	a.RunWorker(ctx, log.Printf, false)
 }

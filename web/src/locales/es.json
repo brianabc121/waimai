@@ -2057,5 +2057,7 @@
  "mtr.store_banner": "Hay {n} traducciones automáticas de los datos de tu tienda esperando tu confirmación.",
  "mtr.store_go": "Revisar",
  "mtr.store_notice": "Aviso",
- "mtr.store_intro": "Sobre la tienda"
+ "mtr.store_intro": "Sobre la tienda",
+ "zawgyi_confirm": "Este texto en birmano parece escrito con la antigua codificación Zawgyi: \"{text}\". Se ve ilegible en otros teléfonos y no se puede traducir. Escríbelo de nuevo con un teclado birmano Unicode.\n\nAceptar lo guarda igualmente; Cancelar vuelve para corregirlo.",
+ "zawgyi_stopped": "No se guardó: escribe de nuevo el birmano con un teclado Unicode."
 }

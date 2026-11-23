@@ -7,7 +7,7 @@
 import { computed } from 'vue'
 import { money, pick, promoLabel, t, mn, sn } from '../../i18n'
 import { cart, useCart } from '../../cart'
-import { cartCount, distanceText, type MallCategory, type MallStore } from '../../mall'
+import { cartCount, catName, distanceText, type MallCategory, type MallStore } from '../../mall'
 
 const props = defineProps<{ store: MallStore; categories: MallCategory[] }>()
 
@@ -15,7 +15,7 @@ const s = computed(() => props.store)
 const open = computed(() => s.value.status === 'open')
 const inCart = computed(() => cartCount(s.value.slug))
 const kinds = computed(() => s.value.categories
-  .map(code => props.categories.find(c => c.code === code)).filter((c): c is MallCategory => !!c).map(c => pick(c.name, c.name_en)).join(' · '))
+  .map(code => props.categories.find(c => c.code === code)).filter((c): c is MallCategory => !!c).map(catName).join(' · '))
 const shut = computed(() => s.value.status === 'paused' ? t('ml.paused') : t('ml.closed'))
 const opens = computed(() => s.value.status === 'closed' && s.value.opens_at
   ? t(s.value.opens_tomorrow ? 'ml.opens_tomorrow' : 'ml.opens_today', { t: s.value.opens_at }) : '')

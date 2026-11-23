@@ -141,6 +141,7 @@ func (a *App) runJob(ctx context.Context, j *claimedJob) error {
 		}
 		return a.parseMenuImport(ctx, p.ID)
 	case "translate_menu":
+		a.freshSettings(ctx)
 		var p translateJob
 		if err := json.Unmarshal(j.Payload, &p); err != nil {
 			return err
@@ -148,6 +149,11 @@ func (a *App) runJob(ctx context.Context, j *claimedJob) error {
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 		defer cancel()
 		return a.TranslateMenu(ctx, p.BranchID, p.Force)
+	case "translate_platform":
+		a.freshSettings(ctx)
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+		defer cancel()
+		return a.TranslatePlatform(ctx, false)
 	default:
 		return fmt.Errorf("unknown job kind %q", j.Kind)
 	}

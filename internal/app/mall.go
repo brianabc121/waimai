@@ -37,6 +37,8 @@ type MallCategory struct {
 	Icon   string `json:"icon"`
 	Sort   int    `json:"sort"`
 	Active bool   `json:"active"`
+	// NameTr is the name in the customer's language, where it differs.
+	NameTr string `json:"name_tr,omitempty" db:"-"`
 }
 
 // MallBanner is a banner at the top of the marketplace.
@@ -51,6 +53,8 @@ type MallBanner struct {
 	ImageURL   string `json:"image_url"`
 	Sort       int    `json:"sort"`
 	Active     bool   `json:"active"`
+	TitleTr    string `json:"title_tr,omitempty"`
+	SubtitleTr string `json:"subtitle_tr,omitempty"`
 }
 
 // MallDelivery is what delivery to the customer's spot costs at one store.
