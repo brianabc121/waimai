@@ -120,7 +120,7 @@ export interface StoreMember {
   expires_at: string | null; created_at: string
   stats?: { week: number; month: number; quarter: number; orders: number; spent: number; last_at: string | null; favorites: string[] }
 }
-export interface AddressHint { line: string; unit: string; note: string; lat: number | null; lng: number | null; mine: boolean; zone_name: string; fee: number | null }
+export interface AddressHint { line: string; unit: string; note: string; lat: number | null; lng: number | null; mine: boolean; kind?: 'mine' | 'book' | 'store'; zone_name: string; fee: number | null }
 export interface TableDevice { id: number; name: string; paired: boolean; paired_at: string | null }
 export interface TableSummary { id: number; order_id: number; public_no: string; guests: number; opened_at: string; total: number; item_count: number; unserved: number }
 export interface DiningTable { id: number; name: string; qr_token: string; active: boolean; sort: number; session: TableSummary | null; devices: TableDevice[] }

@@ -2156,7 +2156,7 @@
  "vo.zone": "Zona",
  "vo.promo": "Oferta",
  "vo.fee_set": "ajustada",
- "vo.addr_ph": "Escribe la dirección; se sugieren direcciones ya entregadas",
+ "vo.addr_ph": "Escribe la dirección; primero se sugiere la libreta de direcciones",
  "vo.unit_ph": "Piso, puerta (opcional)",
  "vo.pinned": "Ubicado en el mapa",
  "vo.not_pinned": "Aún no está en el mapa: pulsa \"Abrir mapa\"",
@@ -2284,5 +2284,15 @@
  "sm.a.saved": "Guardada por el personal",
  "sm.a.more": "+{n}",
  "sm.a.more_title": "Hay más direcciones: abre los detalles",
- "sm.a.hint": "Cada dirección nueva usada en un pedido o guardada para el miembro se conserva aquí, una sola vez. Aparecen primero al escribir una dirección para este miembro."
+ "sm.a.hint": "Cada dirección nueva usada en un pedido o guardada para el miembro se conserva aquí, una sola vez. Aparecen primero al escribir una dirección para este miembro.",
+ "vo.hints_book": "Libreta de direcciones",
+ "vo.hints_google": "Sugerencias de Google",
+ "vo.more": "Más…",
+ "vo.more_hint": "Ve aquí para cargar sugerencias de Google",
+ "vo.more_loading": "Cargando sugerencias de Google…",
+ "vo.more_none": "Google no encontró nada: pulsa \"Abrir mapa\" y coloca el pin",
+ "vo.view": "🔍 Ver",
+ "vo.view_short": "Ver",
+ "vo.view_hint": "Abrir este punto en Google Maps en una ventana nueva",
+ "vo.view_none": "Aún sin ubicación: elige una sugerencia o pulsa \"Abrir mapa\""
 }

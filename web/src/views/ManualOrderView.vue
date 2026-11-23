@@ -12,6 +12,7 @@ import { currentRole, session } from '../session'
 import { dialOf, e164, localDigits, splitPhone } from '../dial'
 import type { AddressHint, Item, OptionGroup, Order, Quote, Storefront, StoreMember } from '../types'
 import type { Picked } from './PlacePicker.vue'
+import { googleMapsLink, mapsKey, suggestPlaces, type Place } from '../maps'
 import './manualStrings'
 
 const PlacePicker = defineAsyncComponent(() => import('./PlacePicker.vue'))
@@ -232,24 +233,90 @@ const listMode = computed(() => store.value?.branch.zone_mode === 'list')
 const feeOverride = ref<number | null>(null)
 const picking = ref(false)
 const hintsOpen = ref(false), hints = ref<AddressHint[]>([])
-let hintTimer = 0
+let hintTimer = 0, hintSeq = 0
+// The address box offers, in order: this number's own addresses, the
+// platform's address book (this store's region), the store's past deliveries,
+// and last "More": Google's suggestions, fetched only once staff move onto it,
+// since every Google lookup is paid for.
+const mapKey = ref('')
+onMounted(() => { void mapsKey().then(k => (mapKey.value = k)) })
+const gq = reactive({ list: [] as Place[], loading: false, asked: '' })
+type Row = { k: 'hint'; h: AddressHint; head?: string } | { k: 'more' } | { k: 'google'; p: Place; head?: string }
+const HEADS: Record<string, string> = { mine: 'vo.hints_mine', book: 'vo.hints_book', store: 'vo.hints_store' }
+const rows = computed<Row[]>(() => {
+  const out: Row[] = []
+  for (const kind of ['mine', 'book', 'store']) {
+    hints.value.filter(h => (h.kind ?? (h.mine ? 'mine' : 'store')) === kind)
+      .forEach((h, i) => out.push({ k: 'hint', h, head: i === 0 ? t(HEADS[kind]) : undefined }))
+  }
+  if (mapKey.value && f.line.trim()) {
+    out.push({ k: 'more' })
+    gq.list.forEach((p, i) => out.push({ k: 'google', p, head: i === 0 ? t('vo.hints_google') : undefined }))
+  }
+  return out
+})
+const hintAt = ref(-1)
 function lineInput() {
   // a typed address is no longer where the pin is
   f.lat = f.lng = null
+  gq.list = []; gq.asked = ''; hintAt.value = -1
   clearTimeout(hintTimer)
   hintTimer = window.setTimeout(loadHints, 250)
 }
 async function loadHints() {
+  const n = ++hintSeq
   const r = await get<{ addresses: AddressHint[] }>(`${base}/address-hints?q=${encodeURIComponent(f.line.trim())}&phone=${encodeURIComponent(phoneE164.value)}`)
     .catch(() => ({ addresses: [] }))
+  if (n !== hintSeq) return
   hints.value = r.addresses
   // only while the address is still being typed in
   hintsOpen.value = document.activeElement?.getAttribute('data-testid') === 'mo-address'
+}
+// "More" was reached: ask Google once for what is typed now.
+async function loadGoogle() {
+  const q = f.line.trim()
+  if (!mapKey.value || !q || gq.asked === q) return
+  gq.asked = q; gq.loading = true
+  const b = store.value?.branch
+  const near = b?.lat != null && b?.lng != null ? [b.lat, b.lng] as [number, number] : undefined
+  const list = await suggestPlaces(mapKey.value, q, { country: b?.country_code || undefined, near }).catch(() => [])
+  if (gq.asked !== q) return
+  gq.list = list; gq.loading = false
 }
 function useHint(h: AddressHint) {
   Object.assign(f, { line: h.line, unit: h.unit || f.unit, addrNote: h.note || f.addrNote, lat: h.lat, lng: h.lng })
   hintsOpen.value = false
 }
+async function useGoogle(p: Place) {
+  hintsOpen.value = false
+  const line = [p.label, p.detail].filter(Boolean).join(', ')
+  const at = p.at ?? await p.locate?.() ?? null
+  f.line = line.slice(0, 300)
+  f.lat = at ? at[0] : null; f.lng = at ? at[1] : null
+  gq.list = []; gq.asked = ''
+}
+function pickRow(r: Row) {
+  if (r.k === 'hint') useHint(r.h)
+  else if (r.k === 'google') void useGoogle(r.p)
+  else void loadGoogle()
+}
+function hover(i: number) {
+  hintAt.value = i
+  if (rows.value[i]?.k === 'more') void loadGoogle()
+}
+function addrKey(e: KeyboardEvent) {
+  if (!hintsOpen.value || !rows.value.length) return
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    const n = rows.value.length
+    hover(e.key === 'ArrowDown' ? (hintAt.value + 1) % n : (hintAt.value - 1 + n) % n)
+  } else if (e.key === 'Enter' && hintAt.value >= 0 && !e.isComposing) {
+    e.preventDefault()
+    const r = rows.value[hintAt.value]
+    if (r) pickRow(r)
+  } else if (e.key === 'Escape') hintsOpen.value = false
+}
+const viewLink = (lat: number | null, lng: number | null) => lat != null && lng != null ? googleMapsLink(lat, lng) : ''
 const later = (fn: () => void) => setTimeout(fn, 150)
 const closeHints = () => later(() => (hintsOpen.value = false))
 const origin = location.origin
@@ -521,6 +588,9 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
           <div class="sec"><span class="k">{{ t('vo.address') }} <i v-if="service === 'delivery'" class="req">*</i></span>
             <div class="btnrow rel">
               <button class="btn blue" :disabled="service === 'pickup'" data-testid="mo-map" @click="picking = true">{{ t('vo.open_map') }}</button>
+              <a class="btn blue" :class="{ off: service === 'pickup' || f.lat == null }" data-testid="mo-view" target="_blank" rel="noopener"
+                :href="viewLink(f.lat, f.lng) || undefined" :title="f.lat == null ? t('vo.view_none') : t('vo.view_hint')"
+                @click="f.lat == null && $event.preventDefault()">{{ t('vo.view') }}</a>
               <button class="btn blue" :class="{ on: feeOverride != null }" :disabled="service === 'pickup'" data-testid="mo-fee" @click="adjustFee">{{ t('vo.fee_adjust') }}</button>
               <button class="btn blue" :class="{ on: service === 'pickup' }" data-testid="mo-pickup"
                 @click="service = service === 'pickup' ? 'delivery' : 'pickup'">{{ service === 'pickup' ? t('vo.delivery') : t('vo.pickup') }}</button>
@@ -554,19 +624,28 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
             <div class="sec rel"><span class="k kt"></span>
               <div class="grow stack0">
                 <textarea v-model="f.line" class="inp ta" rows="2" data-testid="mo-address" maxlength="300" :placeholder="t('vo.addr_ph')"
-                  @input="lineInput" @focus="loadHints" @blur="closeHints"></textarea>
+                  @input="lineInput" @focus="loadHints" @blur="closeHints" @keydown="addrKey"></textarea>
                 <input v-model="f.unit" class="inp" maxlength="100" :placeholder="t('vo.unit_ph')" />
                 <div class="small" :class="f.lat != null ? 'okc' : 'muted'">{{ f.lat != null ? '📍 ' + t('vo.pinned') : t('vo.not_pinned') }}</div>
               </div>
-              <div v-if="hintsOpen && hints.length" class="drop" style="left:80px;right:0;top:64px" data-testid="mo-hints">
-                <template v-for="mine in [true, false]" :key="String(mine)">
-                  <template v-if="hints.some(h => h.mine === mine)">
-                    <div class="grp">{{ mine ? t('vo.hints_mine') : t('vo.hints_store') }}</div>
-                    <div v-for="(h, i) in hints.filter(h => h.mine === mine)" :key="i" class="it" @mousedown.prevent="useHint(h)">
-                      <span class="grow">{{ h.line }}<span v-if="h.unit" class="muted">，{{ h.unit }}</span></span>
-                      <span v-if="h.zone_name" class="tag bad">{{ h.zone_name }}</span>
-                    </div>
-                  </template>
+              <div v-if="hintsOpen && rows.length" class="drop" style="left:80px;right:0;top:64px" data-testid="mo-hints">
+                <template v-for="(r, i) in rows" :key="i">
+                  <div v-if="r.k !== 'more' && r.head" class="grp">{{ r.head }}</div>
+                  <div v-if="r.k === 'hint'" class="it" :class="{ on: i === hintAt }" :data-kind="r.h.kind" data-testid="mo-hint"
+                    @mousedown.prevent="pickRow(r)" @mouseenter="hover(i)">
+                    <span class="grow">{{ r.h.line }}<span v-if="r.h.unit" class="muted">，{{ r.h.unit }}</span></span>
+                    <span v-if="r.h.zone_name" class="tag bad">{{ r.h.zone_name }}</span>
+                    <a v-if="r.h.lat != null" class="look" :href="viewLink(r.h.lat, r.h.lng)" target="_blank" rel="noopener"
+                      @mousedown.stop @click.stop>{{ t('vo.view_short') }}</a>
+                  </div>
+                  <div v-else-if="r.k === 'more'" class="it more" :class="{ on: i === hintAt }" data-testid="mo-more"
+                    @mousedown.prevent="pickRow(r)" @mouseenter="hover(i)">
+                    <span class="grow">{{ t('vo.more') }}</span>
+                    <span class="muted small">{{ gq.loading ? t('vo.more_loading') : gq.asked && !gq.list.length ? t('vo.more_none') : t('vo.more_hint') }}</span>
+                  </div>
+                  <div v-else class="it" :class="{ on: i === hintAt }" data-testid="mo-google" @mousedown.prevent="pickRow(r)" @mouseenter="hover(i)">
+                    <span class="grow">{{ r.p.label }}<span v-if="r.p.detail" class="muted"> · {{ r.p.detail }}</span></span>
+                  </div>
                 </template>
                 <div class="hint">{{ t('vo.hints_map') }}</div>
               </div>
@@ -744,6 +823,9 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 .drop .it.off { opacity: .5; }
 .drop .it em { font-style: normal; color: var(--brand-dark); font-weight: 700; }
 .drop .grp { padding: 4px 12px; background: var(--row); font-size: 11.5px; color: var(--muted); font-weight: 700; }
+.drop .it.more { color: var(--brand-dark); font-weight: 700; border-top: 1px dashed var(--edge); }
+.drop .it .look { font-size: 12px; white-space: nowrap; }
+.btnrow a.btn.off { opacity: .45; cursor: not-allowed; }
 .drop .hint { padding: 6px 12px; font-size: 12px; color: var(--muted); background: var(--paper); }
 .pick .inp { background: #fff; border-color: var(--brand); font-weight: 700; font-size: 15px; }
 .pickhint { padding-inline-start: 80px; }

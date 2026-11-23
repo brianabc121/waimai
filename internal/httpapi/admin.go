@@ -70,6 +70,7 @@ func (s *Server) adminRoutes(admin *gin.RouterGroup) {
 	admin.GET("/members/:id/orders", s.adminMemberOrders)
 	admin.PUT("/members/:id", s.adminSaveMember)
 	admin.DELETE("/members/:id/addresses/:aid", s.adminDeleteMemberAddress)
+	s.addressBookRoutes(admin)
 	admin.GET("/branches/:bid/menu", s.adminBranchMenu)
 	admin.POST("/branches/:bid/categories", s.menuChanged, s.adminSaveCategory)
 	admin.PUT("/branches/:bid/categories/:id", s.menuChanged, s.adminSaveCategory)

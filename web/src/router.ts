@@ -70,6 +70,7 @@ export const router = createRouter({
         { path: 'items', component: () => import('./views/admin/AdminItems.vue'), meta: { title: 'ad.items' } },
         { path: 'customers', component: () => import('./views/admin/AdminCustomers.vue'), meta: { title: 'ad.customers' } },
         { path: 'members', component: () => import('./views/admin/AdminMembers.vue'), meta: { title: 'ad.members' } },
+        { path: 'addresses', component: () => import('./views/admin/AdminAddresses.vue'), meta: { title: 'ad.addresses' } },
         { path: 'mall', component: () => import('./views/admin/AdminMall.vue'), meta: { title: 'ad.mall' } },
         { path: 'coupons', component: () => import('./views/admin/AdminCoupons.vue'), meta: { title: 'ad.coupons' } },
         { path: 'bills', component: () => import('./views/admin/AdminBills.vue'), meta: { title: 'bl.nav' } },

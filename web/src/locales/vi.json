@@ -2156,7 +2156,7 @@
  "vo.zone": "Khu vực",
  "vo.promo": "Ưu đãi",
  "vo.fee_set": "đã chỉnh",
- "vo.addr_ph": "Nhập địa chỉ; sẽ gợi ý các địa chỉ đã giao trước đây",
+ "vo.addr_ph": "Nhập địa chỉ; sổ địa chỉ được gợi ý trước",
  "vo.unit_ph": "Số phòng, tầng (không bắt buộc)",
  "vo.pinned": "Đã định vị trên bản đồ",
  "vo.not_pinned": "Chưa định vị trên bản đồ: nhấn \"Mở bản đồ\"",
@@ -2284,5 +2284,15 @@
  "sm.a.saved": "Nhân viên lưu",
  "sm.a.more": "+{n}",
  "sm.a.more_title": "Còn địa chỉ khác, mở chi tiết để xem",
- "sm.a.hint": "Mỗi địa chỉ mới dùng khi đặt hộ hoặc lưu thông tin đều được giữ ở đây, trùng thì không lưu lại. Khi nhập địa chỉ cho hội viên này, chúng hiện lên trước."
+ "sm.a.hint": "Mỗi địa chỉ mới dùng khi đặt hộ hoặc lưu thông tin đều được giữ ở đây, trùng thì không lưu lại. Khi nhập địa chỉ cho hội viên này, chúng hiện lên trước.",
+ "vo.hints_book": "Sổ địa chỉ",
+ "vo.hints_google": "Gợi ý từ Google",
+ "vo.more": "Thêm…",
+ "vo.more_hint": "Di chuyển đến đây để tải gợi ý Google",
+ "vo.more_loading": "Đang tải gợi ý Google…",
+ "vo.more_none": "Google không tìm thấy: bấm \"Mở bản đồ\" và đặt ghim",
+ "vo.view": "🔍 Xem",
+ "vo.view_short": "Xem",
+ "vo.view_hint": "Mở vị trí này trên Google Maps trong cửa sổ mới",
+ "vo.view_none": "Chưa có tọa độ: chọn một gợi ý hoặc bấm \"Mở bản đồ\""
 }
