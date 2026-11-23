@@ -136,6 +136,10 @@ type Order struct {
 	Cash           *CashCollection `json:"cash"`
 	// Aftersale is the customer's after-sales request, nil when there is none.
 	Aftersale *Aftersale `json:"aftersale"`
+	// Discounts lists the promotion and each coupon taken off.
+	Discounts []OrderDiscount `json:"discounts"`
+	// Gift is the coupon this order earned; only the customer's order page gets it.
+	Gift *CustomerCoupon `json:"gift,omitempty"`
 	// Store is who sold it; only the customer's order page gets it.
 	Store      *OrderStore `json:"store,omitempty"`
 	tokenNonce []byte
@@ -182,10 +186,11 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	o.token_nonce, COALESCE(o.promotion_id, 0), o.promotion_name, o.promotion_name_en, o.scheduled_for, o.release_at,
 	(SELECT b.timezone FROM branches b WHERE b.id = o.branch_id), o.session_id, o.table_name, o.amount_received,
 	o.payment_note, o.dest_lat, o.dest_lng, o.zone_distance_m, o.contact_phone, o.contact_title, o.contact_wechat,
-	o.contact_telegram, o.contact_line, o.contact_whatsapp, EXISTS (SELECT 1 FROM customer_address_photos p WHERE p.address_id = o.address_id)`
+	o.contact_telegram, o.contact_line, o.contact_whatsapp, EXISTS (SELECT 1 FROM customer_address_photos p WHERE p.address_id = o.address_id),
+	o.merchant_discount, o.platform_subsidy`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
-	o := &Order{Items: []OrderItem{}}
+	o := &Order{Items: []OrderItem{}, Discounts: []OrderDiscount{}}
 	t := &o.Totals
 	err := row.Scan(&o.ID, &o.MerchantID, &o.BranchID, &o.PublicNo, &o.PickupCode, &o.Channel, &o.ServiceType,
 		&o.CustomerName, &o.CustomerPhone, &o.ZoneName, &o.AddressLine, &o.AddressUnit, &o.AddressNote, &o.Note,
@@ -196,7 +201,7 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.tokenNonce, &t.PromotionID, &t.PromotionName, &t.PromotionNameEn, &o.ScheduledFor, &o.ReleaseAt,
 		&o.Timezone, &o.SessionID, &o.TableName, &o.AmountReceived, &o.PaymentNote, &o.DestLat, &o.DestLng,
 		&o.ZoneDistanceM, &o.ContactPhone, &o.ContactTitle, &o.ContactWechat, &o.ContactTelegram, &o.ContactLine,
-		&o.ContactWhatsapp, &o.AddressPhoto)
+		&o.ContactWhatsapp, &o.AddressPhoto, &t.MerchantDiscount, &t.PlatformSubsidy)
 	if err != nil {
 		return nil, err
 	}
@@ -284,6 +289,9 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 		return nil, err
 	}
 
+	if err := loadDiscounts(ctx, q, byID, ids); err != nil {
+		return nil, err
+	}
 	cash, err := queryCash(ctx, q, `c.order_id = ANY($1)`, ids)
 	if err != nil {
 		return nil, err
@@ -525,9 +533,12 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			}
 		}
 		if t.PromotionID != 0 {
-			if err := claimPromotion(ctx, tx, b.ID, t.PromotionID, orderID, phone, t.Discount); err != nil {
+			if err := claimPromotion(ctx, tx, b.ID, t.PromotionID, orderID, phone, t.PromotionDiscount); err != nil {
 				return err
 			}
+		}
+		if err := claimCoupons(ctx, tx, b, orderID, phone, cur); err != nil {
+			return err
 		}
 		var batchID int64
 		if err := tx.QueryRow(ctx, `INSERT INTO order_batches (order_id, seq) VALUES ($1, 1) RETURNING id`,
@@ -571,7 +582,11 @@ func (a *App) OrderByToken(ctx context.Context, token string) (*Order, error) {
 	if len(orders) == 0 {
 		return nil, ErrNotFound
 	}
-	return orders[0], nil
+	o := orders[0]
+	if o.Gift, err = orderGift(ctx, a.DB, o.ID); err != nil {
+		return nil, err
+	}
+	return o, nil
 }
 
 // closeOrder is shared by reject, cancel and timeout: it releases stock, marks
@@ -581,6 +596,9 @@ func (a *App) closeOrder(ctx context.Context, tx pgx.Tx, o *lockedOrder, status,
 		return err
 	}
 	if err := releasePromotion(ctx, tx, o.ID); err != nil {
+		return err
+	}
+	if err := releaseCoupons(ctx, tx, o.ID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE order_items SET prep_status='cancelled' WHERE order_id=$1`, o.ID); err != nil {

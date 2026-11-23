@@ -211,7 +211,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
               <span class="price">{{ money(it.line_total, selected.currency) }}</span>
             </div>
           </div>
-          <TotalsTable :totals="selected.totals" :currency="selected.currency" :delivery="selected.service_type === 'delivery'" />
+          <TotalsTable :totals="selected.totals" :currency="selected.currency" :delivery="selected.service_type === 'delivery'" :discounts="selected.discounts" />
 
           <div v-if="selected.delivery" class="row between">
             <span class="muted">{{ t('rider') }}</span>

@@ -54,6 +54,8 @@ export interface Totals {
   subtotal: number; packaging_fee: number; delivery_fee: number; service_charge: number
   tax_amount: number; tax_inclusive: boolean; tax_rate_bp: number; discount: number; total: number
   promotion_id: number; promotion_name: string; promotion_name_en: string
+  // the promotion's part (quotes only); the store's and the platform's parts of discount
+  promotion_discount?: number; merchant_discount: number; platform_subsidy: number
 }
 export interface LineOption { group: string; group_en: string; name: string; name_en: string; price_delta: number }
 export interface OrderItem {
@@ -95,6 +97,8 @@ export interface Order {
   accept_deadline: string; scheduled_for: string | null; release_at: string | null; timezone: string; created_at: string; items: OrderItem[]; delivery: DeliveryTask | null; cash: Cash | null
   session_id: number | null; table_name: string; amount_received: number | null; payment_note: string
   aftersale: Aftersale | null; store?: OrderStore; completed_at?: string | null
+  // the promotion and each coupon taken off; the coupon this order earned (customer page only)
+  discounts?: OrderDiscount[]; gift?: CustomerCoupon | null
 }
 export interface TableDevice { id: number; name: string; paired: boolean; paired_at: string | null }
 export interface TableSummary { id: number; order_id: number; public_no: string; guests: number; opened_at: string; total: number; item_count: number; unserved: number }
@@ -103,6 +107,7 @@ export interface Bill { session_id: number; table_id: number; table_name: string
 export interface TableAccess { slug: string; store_name: string; table_name: string; mode: 'qr' | 'ipad' }
 export interface BatchLine { item_id: number; qty: number; option_ids: number[]; note: string }
 export interface Quote { id: string; currency: string; service_type: string; zone_name: string; zone_distance_m: number | null; scheduled_for: string | null; totals: Totals; expires_at: string
+  coupons: AppliedCoupon[]; coupon_choices: CouponChoice[]
   lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string; basket?: number }[] }
 export interface ImportRow {
   line: number; category: string; name: string; name_en: string; description: string; price: number; station: string
@@ -121,3 +126,22 @@ export interface StaffMember { id: number; username: string; display_name: strin
 export interface RiderInfo extends StaffMember { lat: number | null; lng: number | null; accuracy: number | null; battery: number | null; located_at: string | null; contact: '' | 'ok' | 'none' | 'lost'; distance_m: number | null }
 export interface Tracking { active: boolean; rider_name?: string; rider_phone?: string; lat: number | null; lng: number | null; located_at: string | null; dest_lat: number | null; dest_lng: number | null; distance_m: number | null }
 export interface User { id: number; username: string; display_name: string; is_platform_admin: boolean; roles: BranchRole[] }
+
+// ---- coupons (docs/COUPON_DESIGN.md) ----
+export type CouponKind = 'store_threshold' | 'store_free' | 'store_delivery' | 'platform_free'
+export interface CustomerCoupon {
+  id: number; kind: CouponKind; issuer: 'store' | 'platform'; branch_id: number | null
+  store_slug: string; store_name: string; store_name_en: string; currency: string
+  name: string; name_en: string; value: number; threshold: number; source: string
+  issued_at: string; expires_at: string; status: 'available' | 'used' | 'expired'; used_at: string | null
+}
+export interface CouponChoice extends CustomerCoupon {
+  usable: boolean; reason: '' | 'below_threshold' | 'delivery_only' | 'no_saving'; short: number; saves: number; selected: boolean
+}
+export interface AppliedCoupon { id: number; kind: CouponKind; name: string; name_en: string; amount: number; funded_by: 'store' | 'platform' }
+export interface OrderDiscount { kind: 'promotion' | CouponKind; funded_by: 'store' | 'platform'; name: string; name_en: string; amount: number; coupon_id: number | null }
+export interface RepurchaseRule {
+  enabled: boolean; kind: CouponKind; value: number; threshold: number; valid_days: number; min_order: number
+  monthly_cap: number | null; currency: string
+  stats: { issued: number; used: number; open: number; expired: number; cost: number; sales: number }
+}

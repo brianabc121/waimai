@@ -280,3 +280,15 @@
 | 11 | 堂食能不能用券 | 不能（堂食没有顾客账号） | 堂食扫码时也要求登录 |
 | 12 | 到期提醒 | 到期前 3 天发站内消息，不发短信 | 也发短信（按条收费） |
 | 13 | 平台券能不能把顾客要付的钱减到 0 | 能，最多减到 0，多出部分作废 | 至少要付 ₱1 |
+
+## 13. 实现记录
+
+### 13.1 第一批（券底层、复购礼券、结算页用券）
+
+- 迁移 `00038_coupons.sql`：`coupon_batches`、`customer_coupons`、`order_discounts`，订单加 `merchant_discount`、`platform_subsidy`。老订单的活动优惠已补写进 `order_discounts`。
+- 订单的 `total` 仍是顾客要付的钱（骑手按它收现金），`discount` 是全部优惠之和。商家这一单的实际收入是 `total + platform_subsidy`。
+- 报价接口多了 `coupon_ids`：不传由系统选最省的组合，传空数组表示不用券。报价结果里有 `coupons`（用了哪些）和 `coupon_choices`（这家店能看到的所有券、能不能用、为什么）。下单时按报价里定下的券重算一次，券被别的单用掉就返回“金额有变化”。
+- 复购礼券在订单完成的同一个事务里发（`fulfil.go` 的自取交付和骑手送达），每人每店一张由唯一索引保证。
+- 到期提醒放在 Worker 的定时清理里（每 10 分钟），每张券只提醒一次。
+- 商家端“活动”导航改名为“优惠”，页面分“活动”“优惠券”两个标签（`/merchant/promos?tab=coupons`）。
+- 测试：`internal/app/coupon_test.go`，浏览器测试 `e2e/coupons.cjs`。

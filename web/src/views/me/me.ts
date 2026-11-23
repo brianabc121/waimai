@@ -109,7 +109,12 @@ extend({
   // offers
   'mo.title': ['我的优惠', 'My offers'], 'mo.hint': ['下面是你常去的店铺正在进行的优惠。满足条件时下单会自动使用最划算的一个，不用领取。',
     'These are the offers running at your stores. The best one that applies is used by itself at checkout.'],
-  'mo.auto': ['符合条件时，结算自动用最划算的优惠', 'The best offer applies by itself at checkout'], 'mo.no_claim': ['无需领取', 'Nothing to claim'],
+  'mo.auto': ['结算时自动帮你选最省的券', 'Checkout picks the coupons that save most'], 'mo.no_claim': ['每种券可以各用一张，一起叠加', 'One of each kind can be used together'],
+  'mo.tab_open': ['可用 ({n})', 'Usable ({n})'], 'mo.tab_used': ['已使用', 'Used'], 'mo.tab_expired': ['已过期', 'Expired'],
+  'mo.store_offers': ['店铺活动（下单自动生效，无需领取）', 'Store promotions (apply by themselves, nothing to claim)'],
+  'mo.no_coupons': ['还没有优惠券。在店里完成第一单，有的店会送你一张。', 'No coupons yet. Some stores give you one after your first order.'],
+  'mo.none_used': ['还没有用过优惠券', 'No coupons used yet'], 'mo.none_expired': ['没有过期的优惠券', 'No expired coupons'],
+  'mo.used_on': ['{d} 已使用', 'Used {d}'], 'mo.look': ['去看看', 'Look'],
   'mo.valid': ['有效期：{d}', 'Valid: {d}'], 'mo.no_end': ['未设截止日期', 'no end date'], 'mo.over': ['满 {amt} 可用', 'Over {amt}'], 'mo.any': ['无门槛', 'No minimum'],
   'mo.use': ['去使用', 'Order'], 'mo.until': ['{d} 前有效', 'Until {d}'], 'mo.daily': ['每天 {a}–{b}', 'Daily {a}–{b}'],
   'mo.delivery_only': ['仅外卖', 'Delivery only'], 'mo.pickup_only': ['仅自取', 'Pickup only'],

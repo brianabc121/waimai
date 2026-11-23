@@ -1,19 +1,30 @@
 <script setup lang="ts">
-// The offers running at the customer's stores. They apply by themselves at
-// checkout, so this page only says what there is and leads to the store.
-import { ref, watch } from 'vue'
+// The customer's coupons (usable / used / expired) and, under the usable
+// ones, the promotions their stores run, which apply by themselves.
+import { computed, ref, watch } from 'vue'
+import { get } from '../../api'
+import { couponName, couponStub, validity, whereUsable, lastDay } from '../../coupons'
 import { locale, pick, promoLabel, t } from '../../i18n'
-import type { Promotion } from '../../types'
+import type { CustomerCoupon, Promotion } from '../../types'
 import MeIntro from './MeIntro.vue'
 import MePage from './MePage.vue'
 import { describe, homeStore, me, myOffers, offerParts, type StoreOffers } from './me'
 
 const offers = ref<StoreOffers[] | null>(null)
+const coupons = ref<CustomerCoupon[] | null>(null)
 const error = ref('')
+const tab = ref<'available' | 'used' | 'expired'>('available')
 watch(() => me.profile?.id, async id => {
   if (!id) return
-  try { offers.value = await myOffers(homeStore()?.slug) } catch (e) { error.value = describe(e) }
+  try {
+    const [o, c] = await Promise.all([myOffers(homeStore()?.slug), get<{ coupons: CustomerCoupon[] }>('/customer/coupons')])
+    offers.value = o; coupons.value = c.coupons
+  } catch (e) { error.value = describe(e) }
 }, { immediate: true })
+const shown = computed(() => (coupons.value ?? []).filter(c => c.status === tab.value))
+const openCount = computed(() => (coupons.value ?? []).filter(c => c.status === 'available').length)
+// A store coupon leads to its store; a platform coupon to the marketplace.
+const useLink = (c: CustomerCoupon) => c.store_slug ? `/s/${c.store_slug}` : '/'
 
 // Who the offer is for, when it is not for every order.
 function only(p: Promotion): string {
@@ -37,8 +48,26 @@ function valid(p: Promotion): string {
       <template #icon><svg viewBox="0 0 28 24" width="40" height="34" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h21v3.500a2.5 2.5 0 0 0 0 5V18h-21v-3.500a2.5 2.5 0 0 0 0-5z" /><path d="M10 6.500v11" stroke-dasharray="1.6 2.2" /><path d="m15.5 15 4.5-6M15.8 9.600h.01M19.7 14.400h.01" /></svg></template>
     </MeIntro>
     <div v-if="error" class="banner bad">{{ error }}</div>
-    <div v-if="offers && !offers.length" class="card empty" data-testid="offers-empty">{{ t('me.no_offers') }}</div>
-    <template v-for="o in offers ?? []" :key="o.store.slug">
+    <div class="cp-tabs" role="tablist">
+      <button v-for="k in (['available', 'used', 'expired'] as const)" :key="k" type="button" role="tab" :class="{ on: tab === k }"
+        :aria-selected="tab === k" :data-testid="'coupon-tab-' + k" @click="tab = k">{{ k === 'available' ? t('mo.tab_open', { n: openCount }) : t(k === 'used' ? 'mo.tab_used' : 'mo.tab_expired') }}</button>
+    </div>
+    <div v-if="coupons && !shown.length" class="card empty" data-testid="coupons-empty">{{ t(tab === 'available' ? 'mo.no_coupons' : tab === 'used' ? 'mo.none_used' : 'mo.none_expired') }}</div>
+    <div v-for="c in shown" :key="c.id" class="coupon mine" :class="[c.kind, { gone: tab !== 'available' }]" data-testid="my-coupon">
+      <div class="stub"><b>{{ couponStub(c, c.currency)[0] }}</b><span class="small">{{ couponStub(c, c.currency)[1] }}</span></div>
+      <div class="l">
+        <b>{{ couponName(c) }}</b>
+        <span class="store"><span>{{ whereUsable(c) }}</span><em v-if="c.kind === 'store_delivery'">{{ t('mo.delivery_only') }}</em></span>
+        <span v-if="tab === 'used' && c.used_at" class="small">{{ t('mo.used_on', { d: lastDay(c.used_at) }) }}</span>
+        <span v-else class="small" :class="{ soon: tab === 'available' && validity(c).soon }">{{ validity(c).text }}</span>
+      </div>
+      <router-link v-if="tab === 'available'" :to="useLink(c)" class="use">{{ t('mo.use') }}
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg></router-link>
+    </div>
+    <template v-if="tab === 'available' && offers?.length">
+      <div class="cp-head">{{ t('mo.store_offers') }}</div>
+    </template>
+    <template v-for="o in tab === 'available' ? offers ?? [] : []" :key="o.store.slug">
       <div v-for="p in o.promotions" :key="p.id" class="coupon" :class="{ ship: p.kind === 'free_delivery' }" data-testid="offer">
         <div class="stub">
           <svg v-if="p.kind === 'free_delivery'" viewBox="0 0 28 24" width="44" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6.500h9.500v10M18.5 9.500h4l3 3.500v3.500h-2M9 16.500h6M2.5 9.500h5M4.5 12.500h4" /><circle cx="12" cy="17.5" r="1.9" /><circle cx="21" cy="17.5" r="1.9" /></svg>
@@ -59,6 +88,15 @@ function valid(p: Promotion): string {
 </template>
 
 <style scoped>
+.cp-tabs { display: flex; background: var(--paper); border-radius: 14px; padding: 4px; gap: 4px; box-shadow: 0 3px 12px rgba(90, 40, 15, .06); }
+.cp-tabs button { flex: 1; border: 0; background: none; border-radius: 10px; padding: 9px 4px; font: inherit; font-weight: 700; color: var(--muted); cursor: pointer; }
+.cp-tabs button.on { background: var(--red); color: #fff; }
+.cp-head { font-size: 13.5px; color: var(--muted); font-weight: 700; margin: 6px 4px -2px; }
+.coupon.mine .stub b { font-size: 25px; }
+.coupon.mine.store_delivery .stub { background: linear-gradient(135deg, #fdf1d6, #fbe3ad); border-right-color: #dcbf7c; color: #a8641a; }
+.coupon.mine.platform_free .stub { background: linear-gradient(135deg, #efe6ff, #e2d3fb); border-right-color: #b9a1e6; color: #5b21b6; }
+.coupon.mine.gone { opacity: .6; filter: grayscale(.6); }
+.l .soon { color: #c2410c; font-weight: 700; }
 .coupon { position: relative; display: flex; align-items: stretch; background: var(--paper); border-radius: 16px; box-shadow: 0 3px 12px rgba(90, 40, 15, .08); min-width: 0; }
 .stub { flex: none; width: 31%; min-width: 106px; max-width: 170px; display: grid; justify-items: center; align-content: center; gap: 4px; padding: 14px 6px; border-radius: 16px 0 0 16px; background: linear-gradient(135deg, #fdeae4, #f9d9d3); color: var(--red); border-right: 1.500px dashed #d9a79a; position: relative; text-align: center; }
 .coupon.ship .stub { background: linear-gradient(135deg, #fdf1d6, #fbe3ad); border-right-color: #dcbf7c; }
