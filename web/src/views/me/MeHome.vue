@@ -10,7 +10,7 @@ import { cardStatus, shortStamp } from '../../orders'
 import type { OrderCard } from '../../types'
 import CustomerFrame from './CustomerFrame.vue'
 import CustomerTabs from './CustomerTabs.vue'
-import { avatarUrl, displayName, homeStore, loadProfile, me, myOffers, offerParts, plain, type StoreOffers } from './me'
+import { avatarUrl, displayName, homeStore, loadProfile, me, myOffers, plain, type StoreOffers } from './me'
 
 const router = useRouter()
 const ready = ref(false)
@@ -26,10 +26,8 @@ const wallet = computed(() => {
 })
 const symbol = computed(() => currencySymbol(wallet.value.currency))
 const offerCount = computed(() => offers.value.reduce((n, o) => n + o.promotions.length, 0))
-// A computer has room for four offers and the latest orders; a phone shows two
-// offers, and its orders are one tap away at the bottom.
+// A computer has room for the latest orders; on a phone they are one tap away at the bottom.
 const wide = window.matchMedia('(min-width: 1024px)').matches
-const firstOffers = computed(() => offers.value.flatMap(o => o.promotions.map(p => ({ p, o }))).slice(0, wide ? 4 : 2))
 const recent = ref<OrderCard[] | null>(null)
 
 onMounted(async () => {
@@ -77,7 +75,6 @@ const more = computed<Entry[]>(() => [
    <CustomerFrame active="me">
     <header class="hero">
       <div class="tools">
-        <h1>{{ t('me.me') }}</h1>
         <button :aria-label="t('me.settings')" data-testid="me-settings" @click="go('/me/profile')">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M12 3.500l1.5 2.2 2.6-.5 1 2.5 2.5 1-.5 2.6 2.2 1.5-2.2 1.5.5 2.6-2.5 1-1 2.5-2.6-.500L12 21.500l-1.5-2.2-2.6.5-1-2.5-2.5-1 .5-2.600L2.5 12.200l2.2-1.5-.5-2.6 2.5-1 1-2.5 2.6.500z" transform="translate(-.3 -.5)" /></svg></button>
         <button :aria-label="t('me.share')" data-testid="me-share" @click="share">
@@ -104,23 +101,6 @@ const more = computed<Entry[]>(() => [
         <button class="hot" data-testid="me-coupons" @click="go('/me/coupons')"><b>{{ offerCount }}</b><span>{{ t('me.coupons') }}</span></button>
         <button data-testid="me-bonus" @click="go('/me/wallet/bonus')"><b>{{ symbol }}{{ plain(wallet.bonus) }}</b><span>{{ t('me.bonus') }}</span></button>
       </div>
-
-      <section class="offers">
-        <div class="row between"><h2>{{ t('me.my_offers') }}</h2>
-          <button class="more" @click="go('/me/coupons')">{{ t('me.more') }}
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg></button></div>
-        <p class="sub">{{ t('me.offer_strip_hint') }}</p>
-        <div v-if="!firstOffers.length" class="none">{{ t('me.no_offers') }}</div>
-        <div v-else class="tickets">
-          <router-link v-for="x in firstOffers" :key="x.p.id" :to="`/s/${x.o.store.slug}`" class="ticket" :class="{ ship: x.p.kind === 'free_delivery' }" data-testid="me-offer">
-            <b>{{ offerParts(x.p, x.o.currency).gives }}</b>
-            <svg v-if="x.p.kind === 'free_delivery'" viewBox="0 0 28 24" width="26" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6.500h9.500v10M18.5 9.500h4l3 3.500v3.500h-2M9 16.500h6M2.5 9.500h5M4.5 12.500h4" /><circle cx="12" cy="17.5" r="1.9" /><circle cx="21" cy="17.5" r="1.9" /></svg>
-            <svg v-else viewBox="0 0 28 24" width="26" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h21v3.500a2.5 2.5 0 0 0 0 5V18h-21v-3.500a2.5 2.5 0 0 0 0-5z" /><path d="M10 6.500v11" stroke-dasharray="1.6 2.2" /><path d="m15.5 15 4.5-6M15.8 9.600h.01M19.7 14.400h.01" /></svg>
-            <span>{{ offerParts(x.p, x.o.currency).when }}</span>
-            <small>{{ pick(x.o.store.name, x.o.store.name_en) }}</small>
-          </router-link>
-        </div>
-      </section>
 
       <section>
         <h2>{{ t('me.common') }}</h2>
@@ -173,8 +153,7 @@ const more = computed<Entry[]>(() => [
 .mehome { font-size: 14px; padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 24px); }
 .hero { padding: 6px 16px 66px; color: #fff; border-radius: 0 0 50% 50% / 0 0 26px 26px;
   background: radial-gradient(90% 70% at 70% 0%, rgba(255, 160, 120, .28) 0%, transparent 60%), var(--motif) 0 0 / 56px 56px, linear-gradient(180deg, var(--red-deep) 0%, #b23a2a 100%); }
-.tools { display: flex; align-items: center; gap: 2px; }
-.tools h1 { flex: 1; font-size: 17px; font-weight: 600; padding-inline-start: 2px; }
+.tools { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
 .tools button { width: 38px; height: 38px; border: 0; background: none; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: #fff; }
 .who { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: none; color: #fff; padding: 8px 2px 0; text-align: start; cursor: pointer; }
 .avatar { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: #fbeed3; flex: none; }
@@ -194,16 +173,7 @@ const more = computed<Entry[]>(() => [
 section { display: grid; gap: 8px; min-width: 0; }
 h2 { font-size: 15px; font-weight: 600; }
 .more { border: 0; background: none; display: flex; align-items: center; gap: 1px; font-size: 12px; color: var(--muted); cursor: pointer; padding: 0; }
-.sub { color: var(--muted); font-size: 12px; margin-top: -6px; }
 .none { text-align: center; color: var(--muted); font-size: 12px; padding: 18px 0; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; }
-.tickets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.ticket { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 6px; align-items: center; padding: 10px 12px 8px; border-radius: 12px; background: linear-gradient(135deg, #fdeae4, #f9dcd6); border: 1px solid #f1cfc6; color: var(--red); }
-.ticket.ship { background: linear-gradient(135deg, #fdf1d6, #fbe3ad); border-color: #f0d9a0; }
-.ticket b { font-size: 17px; font-weight: 700; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ticket svg { color: var(--red); opacity: .85; }
-.ticket.ship svg { color: #b9781e; }
-.ticket span { grid-column: 1 / -1; color: var(--ink); opacity: .78; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ticket small { grid-column: 1 / -1; margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(120, 60, 30, .35); color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panel { background: var(--paper); border-radius: 14px; }
 .common { display: grid; grid-template-columns: repeat(4, 1fr); padding: 8px 4px; }
 .common button { border: 0; background: none; border-radius: 12px; display: grid; gap: 4px; justify-items: center; cursor: pointer; font-size: 12px; color: var(--ink); padding: 8px 0; min-width: 0; }
@@ -218,12 +188,11 @@ h2 { font-size: 15px; font-weight: 600; }
 .rows button > svg:first-child { color: var(--red); flex: none; }
 .rows button span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rows .chev { flex: none; color: #b9a793; }
-@media (max-width: 370px) { .rows button { font-size: 13.5px; gap: 6px; padding-inline-start: 4px; } .rows button:nth-child(even) { padding-inline-start: 10px; } .ticket b { font-size: 15px; } }
+@media (max-width: 370px) { .rows button { font-size: 13.5px; gap: 6px; padding-inline-start: 4px; } .rows button:nth-child(even) { padding-inline-start: 10px; } }
 /* an iPad or a computer: the red becomes a card under the top bar */
 @media (min-width: 768px) {
   .mehome.phone { max-width: none; padding-bottom: 40px; }
   .hero { border-radius: 16px; padding: 16px 22px 64px; display: flex; flex-direction: row-reverse; align-items: center; gap: 12px; }
-  .tools h1 { display: none; }
   .who { padding: 0; flex: 1; min-width: 0; }
   .who .chev { display: none; }
   .avatar { width: 60px; height: 60px; }
@@ -242,7 +211,6 @@ h2 { font-size: 15px; font-weight: 600; }
 }
 /* a computer: the side list has every page, so the rows give way to the latest orders */
 @media (min-width: 1024px) {
-  .tickets { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .moresvc { display: none; }
   .olist { padding: 2px 16px; }
   .orow { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto 96px 90px; align-items: center; gap: 14px; padding: 10px 0; border-top: 1px solid var(--line); color: var(--ink); }
