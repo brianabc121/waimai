@@ -183,6 +183,7 @@ func customerView(o *app.Order) *app.Order {
 	o.Cash = nil
 	// which delivery area an address fell in is the store's business
 	o.ZoneName, o.ZoneDistanceM = "", nil
+	o.StaffNote, o.PlacedBy = "", ""
 	return o
 }
 

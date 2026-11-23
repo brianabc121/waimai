@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sort"
 	"time"
@@ -19,6 +20,9 @@ type QuoteLineInput struct {
 	Note      string  `json:"note"`
 	// Basket is 1 to 4; 0 means the first.
 	Basket int `json:"basket,omitempty"`
+	// repeat lets an option be named more than once, for as many of it
+	// (two portions of extra beef). Only orders placed by staff use it.
+	repeat bool
 }
 
 type QuoteInput struct {
@@ -40,6 +44,8 @@ type QuoteInput struct {
 	// Lang is the customer's language: the lines are named in it as well, and
 	// the order keeps those names (docs/I18N_DESIGN.md §6.4).
 	Lang string `json:"lang"`
+	// feeOverride replaces the zone's delivery fee (an order placed by staff).
+	feeOverride *int64
 }
 
 type LineOption struct {
@@ -48,6 +54,9 @@ type LineOption struct {
 	Name       string `json:"name"`
 	NameEn     string `json:"name_en"`
 	PriceDelta int64  `json:"price_delta"`
+	// Qty is how many of it, when more than one (orders placed by staff);
+	// PriceDelta is then for all of them and the name says "× n".
+	Qty int `json:"qty,omitempty"`
 	// In the customer's language, when it differs.
 	GroupTr string `json:"group_tr,omitempty"`
 	NameTr  string `json:"name_tr,omitempty"`
@@ -149,11 +158,14 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 			if err != nil {
 				return nil, err
 			}
-			if loc.Zone == nil {
+			if loc.Zone == nil && in.feeOverride == nil {
 				return nil, ErrD(http.StatusUnprocessableEntity, "OUT_OF_ZONE", "this location is outside the delivery area",
 					map[string]any{"nearest": loc.Nearest})
 			}
-			z = *loc.Zone
+			// Staff may still deliver outside the areas, at a fee they set.
+			if loc.Zone != nil {
+				z = *loc.Zone
+			}
 			if loc.DistanceM > 0 {
 				quote.ZoneDistanceM = &loc.DistanceM
 			}
@@ -169,8 +181,13 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 				return nil, err
 			}
 		}
-		quote.ZoneID, quote.ZoneName = &z.ID, z.Name
+		if z.ID != 0 {
+			quote.ZoneID, quote.ZoneName = &z.ID, z.Name
+		}
 		deliveryFee = z.Fee
+		if in.feeOverride != nil {
+			deliveryFee = *in.feeOverride
+		}
 		minOrder = max(b.MinOrderAmount, z.MinOrder)
 	}
 
@@ -349,29 +366,37 @@ func priceLines(ctx context.Context, q Querier, branchID int64, service string, 
 		ql := QuoteLine{ItemID: it.ID, Name: it.Name, NameEn: it.NameEn, Qty: line.Qty, Note: line.Note,
 			NeedsPrep: it.NeedsPrep, Options: []LineOption{}, Basket: max(1, line.Basket), CategoryID: it.CategoryID}
 		unit := it.Price
-		chosen := map[int64]bool{}
+		chosen := map[int64]int{}
 		for _, id := range line.OptionIDs {
-			if chosen[id] {
+			if chosen[id] > 0 && !line.repeat {
 				return nil, 0, ErrValidation("duplicate option")
 			}
-			chosen[id] = true
+			chosen[id]++
 		}
 		matched := 0
 		optionGone := false
 		for _, g := range it.Groups {
 			n := 0
 			for _, o := range g.Options {
-				if !chosen[o.ID] {
+				k := chosen[o.ID]
+				if k == 0 {
 					continue
 				}
 				matched++
-				n++
+				n += k
 				if o.SoldOut {
 					optionGone = true
 				}
-				unit += o.PriceDelta
-				ql.Options = append(ql.Options, LineOption{Group: g.Name, GroupEn: g.NameEn, Name: o.Name,
-					NameEn: o.NameEn, PriceDelta: o.PriceDelta})
+				unit += o.PriceDelta * int64(k)
+				lo := LineOption{Group: g.Name, GroupEn: g.NameEn, Name: o.Name, NameEn: o.NameEn, PriceDelta: o.PriceDelta}
+				if k > 1 {
+					lo.Qty, lo.PriceDelta = k, o.PriceDelta*int64(k)
+					lo.Name, lo.NameEn = fmt.Sprintf("%s ×%d", o.Name, k), ""
+					if o.NameEn != "" {
+						lo.NameEn = fmt.Sprintf("%s ×%d", o.NameEn, k)
+					}
+				}
+				ql.Options = append(ql.Options, lo)
 			}
 			if n < g.MinSelect || n > g.MaxSelect {
 				return nil, 0, ErrD(http.StatusUnprocessableEntity, "OPTIONS_INVALID",

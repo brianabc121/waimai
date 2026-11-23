@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>代客下单 · 原型</title>
+<link rel="stylesheet" href="proto.css">
+</head>
+<body>
+<!-- 原型：商家后台“代客下单”。顾客在微信里发来订单明细，店员在后台替顾客建外卖单。数据都是示意。方案见 ../MANUAL_ORDER_DESIGN.md -->
+
+<!-- ============ 1 电脑：代客下单主页面 ============ -->
+<section id="pc-main">
+<div class="pc">
+  <aside class="side">
+    <div class="brand">马卡蒂小馆 <i>«</i></div>
+    <a class="on">订单</a><a>桌台</a><a>后厨</a><a>消息</a><a>菜单</a><a>模板</a><a>宣传物料</a><a>优惠</a><a>核款</a><a>账单</a><a>骑手</a><a>配送地图</a><a>员工</a><a>设置</a><a>平台客服</a>
+    <div class="side-foot"><span class="duty">● 上班中</span><div class="row between"><span>店长 owner1</span><span class="lang">中文</span></div><a>退出登录</a></div>
+  </aside>
+  <main class="main">
+    <div class="head">
+      <span class="back">‹ 订单</span>
+      <h1>代客下单</h1>
+      <span class="muted">顾客通过</span>
+      <div class="pills"><span class="on">微信</span><span>电话</span><span>LINE</span><span>其他</span></div>
+      <span class="sp"></span>
+      <span class="muted small">草稿已自动保存 21:52</span>
+      <span class="btn">清空重来</span>
+    </div>
+
+    <div class="cols">
+      <!-- 左栏：顾客消息 + 顾客信息 -->
+      <div class="col">
+        <div class="panel">
+          <div class="ph"><b>① 粘贴顾客消息</b><span class="tag ai">智能识别</span></div>
+          <div class="paste">陈小姐 0917 555 2046<br>Unit 12F, Tower 2, Paseo de Roxas, Makati<br>卤肉饭两份，盐酥鸡一份小辣，冰柠檬茶两杯少冰，再来个鸡腿饭<br>八点半前送到哦，给现金</div>
+          <div class="row between" style="margin-top:8px"><span class="muted small">把微信里的文字整段复制过来</span><span class="btn primary small">识别</span></div>
+          <div class="found">
+            <div class="fl ok">✓ 手机号、称呼、地址已填到下面</div>
+            <div class="fl ok">✓ 4 道菜已加进订单</div>
+            <div class="fl ok">✓ 预约 20:30 前送达，货到付款</div>
+            <div class="fl warn">! “鸡腿饭”菜单里没有，请和顾客确认 <u>手动选菜</u></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="ph"><b>② 顾客</b></div>
+          <label>手机号</label>
+          <div class="inp"><span class="cc">+63</span>917 555 2046</div>
+          <div class="known">老顾客 · 下过 6 单 · 上次 11-18 <span class="link">查看</span></div>
+          <div class="grid2">
+            <div><label>称呼</label><div class="inp">陈小姐</div></div>
+            <div><label>微信号（选填）</label><div class="inp">chen_mky</div></div>
+          </div>
+          <div class="seg"><span class="on">配送</span><span>到店自取</span></div>
+          <label>送到哪里</label>
+          <div class="addr on"><i class="radio on"></i><div class="grow"><b>Unit 12F, Tower 2, Paseo de Roxas</b><div class="muted small">Makati · 识别出的新地址 · 已在地图上定位</div></div></div>
+          <div class="addr"><i class="radio"></i><div class="grow"><span>8F, Ayala Tower One</span><div class="muted small">顾客常用地址 · 上次 11-18</div></div></div>
+          <div class="minimap"><div class="pin">📍</div><span class="zone-ok">在配送范围内 · 配送费 ₱49 · 约 35 分钟</span><span class="adj">拖动图钉校正</span></div>
+          <label>送达时间</label>
+          <div class="seg"><span>尽快送达</span><span class="on">预约 今天 20:30</span></div>
+        </div>
+      </div>
+
+      <!-- 中栏：选菜 -->
+      <div class="col wide">
+        <div class="panel tall">
+          <div class="ph"><b>③ 选菜</b><span class="muted small">点击菜品加入订单，和顾客点餐页同一份菜单</span></div>
+          <div class="search">🔍 搜索菜名、拼音首字母或英文名</div>
+          <div class="cats"><span class="on">全部</span><span>炸物</span><span>主食</span><span>套餐</span><span>饮品</span></div>
+          <div class="dish"><img src="../../../web/public/demo/popcorn-chicken.jpg"><div class="grow"><b>盐酥鸡</b><div class="muted small">Popcorn Chicken · 有规格</div></div><span class="price">₱169</span><span class="cnt">1</span><span class="btn small">选规格</span></div>
+          <div class="dish"><img src="../../../web/public/demo/sweet-potato-fries.jpg"><div class="grow"><b>无盐地瓜条</b><div class="muted small">Sweet Potato Fries</div></div><span class="price">₱99</span><span class="plus">+</span></div>
+          <div class="dish"><img src="../../../web/public/demo/chicken-cutlet.jpg"><div class="grow"><b>黄金鸡排</b><div class="muted small">Crispy Chicken Cutlet · 有规格</div></div><span class="price">₱189</span><span class="btn small">选规格</span></div>
+          <div class="dish"><img src="../../../web/public/demo/braised-pork-rice.jpg"><div class="grow"><b>卤肉饭</b><div class="muted small">Braised Pork Rice</div></div><span class="price">₱159</span><span class="step"><i>−</i>2<i class="f">+</i></span></div>
+          <div class="dish"><img src="../../../web/public/demo/beef-noodle-soup.jpg"><div class="grow"><b>牛肉面</b><div class="muted small">Beef Noodle Soup · 有规格</div></div><span class="price">₱249</span><span class="btn small">选规格</span></div>
+          <div class="dish off"><img src="../../../web/public/demo/bento.jpg"><div class="grow"><b>今日限量便当</b><div class="muted small">今天已售完</div></div><span class="price">₱219</span><span class="tag">售完</span></div>
+          <div class="dish"><img src="../../../web/public/demo/fried-combo.jpg"><div class="grow"><b>双人炸物套餐</b><div class="muted small">Fried Combo for Two · 有规格</div></div><span class="price">₱399</span><span class="btn small">选规格</span></div>
+          <div class="dish"><img src="../../../web/public/demo/iced-lemon-tea.jpg"><div class="grow"><b>冰柠檬茶</b><div class="muted small">Iced Lemon Tea</div></div><span class="price">₱69</span><span class="step"><i>−</i>2<i class="f">+</i></span></div>
+          <div class="dish"><img src="../../../web/public/demo/bubble-milk-tea.jpg"><div class="grow"><b>珍珠奶茶</b><div class="muted small">Bubble Milk Tea</div></div><span class="price">₱119</span><span class="plus">+</span></div>
+          <div class="dish"><img src="../../../web/public/demo/bottled-water.jpg"><div class="grow"><b>瓶装水</b><div class="muted small">Bottled Water</div></div><span class="price">₱30</span><span class="plus">+</span></div>
+        </div>
+      </div>
+
+      <!-- 右栏：订单确认 -->
+      <div class="col">
+        <div class="panel">
+          <div class="ph"><b>④ 订单</b><span class="muted small">5 件</span></div>
+          <div class="line"><div class="grow"><b>卤肉饭</b></div><span class="step sm"><i>−</i>2<i class="f">+</i></span><span class="amt">₱318</span></div>
+          <div class="line"><div class="grow"><b>盐酥鸡</b><div class="muted small">小辣 · <u>改规格</u></div></div><span class="step sm"><i>−</i>1<i class="f">+</i></span><span class="amt">₱169</span></div>
+          <div class="line"><div class="grow"><b>冰柠檬茶</b><div class="muted small">备注：少冰</div></div><span class="step sm"><i>−</i>2<i class="f">+</i></span><span class="amt">₱138</span></div>
+          <div class="sum">
+            <div class="row between"><span>菜品小计</span><span>₱625</span></div>
+            <div class="row between"><span>包装费</span><span>₱10</span></div>
+            <div class="row between"><span>配送费 <span class="tag ok">满₱500免配送费</span></span><span><s class="muted">₱49</s> ₱0</span></div>
+            <div class="row between"><span>满₱200减₱20</span><span class="red">−₱20</span></div>
+            <div class="row between"><span>店家优惠 <span class="muted small">（选填，要写原因）</span></span><span class="mini-inp">₱ 0</span></div>
+            <div class="row between total"><b>应付</b><b>₱615</b></div>
+            <div class="muted small r">含税 12% ₱65.89</div>
+          </div>
+          <label>付款</label>
+          <div class="seg three"><span class="on">货到付款</span><span>已收款</span><span>到店付</span></div>
+          <div class="muted small">选“已收款”可以上传微信转账截图，订单记为已付</div>
+          <label>订单备注（顾客看得到）</label>
+          <div class="inp ta">八点半前送到；冰柠檬茶少冰</div>
+          <label>店内备注（只有店员看得到）</label>
+          <div class="inp ta muted">顾客问的鸡腿饭没有，已推荐卤肉饭</div>
+          <div class="chk"><i class="box on">✓</i>创建后直接接单（不用再点“接单”）</div>
+          <div class="chk"><i class="box on">✓</i>短信把订单链接发给顾客</div>
+          <div class="btn primary big">创建订单 · ₱615</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</section>
+
+<!-- ============ 2 电脑：创建成功，复制回复顾客 ============ -->
+<section id="pc-done">
+<div class="pc">
+  <aside class="side">
+    <div class="brand">马卡蒂小馆 <i>«</i></div>
+    <a class="on">订单</a><a>桌台</a><a>后厨</a><a>消息</a><a>菜单</a><a>模板</a><a>宣传物料</a><a>优惠</a><a>核款</a><a>账单</a><a>骑手</a><a>配送地图</a><a>员工</a><a>设置</a><a>平台客服</a>
+    <div class="side-foot"><span class="duty">● 上班中</span><div class="row between"><span>店长 owner1</span><span class="lang">中文</span></div><a>退出登录</a></div>
+  </aside>
+  <main class="main dim">
+    <div class="modal">
+      <div class="okmark">✓</div>
+      <h2>订单 W-0109 已创建，已接单</h2>
+      <div class="muted">厨房已经收到，骑手按 20:30 送达安排</div>
+      <label style="text-align:left">发给顾客的确认消息（复制后粘贴到微信）</label>
+      <div class="reply">【马卡蒂小馆】订单已确认 W-0109<br>卤肉饭 ×2　₱318<br>盐酥鸡（小辣）×1　₱169<br>冰柠檬茶（少冰）×2　₱138<br>包装费 ₱10　满减 −₱20　配送费 ₱0<br><b>应付 ₱615，货到付款（现金）</b><br>送到：Unit 12F, Tower 2, Paseo de Roxas<br>预计 20:30 前送达<br>查看进度：https://waimai.example/o/7Hk2…</div>
+      <div class="row" style="justify-content:center;margin-top:14px">
+        <span class="btn primary">复制消息</span><span class="btn">只复制链接</span><span class="btn">打印小票</span><span class="btn">查看订单</span>
+      </div>
+      <div class="row" style="justify-content:center;margin-top:10px"><span class="link">继续代客下单</span></div>
+    </div>
+  </main>
+</div>
+</section>
+
+<!-- ============ 3 电脑：订单列表的入口和标记 ============ -->
+<section id="pc-orders">
+<div class="pc">
+  <aside class="side">
+    <div class="brand">马卡蒂小馆 <i>«</i></div>
+    <a class="on">订单</a><a>桌台</a><a>后厨</a><a>消息</a><a>菜单</a><a>模板</a><a>宣传物料</a><a>优惠</a><a>核款</a><a>账单</a><a>骑手</a><a>配送地图</a><a>员工</a><a>设置</a><a>平台客服</a>
+    <div class="side-foot"><span class="duty">● 上班中</span><div class="row between"><span>店长 owner1</span><span class="lang">中文</span></div><a>退出登录</a></div>
+  </aside>
+  <main class="main">
+    <div class="head">
+      <div class="pills"><span class="on">进行中</span><span>历史</span></div>
+      <div class="pills"><span class="on">全部来源</span><span>顾客下单</span><span>代客下单</span></div>
+      <span class="sp"></span>
+      <span class="muted">✓ 新订单提示音</span>
+      <span class="btn primary">＋ 代客下单</span>
+    </div>
+    <div class="olist">
+      <div class="ocard sel"><div class="row between"><b>W-0109</b><span class="tag brand">代客 · 微信</span></div><div>配送 · 陈小姐 · ₱615</div><div class="row between"><span class="tag ok">已接单</span><span class="muted small">预约 20:30 · 店长 owner1 代下</span></div></div>
+      <div class="ocard"><div class="row between"><b>W-0108</b><span class="tag info">顾客下单</span></div><div>配送 · 李小红 · ₱297</div><div class="row between"><span class="tag warn">待接单 02:41</span><span class="muted small">21:48</span></div></div>
+      <div class="ocard"><div class="row between"><b>W-0107</b><span class="tag brand">代客 · 电话</span></div><div>自取 · 王先生 · ₱258</div><div class="row between"><span class="tag ok">待取餐</span><span class="muted small">21:30 · 收银 cashier1 代下</span></div></div>
+    </div>
+    <div class="odetail">
+      <div class="row between"><h2>W-0109</h2><span class="tag brand">代客下单 · 微信</span></div>
+      <div class="kv"><span>下单人</span><b>店长 owner1，21:53</b></div>
+      <div class="kv"><span>顾客</span><b>陈小姐 +63 917 555 2046（老顾客）</b></div>
+      <div class="kv"><span>原始消息</span><span class="quote">陈小姐 0917 555 2046 / Unit 12F, Tower 2… / 卤肉饭两份，盐酥鸡一份小辣…</span></div>
+      <div class="kv"><span>店内备注</span><b>顾客问的鸡腿饭没有，已推荐卤肉饭</b></div>
+      <div class="muted small" style="margin-top:8px">后面的流程（备餐、派骑手、送达、核款、账单）和顾客自己下的单完全一样。</div>
+    </div>
+  </main>
+</div>
+</section>
+
+<!-- ============ 4 手机：三步 ============ -->
+<section id="phone">
+<div class="phones">
+  <div class="phone">
+    <div class="ptop"><span>‹</span><b>代客下单</b><span class="muted small">微信 ▾</span></div>
+    <div class="steps"><span class="on">1 顾客</span><span>2 选菜</span><span>3 确认</span></div>
+    <div class="pbody">
+      <div class="panel">
+        <div class="ph"><b>粘贴顾客消息</b><span class="tag ai">智能识别</span></div>
+        <div class="paste sm">陈小姐 0917 555 2046<br>Unit 12F, Tower 2, Paseo de Roxas…<br>卤肉饭两份，盐酥鸡一份小辣…</div>
+        <div class="fl ok">✓ 已填好顾客、地址和 4 道菜</div>
+        <div class="fl warn">! “鸡腿饭”菜单里没有</div>
+      </div>
+      <div class="panel">
+        <label>手机号</label><div class="inp"><span class="cc">+63</span>917 555 2046</div>
+        <div class="known">老顾客 · 下过 6 单</div>
+        <label>称呼</label><div class="inp">陈小姐</div>
+        <div class="seg"><span class="on">配送</span><span>到店自取</span></div>
+        <div class="addr on"><i class="radio on"></i><div class="grow"><b>Unit 12F, Tower 2, Paseo de Roxas</b><div class="muted small">在配送范围内 · 配送费 ₱49</div></div></div>
+        <div class="seg"><span>尽快送达</span><span class="on">预约 20:30</span></div>
+      </div>
+    </div>
+    <div class="pbar"><div><b>₱615</b><div class="muted small">5 件</div></div><span class="btn primary">下一步：选菜</span></div>
+  </div>
+
+  <div class="phone">
+    <div class="ptop"><span>‹</span><b>代客下单</b><span class="muted small">微信 ▾</span></div>
+    <div class="steps"><span class="done">1 顾客 ✓</span><span class="on">2 选菜</span><span>3 确认</span></div>
+    <div class="pbody">
+      <div class="search">🔍 搜索菜名</div>
+      <div class="cats"><span class="on">全部</span><span>炸物</span><span>主食</span><span>套餐</span><span>饮品</span></div>
+      <div class="dish"><img src="../../../web/public/demo/popcorn-chicken.jpg"><div class="grow"><b>盐酥鸡</b><div class="price">₱169</div></div><span class="cnt">1</span><span class="btn small">选规格</span></div>
+      <div class="dish"><img src="../../../web/public/demo/sweet-potato-fries.jpg"><div class="grow"><b>无盐地瓜条</b><div class="price">₱99</div></div><span class="plus">+</span></div>
+      <div class="dish"><img src="../../../web/public/demo/braised-pork-rice.jpg"><div class="grow"><b>卤肉饭</b><div class="price">₱159</div></div><span class="step"><i>−</i>2<i class="f">+</i></span></div>
+      <div class="dish"><img src="../../../web/public/demo/beef-noodle-soup.jpg"><div class="grow"><b>牛肉面</b><div class="price">₱249</div></div><span class="btn small">选规格</span></div>
+      <div class="dish"><img src="../../../web/public/demo/iced-lemon-tea.jpg"><div class="grow"><b>冰柠檬茶</b><div class="price">₱69</div></div><span class="step"><i>−</i>2<i class="f">+</i></span></div>
+      <div class="dish"><img src="../../../web/public/demo/bubble-milk-tea.jpg"><div class="grow"><b>珍珠奶茶</b><div class="price">₱119</div></div><span class="plus">+</span></div>
+    </div>
+    <div class="pbar"><div><b>₱615</b><div class="muted small">5 件</div></div><span class="btn primary">下一步：确认</span></div>
+  </div>
+
+  <div class="phone">
+    <div class="ptop"><span>‹</span><b>代客下单</b><span class="muted small">微信 ▾</span></div>
+    <div class="steps"><span class="done">1 顾客 ✓</span><span class="done">2 选菜 ✓</span><span class="on">3 确认</span></div>
+    <div class="pbody">
+      <div class="panel">
+        <div class="muted small">陈小姐 · +63 917 555 2046<br>Unit 12F, Tower 2, Paseo de Roxas · 预约 20:30</div>
+        <div class="line"><div class="grow"><b>卤肉饭</b></div><span>×2</span><span class="amt">₱318</span></div>
+        <div class="line"><div class="grow"><b>盐酥鸡</b><div class="muted small">小辣</div></div><span>×1</span><span class="amt">₱169</span></div>
+        <div class="line"><div class="grow"><b>冰柠檬茶</b><div class="muted small">少冰</div></div><span>×2</span><span class="amt">₱138</span></div>
+        <div class="sum">
+          <div class="row between"><span>菜品小计</span><span>₱625</span></div>
+          <div class="row between"><span>包装费</span><span>₱10</span></div>
+          <div class="row between"><span>配送费</span><span><s class="muted">₱49</s> ₱0</span></div>
+          <div class="row between"><span>满₱200减₱20</span><span class="red">−₱20</span></div>
+          <div class="row between total"><b>应付</b><b>₱615</b></div>
+        </div>
+        <label>付款</label>
+        <div class="seg three"><span class="on">货到付款</span><span>已收款</span><span>到店付</span></div>
+        <label>订单备注</label><div class="inp ta">八点半前送到；少冰</div>
+        <div class="chk"><i class="box on">✓</i>创建后直接接单</div>
+      </div>
+    </div>
+    <div class="pbar"><div><b>₱615</b><div class="muted small">货到付款</div></div><span class="btn primary">创建订单</span></div>
+  </div>
+</div>
+</section>
+</body>
+</html>

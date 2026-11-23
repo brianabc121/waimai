@@ -143,8 +143,15 @@ type Order struct {
 	// Gift is the coupon this order earned; only the customer's order page gets it.
 	Gift *CustomerCoupon `json:"gift,omitempty"`
 	// Store is who sold it; only the customer's order page gets it.
-	Store      *OrderStore `json:"store,omitempty"`
-	tokenNonce []byte
+	Store *OrderStore `json:"store,omitempty"`
+	// An order the store placed for a customer (channel "staff"): the
+	// store's member number, where the customer asked (wechat, line,
+	// whatsapp, phone, other), who placed it and the note only staff see.
+	MemberNo    *int   `json:"member_no"`
+	OrderSource string `json:"order_source"`
+	PlacedBy    string `json:"placed_by"`
+	StaffNote   string `json:"staff_note"`
+	tokenNonce  []byte
 }
 
 // DisplayStatus derives the single customer-facing status from the four
@@ -189,7 +196,8 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	(SELECT b.timezone FROM branches b WHERE b.id = o.branch_id), o.session_id, o.table_name, o.amount_received,
 	o.payment_note, o.dest_lat, o.dest_lng, o.zone_distance_m, o.contact_phone, o.contact_title, o.contact_wechat,
 	o.contact_telegram, o.contact_line, o.contact_whatsapp, EXISTS (SELECT 1 FROM customer_address_photos p WHERE p.address_id = o.address_id),
-	o.merchant_discount, o.platform_subsidy`
+	o.merchant_discount, o.platform_subsidy, (SELECT m.member_no FROM store_members m WHERE m.id = o.member_id),
+	o.order_source, COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.placed_by), ''), o.staff_note`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}, Discounts: []OrderDiscount{}}
@@ -203,7 +211,8 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.tokenNonce, &t.PromotionID, &t.PromotionName, &t.PromotionNameEn, &o.ScheduledFor, &o.ReleaseAt,
 		&o.Timezone, &o.SessionID, &o.TableName, &o.AmountReceived, &o.PaymentNote, &o.DestLat, &o.DestLng,
 		&o.ZoneDistanceM, &o.ContactPhone, &o.ContactTitle, &o.ContactWechat, &o.ContactTelegram, &o.ContactLine,
-		&o.ContactWhatsapp, &o.AddressPhoto, &t.MerchantDiscount, &t.PlatformSubsidy)
+		&o.ContactWhatsapp, &o.AddressPhoto, &t.MerchantDiscount, &t.PlatformSubsidy, &o.MemberNo, &o.OrderSource,
+		&o.PlacedBy, &o.StaffNote)
 	if err != nil {
 		return nil, err
 	}
