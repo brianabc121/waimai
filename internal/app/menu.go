@@ -95,17 +95,19 @@ type ItemInput struct {
 	// Photos are more pictures for the dish page, after the main one.
 	Photos []string `json:"photos"`
 	// Details is the longer text on the dish page.
-	Details           string             `json:"details"`
-	Price             int64              `json:"price"`
-	Published         bool               `json:"published"`
-	SoldOut           bool               `json:"sold_out"`
-	StockQty          *int               `json:"stock_qty"`
-	NeedsPrep         bool               `json:"needs_prep"`
-	DeliveryAvailable bool               `json:"delivery_available"`
-	PickupAvailable   bool               `json:"pickup_available"`
-	Sort              int                `json:"sort"`
-	StationID         *int64             `json:"station_id"`
-	Groups            []OptionGroupInput `json:"groups"`
+	Details           string `json:"details"`
+	Price             int64  `json:"price"`
+	Published         bool   `json:"published"`
+	SoldOut           bool   `json:"sold_out"`
+	StockQty          *int   `json:"stock_qty"`
+	NeedsPrep         bool   `json:"needs_prep"`
+	DeliveryAvailable bool   `json:"delivery_available"`
+	PickupAvailable   bool   `json:"pickup_available"`
+	// DineInAvailable left out keeps the dish as it is (offered, for a new one).
+	DineInAvailable *bool              `json:"dine_in_available"`
+	Sort            int                `json:"sort"`
+	StationID       *int64             `json:"station_id"`
+	Groups          []OptionGroupInput `json:"groups"`
 }
 
 // The dish page holds the main picture and up to this many more.
@@ -180,17 +182,20 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 		var err error
 		if id == 0 {
 			err = tx.QueryRow(ctx, `INSERT INTO menu_items (branch_id, category_id, name, name_en, description,
-				image_url, price, published, sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort, station_id, photos, details)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
+				image_url, price, published, sold_out, stock_qty, needs_prep, delivery_available, pickup_available, sort, station_id, photos, details, dine_in_available)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,COALESCE($18, true)) RETURNING id`,
 				branchID, in.CategoryID, in.Name, in.NameEn, in.Description, in.ImageURL, in.Price, in.Published,
-				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort, in.StationID, photos, in.Details).Scan(&id)
+				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort, in.StationID, photos, in.Details,
+				in.DineInAvailable).Scan(&id)
 		} else {
 			err = tx.QueryRow(ctx, `UPDATE menu_items SET category_id=$3, name=$4, name_en=$5, description=$6,
 				image_url=$7, price=$8, published=$9, sold_out=$10, stock_qty=$11, needs_prep=$12,
-				delivery_available=$13, pickup_available=$14, sort=$15, station_id=$16, photos=$17, details=$18, updated_at=now()
+				delivery_available=$13, pickup_available=$14, sort=$15, station_id=$16, photos=$17, details=$18,
+				dine_in_available=COALESCE($19, dine_in_available), updated_at=now()
 				WHERE id=$1 AND branch_id=$2 AND NOT archived RETURNING id`,
 				id, branchID, in.CategoryID, in.Name, in.NameEn, in.Description, in.ImageURL, in.Price, in.Published,
-				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort, in.StationID, photos, in.Details).Scan(&id)
+				in.SoldOut, in.StockQty, in.NeedsPrep, in.DeliveryAvailable, in.PickupAvailable, in.Sort, in.StationID, photos, in.Details,
+				in.DineInAvailable).Scan(&id)
 		}
 		if isNoRows(err) {
 			return ErrNotFound
