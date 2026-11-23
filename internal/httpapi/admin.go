@@ -74,6 +74,10 @@ func (s *Server) adminRoutes(admin *gin.RouterGroup) {
 	admin.POST("/branches/:bid/items/bulk", s.adminBulkItems)
 	admin.PUT("/branches/:bid/items/:id", s.adminSaveItem)
 	admin.PATCH("/branches/:bid/items/:id", s.adminPatchItem)
+	admin.GET("/branches/:bid/menu-imports/template", s.adminMenuTemplate)
+	admin.POST("/branches/:bid/menu-imports", s.adminUploadMenuImport)
+	admin.GET("/branches/:bid/menu-imports/:id", s.adminGetMenuImport)
+	admin.POST("/branches/:bid/menu-imports/:id/apply", s.adminApplyMenuImport)
 
 	admin.GET("/overview", s.adminOverview)
 	admin.GET("/metrics/api", s.adminAPIMetrics)
@@ -543,4 +547,69 @@ func (s *Server) adminRetryFailedJobs(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"retried": n})
+}
+
+// ---- menu import (Excel) for a store ----
+
+func (s *Server) adminMenuTemplate(c *gin.Context) {
+	bid, found := idParam(c, "bid")
+	if !found {
+		return
+	}
+	if _, err := s.App.AdminBranchByID(c, bid); err != nil {
+		fail(c, err)
+		return
+	}
+	sendMenuTemplate(c, s.App, bid)
+}
+
+func (s *Server) adminUploadMenuImport(c *gin.Context) {
+	bid, found := idParam(c, "bid")
+	if !found {
+		return
+	}
+	body, ok := readImportFile(c)
+	if !ok {
+		return
+	}
+	id, err := s.App.AdminCreateMenuImport(c, adminActor(c), bid, c.Query("filename"), body)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"id": id})
+}
+
+func (s *Server) adminGetMenuImport(c *gin.Context) {
+	bid, found := idParam(c, "bid")
+	if !found {
+		return
+	}
+	id, found := idParam(c, "id")
+	if !found {
+		return
+	}
+	m, err := s.App.GetMenuImport(c, bid, id)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, m)
+}
+
+func (s *Server) adminApplyMenuImport(c *gin.Context) {
+	bid, found := idParam(c, "bid")
+	if !found {
+		return
+	}
+	id, found := idParam(c, "id")
+	if !found {
+		return
+	}
+	m, err := s.App.AdminApplyMenuImport(c, adminActor(c), bid, id)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, m)
 }

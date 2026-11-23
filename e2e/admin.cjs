@@ -134,7 +134,7 @@ for (const [name, en, price] of [['猪肉白菜饺', 'Pork & Cabbage Dumplings',
   await f.locator('input').nth(0).fill(name)
   await f.locator('input').nth(1).fill(en)
   await f.locator('input[type=number]').first().fill(price)
-  await f.locator('label.check input').first().check() // published
+  await f.locator('[data-testid=item-published]').check()
   await f.locator('.sheet-foot .btn.primary').click()
   await admin.waitForSelector(`tr[data-item="${name}"]`)
 }

@@ -646,6 +646,35 @@ func TestImportAndScheduleOverHTTP(t *testing.T) {
 	if sf := anon.want(200, "", "GET", "/stores/"+f1.slug, nil); len(sf["categories"].([]any)) != 1 {
 		t.Fatalf("imported drafts leaked: %v", sf["categories"])
 	}
+	// the store's own template and the export of its menu
+	if st, h, body := owner.raw(path + "/template?with=menu"); st != 200 || !strings.Contains(h.Get("Content-Disposition"), "menu-") ||
+		!bytes.HasPrefix(body, []byte("PK")) {
+		t.Fatalf("menu export: %d %v", st, h)
+	}
+	// a platform admin imports for the store through the admin routes
+	admin := adminClient(t)
+	apath := "/admin/branches/" + b1 + "/menu-imports"
+	if code, _ := raw(owner, apath+"?filename=m.xlsx", tpl); code != 403 {
+		t.Fatalf("owner on the admin route: %d", code)
+	}
+	if st, _, _ := admin.raw(apath + "/template"); st != 200 {
+		t.Fatalf("admin template: %d", st)
+	}
+	code, out = raw(admin, apath+"?filename=m.xlsx", tpl)
+	if code != 200 {
+		t.Fatalf("admin upload: %d %v", code, out)
+	}
+	aid := fmt.Sprint(int64(out["id"].(float64)))
+	if err := a.RunJobs(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if m := admin.want(200, "", "GET", apath+"/"+aid, nil); m["status"] != "parsed" {
+		t.Fatalf("admin import: %v", m)
+	}
+	if m := admin.want(200, "", "POST", apath+"/"+aid+"/apply", nil); m["status"] != "applied" || m["updated_count"].(float64) != 3 {
+		t.Fatalf("admin apply: %v", m)
+	}
+	admin.want(404, "NOT_FOUND", "GET", "/admin/branches/999999999/menu-imports/template", nil)
 
 	// scheduling over HTTP: off -> refused; on -> slots offered and an order carries the time
 	later := time.Now().Add(3 * time.Hour).UTC().Format(time.RFC3339)

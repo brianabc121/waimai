@@ -5,6 +5,7 @@ import { del, get, patch, post, put } from '../../api'
 import { money, t } from '../../i18n'
 import type { Category, Item, Station } from '../../types'
 import ItemForm from '../ItemForm.vue'
+import MenuImportDialog from '../MenuImportDialog.vue'
 import Pager from './Pager.vue'
 import type { AdminBranch, AdminItemRow } from './types'
 import { fmtDateTime, qs } from './util'
@@ -20,6 +21,8 @@ const page = ref(1)
 const list = reactive<{ items: AdminItemRow[]; total: number; counts: Record<string, number> }>({ items: [], total: 0, counts: {} })
 const error = ref('')
 const picked = ref<number[]>([])
+// Excel import for the selected store; ?import=1 (from the merchant page) opens it
+const importing = ref(false)
 
 const merchants = computed(() => {
   const seen = new Map<number, string>()
@@ -39,6 +42,7 @@ async function load() {
 onMounted(async () => {
   try { branches.value = (await get('/admin/branches')).branches } catch (e) { error.value = (e as Error).message }
   await load()
+  if (route.query.import === '1' && store.value) importing.value = true
 })
 function reload() { page.value = 1; picked.value = []; void load() }
 function pickMerchant() { if (store.value && store.value.merchant_id !== merchantId.value) branchId.value = 0; reload() }
@@ -113,6 +117,7 @@ function removeCat(c: Category) { if (confirm(t('ad.cat_delete_confirm', { name:
         <button :class="{ on: status === 'sold_out' }" @click="tab('sold_out')">{{ t('ad.i.sold_out') }} {{ list.counts.sold_out ?? 0 }}</button>
       </div>
       <span class="grow"></span>
+      <button class="btn" :disabled="!store" data-testid="open-import" :title="store ? '' : t('ad.pick_store')" @click="importing = true">{{ t('import_excel') }}</button>
       <button class="btn" :disabled="!store" data-testid="manage-cats" @click="openCats">{{ t('ad.manage_cats') }}</button>
       <button class="btn primary" :disabled="!store" data-testid="new-item" @click="edit(null)">＋ {{ t('new_item') }}</button>
     </div>
@@ -160,6 +165,9 @@ function removeCat(c: Category) { if (confirm(t('ad.cat_delete_confirm', { name:
       </template>
     </Pager>
     <p class="small muted">{{ t('ad.items_foot') }} {{ t('ad.excel_hint') }}</p>
+
+    <MenuImportDialog v-if="importing && store" :base="base(store.id)" :cur="store.currency"
+      :title="t('import_excel') + ' · ' + store.merchant_name + ' · ' + store.name" @imported="load" @close="importing = false" />
 
     <ItemForm v-if="form.open" :item="form.item" :cats="form.cats" :stations="form.stations" :cur="form.cur" :base="base(form.bid)"
       @saved="saved" @close="form.open = false" />

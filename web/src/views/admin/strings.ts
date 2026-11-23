@@ -68,7 +68,7 @@ extend({
   'ad.delete_item_confirm': ['删除「{name}」？历史订单不受影响。', 'Delete "{name}"? Past orders are not affected.'],
   'ad.items_foot': ['删除是归档，历史订单里的菜名和价格不受影响。', 'Deleting archives the item. Names and prices on past orders stay as they were.'],
   'ad.cat_delete_confirm': ['删除分类「{name}」？', 'Delete category "{name}"?'], 'ad.cat_hint': ['分类里还有商品时不能删除。', 'A category that still has items cannot be deleted.'],
-  'ad.sort': ['排序', 'Order'], 'ad.excel_hint': ['Excel 导入在门店后台的菜单页里。', 'Excel import lives on the menu page of the store back office.'],
+  'ad.sort': ['排序', 'Order'], 'ad.excel_hint': ['选好门店后可以用“导入 Excel”替商家批量导入菜品。', 'Pick a store to import dishes for it from Excel.'], 'ad.import_menu': ['导入菜品', 'Import dishes'],
   'ad.time': ['时间', 'Time'], 'ad.admin': ['管理员', 'Administrator'], 'ad.action': ['动作', 'Action'], 'ad.target': ['对象', 'Target'],
   'ad.change': ['改动', 'Change'], 'ad.ip': ['来源 IP', 'IP'], 'ad.all_actions': ['全部动作', 'All actions'], 'ad.from': ['从', 'From'], 'ad.to': ['到', 'To'],
   'ad.act.merchant': ['商户', 'Merchants'], 'ad.act.branch': ['门店', 'Stores'], 'ad.act.user': ['账号', 'Accounts'], 'ad.act.item': ['商品', 'Items'],

@@ -79,7 +79,7 @@ async function save() {
           <div v-if="!f.dine_in_available && !f.delivery_available && !f.pickup_available" class="small" style="color:var(--warn)">{{ t('it.no_channel') }}</div>
         </div>
         <div class="grid2">
-          <label class="check"><input type="checkbox" v-model="f.published" />{{ t('published') }}</label>
+          <label class="check"><input type="checkbox" v-model="f.published" data-testid="item-published" />{{ t('published') }}</label>
           <label class="check"><input type="checkbox" v-model="f.needs_prep" />{{ t('needs_prep') }}</label>
           <label class="check"><input type="checkbox" v-model="f.limited" />{{ t('stock') }}</label>
           <input v-if="f.limited" type="number" min="0" step="1" v-model.number="f.stock" />
