@@ -74,6 +74,7 @@ type MallPromo struct {
 type MallDish struct {
 	Name     string `json:"name"`
 	NameEn   string `json:"name_en"`
+	NameTr   string `json:"name_tr,omitempty"`
 	Price    int64  `json:"price"`
 	ImageURL string `json:"image_url"`
 }
@@ -138,6 +139,8 @@ type MallQuery struct {
 	Filters []string
 	// CustomerID, when someone is logged in, marks the stores they use.
 	CustomerID int64
+	// Lang names the dishes found in the customer's language.
+	Lang string
 }
 
 // MallList is the answer: the stores that deliver to the spot, then the
@@ -351,7 +354,7 @@ func (a *App) MallStores(ctx context.Context, q MallQuery) (*MallList, error) {
 		return nil, err
 	}
 	if text := strings.TrimSpace(q.Q); text != "" {
-		if err := a.mallSearch(ctx, all, text); err != nil {
+		if err := a.mallSearch(ctx, all, text, q.Lang); err != nil {
 			return nil, err
 		}
 	}
@@ -504,8 +507,10 @@ func (a *App) mallPromos(ctx context.Context, list []*MallStore) error {
 	return rows.Err()
 }
 
-// mallSearch adds the dishes whose name answers a search, at most three a store.
-func (a *App) mallSearch(ctx context.Context, list []*MallStore, q string) error {
+// mallSearch adds the dishes whose name answers a search, at most three a
+// store. The search looks in every language the menu is translated into, so a
+// Thai customer typing Thai finds a menu written in Chinese.
+func (a *App) mallSearch(ctx context.Context, list []*MallStore, q, lang string) error {
 	if len(list) == 0 {
 		return nil
 	}
@@ -513,10 +518,20 @@ func (a *App) mallSearch(ctx context.Context, list []*MallStore, q string) error
 	for _, s := range list {
 		byID[s.id] = s
 	}
-	rows, err := a.DB.Query(ctx, `SELECT branch_id, name, name_en, price, image_url FROM menu_items
-		WHERE branch_id = ANY($1) AND published AND NOT archived AND (delivery_available OR pickup_available)
-		AND (name ILIKE $2 OR name_en ILIKE $2)
-		ORDER BY branch_id, sort, id`, storeIDs(list), like(q))
+	if !IsLang(lang) {
+		lang = "en"
+	}
+	rows, err := a.DB.Query(ctx, `SELECT i.branch_id, i.name, i.name_en, i.price, i.image_url,
+			CASE WHEN b.menu_lang = $3 THEN '' ELSE COALESCE(
+				(SELECT t.text FROM content_translations t WHERE t.entity='item' AND t.entity_id=i.id AND t.field='name'
+					AND t.lang = CASE WHEN $3 = ANY(b.menu_langs_off) THEN 'en' ELSE $3 END),
+				(SELECT t.text FROM content_translations t WHERE t.entity='item' AND t.entity_id=i.id AND t.field='name'
+					AND t.lang = 'en' AND b.menu_lang <> 'en'), '') END
+		FROM menu_items i JOIN branches b ON b.id = i.branch_id
+		WHERE i.branch_id = ANY($1) AND i.published AND NOT i.archived AND (i.delivery_available OR i.pickup_available)
+		AND (i.name ILIKE $2 OR i.name_en ILIKE $2 OR EXISTS (SELECT 1 FROM content_translations x
+			WHERE x.entity='item' AND x.entity_id=i.id AND x.field='name' AND x.text ILIKE $2))
+		ORDER BY i.branch_id, i.sort, i.id`, storeIDs(list), like(q), lang)
 	if err != nil {
 		return err
 	}
@@ -524,7 +539,7 @@ func (a *App) mallSearch(ctx context.Context, list []*MallStore, q string) error
 	for rows.Next() {
 		var bid int64
 		var d MallDish
-		if err := rows.Scan(&bid, &d.Name, &d.NameEn, &d.Price, &d.ImageURL); err != nil {
+		if err := rows.Scan(&bid, &d.Name, &d.NameEn, &d.Price, &d.ImageURL, &d.NameTr); err != nil {
 			return err
 		}
 		if s := byID[bid]; len(s.Dishes) < 3 {

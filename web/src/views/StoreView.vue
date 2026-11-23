@@ -4,7 +4,7 @@ import { computed, defineAsyncComponent, nextTick, onMounted, reactive, ref, wat
 import { useRouter } from 'vue-router'
 import { ApiError, get, post } from '../api'
 import { addLine, linePrice, useCart } from '../cart'
-import { locale, money, pick, promoLabel, setLocale, t } from '../i18n'
+import { locale, menuOriginal, money, pick, promoLabel, setLocale, t, mn, mt } from '../i18n'
 import { mallSpot } from '../mall'
 import { defaultTemplate } from '../theme'
 import { customer, customerLogout, loadCustomer, loginRoute, prettyPhone } from '../customer'
@@ -42,7 +42,7 @@ const showCart = ref(false)
 async function load() {
   error.value = ''
   try {
-    const s = await get<Storefront>(`/stores/${props.slug}`)
+    const s = await get<Storefront>(`/stores/${props.slug}?lang=${locale.value}`)
     store.value = s
     document.title = pick(s.branch.name, s.branch.name_en)
     // "Home" in the bottom navigation comes back to the store last looked at.
@@ -59,6 +59,8 @@ async function load() {
   }
 }
 onMounted(load)
+// the menu comes in the customer's language: read it again when that changes
+watch(locale, () => { menuOriginal.value = false; void load() })
 onMounted(() => { void loadCustomer() })
 
 // In map mode the delivery terms (the minimum order) follow the spot the
@@ -252,7 +254,7 @@ const shownCats = computed(() => {
   const all = onlineCats.value
   const q = query.value.trim().toLowerCase()
   if (!q) return all
-  return all.map(c => ({ ...c, items: c.items.filter(i => (i.name + ' ' + i.name_en).toLowerCase().includes(q)) })).filter(c => c.items.length)
+  return all.map(c => ({ ...c, items: c.items.filter(i => (i.name + ' ' + i.name_en + ' ' + (i.name_tr ?? '')).toLowerCase().includes(q)) })).filter(c => c.items.length)
 })
 
 // ---- categories the order must contain something from ----
@@ -345,7 +347,7 @@ async function sendReport() {
           </div>
         </div>
         <div class="promoline" v-if="promos.length">
-          <div class="chips brand"><span v-for="p in promos.slice(0, 3)" :key="p.id" :title="pick(p.name, p.name_en)">{{ promoLabel(p, cur) }}</span></div>
+          <div class="chips brand"><span v-for="p in promos.slice(0, 3)" :key="p.id" :title="mn(p)">{{ promoLabel(p, cur) }}</span></div>
           <button class="more" data-testid="promos-more" @click="showPromos = true">{{ t('sf.promos_n', { n: promos.length }) }} ›</button>
         </div>
         <StoreCoupons :slug="slug" :currency="cur" />
@@ -400,6 +402,10 @@ async function sendReport() {
         <div class="pre" v-if="searching">
           <input ref="searchBox" v-model="query" type="search" class="searchbox" :placeholder="t('sf.search')" data-testid="search-box" />
         </div>
+        <div class="pre mt-note" v-if="store.machine_translated" data-testid="mt-note">
+          <span>{{ t(menuOriginal ? 'sf.mt_original' : 'sf.mt_note') }}</span>
+          <button type="button" class="linkish" data-testid="mt-toggle" @click="menuOriginal = !menuOriginal">{{ t(menuOriginal ? 'sf.mt_show_tr' : 'sf.mt_show_orig') }}</button>
+        </div>
         <p v-if="query.trim() && !shownCats.length" class="muted" style="text-align:center;padding:36px 0;margin:0">{{ t('sf.search_none') }}</p>
         <MenuList ref="menu" :categories="shownCats" :currency="cur" :layout="tpl.layout" :can-order="orderable" :qty-of="qtyOf" stats
           @add="open" @dec="dec" @show="dish = $event" />
@@ -419,7 +425,7 @@ async function sendReport() {
             <div v-if="count && deal.promo" class="got" data-testid="side-deal">{{ t('sf.got_promo', { name: promoLabel(deal.promo, cur) }) }}<template v-if="deal.off"> · {{ t('sf.saved', { amt: money(deal.off, cur) }) }}</template></div>
             <div v-if="count && minimum > subtotal" class="small muted">{{ t('below_min', { amt: money(minimum - subtotal, cur) }) }}</div>
             <div v-else-if="nextPromo" class="small" style="color:var(--brand-dark)">{{ t('more_for_promo', { amt: money(nextPromo.threshold - subtotal, cur), name: promoLabel(nextPromo, cur) }) }}</div>
-            <button v-if="count && missing.length" class="btn block big must" data-testid="required-missing" @click="toRequired">{{ t('sf.required_pick') }} · {{ pick(missing[0].name, missing[0].name_en) }}</button>
+            <button v-if="count && missing.length" class="btn block big must" data-testid="required-missing" @click="toRequired">{{ t('sf.required_pick') }} · {{ mn(missing[0]) }}</button>
             <button v-else class="btn primary block big" data-testid="go-checkout" :disabled="blocked" @click="checkout">{{ t('checkout') }}<template v-if="count"> · {{ money(deal.now, cur) }}</template></button>
           </div>
         </div>
@@ -462,16 +468,16 @@ async function sendReport() {
       <div class="sheet-mask" v-if="sheet.item" @click.self="sheet.item = null">
         <div class="sheet">
           <div class="sheet-head">
-            <h2>{{ pick(sheet.item.name, sheet.item.name_en) }}</h2>
-            <div class="muted small" v-if="sheet.item.description">{{ sheet.item.description }}</div>
+            <h2>{{ mn(sheet.item) }}</h2>
+            <div class="muted small" v-if="sheet.item.description">{{ mt(sheet.item.description, sheet.item.description_tr) }}</div>
           </div>
           <div class="sheet-body stack">
             <div v-for="(g, gi) in sheet.item.groups" :key="g.id">
-              <div class="row between"><h3>{{ pick(g.name, g.name_en) }}</h3><span class="muted small">{{ groupHint(g) }}</span></div>
+              <div class="row between"><h3>{{ mn(g) }}</h3><span class="muted small">{{ groupHint(g) }}</span></div>
               <label v-for="o in g.options" :key="o.id" class="opt" :class="{ off: o.sold_out }">
                 <input :type="g.max_select === 1 ? 'radio' : 'checkbox'" :checked="sheet.chosen.has(o.id)" :disabled="o.sold_out"
                   @click.prevent="toggle(gi, o.id)" />
-                <span class="grow">{{ pick(o.name, o.name_en) }}<span v-if="o.sold_out" class="muted small"> · {{ t('sold_out') }}</span></span>
+                <span class="grow">{{ mn(o) }}<span v-if="o.sold_out" class="muted small"> · {{ t('sold_out') }}</span></span>
                 <span class="price muted" v-if="o.price_delta">+{{ money(o.price_delta, cur) }}</span>
               </label>
             </div>
@@ -480,7 +486,7 @@ async function sendReport() {
           <div class="sheet-foot row between">
             <span class="stepper"><button @click="sheet.qty = Math.max(1, sheet.qty - 1)">−</button><span>{{ sheet.qty }}</span><button class="fill" @click="sheet.qty = Math.min(99, sheet.qty + 1)">+</button></span>
             <button class="btn primary grow" :disabled="!!sheetMissing" @click="confirmSheet">
-              {{ sheetMissing ? `${t('required')}: ${pick(sheetMissing.name, sheetMissing.name_en)}` : `${t('add_to_cart')} · ${money(sheetPrice, cur)}` }}
+              {{ sheetMissing ? `${t('required')}: ${mn(sheetMissing)}` : `${t('add_to_cart')} · ${money(sheetPrice, cur)}` }}
             </button>
           </div>
         </div>
@@ -507,7 +513,7 @@ async function sendReport() {
           <div class="sheet-head row between"><h2>{{ t('sf.promos') }}</h2><button class="btn link" @click="showPromos = false">{{ t('close') }}</button></div>
           <div class="sheet-body stack">
             <div v-for="p in promos" :key="p.id" class="row between">
-              <span>{{ pick(p.name, p.name_en) }}</span><span class="tag brand">{{ promoLabel(p, cur) }}</span>
+              <span>{{ mn(p) }}</span><span class="tag brand">{{ promoLabel(p, cur) }}</span>
             </div>
           </div>
         </div>
@@ -539,6 +545,8 @@ async function sendReport() {
 </template>
 
 <style scoped>
+.mt-note { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #8a7f75; padding: 4px 14px; }
+.mt-note .linkish { background: none; border: 0; padding: 0; color: var(--brand, #b8322a); font-size: 12px; cursor: pointer; text-decoration: underline; }
 .shop { --star: #f5a623; --menu-top: 50px; background: var(--bg);
   /* the marketplace's colours: cream cards on a beige page, prices in the deep red */
   --menu-bg: var(--paper); --rail-bg: #f3e6d2; --price: var(--red); --soft-red: #f9e4dc; }

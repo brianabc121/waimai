@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // One table's bill, grouped by ordering round. Staff also get serve and void.
 import { computed } from 'vue'
-import { both, money, pick, t } from '../i18n'
+import { both, money, pick, t, mn } from '../i18n'
 import type { Order, OrderItem } from '../types'
 
 const props = defineProps<{ order: Order; staff?: boolean; readonly?: boolean }>()
@@ -21,7 +21,7 @@ function state(it: OrderItem): [string, string] {
   if (it.prep_status === 'ready') return [t('i.ready'), 'info']
   return [t('i.' + it.prep_status), it.prep_status === 'preparing' ? 'warn' : '']
 }
-const name = (it: OrderItem) => props.staff ? both(it.name, it.name_en) : pick(it.name, it.name_en)
+const name = (it: OrderItem) => props.staff ? both(it.name, it.name_en) : mn(it)
 </script>
 
 <template>
@@ -34,7 +34,7 @@ const name = (it: OrderItem) => props.staff ? both(it.name, it.name_en) : pick(i
       <div v-for="it in b.items" :key="it.id" class="bline" :class="{ strike: it.prep_status === 'cancelled' }">
         <div class="grow">
           <div>{{ it.qty }} × {{ name(it) }}</div>
-          <div class="small muted" v-if="it.options.length">{{ it.options.map(x => pick(x.name, x.name_en)).join(' · ') }}</div>
+          <div class="small muted" v-if="it.options.length">{{ it.options.map(x => props.staff ? pick(x.name, x.name_en) : mn(x)).join(' · ') }}</div>
           <div class="small muted" v-if="it.note">{{ t('note') }}: {{ it.note }}</div>
           <div class="small muted" v-if="it.void_reason">{{ t('reason') }}: {{ it.void_reason }}</div>
         </div>

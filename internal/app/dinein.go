@@ -390,6 +390,8 @@ type BatchInput struct {
 	// ExpectedTotal is the sum of line totals the client showed. When prices
 	// moved since, the batch is refused so the guest can look again.
 	ExpectedTotal *int64 `json:"expected_total"`
+	// Lang is the guest's language; the bill keeps the dishes' names in it.
+	Lang string `json:"lang"`
 }
 
 // AddBatch sends one round of dishes to the kitchen and appends it to the
@@ -432,6 +434,11 @@ func (a *App) AddBatch(ctx context.Context, sessionID int64, source, idemKey str
 		if err != nil {
 			return err
 		}
+		if source != "staff" {
+			if err := localizeLines(ctx, tx, b, in.Lang, lines); err != nil {
+				return err
+			}
+		}
 		if in.ExpectedTotal != nil && *in.ExpectedTotal != subtotal {
 			return ErrD(http.StatusConflict, "QUOTE_CHANGED", "prices changed, please check the amount again",
 				map[string]any{"total": subtotal})
@@ -453,9 +460,9 @@ func (a *App) AddBatch(ctx context.Context, sessionID int64, source, idemKey str
 				status = "ready"
 			}
 			if _, err := tx.Exec(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name, name_en,
-				unit_price, qty, line_total, options, note, needs_prep, prep_status)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, s.OrderID, b.ID, batchID, l.ItemID, l.Name,
-				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, status); err != nil {
+				unit_price, qty, line_total, options, note, needs_prep, prep_status, name_customer)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, s.OrderID, b.ID, batchID, l.ItemID, l.Name,
+				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, status, l.NameTr); err != nil {
 				return wrap("insert batch item", err)
 			}
 		}

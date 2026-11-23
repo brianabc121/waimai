@@ -46,6 +46,7 @@ type OrderCard struct {
 type CardItem struct {
 	Name     string `json:"name"`
 	NameEn   string `json:"name_en"`
+	NameTr   string `json:"name_tr,omitempty"`
 	Qty      int    `json:"qty"`
 	ImageURL string `json:"image_url"`
 }
@@ -134,7 +135,7 @@ func (a *App) CustomerOrders(ctx context.Context, customerID int64, tab, search 
 	if len(ids) == 0 {
 		return out, nil
 	}
-	rows, err = a.DB.Query(ctx, `SELECT i.order_id, i.name, i.name_en, i.qty, COALESCE(m.image_url, '')
+	rows, err = a.DB.Query(ctx, `SELECT i.order_id, i.name, i.name_en, i.qty, COALESCE(m.image_url, ''), i.name_customer
 		FROM order_items i LEFT JOIN menu_items m ON m.id = i.item_id
 		WHERE i.order_id = ANY($1) AND i.void_reason = '' ORDER BY i.id`, ids)
 	if err != nil {
@@ -144,7 +145,7 @@ func (a *App) CustomerOrders(ctx context.Context, customerID int64, tab, search 
 	for rows.Next() {
 		var orderID int64
 		var it CardItem
-		if err := rows.Scan(&orderID, &it.Name, &it.NameEn, &it.Qty, &it.ImageURL); err != nil {
+		if err := rows.Scan(&orderID, &it.Name, &it.NameEn, &it.Qty, &it.ImageURL, &it.NameTr); err != nil {
 			return nil, err
 		}
 		c := &out.Orders[idx[orderID]]

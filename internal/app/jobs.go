@@ -140,6 +140,14 @@ func (a *App) runJob(ctx context.Context, j *claimedJob) error {
 			return err
 		}
 		return a.parseMenuImport(ctx, p.ID)
+	case "translate_menu":
+		var p translateJob
+		if err := json.Unmarshal(j.Payload, &p); err != nil {
+			return err
+		}
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+		defer cancel()
+		return a.TranslateMenu(ctx, p.BranchID, p.Force)
 	default:
 		return fmt.Errorf("unknown job kind %q", j.Kind)
 	}

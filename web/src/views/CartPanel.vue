@@ -3,7 +3,7 @@
 // sheet over the cart bar and beside the menu on a computer.
 import { computed, ref } from 'vue'
 import { cart, linePrice, MAX_BASKETS, moveLine, type CartLine } from '../cart'
-import { money, pick, t } from '../i18n'
+import { money, pick, t, mn } from '../i18n'
 import type { Item, Storefront } from '../types'
 
 const props = defineProps<{ store: Storefront; items: Map<number, Item>; currency: string; orderable: (it: Item) => boolean }>()
@@ -19,12 +19,12 @@ const lines = computed(() => baskets.value.length ? cart.lines.filter(l => l.bas
 const sum = (ls: CartLine[]) => ls.reduce((s, l) => s + (linePrice(l, props.items) ?? 0) * l.qty, 0)
 const used = computed(() => new Set(cart.lines.map(l => l.basket)).size)
 const bad = (l: CartLine) => { const it = props.items.get(l.item_id); return !it || !props.orderable(it) || linePrice(l, props.items) === null }
-const name = (l: CartLine) => { const it = props.items.get(l.item_id); return it ? pick(it.name, it.name_en) : '—' }
+const name = (l: CartLine) => { const it = props.items.get(l.item_id); return it ? mn(it) : '—' }
 function optionNames(l: CartLine) {
   const it = props.items.get(l.item_id)
   if (!it) return ''
   const all = new Map(it.groups.flatMap(g => g.options).map(o => [o.id, o]))
-  return l.option_ids.map(id => all.get(id)).filter(Boolean).map(o => pick(o!.name, o!.name_en)).join(' · ')
+  return l.option_ids.map(id => all.get(id)).filter(Boolean).map(o => mn(o!)).join(' · ')
 }
 
 function change(l: CartLine, d: number) {

@@ -5,6 +5,8 @@ export interface Branch {
   delivery_enabled: boolean; pickup_enabled: boolean; paused: boolean
   open_time: string; close_time: string; open_now: boolean; notify_sms: boolean
   scheduling_enabled: boolean; prep_minutes: number
+  // the language the menu is written in; languages whose customers get the English menu
+  menu_lang?: string; menu_langs_off?: string[]
   kitchen_slow_minutes: number; detour_percent: number; detour_meters: number
   lat: number | null; lng: number | null; zone_mode: 'list' | 'map'; zone_tolerance_m: number
   notice: string; intro: string; baskets_enabled: boolean
@@ -17,8 +19,9 @@ export interface Station { id: number; name: string; name_en: string; active: bo
 export type LatLngPair = [number, number]
 export interface Zone { id: number; name: string; name_en: string; fee: number; min_order: number; active: boolean; sort: number
   polygon: LatLngPair[]; color: string; eta_minutes: number | null }
-export interface Option { id: number; name: string; name_en: string; price_delta: number; sold_out: boolean }
-export interface OptionGroup { id: number; name: string; name_en: string; min_select: number; max_select: number; options: Option[] }
+// name_tr and the like: the text in the customer's language, when it differs (customer pages only)
+export interface Option { id: number; name: string; name_en: string; price_delta: number; sold_out: boolean; name_tr?: string }
+export interface OptionGroup { id: number; name: string; name_en: string; min_select: number; max_select: number; options: Option[]; name_tr?: string }
 export interface Item {
   id: number; category_id: number; name: string; name_en: string; description: string; image_url: string
   price: number; published: boolean; sold_out: boolean; stock_qty: number | null; needs_prep: boolean
@@ -27,19 +30,23 @@ export interface Item {
   photos?: string[]; details?: string
   // How many were ordered so far; only the customer's store page gets it.
   sold?: number
+  name_tr?: string; description_tr?: string; details_tr?: string
 }
-export interface Category { id: number; name: string; name_en: string; sort: number; required?: boolean; items: Item[] }
+export interface Category { id: number; name: string; name_en: string; sort: number; required?: boolean; items: Item[]; name_tr?: string }
 export interface Promotion {
   id: number; name: string; name_en: string; kind: 'amount_off' | 'percent_off' | 'free_delivery'
   threshold: number; value: number; max_discount: number | null; applies_delivery: boolean; applies_pickup: boolean
   starts_at: string | null; ends_at: string | null; daily_start: string; daily_end: string
   total_quota: number | null; per_phone_limit: number | null; used_count: number; status: string; live_now: boolean
+  name_tr?: string
 }
 export interface Template { layout: 'list' | 'featured' | 'grid'; theme_color: string; logo_url: string; cover_url: string }
 export type Channel = 'delivery' | 'qr' | 'ipad'
 export interface ChannelTemplate { channel: Channel; published: Template; draft: Template | null; published_at: string | null }
 export interface Storefront { branch: Branch; zones: Zone[]; categories: Category[]; promotions: Promotion[]; slots: string[]; templates: Record<Channel, Template>
-  sales: number; rating: ReviewSummary; media?: PromoMedia[] }
+  sales: number; rating: ReviewSummary; media?: PromoMedia[]
+  // some of the menu is shown machine translated
+  machine_translated?: boolean }
 export interface Crop { x: number; y: number; w: number; h: number }
 // A promotional picture, GIF or video at the top of the store page.
 export interface PromoMedia { id: number; kind: 'image' | 'gif' | 'video'; url: string; poster_url: string; title: string
@@ -57,9 +64,9 @@ export interface Totals {
   // the promotion's part (quotes only); the store's and the platform's parts of discount
   promotion_discount?: number; merchant_discount: number; platform_subsidy: number
 }
-export interface LineOption { group: string; group_en: string; name: string; name_en: string; price_delta: number }
+export interface LineOption { group: string; group_en: string; name: string; name_en: string; price_delta: number; group_tr?: string; name_tr?: string }
 export interface OrderItem {
-  id: number; item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number
+  id: number; item_id: number; name: string; name_en: string; name_tr?: string; unit_price: number; qty: number; line_total: number
   options: LineOption[]; note: string; needs_prep: boolean; prep_status: string
   station_id: number | null; station_name: string
   batch_seq: number; batch_source: string; served_at: string | null; void_reason?: string
@@ -72,7 +79,7 @@ export interface OrderStore { slug: string; name: string; name_en: string; phone
 export interface OrderCard {
   token: string; public_no: string; store: OrderStore; service_type: 'delivery' | 'pickup'; display_status: string
   created_at: string; timezone: string; total: number; currency: string; item_count: number
-  items: { name: string; name_en: string; qty: number; image_url: string }[]
+  items: { name: string; name_en: string; name_tr?: string; qty: number; image_url: string }[]
   can_review: boolean; reviewed: boolean; aftersale: '' | 'open' | 'resolved' | 'declined'
 }
 export interface Reorder { slug: string; service_type: 'delivery' | 'pickup'

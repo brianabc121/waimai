@@ -12,7 +12,7 @@ interface Setting {
 }
 interface View {
   items: Setting[]
-  active: { maps: string; routes: string; web_push: boolean; app_push: boolean; sms: string }
+  active: { maps: string; routes: string; web_push: boolean; app_push: boolean; sms: string; translate: string }
   otp_sent_today?: number
   weak_secret: boolean
 }
@@ -24,7 +24,7 @@ const error = ref('')
 const failed = ref('') // the group whose save was refused
 const saved = ref('')
 const busy = ref(false)
-const groups = ['maps', 'web_push', 'app_push', 'sms'] as const
+const groups = ['maps', 'web_push', 'app_push', 'sms', 'translate'] as const
 type Group = typeof groups[number]
 
 function take(v: View) {
@@ -81,6 +81,7 @@ function state(g: Group): { on: boolean; text: string } {
   if (g === 'maps') return { on: a.maps !== 'off', text: t('ad.set.maps_' + a.maps) + ' · ' + t('ad.set.routes_' + a.routes) }
   if (g === 'web_push') return { on: a.web_push, text: t(a.web_push ? 'ad.set.on' : 'ad.set.off') }
   if (g === 'app_push') return { on: a.app_push, text: t(a.app_push ? 'ad.set.on' : 'ad.set.off') }
+  if (g === 'translate') return { on: a.translate !== 'off', text: t('ad.set.tr_' + a.translate) }
   return { on: a.sms !== 'log', text: t('ad.set.sms_' + a.sms) }
 }
 </script>
@@ -115,6 +116,10 @@ function state(g: Group): { on: boolean; text: string } {
               <option value="log">{{ t('ad.set.sms_log') }}</option>
               <option value="webhook">{{ t('ad.set.sms_webhook') }}</option>
               <option value="twilio">{{ t('ad.set.sms_twilio') }}</option>
+            </select>
+            <select v-else-if="s.key === 'TRANSLATE_PROVIDER'" v-model="draft[s.key]" data-testid="tr-provider">
+              <option value="">{{ t('ad.set.tr_auto') }}</option>
+              <option v-for="p in ['claude-haiku-5-5', 'claude-sonnet-5-5', 'google', 'off']" :key="p" :value="p">{{ t('ad.set.tr_' + p) }}</option>
             </select>
             <textarea v-else-if="s.key === 'FCM_SERVICE_ACCOUNT'" v-model="draft[s.key]" rows="3" spellcheck="false" :placeholder="t('ad.set.fcm_ph')"></textarea>
             <input v-else v-model="draft[s.key]" :type="s.secret ? 'password' : 'text'" autocomplete="new-password" spellcheck="false"

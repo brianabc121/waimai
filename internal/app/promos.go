@@ -15,6 +15,7 @@ type Promotion struct {
 	ID              int64      `json:"id"`
 	Name            string     `json:"name"`
 	NameEn          string     `json:"name_en"`
+	NameTr          string     `json:"name_tr,omitempty"`
 	Kind            string     `json:"kind"` // amount_off, percent_off, free_delivery
 	Threshold       int64      `json:"threshold"`
 	Value           int64      `json:"value"`

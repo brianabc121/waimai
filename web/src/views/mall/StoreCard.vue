@@ -5,7 +5,7 @@
 // store near the customer that does not deliver to them is greyed and marked
 // "no delivery"; opening it starts its cart on pickup when it offers that.
 import { computed } from 'vue'
-import { money, pick, promoLabel, t } from '../../i18n'
+import { money, pick, promoLabel, t, mn } from '../../i18n'
 import { cart, useCart } from '../../cart'
 import { cartCount, distanceText, type MallCategory, type MallStore } from '../../mall'
 
@@ -74,7 +74,7 @@ function opened() {
         <div v-for="(d, i) in s.dishes" :key="i" class="dish">
           <img v-if="d.image_url" :src="d.image_url" alt="" loading="lazy" />
           <span v-else class="ph"></span>
-          <span class="dn">{{ pick(d.name, d.name_en) }}</span>
+          <span class="dn">{{ mn(d) }}</span>
           <b>{{ money(d.price, s.currency) }}</b>
         </div>
       </div>

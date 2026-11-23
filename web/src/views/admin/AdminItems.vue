@@ -6,6 +6,8 @@ import { money, t } from '../../i18n'
 import type { Category, Item, Station } from '../../types'
 import ItemForm from '../ItemForm.vue'
 import MenuImportDialog from '../MenuImportDialog.vue'
+import MenuTranslations from '../MenuTranslations.vue'
+import '../translateStrings'
 import Pager from './Pager.vue'
 import type { AdminBranch, AdminItemRow } from './types'
 import { fmtDateTime, qs } from './util'
@@ -82,6 +84,12 @@ async function edit(row: AdminItemRow | null) {
 }
 async function saved() { form.open = false; await load() }
 
+// ---- the store's menu in other languages ----
+const langs = reactive<{ open: boolean; cats: Category[] }>({ open: false, cats: [] })
+async function openLangs() {
+  try { langs.cats = (await get(`${base(branchId.value)}/menu`)).categories; langs.open = true } catch (e) { error.value = (e as Error).message }
+}
+
 // ---- categories of the selected store ----
 const cats = reactive<{ open: boolean; error: string; rows: Category[]; name: string; name_en: string }>({ open: false, error: '', rows: [], name: '', name_en: '' })
 async function loadCats() { cats.rows = (await get(`${base(branchId.value)}/menu`)).categories }
@@ -118,6 +126,7 @@ function removeCat(c: Category) { if (confirm(t('ad.cat_delete_confirm', { name:
       </div>
       <span class="grow"></span>
       <button class="btn" :disabled="!store" data-testid="open-import" :title="store ? '' : t('ad.pick_store')" @click="importing = true">{{ t('import_excel') }}</button>
+      <button class="btn" :disabled="!store" data-testid="open-langs" :title="store ? t('mtr.open_hint') : t('ad.pick_store')" @click="openLangs">{{ t('mtr.open') }}</button>
       <button class="btn" :disabled="!store" data-testid="manage-cats" @click="openCats">{{ t('ad.manage_cats') }}</button>
       <button class="btn primary" :disabled="!store" data-testid="new-item" @click="edit(null)">＋ {{ t('new_item') }}</button>
     </div>
@@ -166,6 +175,7 @@ function removeCat(c: Category) { if (confirm(t('ad.cat_delete_confirm', { name:
     </Pager>
     <p class="small muted">{{ t('ad.items_foot') }} {{ t('ad.excel_hint') }}</p>
 
+    <MenuTranslations v-if="langs.open && store" :base="base(store.id)" :cats="langs.cats" @close="langs.open = false" />
     <MenuImportDialog v-if="importing && store" :base="base(store.id)" :cur="store.currency"
       :title="t('import_excel') + ' · ' + store.merchant_name + ' · ' + store.name" @imported="load" @close="importing = false" />
 

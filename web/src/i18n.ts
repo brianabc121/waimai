@@ -318,6 +318,21 @@ export function pick(zh: string, en: string): string {
   return isZh() ? zh || en : en || zh
 }
 
+// menuOriginal shows the store's menu as the merchant wrote it ("查看原文").
+export const menuOriginal = ref(false)
+
+// mn names a dish, category, option or offer for the customer: in their
+// language when the server sent it (name_tr), else as pick does.
+export function mn(o: { name: string; name_en?: string; name_tr?: string }): string {
+  if (menuOriginal.value) return o.name
+  return o.name_tr || pick(o.name, o.name_en ?? '')
+}
+
+// mt is a longer menu text (description, details) for the customer.
+export function mt(orig: string | undefined, tr: string | undefined): string {
+  return (!menuOriginal.value && tr) || orig || ''
+}
+
 // both shows "中文 / English" for staff screens where the team is mixed.
 export function both(zh: string, en: string): string {
   return en && en !== zh ? `${zh} / ${en}` : zh

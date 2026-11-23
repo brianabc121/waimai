@@ -37,6 +37,9 @@ type QuoteInput struct {
 	// CouponIDs are the coupons to use. nil lets the system choose the best
 	// ones; an empty list uses none. A stored quote always has the list.
 	CouponIDs *[]int64 `json:"coupon_ids"`
+	// Lang is the customer's language: the lines are named in it as well, and
+	// the order keeps those names (docs/I18N_DESIGN.md §6.4).
+	Lang string `json:"lang"`
 }
 
 type LineOption struct {
@@ -45,12 +48,16 @@ type LineOption struct {
 	Name       string `json:"name"`
 	NameEn     string `json:"name_en"`
 	PriceDelta int64  `json:"price_delta"`
+	// In the customer's language, when it differs.
+	GroupTr string `json:"group_tr,omitempty"`
+	NameTr  string `json:"name_tr,omitempty"`
 }
 
 type QuoteLine struct {
 	ItemID    int64        `json:"item_id"`
 	Name      string       `json:"name"`
 	NameEn    string       `json:"name_en"`
+	NameTr    string       `json:"name_tr,omitempty"`
 	UnitPrice int64        `json:"unit_price"`
 	Qty       int          `json:"qty"`
 	LineTotal int64        `json:"line_total"`
@@ -175,6 +182,9 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		for i := range lines {
 			lines[i].Basket = 1
 		}
+	}
+	if err := localizeLines(ctx, q, b, in.Lang, lines); err != nil {
+		return nil, err
 	}
 	quote.Lines = lines
 	if err := checkRequired(ctx, q, b.ID, in.ServiceType, lines); err != nil {

@@ -6,6 +6,8 @@ import { currentRole, session } from '../session'
 import type { Category, Item, Station } from '../types'
 import ItemForm from './ItemForm.vue'
 import MenuImportDialog from './MenuImportDialog.vue'
+import MenuTranslations from './MenuTranslations.vue'
+import './translateStrings'
 
 const bid = session.branchId!
 const cur = currentRole()?.currency ?? 'PHP'
@@ -47,6 +49,17 @@ async function newCategory() {
 const setRequired = (c: Category) => run(() => put(`/merchant/branches/${bid}/categories/${c.id}`,
   { name: c.name, name_en: c.name_en, sort: c.sort, required: !c.required }))
 
+// ---- the menu in other languages (MenuTranslations.vue) ----
+const langs = reactive<{ open: boolean; item: Item | null }>({ open: false, item: null })
+const showLangs = (it: Item | null) => Object.assign(langs, { open: true, item: it })
+// a failed translation run shows on the page until a later one works
+const trFailed = ref(false)
+async function checkTranslations() {
+  trFailed.value = !!(await get<{ error: string }>(`/merchant/branches/${bid}/translations`).catch(() => ({ error: '' }))).error
+}
+onMounted(checkTranslations)
+function closeLangs() { langs.open = false; void checkTranslations() }
+
 // ---- Excel import (MenuImportDialog.vue) ----
 const importing = ref(false)
 
@@ -61,12 +74,15 @@ async function saved() { form.open = false; await load() }
     <div class="row between">
       <h1>{{ t('menu_admin') }}</h1>
       <div class="row" v-if="manager">
+        <button class="btn" :title="t('mtr.open_hint')" data-testid="open-langs" @click="showLangs(null)">{{ t('mtr.open') }}</button>
         <button class="btn" data-testid="open-import" @click="importing = true">{{ t('import_excel') }}</button>
         <button class="btn" @click="newCategory">{{ t('new_category') }}</button>
         <button class="btn primary" :disabled="cats.length === 0" @click="edit(null)">{{ t('new_item') }}</button>
       </div>
     </div>
     <div v-if="error" class="banner bad">{{ error }}</div>
+    <div v-if="trFailed && manager" class="banner bad row between" data-testid="tr-failed-banner">{{ t('mtr.failed', { at: '' }) }}
+      <button class="btn small" @click="showLangs(null)">{{ t('mtr.open') }}</button></div>
 
     <div v-for="c in cats" :key="c.id" class="card" style="padding:0;overflow:auto">
       <div class="row between wrap" style="padding:10px 12px"><h2>{{ both(c.name, c.name_en) }}
@@ -94,6 +110,7 @@ async function saved() { form.open = false; await load() }
                 <template v-if="manager">
                   <button class="btn small" @click="quick(it, { published: !it.published })">{{ it.published ? t('unpublish') : t('publish') }}</button>
                   <button class="btn small" @click="edit(it)">{{ t('edit') }}</button>
+                  <button class="btn small" :data-testid="'item-langs-' + it.id" @click="showLangs(it)">{{ t('mtr.open') }}</button>
                   <button class="btn small danger" @click="archive(it)">{{ t('archive') }}</button>
                 </template>
               </div>
@@ -105,6 +122,8 @@ async function saved() { form.open = false; await load() }
     </div>
 
     <MenuImportDialog v-if="importing" :base="`/merchant/branches/${bid}`" :cur="cur" @imported="load" @close="importing = false" />
+
+    <MenuTranslations v-if="langs.open" :base="`/merchant/branches/${bid}`" :cats="cats" :item="langs.item" @close="closeLangs" />
 
     <ItemForm v-if="form.open" :item="form.item" :category-id="form.categoryId" :cats="cats" :stations="stations" :cur="cur"
       :base="`/merchant/branches/${bid}`" @saved="saved" @close="form.open = false" />
