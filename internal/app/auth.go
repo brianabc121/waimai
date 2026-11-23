@@ -449,9 +449,15 @@ func (a *App) VerifyOTP(ctx context.Context, phone, code string) (token string, 
 			return err
 		}
 		var customerID int64
+		var isNew bool
 		if err := tx.QueryRow(ctx, `INSERT INTO customers (phone) VALUES ($1)
-			ON CONFLICT (phone) DO UPDATE SET last_login_at = now() RETURNING id`, phone).Scan(&customerID); err != nil {
+			ON CONFLICT (phone) DO UPDATE SET last_login_at = now() RETURNING id, xmax = 0`, phone).Scan(&customerID, &isNew); err != nil {
 			return err
+		}
+		if isNew {
+			if err := giftNewCustomer(ctx, tx, customerID); err != nil {
+				return err
+			}
 		}
 		if _, err := tx.Exec(ctx, `UPDATE orders SET customer_id=$1 WHERE customer_phone=$2 AND customer_id IS NULL`,
 			customerID, phone); err != nil {

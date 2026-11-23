@@ -134,6 +134,7 @@ export interface CustomerCoupon {
   store_slug: string; store_name: string; store_name_en: string; currency: string
   name: string; name_en: string; value: number; threshold: number; source: string
   issued_at: string; expires_at: string; status: 'available' | 'used' | 'expired'; used_at: string | null
+  country: string; country_code: string; province: string
 }
 export interface CouponChoice extends CustomerCoupon {
   usable: boolean; reason: '' | 'below_threshold' | 'delivery_only' | 'no_saving'; short: number; saves: number; selected: boolean
@@ -145,3 +146,13 @@ export interface RepurchaseRule {
   monthly_cap: number | null; currency: string
   stats: { issued: number; used: number; open: number; expired: number; cost: number; sales: number }
 }
+export interface CouponBatch {
+  id: number; issuer: 'store' | 'platform'; branch_id: number | null; kind: CouponKind; source: 'repurchase' | 'claim' | 'new_customer' | 'manual'
+  name: string; name_en: string; currency: string; value: number; threshold: number; valid_days: number
+  total_quota: number | null; per_customer: number | null; budget: number | null
+  country_code: string; country: string; province: string; issued_count: number; status: 'active' | 'paused' | 'ended'
+  stats: { issued: number; used: number; open: number; spent: number }
+}
+export interface ClaimableCoupon { id: number; kind: CouponKind; name: string; name_en: string; value: number; threshold: number; valid_days: number; claimed: boolean; gone: boolean }
+export interface CouponCountry { country_code: string; country: string; currency: string; stores: number; provinces: string[] }
+export interface PlatformCouponSummary { currency: string; month_spent: number; month_orders: number; open_count: number; open_value: number }

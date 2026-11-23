@@ -14,6 +14,7 @@ import DishDetail from './DishDetail.vue'
 import MediaCarousel from './MediaCarousel.vue'
 import MenuList from './MenuList.vue'
 import StoreReviews from './StoreReviews.vue'
+import StoreCoupons from './StoreCoupons.vue'
 import './storeStrings'
 import CustomerTabs from './me/CustomerTabs.vue'
 import { isFavorite, loadProfile, rememberStore, setFavorite } from './me/me'
@@ -323,6 +324,7 @@ async function sendReport() {
           <div class="chips brand"><span v-for="p in promos.slice(0, 3)" :key="p.id" :title="pick(p.name, p.name_en)">{{ promoLabel(p, cur) }}</span></div>
           <button class="more" data-testid="promos-more" @click="showPromos = true">{{ t('sf.promos_n', { n: promos.length }) }} ›</button>
         </div>
+        <StoreCoupons :slug="slug" :currency="cur" />
         <div class="notice" v-if="store.branch.notice" data-testid="notice">
           <span class="lbl">{{ t('sf.notice') }}</span>
           <!-- a notice too long for the line scrolls round and round -->
