@@ -31,6 +31,9 @@ func (s *Server) chatRoutes(r *gin.Engine, api *gin.RouterGroup) {
 	api.POST("/customer/chats/:slug/report", w, s.customerChatReport)
 	api.POST("/customer/devices", w, s.customerDevice)
 	api.DELETE("/customer/devices/:id", w, s.customerDeviceRemove)
+	api.GET("/customer/support", s.customerSupport)
+	api.POST("/customer/support/read", w, s.customerSupportRead)
+	api.POST("/customer/support/images", w, s.customerSupportImage)
 
 	// OpenIM calls back here from inside the private network. Its callbacks
 	// are not signed, so the address carries a key.
@@ -51,6 +54,18 @@ func (s *Server) chatAdminRoutes(auth, admin *gin.RouterGroup) {
 
 	auth.POST("/merchant/branches/:bid/chats/:cid/block", s.storeChatBlock)
 	auth.POST("/merchant/branches/:bid/chats/:cid/report", s.storeChatReport)
+
+	auth.GET("/merchant/branches/:bid/support", s.storeSupport)
+	auth.POST("/merchant/branches/:bid/support/read", s.storeSupportRead)
+	auth.POST("/merchant/branches/:bid/support/images", s.storeSupportImage)
+
+	admin.GET("/support", s.adminSupport)
+	admin.GET("/support/unread", s.adminSupportUnread)
+	admin.POST("/support/login", s.adminSupportLogin)
+	admin.GET("/support/:party", s.adminSupportChat)
+	admin.POST("/support/:party/read", s.adminSupportRead)
+	admin.POST("/support/:party/images", s.adminSupportImage)
+	admin.POST("/support/:party/resolve", s.adminSupportResolve)
 
 	admin.GET("/chats", s.adminChats)
 	admin.POST("/chats/:id/reports/resolve", s.adminChatResolve)
@@ -74,7 +89,11 @@ func (s *Server) customerUnread(c *gin.Context) {
 func (s *Server) customerChats(c *gin.Context) {
 	if cu, ok := s.me(c); ok {
 		chats, err := s.App.CustomerChats(c, cu.ID)
-		reply(c, gin.H{"chats": chats, "enabled": s.App.ChatOn()}, err)
+		var support *app.ChatThread
+		if err == nil {
+			support, err = s.App.SupportThreadOf(c, app.CustomerParty(cu.ID))
+		}
+		reply(c, gin.H{"chats": chats, "support": support, "enabled": s.App.ChatOn()}, err)
 	}
 }
 
@@ -112,7 +131,11 @@ func (s *Server) storeChats(c *gin.Context) {
 		return
 	}
 	chats, unread, err := s.App.StoreChats(c, bid, app.ChatFilter{Q: c.Query("q"), Unread: c.Query("unread") == "1", Active: c.Query("active") == "1"})
-	reply(c, gin.H{"chats": chats, "unread": unread, "enabled": s.App.ChatOn()}, err)
+	var support int
+	if err == nil {
+		support, err = s.App.SupportUnread(c, app.StoreParty(bid))
+	}
+	reply(c, gin.H{"chats": chats, "unread": unread, "support_unread": support, "enabled": s.App.ChatOn()}, err)
 }
 
 func (s *Server) storeChatLogin(c *gin.Context) {

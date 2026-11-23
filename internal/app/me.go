@@ -59,6 +59,7 @@ func (a *App) CustomerProfile(ctx context.Context, customerID int64) (*Profile, 
 		(SELECT count(*) FROM customer_favorites f JOIN branches b ON b.id = f.branch_id
 			WHERE f.customer_id = c.id AND b.deleted_at IS NULL),
 		(SELECT COALESCE(sum(t.customer_unread), 0) FROM chat_threads t WHERE t.customer_id = c.id)
+		+ (SELECT COALESCE(sum(s.party_unread), 0) FROM support_threads s WHERE s.customer_id = c.id)
 		FROM customers c WHERE id=$1`, customerID).Scan(&p.Phone, &p.Nickname, &p.AvatarAt, &p.Unread, &p.Favorites, &p.ChatUnread)
 	if err != nil {
 		return nil, err

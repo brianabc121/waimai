@@ -1,20 +1,21 @@
 <script setup lang="ts">
 // One conversation: the messages and the box to write in. The customer's chat
-// page and the store's message page both use it.
+// page, the store's message page and the platform's support pages all use it.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { money, t } from '../../i18n'
-import { chat, clock, connect, history, listen, sendImage, sendOrder, sendText, type ChatMsg, type ChatOrder } from '../../chat'
+import { chat, clock, connect, history, listen, sendImage, sendOrder, sendText, type ChatMsg, type ChatOrder, type Side } from '../../chat'
 
 const props = defineProps<{
   peer: string
-  self: 'customer' | 'store'
-  branchId?: number // set on the store's side
+  self: 'customer' | 'store' | 'platform'
+  branchId?: Side // the account this page writes as: the store's branch, or 'platform'
   staff?: { uid: number; name: string }
   peerReadAt: string | null
   blocked?: string // why nothing can be sent, when it cannot
   desk?: boolean // Enter sends
   uploadPath: string // where this conversation's pictures are uploaded
   orders?: ChatOrder[] // the customer's orders with the store: what a card shows and what can be sent
+  emptyText?: string // shown before the first message
 }>()
 const emit = defineEmits<{ seen: []; activity: []; order: [order: ChatOrder] }>()
 
@@ -135,7 +136,7 @@ const stamp = (i: number) => i === 0 || list.value[i].at - list.value[i - 1].at 
       <button v-if="!end" class="btn link small cp-more" data-testid="chat-earlier" @click="earlier">{{ t('ch.earlier') }}</button>
       <div v-if="loading" class="cp-note">{{ t('ch.connecting') }}</div>
       <div v-else-if="error" class="banner bad" data-testid="chat-error">{{ error }}</div>
-      <div v-else-if="!list.length" class="cp-note" data-testid="chat-empty">{{ t(self === 'store' ? 'ch.start_desk' : 'ch.start') }}</div>
+      <div v-else-if="!list.length" class="cp-note" data-testid="chat-empty">{{ emptyText || t(self === 'store' ? 'ch.start_desk' : 'ch.start') }}</div>
       <template v-for="(m, i) in list" :key="m.id">
         <div v-if="stamp(i)" class="cp-day">{{ clock(m.at) }}</div>
         <div class="cp-msg" :class="{ me: m.mine, failed: m.state === 'failed' }" data-testid="chat-msg" :data-mine="m.mine" :data-state="m.state">
@@ -152,7 +153,7 @@ const stamp = (i: number) => i === 0 || list.value[i].at - list.value[i - 1].at 
             </button>
             <span v-else class="muted">{{ t('ch.other') }}</span>
             <em v-if="m.auto">{{ t('ch.auto') }}</em>
-            <em v-else-if="m.mine && self === 'store' && m.staff">{{ m.staff }}</em>
+            <em v-else-if="m.staff && (m.mine ? self !== 'customer' : self === 'platform')">{{ m.staff }}</em>
           </div>
         </div>
         <div v-if="m.state === 'failed'" class="cp-state bad" data-testid="chat-failed" @click="deliver(m)">{{ m.error || t('ch.failed') }} · {{ t('ch.failed') }}</div>
@@ -166,7 +167,7 @@ const stamp = (i: number) => i === 0 || list.value[i].at - list.value[i - 1].at 
       <div class="row between"><b>{{ t('ch.pick_order') }}</b><button type="button" class="btn link small" @click="picking = false">{{ t('close') }}</button></div>
       <div v-if="!orders?.length" class="small muted">{{ t('ch.no_orders_here') }}</div>
       <button v-for="o in orders ?? []" :key="o.id" type="button" data-testid="chat-order-pick" @click="pickOrder(o)">
-        <b>#{{ o.public_no }}</b><span class="tag warn">{{ t('s.' + o.status) }}</span><span class="small muted">{{ clock(o.created_at) }} · {{ money(o.total, o.currency) }}</span>
+        <b>#{{ o.public_no }}</b><span v-if="o.store_name" class="small">{{ o.store_name }}</span><span class="tag warn">{{ t('s.' + o.status) }}</span><span class="small muted">{{ clock(o.created_at) }} · {{ money(o.total, o.currency) }}</span>
       </button>
     </div>
     <form v-if="!blocked" class="cp-box" @submit.prevent="send">

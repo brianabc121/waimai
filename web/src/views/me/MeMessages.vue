@@ -14,13 +14,14 @@ const route = useRoute(), router = useRouter()
 // ---- chats ----
 const tab = ref<'chats' | 'notices'>(route.query.tab === 'notices' ? 'notices' : 'chats')
 const chats = ref<ChatThread[] | null>(null), chatOn = ref(true)
+const support = ref<ChatThread | null>(null) // the conversation with platform support, kept on top
 async function loadChats() {
   try {
     const r = await customerChats()
-    chats.value = r.chats; chatOn.value = r.enabled
-    if (me.profile) me.profile.chat_unread = r.chats.reduce((n, c) => n + c.unread, 0)
+    chats.value = r.chats; chatOn.value = r.enabled; support.value = r.support
+    if (me.profile) me.profile.chat_unread = r.chats.reduce((n, c) => n + c.unread, 0) + (r.support?.unread ?? 0)
     // Open on the notices where chat is not set up, and where only they have something new.
-    const unread = r.chats.some(c => c.unread > 0), chats0 = first
+    const unread = r.chats.some(c => c.unread > 0) || !!r.support?.unread, chats0 = first
     first = false
     if (!route.query.tab && !tabPicked && chats0 && ((!r.enabled && !r.chats.length) || (!unread && (me.profile?.unread ?? 0) > 0))) tab.value = 'notices'
   } catch (e) { error.value = describe(e) }
@@ -79,8 +80,15 @@ async function readAll() {
     </div>
     <div v-if="error" class="banner bad">{{ error }}</div>
     <template v-if="tab === 'chats'">
-      <div v-if="chats && !chats.length" class="card empty" data-testid="chats-empty">{{ t(chatOn ? 'ch.none' : 'ch.off') }}</div>
-      <div v-if="chats?.length" class="card clist" data-testid="chats">
+      <div v-if="chats && !chats.length && !support" class="card empty" data-testid="chats-empty">{{ t(chatOn ? 'ch.none' : 'ch.off') }}</div>
+      <div v-if="chats?.length || support" class="card clist" data-testid="chats">
+        <router-link v-if="support" to="/me/support/chat" class="crow" data-testid="chat-row-support">
+          <span class="me-logo sp">{{ t('sp.ava') }}</span>
+          <span class="grow">
+            <span class="row between"><b>{{ t('sp.title') }}</b><span class="small muted">{{ day(support.last_at) }}</span></span>
+            <span class="row between"><span class="last">{{ lastLine(support, 'customer') }}</span><i v-if="support.unread" class="num" data-testid="chat-row-unread">{{ support.unread > 99 ? '99+' : support.unread }}</i></span>
+          </span>
+        </router-link>
         <router-link v-for="c in chats" :key="c.id" :to="`/chat/${c.slug}`" class="crow" data-testid="chat-row" :data-slug="c.slug">
           <span class="me-logo">{{ (c.store_name ?? '').slice(0, 1) }}</span>
           <span class="grow">
@@ -90,7 +98,7 @@ async function readAll() {
           </span>
         </router-link>
       </div>
-      <p v-if="chats?.length" class="note" style="text-align:center">{{ t('ch.keep') }}</p>
+      <p v-if="chats?.length || support" class="note" style="text-align:center">{{ t('ch.keep') }}</p>
     </template>
     <template v-else>
       <div v-if="list && !list.length" class="card empty" data-testid="msg-empty">{{ t('mm.none') }}</div>
@@ -118,5 +126,6 @@ async function readAll() {
 .crow .grow { min-width: 0; display: grid; gap: 2px; }
 .crow .last { color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .crow .tag { justify-self: start; }
+.me-logo.sp { background: var(--red, #8b1a1a); color: var(--gold, #f3c86b); }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #e5352b; margin-right: 6px; vertical-align: 1px; }
 </style>

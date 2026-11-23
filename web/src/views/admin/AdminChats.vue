@@ -27,6 +27,7 @@ extend({
   'ax.reported': ['被举报', 'Reported'], 'ax.n_reports': ['{n} 条举报', '{n} reports'], 'ax.blocked': ['门店已拉黑', 'Blocked by store'],
   'ax.reports': ['举报', 'Reports'], 'ax.by_customer': ['顾客举报门店', 'Customer reported the store'], 'ax.by_store': ['门店举报顾客', 'Store reported the customer'],
   'ax.resolve': ['标记为已处理', 'Mark as dealt with'], 'ax.resolved': ['已处理 {d}', 'Dealt with {d}'], 'ax.img_gone': ['图片已过期', 'Picture expired'],
+  'ax.support_store': ['以平台客服身份联系门店 ›', 'Message the store as support ›'], 'ax.support_customer': ['以平台客服身份联系顾客 ›', 'Message the customer as support ›'],
   'ax.image': ['[图片]', '[Picture]'], 'ax.order': ['[订单]', '[Order]'], 'ax.you': ['', ''],
 })
 
@@ -170,6 +171,8 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
         <button v-if="detail.reports" class="btn small" style="justify-self:start" data-testid="ax-resolve" @click="resolve">{{ t('ax.resolve') }}</button>
       </template>
       <h4>{{ t('ax.actions') }}</h4>
+      <router-link class="lnk" :to="{ path: '/admin/support', query: { party: 'b_' + detail.branch_id } }" data-testid="ax-support-store">{{ t('ax.support_store') }}</router-link>
+      <router-link class="lnk" :to="{ path: '/admin/support', query: { party: 'c_' + detail.customer_id } }" data-testid="ax-support-customer">{{ t('ax.support_customer') }}</router-link>
       <button class="btn link bad" data-testid="ax-mute" :data-on="detail.muted || null" @click="mute">{{ t(detail.muted ? 'ax.unmute' : 'ax.mute') }}</button>
       <button class="btn link bad" data-testid="ax-store-toggle" @click="toggleStore">{{ t(detail.chat_enabled ? 'ax.close_store' : 'ax.open_store') }}</button>
     </aside>

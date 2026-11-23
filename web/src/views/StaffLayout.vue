@@ -27,7 +27,9 @@ async function toggleShift() {
 // read. When it grows while another page is open, a line across the top says
 // so (with a soft tone, unless the order sound is switched off).
 const chatUnread = ref(0), chatNew = ref(false)
-let chatTimer = 0, chatKnown = -1, chatSoon = 0
+// and the platform's answers on "platform support"
+const supportUnread = ref(0)
+let chatTimer = 0, chatKnown = -1, chatSoon = 0, supportKnown = -1
 function tone() {
   if (localStorage.getItem('order-sound') === 'off') return
   try {
@@ -40,10 +42,13 @@ function tone() {
 }
 async function countChats() {
   if (!desk.value || !session.branchId || document.visibilityState !== 'visible') return
-  const n = await storeChats(session.branchId, { unread: true }).then(r => r.unread, () => chatUnread.value)
+  const r = await storeChats(session.branchId, { unread: true }).catch(() => ({ unread: chatUnread.value, support_unread: supportUnread.value }))
+  const n = r.unread
   if (chatKnown >= 0 && n > chatKnown && route.path !== '/merchant/messages') { chatNew.value = true; tone() }
   if (!n) chatNew.value = false
   chatKnown = chatUnread.value = n
+  if (supportKnown >= 0 && r.support_unread > supportKnown && route.path !== '/merchant/support') tone()
+  supportKnown = supportUnread.value = r.support_unread
 }
 const countSoon = () => { clearTimeout(chatSoon); chatSoon = window.setTimeout(countChats, 400) }
 onMounted(() => { void countChats(); chatTimer = window.setInterval(countChats, 20000); window.addEventListener('live-refresh', countSoon) })
@@ -88,6 +93,7 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
         <router-link v-if="manager" to="/merchant/delivery-map">{{ t('delivery_map') }}</router-link>
         <router-link v-if="manager" to="/merchant/staff">{{ t('staff') }}</router-link>
         <router-link v-if="manager" to="/merchant/settings">{{ t('settings') }}</router-link>
+        <router-link v-if="desk" to="/merchant/support" data-testid="nav-support" @click="countChats">{{ t('sp.title') }}<span v-if="supportUnread" class="navnum" data-testid="nav-support-unread">{{ supportUnread > 99 ? '99+' : supportUnread }}</span></router-link>
         <router-link v-if="posts.length" to="/work">{{ t('my_workbench') }}</router-link>
       </div>
       <div class="shell-foot">

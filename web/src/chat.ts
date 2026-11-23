@@ -14,7 +14,7 @@ export interface ChatThread {
   peer: string; last_kind: string; last_text: string; last_sender: 'customer' | 'store' | 'system'; last_at: string
   unread: number; count: number; peer_read_at: string | null; order: OrderTag | null
 }
-export interface ChatOrder { id: number; public_no: string; status: string; service_type: string; total: number; currency: string; created_at: string; open: boolean; token?: string }
+export interface ChatOrder { id: number; public_no: string; status: string; service_type: string; total: number; currency: string; created_at: string; open: boolean; token?: string; store_name?: string }
 export interface CustomerChat {
   branch_id: number; slug: string; store_name: string; store_name_en: string; phone: string; open_now: boolean; open_time: string
   peer: string; enabled: boolean; muted: boolean; thread_id: number; peer_read_at: string | null; orders: ChatOrder[]; quiet: boolean
@@ -35,12 +35,12 @@ export interface ChatSetup { quick_replies: QuickReply[]; auto_reply_on: boolean
 export const chatImageUrl = (token: string) => `/api/v1/chat-images/${token}`
 
 // ---- this system's API ----
-export const customerChats = () => get<{ chats: ChatThread[]; enabled: boolean }>('/customer/chats')
+export const customerChats = () => get<{ chats: ChatThread[]; support: ChatThread | null; enabled: boolean }>('/customer/chats')
 export const customerChat = (slug: string) => get<CustomerChat>(`/customer/chats/${slug}`)
 export const customerChatRead = (slug: string) => post(`/customer/chats/${slug}/read`)
-export const customerUnread = () => get<{ chats: number; notices: number; total: number }>('/customer/unread')
+export const customerUnread = () => get<{ chats: number; support: number; notices: number; total: number }>('/customer/unread')
 export const storeChats = (bid: number, q: { q?: string; unread?: boolean; active?: boolean } = {}) =>
-  get<{ chats: ChatThread[]; unread: number; enabled: boolean }>(`/merchant/branches/${bid}/chats?q=${encodeURIComponent(q.q ?? '')}&unread=${q.unread ? 1 : ''}&active=${q.active ? 1 : ''}`)
+  get<{ chats: ChatThread[]; unread: number; support_unread: number; enabled: boolean }>(`/merchant/branches/${bid}/chats?q=${encodeURIComponent(q.q ?? '')}&unread=${q.unread ? 1 : ''}&active=${q.active ? 1 : ''}`)
 export const storeChat = (bid: number, customerId: number) => get<StoreChat>(`/merchant/branches/${bid}/chats/${customerId}`)
 export const chatSetup = (bid: number) => get<ChatSetup>(`/merchant/branches/${bid}/chat-setup`)
 export const addQuickReply = (bid: number, body: string) => post<QuickReply>(`/merchant/branches/${bid}/chat-quick-replies`, { body })
@@ -51,6 +51,25 @@ export const customerChatQuiet = (slug: string, quiet: boolean) => post(`/custom
 export const customerChatHide = (slug: string) => post(`/customer/chats/${slug}/hide`)
 export const storeChatBlock = (bid: number, customerId: number, blocked: boolean) => post(`/merchant/branches/${bid}/chats/${customerId}/block`, { blocked })
 export const storeChatRead = (bid: number, customerId: number) => post(`/merchant/branches/${bid}/chats/${customerId}/read`)
+
+// ---- platform support (the platform's shared inbox, p_1) ----
+export interface SupportChat { enabled: boolean; peer: string; thread_id: number; unread: number; peer_read_at: string | null; orders: ChatOrder[] }
+export interface SupportRow {
+  id: number; party: string; kind: 'customer' | 'store'; customer_id?: number; branch_id?: number; name: string; phone: string; phone_tail: string; merchant?: string
+  last_kind: string; last_text: string; last_sender: 'customer' | 'store' | 'platform'; last_at: string; unread: number; count: number
+  peer_read_at: string | null; resolved_at: string | null; resolved_by?: string
+}
+export interface SupportDetail extends SupportRow { started_at: string | null; orders: ChatOrder[]; slug?: string; merchant_id?: number; muted: boolean; since: string; chat_enabled: boolean }
+export const customerSupport = () => get<SupportChat>('/customer/support')
+export const customerSupportRead = () => post('/customer/support/read')
+export const storeSupport = (bid: number) => get<SupportChat>(`/merchant/branches/${bid}/support`)
+export const storeSupportRead = (bid: number) => post(`/merchant/branches/${bid}/support/read`)
+export const adminSupport = (q: { q?: string; who?: string; unread?: boolean; open?: boolean; page?: number; page_size?: number }) =>
+  get<{ list: { chats: SupportRow[]; total: number; unread: number; open: number }; enabled: boolean }>(`/admin/support?q=${encodeURIComponent(q.q ?? '')}&who=${q.who ?? ''}&unread=${q.unread ? 1 : ''}&open=${q.open ? 1 : ''}&page=${q.page ?? 1}&page_size=${q.page_size ?? 30}`)
+export const adminSupportUnread = () => get<{ unread: number }>('/admin/support/unread')
+export const adminSupportChat = (party: string) => get<SupportDetail>(`/admin/support/${party}`)
+export const adminSupportRead = (party: string) => post(`/admin/support/${party}/read`)
+export const adminSupportResolve = (party: string, resolved: boolean) => post(`/admin/support/${party}/resolve`, { resolved })
 
 // chatOn says whether this installation has chat at all (the entry points hide without it).
 let onPromise: Promise<boolean> | null = null
@@ -130,9 +149,13 @@ async function open(loginPath: string): Promise<Sdk> {
   return s
 }
 
-// connect signs in (once) as the customer, or as the store when a branch is given.
-export function connect(branchId?: number): Promise<Sdk> {
-  const path = branchId ? `/merchant/branches/${branchId}/chats/login` : '/customer/chats/login'
+// Side is whose account a page signs in to the chat server as: the customer
+// (undefined), a store (its branch id) or the platform's support inbox.
+export type Side = number | 'platform' | undefined
+
+// connect signs in (once) as the given side.
+export function connect(side?: Side): Promise<Sdk> {
+  const path = side === 'platform' ? '/admin/support/login' : side ? `/merchant/branches/${side}/chats/login` : '/customer/chats/login'
   if (pending && wanted === path) return pending
   wanted = path
   pending = open(path).catch(e => { pending = null; wanted = ''; throw e })
@@ -169,7 +192,7 @@ async function conversationId(s: Sdk, peer: string): Promise<string> {
 
 // history returns one page of a conversation, oldest first; `before` is the
 // id of the oldest message already shown.
-export async function history(branchId: number | undefined, peer: string, before = ''): Promise<{ list: ChatMsg[]; end: boolean }> {
+export async function history(branchId: Side, peer: string, before = ''): Promise<{ list: ChatMsg[]; end: boolean }> {
   const s = await connect(branchId)
   try {
     const r = (await s.getAdvancedHistoryMessageList({ conversationID: await conversationId(s, peer), startClientMsgID: before, count: 30, viewType: 0 })).data
@@ -180,7 +203,7 @@ export async function history(branchId: number | undefined, peer: string, before
 
 // sendText sends one text. extra travels with the message: the store's side
 // says which member of staff is writing.
-export async function sendText(branchId: number | undefined, peer: string, text: string, extra?: { uid: number; name: string }): Promise<ChatMsg> {
+export async function sendText(branchId: Side, peer: string, text: string, extra?: { uid: number; name: string }): Promise<ChatMsg> {
   const s = await connect(branchId)
   try {
     const m = (await s.createTextMessage(text)).data
@@ -190,7 +213,7 @@ export async function sendText(branchId: number | undefined, peer: string, text:
   } catch (e) { throw chatError(e) }
 }
 
-async function sendCard(branchId: number | undefined, peer: string, card: object, extra?: { uid: number; name: string }): Promise<ChatMsg> {
+async function sendCard(branchId: Side, peer: string, card: object, extra?: { uid: number; name: string }): Promise<ChatMsg> {
   const s = await connect(branchId)
   try {
     const m = (await s.createCustomMessage({ data: JSON.stringify(card), extension: '', description: '' })).data
@@ -202,7 +225,7 @@ async function sendCard(branchId: number | undefined, peer: string, card: object
 
 // sendImage shrinks a picture, uploads it to this system (uploadPath is the
 // conversation's own address for that) and sends its token as a card.
-export async function sendImage(branchId: number | undefined, peer: string, uploadPath: string, file: File, extra?: { uid: number; name: string }): Promise<ChatMsg> {
+export async function sendImage(branchId: Side, peer: string, uploadPath: string, file: File, extra?: { uid: number; name: string }): Promise<ChatMsg> {
   let token: string
   try { token = (await upload<{ token: string }>(uploadPath, await shrink(file))).token } catch (e) {
     if (e instanceof ApiError) throw new ApiError(e.status, e.code, describeChat(e.code === 'FILE_TOO_LARGE' || e.code === 'VALIDATION' ? 'BAD_IMAGE' : e.code))
@@ -211,7 +234,7 @@ export async function sendImage(branchId: number | undefined, peer: string, uplo
   return sendCard(branchId, peer, { t: 'image', token }, extra)
 }
 
-export const sendOrder = (branchId: number | undefined, peer: string, orderId: number, extra?: { uid: number; name: string }) =>
+export const sendOrder = (branchId: Side, peer: string, orderId: number, extra?: { uid: number; name: string }) =>
   sendCard(branchId, peer, { t: 'order', order: orderId }, extra)
 
 // ---- words ----
@@ -234,7 +257,14 @@ export function lastLine(c: ChatThread, self: 'customer' | 'store'): string {
 }
 
 extend({
-  'ch.title': ['消息', 'Messages'], 'ch.tab_chats': ['聊天', 'Chats'], 'ch.tab_notices': ['通知', 'Notices'],
+  'ch.title': ['消息', 'Messages'],
+  'sp.title': ['平台客服', 'Platform support'], 'sp.online': ['在线客服', 'Chat with support'], 'sp.ava': ['客', 'S'],
+  'sp.start': ['有什么问题，直接发消息给平台客服。', 'Write to platform support about anything.'],
+  'sp.tip': ['平台客服会尽快回复。订单的问题也可以先联系商家。', 'Platform support will answer soon. For an order, you can also ask the store first.'],
+  'sp.hours': ['服务时间：{h}', 'Hours: {h}'], 'sp.call': ['打电话给客服', 'Call support'],
+  'sp.store_tip': ['这里是平台客服，帮你处理账号、结算、上架、投诉等问题。门店的店长和前台共用这个会话。', 'Platform support helps with your account, payouts, listings and complaints. Managers and the desk share this conversation.'],
+  'sp.store_start': ['还没有消息。有问题可以直接问平台。', 'No messages yet. Ask the platform anything.'],
+  'sp.you_store': ['平台客服：', 'Support: '], 'ch.tab_chats': ['聊天', 'Chats'], 'ch.tab_notices': ['通知', 'Notices'],
   'ch.none': ['还没有聊天。在店铺页或订单页点“联系商家”就可以开始。', 'No chats yet. Tap "Contact store" on a store or an order to start.'],
   'ch.keep': ['聊天记录保留 180 天', 'Chats are kept for 180 days'],
   'ch.off': ['聊天功能暂时没有开通', 'Chat is not available yet'],

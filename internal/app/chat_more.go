@@ -77,7 +77,8 @@ func (a *App) CustomerChatImage(ctx context.Context, customerID int64, slug stri
 // the two sides of the conversation (and the platform) ever see it.
 func (a *App) ChatImage(ctx context.Context, token string) ([]byte, error) {
 	var image []byte
-	err := a.DB.QueryRow(ctx, `SELECT content FROM chat_images WHERE token=$1`, token).Scan(&image)
+	err := a.DB.QueryRow(ctx, `SELECT content FROM chat_images WHERE token=$1
+		UNION ALL SELECT content FROM support_images WHERE token=$1 LIMIT 1`, token).Scan(&image)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	}

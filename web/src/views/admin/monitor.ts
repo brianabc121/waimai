@@ -4,7 +4,12 @@ import { reactive } from 'vue'
 import { get } from '../../api'
 import type { WorkerStatus } from './types'
 
-export const monitor = reactive({ failedJobs: 0 })
+export const monitor = reactive({ failedJobs: 0, supportUnread: 0 })
+
+// loadSupportUnread keeps the number on "platform support" current.
+export async function loadSupportUnread() {
+  monitor.supportUnread = (await get<{ unread: number }>('/admin/support/unread')).unread
+}
 
 export async function loadWorkerStatus(): Promise<WorkerStatus> {
   const s = await get<WorkerStatus>('/admin/worker')
