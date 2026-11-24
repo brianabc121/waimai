@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>菜品口味备注模板 · 原型</title>
+<!-- 用的就是系统真实的样式表，原型只补几条自己的样式。方案见 ../NOTE_TEMPLATE_DESIGN.md。数据都是示意。 -->
+<link rel="stylesheet" href="../../web/src/styles.css">
+<style>
+  section { display: none; } section.show { display: block; }
+  .staffbar a.on { background: #2d333b; color: #fff; box-shadow: inset 3px 0 0 var(--brand); }
+  .shell-brand.two { display: block; padding-bottom: 14px; min-height: 0; flex: none; }
+  .shell-brand.two .nm { display: flex; align-items: center; gap: 6px; } .shell-brand.two .nm b { flex: 1; }
+  .shell-brand.two .rl { margin-top: 6px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #8b949e; }
+  .pagehead { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; } .pagehead h1 { font-size: 20px; margin: 0; }
+  .subtabs a { padding: 9px 16px; font-weight: 600; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; }
+  .subtabs a.on { color: var(--brand-dark); border-bottom-color: var(--brand); }
+  .subtabs a .n { font-size: 11px; background: var(--brand); color: #fff; border-radius: 9px; padding: 0 6px; margin-inline-start: 4px; }
+  .muted2 { color: #8b949e; }
+
+  /* 模板页 */
+  .tplwrap { display: grid; grid-template-columns: 300px 1fr; gap: 14px; align-items: start; margin-top: 14px; }
+  .tlist { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .tlist .ti { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
+  .tlist .ti.on { background: var(--brand-soft); box-shadow: inset 3px 0 0 var(--brand); }
+  .tlist .ti b { display: block; } .tlist .ti small { color: var(--muted); font-size: 12.5px; }
+  .tlist .ti .use { margin-inline-start: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .tlist .foot { padding: 12px 14px; display: grid; gap: 8px; }
+  .ico { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-size: 17px; flex: none; }
+  .editor { background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+  .editor .eh { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
+  .editor .eb { padding: 16px 18px; display: grid; gap: 12px; }
+  .grp { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: #fcfcfb; }
+  .grp .gh { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .grp .gh input { width: 160px; }
+  .seg2 { display: inline-flex; background: #eceef0; border-radius: 8px; padding: 3px; }
+  .seg2 span { padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #57606a; }
+  .seg2 span.on { background: #fff; color: var(--brand-dark); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 6px; }
+  .tg { display: inline-flex; align-items: center; gap: 6px; background: #f2f3f5; border: 1px solid #e1e4e8; border-radius: 6px; padding: 3px 4px 3px 9px; font-size: 13.5px; }
+  .tg .x { color: #8b949e; font-size: 12px; padding: 0 4px; }
+  .tg.off { color: #9aa1a9; text-decoration: line-through; background: #fafafa; }
+  .tags .add { border: 0; outline: 0; font-size: 13.5px; padding: 4px; min-width: 140px; flex: 1; background: none; }
+  .gops { margin-inline-start: auto; display: flex; gap: 4px; }
+  .gops button { border: 1px solid var(--line); background: #fff; border-radius: 6px; width: 28px; height: 28px; color: #57606a; }
+  .why { background: #fff8ec; border: 1px solid #f5ddb0; color: #7a4b05; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+  .why b { color: #5c3800; }
+  .preview { border: 1px dashed #d0c3ae; border-radius: 10px; padding: 12px; background: #fffaf2; }
+  .preview .pg { margin-bottom: 8px; } .preview .pg:last-child { margin-bottom: 0; }
+  .preview .pgn { font-size: 13px; font-weight: 700; color: #3b1f14; margin-bottom: 6px; } .preview .pgn small { font-weight: 500; color: #7b6657; margin-inline-start: 6px; }
+
+  /* 菜品编辑 */
+  .ovl { position: relative; }
+  .ovl::after { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.45); z-index: 35; }
+  .float { position: absolute; z-index: 40; }
+  .form { background: #fff; border-radius: 14px; width: 600px; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+  .form .sheet-body { max-height: none; }
+  .tplpick { display: grid; gap: 8px; }
+  .tplpick label { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+  .tplpick label.on { border-color: var(--brand); background: #fffaf6; }
+  .tplpick label small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .newtag { display: inline-block; font-size: 11px; font-weight: 700; background: var(--brand); color: #fff; padding: 0 6px; border-radius: 4px; margin-inline-start: 6px; vertical-align: 2px; }
+  .hl { outline: 2px dashed var(--brand); outline-offset: 6px; border-radius: 10px; }
+  .apply { background: #fff; border-radius: 14px; width: 560px; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+  .apply .cat { padding: 8px 16px; background: #f6f6f4; display: flex; gap: 10px; align-items: center; font-weight: 700; border-top: 1px solid var(--line); }
+  .apply .it { padding: 8px 16px 8px 44px; display: flex; gap: 10px; align-items: center; border-top: 1px solid #f0f0f0; font-size: 14px; }
+  .apply .it .cur { margin-inline-start: auto; font-size: 12px; color: var(--muted); }
+  .ntag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 0 7px; border-radius: 999px; background: #fff4e0; color: #9a5b00; border: 1px solid #f3d9a8; margin-inline-start: 6px; white-space: nowrap; }
+  .mtable { width: 100%; border-collapse: collapse; background: #fff; font-size: 14px; }
+  .mtable td, .mtable th { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: start; }
+  .mtable th { background: #fafafa; color: var(--muted); font-size: 12.5px; }
+
+  /* 顾客端（深红米金） */
+  .stage { display: flex; gap: 34px; justify-content: center; align-items: flex-start; padding: 30px 24px; background: #e9e4dc; min-height: 100vh; }
+  .phone { width: 390px; height: 800px; border: 9px solid #1f2328; border-radius: 40px; overflow: hidden; position: relative; background: var(--bg); }
+  .cap { text-align: center; margin-top: 12px; font-size: 14px; color: #4b5563; max-width: 400px; }
+  .warm .tb { background: var(--red-bg); color: #fff; padding: 40px 14px 14px; }
+  .warm .tb h2 { margin: 0; font-size: 17px; }
+  .warm .menu { display: grid; grid-template-columns: 86px 1fr; height: calc(100% - 140px); }
+  .warm .cats { background: #f3e7d4; font-size: 13px; }
+  .warm .cats div { padding: 13px 10px; color: var(--muted); }
+  .warm .cats div.on { background: var(--paper); color: var(--ink); font-weight: 700; box-shadow: inset 3px 0 0 var(--red); }
+  .warm .dishes { background: var(--paper); padding: 6px 12px; overflow: hidden; }
+  .warm .dish { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .warm .dish .pic { width: 78px; height: 78px; border-radius: 10px; flex: none; display: grid; place-items: center; font-size: 30px; }
+  .warm .dish .nm { font-weight: 700; font-size: 15px; }
+  .warm .dish .ds { font-size: 12px; color: var(--muted); margin: 2px 0 4px; }
+  .warm .dish .pr { color: var(--red); font-weight: 700; }
+  .warm .dish .bt { margin-inline-start: auto; align-self: flex-end; background: var(--red); color: #fff; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .warm .dish .bt.sm { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; font-size: 18px; }
+  .warm .dish .bt b { background: var(--gold); color: var(--red-deep); border-radius: 9px; padding: 0 5px; margin-inline-start: 4px; font-size: 11px; }
+  .warm .cartbar { position: absolute; left: 12px; right: 12px; bottom: 16px; background: #2b1a12; color: #fff; border-radius: 999px; display: flex; align-items: center; padding: 6px 6px 6px 18px; gap: 10px; }
+  .warm .cartbar .go { margin-inline-start: auto; background: var(--red); border-radius: 999px; padding: 9px 20px; font-weight: 700; }
+  .warm .mask { position: absolute; inset: 0; background: rgba(40,20,10,.5); }
+  .warm .bs { position: absolute; left: 0; right: 0; bottom: 0; background: var(--paper); border-radius: 18px 18px 0 0; display: flex; flex-direction: column; max-height: 88%; }
+  .warm .bs .bh { padding: 16px 16px 10px; display: flex; gap: 12px; }
+  .warm .bs .bb { padding: 0 16px 12px; overflow: hidden; }
+  .warm .bs .bf { padding: 10px 16px 22px; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
+  .warm .sec { padding: 10px 0; border-top: 1px solid var(--line); }
+  .warm .sec h4 { margin: 0 0 8px; font-size: 14px; display: flex; align-items: baseline; gap: 6px; }
+  .warm .sec h4 small { font-weight: 500; color: var(--muted); font-size: 12px; }
+  .warm .sec h4 .req { color: var(--red); font-size: 11.5px; font-weight: 700; border: 1px solid var(--red); border-radius: 4px; padding: 0 4px; }
+  .warm .sec .lbl { font-size: 15px; font-weight: 700; color: var(--red-deep); display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .warm .sec .lbl::before { content: ""; width: 3px; height: 14px; background: var(--red); border-radius: 2px; }
+  .warm .chs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .warm .ch { border: 1px solid #d9c8b0; background: #fff; border-radius: 8px; padding: 6px 12px; font-size: 13.5px; color: var(--ink); }
+  .warm .ch.on { border-color: var(--red); background: #fbe7b3; color: var(--red-deep); font-weight: 600; }
+  .warm .ch small { color: var(--muted); margin-inline-start: 4px; }
+  .warm .subg { margin-bottom: 10px; } .warm .subg:last-child { margin-bottom: 0; }
+  .warm .subg .gn { font-size: 13px; color: var(--ink); font-weight: 600; margin-bottom: 6px; } .warm .subg .gn small { color: var(--muted); font-weight: 400; margin-inline-start: 6px; font-size: 12px; }
+  .warm .inp { width: 100%; border: 1px solid #d9c8b0; border-radius: 8px; padding: 9px 10px; background: #fff; font-size: 14px; color: var(--ink); }
+  .warm .inp.ph { color: #a8968a; }
+  .warm .chosen { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .warm .chosen b { color: var(--red-deep); }
+  .warm .add { flex: 1; background: var(--red); color: #fff; border-radius: 999px; text-align: center; padding: 11px 0; font-weight: 700; }
+  .warm .stp { display: inline-flex; align-items: center; gap: 10px; }
+  .warm .stp i { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--red); color: var(--red); display: grid; place-items: center; font-style: normal; font-size: 17px; background: #fff; }
+  .warm .stp i.f { background: var(--red); color: #fff; }
+  .warm .line { display: flex; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .warm .line .pic { width: 54px; height: 54px; border-radius: 8px; display: grid; place-items: center; font-size: 24px; flex: none; }
+  .warm .line .ln { font-weight: 700; font-size: 14.5px; }
+  .warm .line .lo { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .warm .line .lt { font-size: 12px; margin-top: 3px; color: var(--red-deep); background: #fbefd2; border-radius: 6px; padding: 2px 7px; display: inline-block; }
+  .warm .line .lp { color: var(--red); font-weight: 700; margin-top: 4px; }
+
+  /* 代客下单（.warm 电脑） */
+  .pc { width: 1440px; height: 900px; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+  .mo-top { background: var(--red-bg); color: #fff; display: flex; align-items: center; gap: 14px; padding: 12px 18px; }
+  .mo-top h1 { font-size: 18px; margin: 0; } .mo-top .back { color: #f4cf73; font-weight: 600; }
+  .mo-body { flex: 1; display: grid; grid-template-columns: 1fr 520px; gap: 0; min-height: 0; }
+  .order { background: var(--paper); border-inline-end: 1px solid var(--line); display: flex; flex-direction: column; }
+  .thead, .tr { display: grid; grid-template-columns: 40px minmax(0, 1.6fr) 110px 80px 90px minmax(0, 1.9fr) 56px; gap: 8px; align-items: center; padding: 8px 14px; }
+  .thead { background: #f3e7d4; font-size: 12.5px; color: var(--muted); font-weight: 700; }
+  .tr { border-bottom: 1px solid var(--line); font-size: 14px; }
+  .tr.sel { background: #fff3dc; }
+  .tr .code { font-size: 11px; background: #3b1f14; color: #fbe7b3; border-radius: 4px; padding: 0 5px; margin-inline-end: 5px; }
+  .tr .spec { display: block; font-size: 12px; color: var(--muted); }
+  .qty { display: inline-flex; align-items: center; gap: 8px; } .qty i { width: 24px; height: 24px; border: 1px solid var(--red); border-radius: 50%; display: grid; place-items: center; color: var(--red); font-style: normal; background: #fff; }
+  .qty i.f { background: var(--red); color: #fff; }
+  .notecell { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 3px 6px; min-height: 30px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 13px; }
+  .notecell.focus { border-color: var(--red); box-shadow: 0 0 0 2px #f8e3b2; }
+  .notecell .pt { background: #fbe7b3; color: var(--red-deep); border-radius: 4px; padding: 0 6px; font-size: 12.5px; font-weight: 600; }
+  .notecell .ph { color: #a8968a; }
+  .ops { color: var(--muted); display: flex; gap: 8px; justify-content: flex-end; }
+  .dd { position: absolute; z-index: 10; width: 440px; background: #fff; border: 1px solid #d9c8b0; border-radius: 12px; box-shadow: 0 16px 40px rgba(59,31,20,.25); }
+  .dd .q { padding: 10px; border-bottom: 1px solid var(--line); }
+  .dd .q .inp { border-color: var(--red); }
+  .dd .dg { padding: 9px 12px; border-bottom: 1px dashed var(--line); }
+  .dd .dg .gn { font-size: 12.5px; color: var(--muted); margin-bottom: 6px; } .dd .dg .gn b { color: var(--ink); margin-inline-end: 6px; }
+  .dd .df { padding: 9px 12px; display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .dd .ch { padding: 4px 10px; font-size: 13px; }
+  .dd .ch.dim { opacity: .35; }
+  .kbd { border: 1px solid #d0c3ae; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 11px; background: #fffaf2; color: var(--ink); }
+  .side { padding: 14px 16px; background: var(--bg); display: grid; gap: 12px; align-content: start; }
+  .side .box { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .mobtm { border-top: 1px solid var(--line); background: #fff; padding: 12px 16px; display: flex; align-items: center; gap: 14px; margin-top: auto; }
+  .mobtm .tot { font-size: 20px; font-weight: 800; color: var(--red); }
+
+  /* 后厨、小票 */
+  .kcard { background: #fff; border: 1px solid var(--line); border-radius: 12px; width: 360px; overflow: hidden; }
+  .kcard .kh { background: #1f2328; color: #fff; padding: 10px 14px; display: flex; justify-content: space-between; }
+  .kcard .ki { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; }
+  .kcard .ki b { font-size: 16px; }
+  .kn { color: var(--warn, #b45309); font-weight: 700; font-size: 13px; margin-top: 3px; }
+  .kn .t { background: #fff4d6; border-radius: 4px; padding: 0 5px; margin-inline-end: 3px; }
+  .ticket { width: 300px; background: #fff; padding: 18px 16px; font-family: "Courier New", monospace; font-size: 13.5px; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+  .ticket hr { border: 0; border-top: 1px dashed #999; margin: 8px 0; }
+  .ticket .r { display: flex; justify-content: space-between; }
+  .ticket .n { font-weight: 700; padding-inline-start: 10px; }
+  .odcard { width: 380px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+</style>
+</head>
+<body>
+
+<!-- ============ ① 菜单页 · 口味模板 ============ -->
+<section id="tpl">
+  <div class="shell" style="min-height:900px">
+    <nav class="staffbar" style="height:900px">
+      <div class="shell-brand two"><div class="nm"><b>马卡蒂小馆</b><button class="shell-fold">«</button></div><div class="rl"><span class="rtag owner">店主</span>陈大文</div></div>
+      <div class="shell-links"><a>订单</a><a>会员管理</a><a>客户地址</a><a>桌台</a><a>后厨</a><a>消息</a><a class="on">菜单</a><a>模板</a><a>宣传物料</a><a>优惠</a><a>核款</a><a>账单</a><a>骑手</a><a>配送地图</a><a>员工</a><a>设置</a></div>
+    </nav>
+    <main class="shell-main"><div class="page">
+      <div class="pagehead"><h1>菜单管理</h1><span class="grow"></span><button class="btn">多语言</button><button class="btn">导入 Excel</button></div>
+      <div class="subtabs"><a>菜品</a><a class="on">口味模板 <span class="n">新</span></a></div>
+      <div class="tplwrap">
+        <div>
+          <div class="tlist">
+            <div class="ti on"><span class="ico" style="background:#fde8d8">🧋</span><div><b>奶茶类</b><small>2 组 · 10 个标签</small></div><span class="use">用在 18 道菜</span></div>
+            <div class="ti"><span class="ico" style="background:#fbe3e0">🌶️</span><div><b>炒菜类</b><small>2 组 · 10 个标签</small></div><span class="use">用在 24 道菜</span></div>
+            <div class="ti"><span class="ico" style="background:#efe6da">☕</span><div><b>咖啡类</b><small>3 组 · 11 个标签</small></div><span class="use">用在 6 道菜</span></div>
+            <div class="ti"><span class="ico" style="background:#f6ecd4">🍜</span><div><b>粉面类</b><small>2 组 · 8 个标签</small></div><span class="use">用在 9 道菜</span></div>
+            <div class="ti"><span class="ico" style="background:#e8eef6">📦</span><div><b>通用</b><small>1 组 · 4 个标签</small></div><span class="use">用在 52 道菜</span></div>
+            <div class="foot"><button class="btn primary">+ 新建模板</button><button class="btn">从常用模板添加</button></div>
+          </div>
+          <div class="why" style="margin-top:12px"><b>口味模板和规格有什么不同？</b><br>要<b>加钱</b>或<b>必须选</b>的（大杯 / 中杯、加珍珠 +5），在菜品里设“规格”。<br>不加钱、可选可不选的口味要求（少糖、去冰、不要葱），用口味模板：写一次，很多菜共用。</div>
+        </div>
+        <div class="editor">
+          <div class="eh"><span class="ico" style="background:#fde8d8">🧋</span><input value="奶茶类" style="font-size:17px;font-weight:700;width:220px"><span class="muted small">只有店里看得到这个名字</span><span class="grow"></span><button class="btn">套用到菜品（18）</button><button class="btn danger">删除</button></div>
+          <div class="eb">
+            <div class="grp">
+              <div class="gh"><input value="甜度" placeholder="组名，可留空"><span class="seg2"><span class="on">单选</span><span>多选</span></span><span class="muted small">顾客只能选其中一个</span>
+                <span class="gops"><button>↑</button><button>↓</button><button>✕</button></span></div>
+              <div class="tags"><span class="tg">正常糖<span class="x">✕</span></span><span class="tg">少糖<span class="x">✕</span></span><span class="tg">半糖<span class="x">✕</span></span><span class="tg">微糖<span class="x">✕</span></span><span class="tg">无糖<span class="x">✕</span></span><input class="add" placeholder="输入标签，回车添加"></div>
+            </div>
+            <div class="grp">
+              <div class="gh"><input value="温度" placeholder="组名，可留空"><span class="seg2"><span class="on">单选</span><span>多选</span></span><span class="muted small">顾客只能选其中一个</span>
+                <span class="gops"><button>↑</button><button>↓</button><button>✕</button></span></div>
+              <div class="tags"><span class="tg">正常冰<span class="x">✕</span></span><span class="tg">少冰<span class="x">✕</span></span><span class="tg">去冰<span class="x">✕</span></span><span class="tg">常温<span class="x">✕</span></span><span class="tg">热<span class="x">✕</span></span><span class="tg off" title="已停用">冰沙<span class="x">✕</span></span><input class="add" placeholder="输入标签，回车添加"></div>
+              <div class="muted small" style="margin-top:6px">点标签可以改名、停用；拖动排序。划线的是停用的，顾客暂时看不到。</div>
+            </div>
+            <button class="btn" style="justify-self:start">+ 加一组</button>
+            <div>
+              <div class="muted small" style="margin-bottom:6px">顾客看到的样子</div>
+              <div class="preview warm" style="background:var(--paper)">
+                <div class="pg"><div class="pgn">甜度<small>单选</small></div><div class="chs"><span class="ch">正常糖</span><span class="ch on">少糖</span><span class="ch">半糖</span><span class="ch">微糖</span><span class="ch">无糖</span></div></div>
+                <div class="pg"><div class="pgn">温度<small>单选</small></div><div class="chs"><span class="ch">正常冰</span><span class="ch">少冰</span><span class="ch on">去冰</span><span class="ch">常温</span><span class="ch">热</span></div></div>
+              </div>
+            </div>
+            <div class="row" style="justify-content:flex-end;gap:10px"><span class="muted small">保存后，18 道套用的菜马上跟着变；已下的订单不变。</span><button class="btn">取消</button><button class="btn primary">保存</button></div>
+          </div>
+        </div>
+      </div>
+    </div></main>
+  </div>
+</section>
+
+<!-- ============ ② 常用模板 ============ -->
+<section id="starter">
+  <div class="shell ovl" style="min-height:900px">
+    <nav class="staffbar" style="height:900px">
+      <div class="shell-brand two"><div class="nm"><b>马卡蒂小馆</b></div><div class="rl"><span class="rtag owner">店主</span>陈大文</div></div>
+      <div class="shell-links"><a>订单</a><a>会员管理</a><a>客户地址</a><a>桌台</a><a>后厨</a><a>消息</a><a class="on">菜单</a><a>模板</a><a>宣传物料</a><a>优惠</a></div>
+    </nav>
+    <main class="shell-main"><div class="page">
+      <div class="pagehead"><h1>菜单管理</h1></div>
+      <div class="subtabs"><a>菜品</a><a class="on">口味模板</a></div>
+      <div class="card" style="margin-top:14px;text-align:center;padding:60px">还没有口味模板</div>
+    </div></main>
+    <div class="float" style="left:50%;top:70px;transform:translateX(-50%)">
+      <div class="apply">
+        <div class="sheet-head"><h2 style="margin:0">从常用模板添加</h2><div class="muted small">勾上的模板加进店里，加进来以后可以随便改。顾客那边的其他语言已经翻好。</div></div>
+        <div class="sheet-body tplpick">
+          <label class="on"><input type="checkbox" checked><div><b>🧋 奶茶类</b><small>甜度（单选）：正常糖、少糖、半糖、微糖、无糖<br>温度（单选）：正常冰、少冰、去冰、常温、热</small></div></label>
+          <label class="on"><input type="checkbox" checked><div><b>🌶️ 炒菜类</b><small>辣度（单选）：不辣、微辣、中辣、特辣<br>忌口（多选）：少油、少盐、不要葱、不要姜、不要蒜、不要香菜</small></div></label>
+          <label><input type="checkbox"><div><b>☕ 咖啡类</b><small>温度（单选）：冰、热 · 浓度（单选）：正常、浓一点、淡一点<br>奶和糖（多选）：不加奶、燕麦奶、不加糖、少糖…</small></div></label>
+          <label><input type="checkbox"><div><b>🍜 粉面类</b><small>软硬（单选）：正常、软一点、硬一点<br>加减（多选）：多汤、少汤、不要葱花、不要香菜、汤面分开</small></div></label>
+          <label class="on"><input type="checkbox" checked><div><b>📦 通用</b><small>其他（多选）：打包分开装、不要餐具、多给纸巾、汤和饭分开</small></div></label>
+        </div>
+        <div class="sheet-foot row"><button class="btn grow">取消</button><button class="btn primary grow">添加 3 个模板</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ③ 菜品编辑 · 套用模板 ============ -->
+<section id="item">
+  <div class="shell ovl" style="min-height:900px">
+    <nav class="staffbar" style="height:900px">
+      <div class="shell-brand two"><div class="nm"><b>马卡蒂小馆</b></div><div class="rl"><span class="rtag owner">店主</span>陈大文</div></div>
+      <div class="shell-links"><a>订单</a><a>会员管理</a><a>客户地址</a><a>桌台</a><a>后厨</a><a>消息</a><a class="on">菜单</a></div>
+    </nav>
+    <main class="shell-main"><div class="page">
+      <div class="pagehead"><h1>菜单管理</h1></div>
+      <div class="subtabs"><a class="on">菜品</a><a>口味模板</a></div>
+      <table class="mtable" style="margin-top:14px">
+        <tr><th>菜品</th><th>价格</th><th>状态</th></tr>
+        <tr><td>珍珠奶茶 <span class="ntag">口味：奶茶类、通用</span></td><td>₱120</td><td>上架</td></tr>
+        <tr><td>芋泥波波奶茶 <span class="ntag">口味：奶茶类</span></td><td>₱140</td><td>上架</td></tr>
+        <tr><td>杨枝甘露</td><td>₱150</td><td>上架</td></tr>
+      </table>
+    </div></main>
+    <div class="float" style="left:190px;top:24px">
+      <div class="form">
+        <div class="sheet-head"><h2 style="margin:0">编辑</h2></div>
+        <div class="sheet-body" style="padding-top:8px">
+          <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">
+            <label class="field"><span>中文名</span><input value="珍珠奶茶"></label>
+            <label class="field"><span>价格 (PHP)</span><input value="120"></label>
+          </div>
+          <div class="field"><span>供应方式</span><div class="row" style="gap:18px"><label class="check"><input type="checkbox" checked>堂食</label><label class="check"><input type="checkbox" checked>外卖</label><label class="check"><input type="checkbox" checked>自取</label></div></div>
+          <div class="hl" style="margin:14px 0 18px">
+            <h3 style="margin:0 0 4px">口味备注模板<span class="newtag">新</span></h3>
+            <div class="muted small" style="margin-bottom:8px">不加钱、可选可不选的口味要求。最多选 3 个。要加钱或必须选的，用下面的“规格”。</div>
+            <div class="tplpick">
+              <label class="on"><input type="checkbox" checked><div><b>奶茶类</b><small>甜度：正常糖、少糖、半糖、微糖、无糖 · 温度：正常冰、少冰、去冰、常温、热</small></div></label>
+              <label class="on"><input type="checkbox" checked><div><b>通用</b><small>打包分开装、不要餐具、多给纸巾、汤和饭分开</small></div></label>
+              <label><input type="checkbox"><div><b>炒菜类</b><small>辣度：不辣、微辣、中辣、特辣 · 忌口：少油、少盐、不要葱…</small></div></label>
+              <div class="row between"><span class="muted small">还有 2 个模板 · <a>管理口味模板</a></span><a class="small">展开全部</a></div>
+            </div>
+          </div>
+          <h3 style="margin:0 0 8px">规格</h3>
+          <div class="card" style="background:#fafafa;padding:10px 12px">
+            <div class="row between"><b>杯型</b><span class="muted small">必选 1 个</span></div>
+            <div class="muted small" style="margin-top:4px">中杯 · 大杯 +₱20</div>
+          </div>
+          <div class="card" style="background:#fafafa;padding:10px 12px;margin-top:8px">
+            <div class="row between"><b>加料</b><span class="muted small">可选，最多 3 个</span></div>
+            <div class="muted small" style="margin-top:4px">珍珠 +₱15 · 椰果 +₱15 · 布丁 +₱20</div>
+          </div>
+        </div>
+        <div class="sheet-foot row"><button class="btn grow">取消</button><button class="btn primary grow">保存</button></div>
+      </div>
+    </div>
+    <div class="float" style="left:840px;top:120px">
+      <div class="apply">
+        <div class="sheet-head"><h2 style="margin:0">把“奶茶类”套用到菜品</h2><div class="muted small">勾上的菜会显示这个模板的口味；取消勾选就不再显示。</div></div>
+        <div style="padding:10px 16px"><input placeholder="搜菜名或编号" style="width:100%"></div>
+        <div class="cat"><input type="checkbox" checked>奶茶 <span class="muted small" style="font-weight:500">全部 12 道</span></div>
+        <div class="it"><input type="checkbox" checked>珍珠奶茶<span class="cur">已套用：奶茶类、通用</span></div>
+        <div class="it"><input type="checkbox" checked>芋泥波波奶茶<span class="cur">已套用：奶茶类</span></div>
+        <div class="it"><input type="checkbox" checked>黑糖鲜奶<span class="cur"></span></div>
+        <div class="it muted">… 另外 9 道</div>
+        <div class="cat"><input type="checkbox" style="accent-color:var(--brand)" checked disabled>果茶 <span class="muted small" style="font-weight:500">8 道中 6 道</span></div>
+        <div class="it"><input type="checkbox" checked>杨枝甘露</div>
+        <div class="it"><input type="checkbox">柠檬绿茶</div>
+        <div class="cat"><input type="checkbox">小吃 <span class="muted small" style="font-weight:500">0 / 10</span></div>
+        <div class="sheet-foot row"><span class="muted small grow">共 18 道菜</span><button class="btn">取消</button><button class="btn primary">保存</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ④ 顾客点餐页（手机） ============ -->
+<section id="customer">
+  <div class="stage">
+    <div>
+      <div class="phone warm">
+        <div class="tb"><h2>马卡蒂小馆</h2><div style="font-size:12px;opacity:.85;margin-top:2px">满 ₱300 减 ₱30 · 配送约 35 分钟</div></div>
+        <div style="background:var(--paper);display:flex;gap:22px;padding:10px 16px;font-weight:700;border-bottom:1px solid var(--line)"><span style="color:var(--red);border-bottom:2px solid var(--red);padding-bottom:4px">点餐</span><span class="muted">评价</span><span class="muted">商家</span></div>
+        <div class="menu">
+          <div class="cats"><div class="on">奶茶</div><div>果茶</div><div>小炒</div><div>粉面</div><div>小吃</div></div>
+          <div class="dishes">
+            <div class="dish"><div class="pic" style="background:#f1dcc0">🧋</div><div class="grow"><div class="nm">珍珠奶茶</div><div class="ds">招牌，台湾黑糖珍珠</div><div class="pr">₱120</div></div><span class="bt">选规格<b>1</b></span></div>
+            <div class="dish"><div class="pic" style="background:#e8d5f0">🍠</div><div class="grow"><div class="nm">芋泥波波奶茶</div><div class="ds">手打芋泥</div><div class="pr">₱140</div></div><span class="bt">选口味</span></div>
+            <div class="dish"><div class="pic" style="background:#f6e7c8">🥛</div><div class="grow"><div class="nm">黑糖鲜奶</div><div class="ds">鲜奶 + 黑糖</div><div class="pr">₱110</div></div><span class="bt">选口味</span></div>
+            <div class="dish"><div class="pic" style="background:#e3eed8">🍋</div><div class="grow"><div class="nm">柠檬绿茶</div><div class="ds">没有口味模板</div><div class="pr">₱90</div></div><span class="bt sm">+</span></div>
+          </div>
+        </div>
+        <div class="cartbar"><span style="font-size:22px">🛍️</span><div><b>₱120</b><div style="font-size:11px;opacity:.7">另需配送费 ₱39</div></div><span class="go">去结算</span></div>
+      </div>
+      <div class="cap">只有口味没有规格的菜，按钮叫“选口味”；什么都没有的菜仍然是“+”</div>
+    </div>
+    <div>
+      <div class="phone warm">
+        <div class="tb"><h2>马卡蒂小馆</h2></div>
+        <div class="mask"></div>
+        <div class="bs">
+          <div class="bh"><div class="pic" style="width:64px;height:64px;border-radius:10px;background:#f1dcc0;display:grid;place-items:center;font-size:30px">🧋</div><div class="grow"><b style="font-size:16px">珍珠奶茶</b><div class="muted small">招牌，台湾黑糖珍珠</div></div><span style="font-size:20px;color:var(--muted)">✕</span></div>
+          <div class="bb">
+            <div class="sec"><h4>杯型 <span class="req">必选</span></h4><div class="chs"><span class="ch on">中杯</span><span class="ch">大杯<small>+₱20</small></span></div></div>
+            <div class="sec"><h4>加料 <small>可选 · 最多 3 个</small></h4><div class="chs"><span class="ch">珍珠<small>+₱15</small></span><span class="ch">椰果<small>+₱15</small></span><span class="ch">布丁<small>+₱20</small></span></div></div>
+            <div class="sec">
+              <div class="lbl">口味备注</div>
+              <div class="muted small" style="margin:-2px 0 10px">不加钱，可以不选</div>
+              <div class="subg"><div class="gn">甜度<small>单选</small></div><div class="chs"><span class="ch">正常糖</span><span class="ch on">少糖</span><span class="ch">半糖</span><span class="ch">微糖</span><span class="ch">无糖</span></div></div>
+              <div class="subg"><div class="gn">温度<small>单选</small></div><div class="chs"><span class="ch">正常冰</span><span class="ch">少冰</span><span class="ch on">去冰</span><span class="ch">常温</span><span class="ch">热</span></div></div>
+              <div class="subg"><div class="gn">其他<small>可多选</small></div><div class="chs"><span class="ch on">打包分开装</span><span class="ch">不要餐具</span><span class="ch">多给纸巾</span></div></div>
+              <div class="inp" style="margin-top:10px">珍珠多一点</div>
+              <div class="chosen">已选：<b>中杯 · 少糖 · 去冰 · 打包分开装 · 珍珠多一点</b></div>
+            </div>
+          </div>
+          <div class="bf"><span class="stp"><i>−</i><b>1</b><i class="f">+</i></span><span class="add">加入购物车 · ₱120</span></div>
+        </div>
+      </div>
+      <div class="cap">规格在上，口味备注在下：组名后写单选 / 可多选，选中变红框金底；最下面还能自己写</div>
+    </div>
+    <div>
+      <div class="phone warm">
+        <div class="tb"><h2>马卡蒂小馆</h2></div>
+        <div class="mask"></div>
+        <div class="bs" style="height:66%">
+          <div class="bh" style="border-bottom:1px solid var(--line)"><b class="grow" style="font-size:16px">购物车</b><span class="muted small">清空</span></div>
+          <div class="bb" style="padding-top:2px">
+            <div class="line"><div class="pic" style="background:#f1dcc0">🧋</div><div class="grow"><div class="ln">珍珠奶茶</div><div class="lo">中杯</div><div class="lt">少糖 · 去冰 · 打包分开装 · 珍珠多一点</div><div class="lp">₱120</div></div><span class="stp" style="align-self:flex-end"><i>−</i><b>1</b><i class="f">+</i></span></div>
+            <div class="line"><div class="pic" style="background:#f1dcc0">🧋</div><div class="grow"><div class="ln">珍珠奶茶</div><div class="lo">大杯</div><div class="lt">无糖 · 热</div><div class="lp">₱140</div></div><span class="stp" style="align-self:flex-end"><i>−</i><b>1</b><i class="f">+</i></span></div>
+            <div class="line"><div class="pic" style="background:#f9d9cf">🌶️</div><div class="grow"><div class="ln">小炒黄牛肉</div><div class="lt">微辣 · 少油 · 不要香菜</div><div class="lp">₱260</div></div><span class="stp" style="align-self:flex-end"><i>−</i><b>1</b><i class="f">+</i></span></div>
+            <div class="line" style="border:0"><div class="pic" style="background:#e3eed8">🍋</div><div class="grow"><div class="ln">柠檬绿茶</div><div class="lp">₱90</div></div><span class="stp" style="align-self:flex-end"><i>−</i><b>1</b><i class="f">+</i></span></div>
+          </div>
+        </div>
+        <div class="cartbar"><span style="font-size:22px">🛍️</span><div><b>₱610</b><div style="font-size:11px;opacity:.7">已减 ₱30</div></div><span class="go">去结算</span></div>
+      </div>
+      <div class="cap">购物车、结算、订单详情：口味和备注一行显示在菜名下；口味不同就是两行</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ⑤ 代客下单（电脑） ============ -->
+<section id="manual">
+  <div class="pc warm">
+    <div class="mo-top"><span class="back">‹ 返回订单</span><h1>代客下单</h1><span style="color:#fbe7b3">马卡蒂小馆</span></div>
+    <div class="mo-body">
+      <div class="order">
+        <div class="thead"><span>#</span><span>菜品</span><span style="text-align:center">数量</span><span style="text-align:right">单价</span><span style="text-align:right">小计</span><span>口味 / 备注</span><span></span></div>
+        <div class="tr"><span>1</span><span><span class="code">A01</span><b>珍珠奶茶</b><span class="spec">中杯</span></span><span style="text-align:center"><span class="qty"><i>−</i><b>2</b><i class="f">+</i></span></span><span style="text-align:right">₱120</span><span style="text-align:right"><b>₱240</b></span>
+          <span class="notecell"><span class="pt">少糖</span><span class="pt">去冰</span></span><span class="ops">⧉ ✕</span></div>
+        <div class="tr sel"><span>2</span><span><span class="code">C12</span><b>小炒黄牛肉</b></span><span style="text-align:center"><span class="qty"><i>−</i><b>1</b><i class="f">+</i></span></span><span style="text-align:right">₱260</span><span style="text-align:right"><b>₱260</b></span>
+          <span class="notecell focus"><span class="pt">微辣</span><span class="pt">不要香菜</span></span><span class="ops">⧉ ✕</span></div>
+        <div class="tr"><span>3</span><span><span class="code">D03</span><b>柠檬绿茶</b></span><span style="text-align:center"><span class="qty"><i>−</i><b>1</b><i class="f">+</i></span></span><span style="text-align:right">₱90</span><span style="text-align:right"><b>₱90</b></span>
+          <span class="notecell"><span class="ph">备注</span></span><span class="ops">⧉ ✕</span></div>
+        <div class="mobtm"><span class="muted">共 4 份</span><span class="grow"></span><span>合计</span><span class="tot">₱590</span><button class="btn primary" style="padding:10px 26px">下单</button></div>
+      </div>
+      <div class="side">
+        <div class="box"><b>会员</b><div class="muted small" style="margin-top:6px">#100236 · 林小姐 · 0917 *** 2231</div><div class="small" style="margin-top:4px">Salcedo Village, Makati · 12F 1203</div></div>
+        <div class="box"><b>选菜</b><div class="muted small" style="margin-top:6px">输入编号或菜名…</div>
+          <div class="chs" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"><span class="ch">A01 珍珠奶茶</span><span class="ch">A02 芋泥波波</span><span class="ch">C12 小炒黄牛肉</span><span class="ch">C15 干煸四季豆</span><span class="ch">D03 柠檬绿茶</span></div></div>
+        <div class="box"><b>订单备注</b><div class="inp ph" style="margin-top:6px">给整单的备注</div></div>
+      </div>
+    </div>
+    <div class="dd" style="left:705px;top:178px">
+      <div class="q"><div class="inp">少<span style="border-inline-start:1.5px solid var(--red);margin-inline-start:1px"></span></div><div class="muted small" style="margin-top:6px">打字筛选，<span class="kbd">回车</span> 选第一个；没有匹配的，回车就当自定义备注</div></div>
+      <div class="dg"><div class="gn"><b>辣度</b>单选</div><div class="chs"><span class="ch dim">不辣</span><span class="ch on">微辣</span><span class="ch dim">中辣</span><span class="ch dim">特辣</span></div></div>
+      <div class="dg"><div class="gn"><b>忌口</b>可多选</div><div class="chs"><span class="ch" style="border-color:var(--red)">少油</span><span class="ch">少盐</span><span class="ch dim">不要葱</span><span class="ch dim">不要姜</span><span class="ch dim">不要蒜</span><span class="ch on">不要香菜</span></div></div>
+      <div class="df"><span>炒菜类 · 打“少”只亮出 少油、少盐</span><span><span class="kbd">Esc</span> 关闭</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ⑥ 代客下单（手机） ============ -->
+<section id="manualphone">
+  <div class="stage">
+    <div>
+      <div class="phone warm">
+        <div class="mo-top" style="padding-top:40px"><span class="back">‹</span><h1>代客下单</h1></div>
+        <div style="background:var(--paper);padding:4px 14px">
+          <div class="line"><div class="grow"><div class="ln"><span class="code" style="font-size:11px;background:#3b1f14;color:#fbe7b3;border-radius:4px;padding:0 5px;margin-inline-end:5px">A01</span>珍珠奶茶 ×2</div><div class="lo">中杯</div><div class="lt">少糖 · 去冰</div></div><b style="color:var(--red)">₱240</b></div>
+          <div class="line"><div class="grow"><div class="ln"><span class="code" style="font-size:11px;background:#3b1f14;color:#fbe7b3;border-radius:4px;padding:0 5px;margin-inline-end:5px">C12</span>小炒黄牛肉 ×1</div><div class="lt">微辣 · 不要香菜</div></div><b style="color:var(--red)">₱260</b></div>
+        </div>
+        <div class="mask"></div>
+        <div class="bs">
+          <div class="bh" style="border-bottom:1px solid var(--line)"><b class="grow" style="font-size:16px">小炒黄牛肉 · 口味 / 备注</b><span style="font-size:20px;color:var(--muted)">✕</span></div>
+          <div class="bb" style="padding-top:12px">
+            <div class="inp ph">搜索标签，或直接写备注</div>
+            <div class="sec" style="border:0;padding-top:12px">
+              <div class="subg"><div class="gn">辣度<small>单选</small></div><div class="chs"><span class="ch">不辣</span><span class="ch on">微辣</span><span class="ch">中辣</span><span class="ch">特辣</span></div></div>
+              <div class="subg"><div class="gn">忌口<small>可多选</small></div><div class="chs"><span class="ch">少油</span><span class="ch">少盐</span><span class="ch">不要葱</span><span class="ch">不要姜</span><span class="ch">不要蒜</span><span class="ch on">不要香菜</span></div></div>
+              <div class="subg"><div class="gn">其他<small>可多选</small></div><div class="chs"><span class="ch">打包分开装</span><span class="ch">不要餐具</span><span class="ch">多给纸巾</span><span class="ch">汤和饭分开</span></div></div>
+            </div>
+          </div>
+          <div class="bf"><span class="muted small grow">已选：微辣 · 不要香菜</span><span class="add" style="flex:none;padding:10px 30px">完成</span></div>
+        </div>
+      </div>
+      <div class="cap">代客下单手机版：点一行的备注，从底部升起同样的面板</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ⑦ 后厨、小票、订单详情 ============ -->
+<section id="kitchen">
+  <div class="stage" style="background:#eceef0;gap:28px">
+    <div>
+      <div class="kcard">
+        <div class="kh"><b>#A1042 外卖</b><span>12:31 · 4 分钟</span></div>
+        <div class="ki"><b>2 × 珍珠奶茶</b><div class="muted small">中杯</div><div class="kn"><span class="t">少糖</span><span class="t">去冰</span><span class="t">打包分开装</span></div><div class="kn">备注：珍珠多一点</div></div>
+        <div class="ki"><b>1 × 小炒黄牛肉</b><div class="kn"><span class="t">微辣</span><span class="t">少油</span><span class="t">不要香菜</span></div></div>
+        <div class="ki" style="border:0"><b>1 × 柠檬绿茶</b></div>
+      </div>
+      <div class="cap">后厨工作台：点选的口味用醒目块，自己写的另起一行“备注：”</div>
+    </div>
+    <div>
+      <div class="ticket">
+        <div style="text-align:center;font-weight:700;font-size:16px">马卡蒂小馆</div>
+        <div style="text-align:center">外卖 #A1042 · 12:31</div><hr>
+        <div class="r"><span>2 珍珠奶茶(中杯)</span><span>240.00</span></div>
+        <div class="n">※ 少糖 去冰 打包分开装</div>
+        <div class="n">备注: 珍珠多一点</div>
+        <div class="r" style="margin-top:6px"><span>1 小炒黄牛肉</span><span>260.00</span></div>
+        <div class="n">※ 微辣 少油 不要香菜</div>
+        <div class="r" style="margin-top:6px"><span>1 柠檬绿茶</span><span>90.00</span></div><hr>
+        <div class="r"><b>合计</b><b>590.00</b></div>
+      </div>
+      <div class="cap">小票：口味单独一行，前面加“※”</div>
+    </div>
+    <div>
+      <div class="odcard warm">
+        <b style="font-size:15px">商品</b>
+        <div class="line"><div class="pic" style="background:#f1dcc0">🧋</div><div class="grow"><div class="ln">Pearl milk tea ×2</div><div class="lo">Medium</div><div class="lt">Less sugar · No ice · Pack separately</div><div class="lo" style="margin-top:3px">Note: 珍珠多一点</div></div><b style="color:var(--red)">₱240</b></div>
+        <div class="line" style="border:0"><div class="pic" style="background:#f9d9cf">🌶️</div><div class="grow"><div class="ln">Stir-fried beef ×1</div><div class="lt">Mild spicy · Less oil · No coriander</div></div><b style="color:var(--red)">₱260</b></div>
+      </div>
+      <div class="cap">顾客用英文下单：订单详情里口味是英文；后厨和小票仍是中文（店铺菜单语言）；自己写的备注原样</div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const id = (location.hash || '#tpl').slice(1)
+  document.getElementById(id)?.classList.add('show')
+</script>
+</body>
+</html>
