@@ -159,6 +159,10 @@ const standalone = native || window.matchMedia('(display-mode: standalone)').mat
 .wk .quick { display: flex; gap: 8px; flex-wrap: wrap; }
 .wk .quick button { border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13px; background: #fff; cursor: pointer; }
 .wk .quick button.on { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-soft); font-weight: 600; }
+.wk .seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.wk .seg button { flex: 1; min-height: 40px; border: 0; background: #fff; font: inherit; cursor: pointer; }
+.wk .seg button + button { border-inline-start: 1px solid var(--line); }
+.wk .seg button.on { background: var(--brand-soft); color: var(--brand-dark); font-weight: 600; }
 .wk .duty { display: grid; gap: 6px; border-inline-start: 4px solid var(--line); } .wk .duty.on { border-inline-start-color: var(--ok); }
 .wk .cash input { font-size: 26px; font-weight: 700; border: 2px solid var(--brand); }
 </style>

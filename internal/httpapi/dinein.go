@@ -139,6 +139,16 @@ func (s *Server) closeTable(c *gin.Context) {
 	if !bind(c, &in) {
 		return
 	}
+	if in.Adjust != nil && (in.Adjust.PercentBP != 0 || in.Adjust.Mode != "") {
+		bid, err := s.App.SessionBranch(c, id)
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		if !s.discountOK(c, bid) {
+			return
+		}
+	}
 	bill, err := s.App.CloseTable(c, id, in, staffActor(c))
 	if err != nil {
 		fail(c, err)

@@ -144,6 +144,16 @@ type Order struct {
 	AmountReceived *int64 `json:"amount_received"`
 	PaymentNote    string `json:"payment_note"`
 	PayMethod      string `json:"pay_method"`
+	// PayType is how the order was paid: cash, card or online (PayChannelID
+	// says which method, PayMethod its name then); "" when not recorded.
+	PayType      string `json:"pay_type"`
+	PayChannelID int64  `json:"pay_channel_id"`
+	// Who gave the discount at checkout (Totals.StaffDiscount, RoundOff), why
+	// and the manager who approved it; staff only.
+	AdjReason     string     `json:"adj_reason"`
+	AdjBy         string     `json:"adj_by"`
+	AdjApprovedBy string     `json:"adj_approved_by"`
+	AdjAt         *time.Time `json:"adj_at"`
 	// TableTags are the sitting's notes (children, birthday) for the kitchen.
 	TableTags   []string        `json:"table_tags"`
 	CreatedAt   time.Time       `json:"created_at"`
@@ -231,7 +241,11 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	o.contact_telegram, o.contact_line, o.contact_whatsapp, EXISTS (SELECT 1 FROM customer_address_photos p WHERE p.address_id = o.address_id),
 	o.merchant_discount, o.platform_subsidy, (SELECT m.member_no FROM store_members m WHERE m.id = o.member_id),
 	o.order_source, COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.placed_by), ''), o.staff_note,
-	o.pay_method, COALESCE((SELECT s.tags FROM dining_sessions s WHERE s.id = o.session_id), '{}')`
+	o.pay_method, COALESCE((SELECT s.tags FROM dining_sessions s WHERE s.id = o.session_id), '{}'),
+	o.adj_percent_bp, o.staff_discount, o.adj_mode, o.round_off, o.adj_reason,
+	COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.adj_by), ''),
+	COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.adj_approved_by), ''), o.adj_at, o.pay_type,
+	COALESCE(o.pay_channel_id, 0)`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}, Discounts: []OrderDiscount{}, Voids: []OrderVoid{}, Refunds: []OrderRefund{}}
@@ -246,7 +260,9 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.Timezone, &o.SessionID, &o.TableName, &o.AmountReceived, &o.PaymentNote, &o.DestLat, &o.DestLng,
 		&o.ZoneDistanceM, &o.ContactPhone, &o.ContactTitle, &o.ContactWechat, &o.ContactTelegram, &o.ContactLine,
 		&o.ContactWhatsapp, &o.AddressPhoto, &t.MerchantDiscount, &t.PlatformSubsidy, &o.MemberNo, &o.OrderSource,
-		&o.PlacedBy, &o.StaffNote, &o.PayMethod, &o.TableTags)
+		&o.PlacedBy, &o.StaffNote, &o.PayMethod, &o.TableTags,
+		&t.AdjPercentBP, &t.StaffDiscount, &t.AdjMode, &t.RoundOff, &o.AdjReason, &o.AdjBy, &o.AdjApprovedBy, &o.AdjAt,
+		&o.PayType, &o.PayChannelID)
 	if err != nil {
 		return nil, err
 	}

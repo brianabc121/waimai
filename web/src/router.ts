@@ -81,6 +81,7 @@ export const router = createRouter({
         { path: 'mall', component: () => import('./views/admin/AdminMall.vue'), meta: { title: 'ad.mall' } },
         { path: 'coupons', component: () => import('./views/admin/AdminCoupons.vue'), meta: { title: 'ad.coupons' } },
         { path: 'bills', component: () => import('./views/admin/AdminBills.vue'), meta: { title: 'bl.nav' } },
+        { path: 'pay-methods', component: () => import('./views/admin/AdminPayMethods.vue'), meta: { title: 'ad.pay' } },
         { path: 'support', component: () => import('./views/admin/AdminSupport.vue'), meta: { title: 'ad.support' } },
         { path: 'chats', component: () => import('./views/admin/AdminChats.vue'), meta: { title: 'ad.chats' } },
         { path: 'worker', component: () => import('./views/admin/AdminWorker.vue'), meta: { title: 'ad.worker' } },

@@ -173,4 +173,5 @@ extend({
   'ad.r.count': ['请求数', 'Requests'], 'ad.r.slowest': ['最慢', 'Slowest'], 'ad.r.show_errors': ['点一下只看这个接口的错误', 'Click to show this endpoint\'s errors'],
   'ad.e.title': ['最近错误', 'Recent errors'], 'ad.e.all_status': ['全部状态', 'Any status'], 'ad.e.all_routes': ['全部接口', 'Any endpoint'], 'ad.e.internal': ['内部错误', 'Internal error'],
   'ad.api_foot': ['按路由模板统计，不含订单号和令牌。SSE 长连接只计连接数，不计入请求和耗时；健康检查和静态文件不计。P50、P95 由耗时分桶估算。这里只记 5xx 和 429，数据保留 7 天。', 'Counted by route template, without order numbers or tokens. Event streams count as connections, not as requests; health checks and static files are left out. P50 and P95 are estimated from latency buckets. Only 5xx and 429 responses are listed. Data is kept for 7 days.'],
+  'ad.pay': ['支付方式', 'Payment methods'],
 })

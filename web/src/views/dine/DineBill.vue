@@ -2,11 +2,15 @@
 // A table's bill by round, what can be done to each dish (serve, one more,
 // rush, void with a tapped reason), and taking payment with tapped amounts
 // (docs/DINE_IN_ORDER_DESIGN.md §8, §9).
-import { computed, reactive, ref, watch } from 'vue'
-import { ApiError, post } from '../../api'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { ApiError, get, post } from '../../api'
 import { money, pick, t, toMinor } from '../../i18n'
-import '../../checkout'
-import type { Bill, DinePresets, Item, OrderItem } from '../../types'
+import { can } from '../../session'
+import { pctText, payText } from '../../checkout'
+import type { Adjust, Bill, DinePresets, Item, OrderItem, PayChoice, PayOptions, Totals } from '../../types'
+import AdjustSheet from '../checkout/AdjustSheet.vue'
+import PayPicker from '../checkout/PayPicker.vue'
+import ApproveDialog from '../ApproveDialog.vue'
 import type { DeskLine } from './DineOrder.vue'
 import { presetList, sinceText } from './strings'
 
@@ -74,19 +78,59 @@ const paying = ref(props.payFirst || !props.phone)
 const o = computed(() => props.bill.order)
 const live = computed(() => o.value.items.filter(i => i.prep_status !== 'cancelled'))
 const cooking = computed(() => live.value.filter(i => i.prep_status === 'pending' || i.prep_status === 'preparing').length)
-const methods = computed(() => presetList(props.presets, 'pay_methods', props.country))
-const pay = reactive({ method: '', digits: '', manifest: 0, busy: false })
-const cashLike = computed(() => pay.method === methods.value[0])
-watch(methods, ms => { if (!pay.method) pay.method = ms[0] ?? '' }, { immediate: true })
-function resetPay() { pay.digits = ''; pay.manifest = o.value.manifest_version }
+// how the guests pay: cash, card or an online method the store takes (§6.1)
+const payOpts = ref<PayOptions | null>(null)
+onMounted(async () => {
+  try { payOpts.value = await get<PayOptions>(`/merchant/branches/${o.value.branch_id}/pay-options`) } catch (e) { error.value = (e as Error).message }
+})
+const choice = ref<PayChoice>({ type: 'cash', channel_id: 0 })
+const pay = reactive({ digits: '', manifest: 0, busy: false })
+const cashLike = computed(() => choice.value.type === 'cash')
+watch(() => choice.value.type, ty => { if (ty !== 'cash') pay.digits = '' })
+
+// the discount at checkout (§5): none until someone sets it; without the
+// permission a manager approves first
+const adjust = ref<Adjust | null>(null)
+const adjTotals = ref<Totals | null>(null)
+const adjOpen = ref(false)
+const approval = ref('')
+const approving = ref(false)
+const notice = ref('')
+function openAdjust() {
+  if (can('checkout.discount') || approval.value) adjOpen.value = true
+  else approving.value = true
+}
+function approved(token: string, name: string) {
+  approving.value = false; approval.value = token
+  notice.value = t('ck.approved', { name }); adjOpen.value = true
+}
+const previewAdj = (a: Adjust) => post<Totals>(`/merchant/orders/${o.value.id}/adjust-preview`, a)
+function setAdjust(a: Adjust | null, tot: Totals | null) {
+  adjOpen.value = false
+  adjust.value = a; adjTotals.value = a ? tot : null
+}
+const tot = computed(() => adjTotals.value ?? o.value.totals)
+const adjLabel = computed(() => {
+  const a = adjust.value, x = adjTotals.value
+  if (!a || !x) return t('ck.adj_none')
+  const parts: string[] = []
+  if (a.percent_bp) parts.push(`${pctText(a.percent_bp)} −${m(x.staff_discount ?? 0)}`)
+  if (a.mode === 'round') parts.push(`${t('ck.round_off')} −${m(x.round_off ?? 0)}`)
+  if (a.mode === 'set_total') parts.push(a.amount === 0 ? t('ck.free') : `${t('ck.set_off')} −${m(x.round_off ?? 0)}`)
+  return parts.join(' · ') + (a.reason ? ` · ${a.reason}` : '')
+})
+
+function resetPay() { pay.digits = ''; pay.manifest = o.value.manifest_version; adjust.value = null; adjTotals.value = null }
 resetPay()
 watch(() => o.value.manifest_version, v => { if (pay.manifest && v !== pay.manifest) { resetPay(); error.value = t('bill_changed') } })
 // amounts are typed in major units; the bill is in minor units
-const received = computed(() => pay.digits ? toMinor(pay.digits) : o.value.totals.total)
-const change = computed(() => received.value - o.value.totals.total)
+const due = computed(() => tot.value.total)
+const received = computed(() => pay.digits ? toMinor(pay.digits) : due.value)
+const change = computed(() => received.value - due.value)
+const canClose = computed(() => !cooking.value && change.value >= 0 && !pay.busy && (choice.value.type !== 'online' || !!choice.value.channel_id))
 // the quick amounts: round numbers just above the bill
 const quick = computed(() => {
-  const due = o.value.totals.total / 100
+  const due = tot.value.total / 100
   const steps = due < 100 ? [10, 50, 100] : due < 1000 ? [50, 100, 500] : [100, 500, 1000]
   const out: number[] = []
   for (const s of steps) { const v = Math.ceil(due / s) * s; if (v > due && !out.includes(v)) out.push(v) }
@@ -100,15 +144,20 @@ function key(k: string) {
   pay.digits += k
 }
 async function close() {
-  if (cooking.value || change.value < 0) return
+  if (!canClose.value) return
   pay.busy = true; error.value = ''
   try {
     const b = await post<Bill>(`/merchant/table-sessions/${props.bill.session_id}/close`,
-      { expected_manifest_version: pay.manifest, amount_received: received.value, pay_method: pay.method, note: '' })
+      { expected_manifest_version: pay.manifest, amount_received: cashLike.value ? received.value : due.value, pay_type: choice.value.type,
+        pay_channel_id: choice.value.channel_id, adjust: adjust.value, expected_total: due.value, note: '' },
+      adjust.value && approval.value ? { 'X-Approval': approval.value } : undefined)
     emit('update', b)
     done.value = true
+    approval.value = ''
   } catch (e) {
-    if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') error.value = t('bill_changed')
+    if (e instanceof ApiError && e.code === 'APPROVAL_INVALID') { approval.value = ''; error.value = t('ck.approval_used') }
+    else if (e instanceof ApiError && e.code === 'VERSION_CONFLICT' && e.details?.reason !== 'promotion_used_up' && adjust.value) error.value = t('ck.changed')
+    else if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') error.value = t('bill_changed')
     else if (e instanceof ApiError && e.code === 'ITEMS_IN_PROGRESS') error.value = t('dd.cooking_block', { n: e.details?.count ?? '' })
     else error.value = (e as Error).message
     resetPay()
@@ -162,8 +211,11 @@ const done = ref(false)
         <div v-if="o.totals.discount" class="kv promo" data-testid="dd-promo"><span>{{ t('ck.tab_dine') }} · {{ pick(o.totals.promotion_name, o.totals.promotion_name_en) }}</span><span>−{{ m(o.totals.discount) }}</span></div>
         <div v-if="o.totals.service_charge" class="kv"><span>{{ t('dd.service') }}</span><span>{{ m(o.totals.service_charge) }}</span></div>
         <div v-if="o.totals.tax_amount" class="kv"><span>{{ o.totals.tax_inclusive ? t('dd.tax_incl') : t('dd.tax') }} {{ o.totals.tax_rate_bp / 100 }}%</span><span>{{ m(o.totals.tax_amount) }}</span></div>
-        <div class="due"><span>{{ t('dd.due') }}</span><b data-testid="dd-due">{{ m(o.totals.total) }}</b></div>
-        <div class="dd-chs methods"><button v-for="x in methods" :key="x" class="dd-ch" :class="{ on: pay.method === x }" data-testid="dd-method" @click="pay.method = x; if (pay.method !== methods[0]) pay.digits = ''">{{ x }}</button></div>
+        <button class="kv adj" :class="{ set: !!adjust }" data-testid="dd-adj" @click="openAdjust">
+          <span>{{ t('ck.adj') }}</span><span>{{ adjLabel }} <span class="rtl-flip">›</span></span></button>
+        <div v-if="notice" class="muted small" data-testid="dd-approved">{{ notice }}</div>
+        <div class="due"><span>{{ t('dd.due') }}</span><b data-testid="dd-due"><s v-if="adjTotals && adjTotals.total !== o.totals.total" class="was">{{ m(o.totals.total) }}</s>{{ m(due) }}</b></div>
+        <PayPicker v-model="choice" :options="payOpts" class="methods" />
         <template v-if="cashLike">
           <div class="recv"><span class="muted">{{ t('dd.received') }}</span><b data-testid="dd-received">{{ m(received) }}</b></div>
           <div class="quick"><button :class="{ on: !pay.digits }" @click="pay.digits = ''">{{ t('dd.exact') }}</button>
@@ -173,7 +225,7 @@ const done = ref(false)
         </template>
         <div class="pf">
           <div v-if="cooking" class="banner warn small">{{ t('dd.cooking_block', { n: cooking }) }}</div>
-          <button class="dd-big" :disabled="!!cooking || change < 0 || pay.busy" data-testid="dd-close" @click="close">{{ t('dd.close') }}</button>
+          <button class="dd-big" :disabled="!canClose" data-testid="dd-close" @click="close">{{ t('dd.close') }}</button>
         </div>
       </section>
     </div>
@@ -202,13 +254,19 @@ const done = ref(false)
       </div>
     </div>
 
+    <AdjustSheet v-if="adjOpen" :currency="currency" :reasons="payOpts?.reasons" :initial="adjust" :bottom="phone" :preview="previewAdj"
+      @close="adjOpen = false" @apply="setAdjust" />
+    <ApproveDialog v-if="approving" :branch-id="o.branch_id" perm="checkout.discount" :what="t('ck.approve_what')" @approved="approved" @close="approving = false" />
+
     <!-- closed -->
     <div v-if="done" class="dd-mask">
       <div class="dd-modal" data-testid="dd-closed">
         <div class="mh"><h3>{{ t('dd.closed_title', { name: bill.table_name }) }}</h3></div>
         <div class="mb">
           <div class="kv"><span>{{ t('dd.due') }}</span><b>{{ m(o.totals.total) }}</b></div>
-          <div class="kv"><span>{{ t('dd.received') }} · {{ o.pay_method }}</span><b>{{ m(o.amount_received ?? 0) }}</b></div>
+          <div v-if="o.totals.staff_discount" class="kv"><span>{{ t('ck.staff_disc') }}</span><b>−{{ m(o.totals.staff_discount) }}</b></div>
+          <div v-if="o.totals.round_off" class="kv"><span>{{ t('ck.round_off') }}</span><b>−{{ m(o.totals.round_off) }}</b></div>
+          <div class="kv"><span>{{ t('dd.received') }} · {{ payText(o) }}</span><b data-testid="dd-closed-received">{{ m(o.amount_received ?? 0) }}</b></div>
           <div v-if="(o.amount_received ?? 0) > o.totals.total" class="kv"><span>{{ t('dd.change') }}</span><b>{{ m((o.amount_received ?? 0) - o.totals.total) }}</b></div>
         </div>
         <div class="mf"><a class="dd-big ghost" :href="`/ticket/${o.id}`" target="_blank" rel="noopener">{{ t('dd.print') }}</a>

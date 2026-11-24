@@ -368,6 +368,16 @@ func (a *App) voidLine(ctx context.Context, tx pgx.Tx, itemID int64, in VoidInpu
 			}
 		}
 	}
+	// The discount at checkout: the percentage is taken off the new amount,
+	// a round-off or a typed amount to pay is dropped.
+	if _, err := reapplyAdjust(ctx, tx, b, o.ID); err != nil {
+		return nil, err
+	}
+	if err := tx.QueryRow(ctx, `SELECT service_charge, tax_amount, total, staff_discount, round_off, adj_mode
+		FROM orders WHERE id=$1`, o.ID).Scan(&after.ServiceCharge, &after.TaxAmount, &after.Total, &after.StaffDiscount,
+		&after.RoundOff, &after.AdjMode); err != nil {
+		return nil, err
+	}
 	q.After = after
 	q.Less = q.Before.Total - after.Total
 	q.PromoAfter = after.PromotionName
