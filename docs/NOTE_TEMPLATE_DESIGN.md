@@ -1,6 +1,6 @@
 # 菜品口味备注模板 设计方案 v0.1
 
-> 状态：方案，待 brian 确认。确认前不写代码。
+> 状态：2026-11-24 brian 确认，第 10 节全部按推荐。
 > 效果图：[docs/note-template-screens/](note-template-screens/)，原型 [docs/note-template-prototype/index.html](note-template-prototype/index.html)。
 >
 > | 效果图 | 内容 |
@@ -219,7 +219,7 @@ ALTER TABLE order_items ADD COLUMN note_tags JSONB NOT NULL DEFAULT '[]';
 
 每批有 Go 测试（下单校验、快照、翻译）和浏览器测试（建模板、套用、顾客下单、代客下单选口味、后厨看到）。
 
-## 10. 请 brian 确认（括号里是推荐）
+## 10. 已确认的问题（全部按推荐）
 
 1. **模板里分组**：一个模板可以分几组，每组单选或多选（**推荐：支持分组**，像“甜度单选、温度单选、忌口多选”；新建时默认一组多选，不想分组的商家感觉不到）。
 2. **一道菜能套几个模板**（**推荐：最多 3 个**，例如奶茶同时套“奶茶类”和“通用”）。
