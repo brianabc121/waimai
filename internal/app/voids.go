@@ -108,6 +108,8 @@ type VoidResult struct {
 	Quote     *VoidQuote `json:"quote"`
 	Order     *Order     `json:"order"`
 	SessionID *int64     `json:"session_id"`
+	// AccessToken opens the customer's order page, for the message the desk sends.
+	AccessToken string `json:"access_token,omitempty"`
 }
 
 var (
@@ -173,7 +175,11 @@ func (a *App) VoidLine(ctx context.Context, itemID int64, in VoidInput, actor Ac
 	if err != nil {
 		return nil, err
 	}
-	return &VoidResult{Quote: q, Order: o, SessionID: o.SessionID}, nil
+	r := &VoidResult{Quote: q, Order: o, SessionID: o.SessionID}
+	if o.SessionID == nil {
+		r.AccessToken = a.orderToken(o.tokenNonce)
+	}
+	return r, nil
 }
 
 // VoidItem is the table bill's void (PR #105): a reason the desk tapped,
