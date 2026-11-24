@@ -2976,7 +2976,7 @@
  "vd.kind.customer": "Motivo del cliente",
  "vd.kind.store": "Motivo de la tienda",
  "vd.kind_hint.customer": "La oferta se recalcula con lo que queda y puede bajar",
- "vd.kind_hint.store": "Culpa de la tienda: la oferta se mantiene",
+ "vd.kind_hint.store": "Culpa del local: la oferta se mantiene, en proporción a los platos que quedan",
  "vd.reasons.customer": "Pedido equivocado|El cliente cambió de idea",
  "vd.reasons.store": "Muy lento|Problema de calidad|Agotado",
  "vd.st.free": "Sin empezar: el stock se devuelve",

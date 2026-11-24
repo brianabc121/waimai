@@ -64,9 +64,11 @@ type orderMoney struct {
 	// took it, and what it took off; nil when none.
 	Promo       *Promotion
 	PromoAmount int64
-	// Dish are the dish promotions the order used, as they were then.
-	Dish    []*Promotion
-	Coupons []orderCoupon
+	// Dish are the dish promotions the order used, as they were then, and
+	// what they took off in all.
+	Dish       []*Promotion
+	DishAmount int64
+	Coupons    []orderCoupon
 	// The discount at checkout: the share still charged (0 = none), and a
 	// round-off or typed amount (Mode "round" or "set_total").
 	StaffBP  int
@@ -121,6 +123,7 @@ func loadMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, erro
 			return nil, err
 		}
 		if c.Kind == "dish_promotion" {
+			m.DishAmount += c.Amount
 			if pid != nil {
 				if p, ok := promoFromRule(*pid, c.Name, c.NameEn, rule); ok {
 					m.Dish = append(m.Dish, p)
@@ -195,6 +198,25 @@ type promoPolicy struct {
 	floor bool
 	// pick moves to another live promotion that saves more.
 	pick bool
+	// prorate scales what keep and floor hold to the dishes left: a void
+	// or refund by the store's fault leaves the promotion its share of
+	// what is still bought, not its whole amount.
+	prorate bool
+}
+
+// heldPromo is what the order's promotion holds under pol when the dishes
+// (after dish promotions) now cost sub: its amount, or with pol.prorate its
+// share of it in proportion to what the dishes cost when it was priced.
+// Free delivery is not about the dishes and is held whole.
+func (m *orderMoney) heldPromo(sub int64, pol promoPolicy) int64 {
+	held := m.PromoAmount
+	if !pol.prorate || m.Promo == nil || m.Promo.Kind == "free_delivery" {
+		return held
+	}
+	if base := m.Subtotal - m.DishAmount; base > 0 && sub < base {
+		held = mulDivRound(held, max(sub, 0), base)
+	}
+	return held
 }
 
 // choosePromo decides the promotion for sub of dishes, by pol. switched
@@ -205,15 +227,15 @@ func (m *orderMoney) choosePromo(ctx context.Context, q Querier, b *Branch, sub 
 	if m.Promo != nil {
 		switch {
 		case pol.keep:
-			if m.PromoAmount > 0 {
-				return m.Promo, promoOn(m.Promo.Kind, m.PromoAmount), false, nil
+			if held := m.heldPromo(sub, pol); held > 0 {
+				return m.Promo, promoOn(m.Promo.Kind, held), false, nil
 			}
 			return nil, Discount{}, false, nil
 		case pol.current && sub >= m.Promo.Threshold:
 			cur, off = m.Promo, m.Promo.discount(sub, m.DeliveryFee)
 		}
-		if pol.floor && off.total() < m.PromoAmount {
-			cur, off = m.Promo, promoOn(m.Promo.Kind, m.PromoAmount)
+		if held := m.heldPromo(sub, pol); pol.floor && off.total() < held {
+			cur, off = m.Promo, promoOn(m.Promo.Kind, held)
 		}
 	}
 	if !pol.pick {

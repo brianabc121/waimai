@@ -35,7 +35,8 @@ func TestVoidDelivery(t *testing.T) {
 	before := o.Totals
 
 	// a quote changes nothing: the customer's fault drops to the small
-	// promotion, the store's keeps the big one
+	// promotion, the store's keeps the big one at its share of what is left
+	// (100.00 × 537/606)
 	q, err := a.QuoteVoid(ctx, tea.ID, app.VoidInput{ReasonKind: "customer"}, false)
 	noErr(t, err)
 	if q.Wasted || q.NeedsApproval || q.After.PromotionID != small || !q.PromoDown || q.Less != before.Total-q.After.Total ||
@@ -44,7 +45,7 @@ func TestVoidDelivery(t *testing.T) {
 	}
 	qs, err := a.QuoteVoid(ctx, tea.ID, app.VoidInput{ReasonKind: "store"}, false)
 	noErr(t, err)
-	if qs.After.PromotionID != big || qs.After.Discount != 10000 || qs.PromoDown || qs.Less <= 6900 || qs.Version != o.Version {
+	if qs.After.PromotionID != big || qs.After.Discount != 8861 || !qs.PromoDown || qs.Less <= 5000 || qs.Version != o.Version {
 		t.Fatalf("store quote: %+v", qs)
 	}
 	o2, err := a.GetOrder(ctx, o.ID)
@@ -239,8 +240,9 @@ func TestVoidStockAndPromotionRelease(t *testing.T) {
 	wantCode(t, err, "ITEM_UNAVAILABLE")
 }
 
-// A table: the store's fault keeps the dine-in promotion, the guests' does
-// not; a dish already started needs the permission.
+// A table: the store's fault keeps the dine-in promotion (at its share of
+// what is left, even below its threshold), the guests' does not; a dish
+// already started needs the permission.
 func TestVoidDineIn(t *testing.T) {
 	s := newStore(t, true)
 	ctx := context.Background()
@@ -265,7 +267,8 @@ func TestVoidDineIn(t *testing.T) {
 	}
 	r, err := a.VoidLine(ctx, chicken.ID, app.VoidInput{Qty: 1, Reason: "沽清了", ReasonKind: "store"}, s.staff, false)
 	noErr(t, err)
-	if r.Order.Totals.Discount != 3000 || r.Order.Totals.Subtotal != 16900+6900 || r.SessionID == nil {
+	// 30.00 × 238/407
+	if r.Order.Totals.Discount != 1754 || r.Order.Totals.Subtotal != 16900+6900 || r.SessionID == nil {
 		t.Fatalf("store's fault: %+v", r.Order.Totals)
 	}
 	_, err = a.SetItemStatus(ctx, bill.Order.ID, tea.ID, "start", s.staff)

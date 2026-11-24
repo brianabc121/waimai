@@ -432,12 +432,14 @@ func (a *App) voidLine(ctx context.Context, tx pgx.Tx, itemID int64, in VoidInpu
 
 // voidPolicy is how a void or a refund of a delivery or pickup order
 // decides the promotion (docs/VOID_ITEM_DESIGN.md §6): the store's fault
-// keeps it at its amount; the customer's works it out again on what is left,
+// keeps it, scaled to the share of the dishes still bought (brian,
+// 2026-11-24: a big void must not leave the rest almost free); the
+// customer's works it out again on what is left,
 // with the promotion hours of when they ordered, and may move to another
 // promotion that now saves more (pick).
 func voidPolicy(m *orderMoney, kind string, pick bool) promoPolicy {
 	if kind == "store" {
-		return promoPolicy{keep: true}
+		return promoPolicy{keep: true, prorate: true}
 	}
 	return promoPolicy{at: m.Created, current: true, pick: pick}
 }

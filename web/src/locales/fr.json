@@ -2976,7 +2976,7 @@
  "vd.kind.customer": "Motif du client",
  "vd.kind.store": "Motif du restaurant",
  "vd.kind_hint.customer": "L’offre est recalculée sur ce qui reste et peut baisser",
- "vd.kind_hint.store": "Faute du restaurant : l’offre reste la même",
+ "vd.kind_hint.store": "Faute du restaurant : l'offre reste, au prorata des plats restants",
  "vd.reasons.customer": "Erreur de commande|Le client a changé d’avis",
  "vd.reasons.store": "Trop lent|Problème de qualité|Épuisé",
  "vd.st.free": "Pas commencé : le stock est rendu",

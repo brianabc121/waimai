@@ -2976,7 +2976,7 @@
  "vd.kind.customer": "Lý do của khách",
  "vd.kind.store": "Lý do của cửa hàng",
  "vd.kind_hint.customer": "Ưu đãi được tính lại theo món còn lại và có thể giảm",
- "vd.kind_hint.store": "Lỗi của cửa hàng: ưu đãi giữ nguyên",
+ "vd.kind_hint.store": "Lỗi của quán: KM vẫn giữ, theo tỷ lệ các món còn lại",
  "vd.reasons.customer": "Đặt nhầm|Khách đổi ý",
  "vd.reasons.store": "Ra món chậm|Món có vấn đề|Hết món",
  "vd.st.free": "Chưa làm: trả lại tồn kho",

@@ -2976,7 +2976,7 @@
  "vd.kind.customer": "お客様の理由",
  "vd.kind.store": "お店の理由",
  "vd.kind_hint.customer": "残りの料理で割引を計算し直します（下がることがあります）",
- "vd.kind_hint.store": "お店の都合なので割引はそのままです",
+ "vd.kind_hint.store": "店側の理由：特典は最低金額で外れず、残った料理の割合で残ります",
  "vd.reasons.customer": "注文ミス|お客様が不要に",
  "vd.reasons.store": "提供が遅い|品質の問題|売り切れ",
  "vd.st.free": "まだ作っていません：在庫は戻ります",

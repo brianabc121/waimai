@@ -2976,7 +2976,7 @@
 "vd.kind.customer":"顧客原因",
 "vd.kind.store":"店鋪原因",
 "vd.kind_hint.customer":"滿減按剩下的菜重新算，可能降檔",
-"vd.kind_hint.store":"店裡的原因，滿減照舊不降",
+"vd.kind_hint.store":"店裡的原因：滿減不按門檻降檔，按剩下菜品的比例保留",
 "vd.reasons.customer":"點錯了|顧客不要了",
 "vd.reasons.store":"上太慢|菜品有問題|沽清了",
 "vd.st.free":"還沒開始做，退了庫存退回",
