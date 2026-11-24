@@ -2,7 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { get, patch, post, put } from '../api'
 import { both, extend, money, pick, t, toMajor, toMinor } from '../i18n'
-import { session } from '../session'
+import { can, session } from '../session'
 import { CONTACT_FIELDS } from '../addresses'
 import type { Branch, Station, Zone } from '../types'
 import StoreTextsCard from './StoreTextsCard.vue'
@@ -48,7 +48,7 @@ extend({
 })
 
 async function load() {
-  if (!listing.value) void get(`/merchant/branches/${bid}/mall`).then(setListing).catch(() => null)
+  if (!listing.value && can('mall')) void get(`/merchant/branches/${bid}/mall`).then(setListing).catch(() => null)
   const m = await get(`/merchant/branches/${bid}/menu`)
   const b: Branch = m.branch
   branch.value = b; zones.value = m.zones; stations.value = m.stations
@@ -101,7 +101,7 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
       <a :href="link()" target="_blank">{{ link() }}</a>
     </div>
 
-    <form class="card" @submit.prevent="saveSettings">
+    <form v-if="can('settings')" class="card" @submit.prevent="saveSettings">
       <h2 style="margin-bottom:12px">{{ t('store_settings') }}</h2>
       <div class="grid2">
         <label class="field"><span>{{ t('name_zh') }}</span><input v-model="s.name" required /></label>
@@ -139,9 +139,9 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
       <button class="btn primary">{{ t('save') }}</button>
     </form>
 
-    <StoreTextsCard ref="texts" :base="`/merchant/branches/${bid}`" @en-name="v => s.name_en = v" />
+    <StoreTextsCard v-if="can('menu.translate')" ref="texts" :base="`/merchant/branches/${bid}`" @en-name="v => s.name_en = v" />
 
-    <form v-if="listing" class="card stack" data-testid="mall-listing" @submit.prevent="saveListing">
+    <form v-if="listing && can('mall')" class="card stack" data-testid="mall-listing" @submit.prevent="saveListing">
       <h2>{{ t('mls.title') }}</h2>
       <p class="muted small">{{ t('mls.hint') }}</p>
       <div v-if="listing.hidden" class="banner bad" data-testid="mall-listing-hidden">{{ t('mls.hidden') }}</div>
@@ -165,14 +165,14 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
       </div>
     </form>
 
-    <div class="card stack">
+    <div v-if="can('delivery.map')" class="card stack">
       <h2>{{ t('zones') }}</h2>
       <p class="muted">{{ t('zones_moved') }}</p>
       <div><span v-for="zone in zones" :key="zone.id" class="tag" :class="zone.active ? 'ok' : ''" style="margin:0 6px 6px 0">{{ both(zone.name, zone.name_en) }} · {{ money(zone.fee, branch.currency) }}</span></div>
       <router-link class="btn" to="/merchant/delivery-map" data-testid="to-delivery-map">{{ t('delivery_map') }}</router-link>
     </div>
 
-    <div class="card stack">
+    <div v-if="can('settings')" class="card stack">
       <h2>{{ t('stations') }}</h2>
       <p class="muted small">{{ t('stations_hint') }}</p>
       <table class="data" v-if="stations.length">
@@ -192,7 +192,7 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
       </form>
     </div>
 
-    <div class="card row between">
+    <div v-if="can('staff.view')" class="card row between">
       <span><b>{{ t('staff') }}</b> <span class="muted small">{{ t('staff_moved') }}</span></span>
       <router-link class="btn" to="/merchant/staff">{{ t('staff') }}</router-link>
     </div>

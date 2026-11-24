@@ -410,3 +410,13 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
 html[data-lang="th"] body { line-height: 1.6; }
 html[data-lang="my"] body, html[data-lang="km"] body { line-height: 1.8; }
 .zawgyi-notice { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 1000; max-width: calc(100vw - 32px); background: #1f2328; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.5; box-shadow: 0 4px 16px rgba(0,0,0,.2); }
+
+/* the role someone works under in the store's back office (docs/STAFF_ACCESS_DESIGN.md §5.3) */
+.rtag { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; line-height: 18px; white-space: nowrap; }
+.rtag.owner { background: #3d444d; color: #fff; } .rtag.manager { background: #ffe3d1; color: #b93a08; }
+.rtag.cashier { background: #dde7ff; color: #1d4ed8; } .rtag.staff { background: #eef0f2; color: #57606a; }
+.staffbar .rtag.owner { background: #57606a; }
+.shell-role { display: flex; align-items: center; gap: 8px; padding: 0 10px 12px; margin-top: -6px; font-size: 12.5px; color: #8b949e; min-width: 0; }
+.shell-role .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* an action the role may not take: still shown, so people know whom to ask */
+.btn.need, .btn.need:disabled { color: #6b7280; background: #f6f6f4; border-style: dashed; opacity: 1; }

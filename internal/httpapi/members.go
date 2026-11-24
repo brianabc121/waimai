@@ -32,21 +32,21 @@ func memberNo(c *gin.Context) (int, bool) {
 }
 
 func (s *Server) searchMembers(c *gin.Context) {
-	if bid, ok := branchScope(c, deskRoles); ok {
+	if bid, ok := branchScope(c, pMemberLookup); ok {
 		ms, err := s.App.SearchMembers(c, bid, c.Query("q"))
 		reply(c, gin.H{"members": ms}, err)
 	}
 }
 
 func (s *Server) newMember(c *gin.Context) {
-	if bid, ok := branchScope(c, deskRoles); ok {
+	if bid, ok := branchScope(c, pMemberWrite); ok {
 		m, err := s.App.NewMember(c, bid, currentUser(c).ID)
 		reply(c, m, err)
 	}
 }
 
 func (s *Server) getMember(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pMemberLookup)
 	if !ok {
 		return
 	}
@@ -57,7 +57,7 @@ func (s *Server) getMember(c *gin.Context) {
 }
 
 func (s *Server) saveMember(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pMemberWrite)
 	if !ok {
 		return
 	}
@@ -72,14 +72,14 @@ func (s *Server) saveMember(c *gin.Context) {
 }
 
 func (s *Server) addressHints(c *gin.Context) {
-	if bid, ok := branchScope(c, deskRoles); ok {
+	if bid, ok := branchScope(c, pMemberLookup); ok {
 		hs, err := s.App.AddressHints(c, bid, c.Query("q"), c.Query("phone"))
 		reply(c, gin.H{"addresses": hs}, err)
 	}
 }
 
 func (s *Server) staffQuote(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pManual)
 	var in app.StaffOrderInput
 	if !ok || !bind(c, &in) {
 		return
@@ -89,7 +89,7 @@ func (s *Server) staffQuote(c *gin.Context) {
 }
 
 func (s *Server) staffOrder(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pManual)
 	var in app.StaffOrderInput
 	if !ok || !bind(c, &in) {
 		return
@@ -105,7 +105,7 @@ func memberFilter(c *gin.Context) app.MemberFilter {
 }
 
 func (s *Server) listMembers(c *gin.Context) {
-	if bid, ok := branchScope(c, deskRoles); ok {
+	if bid, ok := branchScope(c, pMemberView); ok {
 		f := memberFilter(c)
 		f.BranchID = bid
 		l, err := s.App.ListMembers(c, f)
@@ -114,7 +114,7 @@ func (s *Server) listMembers(c *gin.Context) {
 }
 
 func (s *Server) memberOrders(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pMemberLookup)
 	if !ok {
 		return
 	}
@@ -162,7 +162,7 @@ func (s *Server) adminSaveMember(c *gin.Context) {
 }
 
 func (s *Server) deleteMemberAddress(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pMemberWrite)
 	if !ok {
 		return
 	}

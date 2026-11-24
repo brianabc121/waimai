@@ -146,7 +146,7 @@ export interface MenuImport {
 // A post is one job in a branch: a kitchen station, the packing counter, or rider.
 export interface Post { kind: 'station' | 'packing' | 'rider'; station_id: number | null; station_name?: string; station_name_en?: string; station_active?: boolean }
 // role is back-office access (owner, manager, cashier, staff); posts say what the person works on.
-export interface BranchRole { branch_id: number; branch_name: string; slug: string; currency: string; role: string; posts: Post[] }
+export interface BranchRole { branch_id: number; branch_name: string; slug: string; currency: string; role: string; posts: Post[]; perms?: string[] }
 export interface StaffMember { id: number; username: string; display_name: string; phone: string; role: string; active: boolean; posts: Post[]; open_tasks: number; active_deliveries: number; on_duty: boolean }
 export interface RiderInfo extends StaffMember { lat: number | null; lng: number | null; accuracy: number | null; battery: number | null; located_at: string | null; contact: '' | 'ok' | 'none' | 'lost'; distance_m: number | null }
 export interface Tracking { active: boolean; rider_name?: string; rider_phone?: string; lat: number | null; lng: number | null; located_at: string | null; dest_lat: number | null; dest_lng: number | null; distance_m: number | null }

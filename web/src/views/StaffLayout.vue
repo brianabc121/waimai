@@ -7,15 +7,17 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { get, post } from '../api'
 import { locale, setLocale, t } from '../i18n'
-import { currentRole, logout, session, setAdminView, setBranch } from '../session'
+import { can, currentRole, logout, reloadUser, session, setAdminView, setBranch } from '../session'
+import { pagePerms } from '../perms'
 import { useShell } from '../shell'
 import { storeChats } from '../chat'
 
 const router = useRouter(), route = useRoute()
 const shell = useShell('store')
 const role = computed(() => currentRole()?.role ?? '')
-const desk = computed(() => ['owner', 'manager', 'cashier'].includes(role.value))
-const manager = computed(() => ['owner', 'manager'].includes(role.value))
+// a page the person's role may not open (docs/STAFF_ACCESS_DESIGN.md §6.4)
+const blocked = computed(() => { const p = pagePerms(route.path); return !!p && !can(...p) })
+const show = (path: string) => { const p = pagePerms(path); return !p || can(...p) }
 const posts = computed(() => currentRole()?.posts ?? [])
 const inStore = computed(() => posts.value.some(p => p.kind !== 'rider'))
 
@@ -45,7 +47,7 @@ function tone() {
   } catch { /* no sound on this device */ }
 }
 async function countChats() {
-  if (!desk.value || !session.branchId || document.visibilityState !== 'visible') return
+  if (!can('chat.reply') || !session.branchId || document.visibilityState !== 'visible') return
   const r = await storeChats(session.branchId, { unread: true }).catch(() => ({ unread: chatUnread.value, support_unread: supportUnread.value }))
   const n = r.unread
   if (chatKnown >= 0 && n > chatKnown && route.path !== '/merchant/messages') { chatNew.value = true; tone() }
@@ -54,7 +56,10 @@ async function countChats() {
   if (supportKnown >= 0 && r.support_unread > supportKnown && route.path !== '/merchant/support') tone()
   supportKnown = supportUnread.value = r.support_unread
 }
-const countSoon = () => { clearTimeout(chatSoon); chatSoon = window.setTimeout(countChats, 400) }
+// a change of the store's role permissions or of this person's role comes as a
+// refresh of the store: re-read what this person may do
+let permSoon = 0
+const countSoon = () => { clearTimeout(chatSoon); chatSoon = window.setTimeout(countChats, 400); clearTimeout(permSoon); permSoon = window.setTimeout(reloadUser, 1500) }
 onMounted(() => { void countChats(); chatTimer = window.setInterval(countChats, 20000); window.addEventListener('live-refresh', countSoon) })
 onBeforeUnmount(() => { clearInterval(chatTimer); clearTimeout(chatSoon); window.removeEventListener('live-refresh', countSoon) })
 watch(() => route.path, p => { if (p === '/merchant/messages') chatNew.value = false })
@@ -83,24 +88,25 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
         <button v-if="!shell.narrow.value" class="shell-fold" data-testid="nav-fold" :title="t('nav_fold')" :aria-label="t('nav_fold')" @click="shell.fold()">«</button>
         <button v-else class="shell-fold" :aria-label="t('close')" @click="shell.open.value = false">×</button>
       </div>
+      <div v-if="role && !viewing" class="shell-role" data-testid="nav-role"><span class="rtag" :class="role">{{ t('role.' + role) }}</span><span class="who">{{ session.user?.display_name }}</span></div>
       <div class="shell-links">
-        <router-link v-if="desk" to="/merchant/orders">{{ t('orders') }}</router-link>
-        <router-link v-if="desk" to="/merchant/members" data-testid="nav-members">{{ t('sm.title') }}</router-link>
-        <router-link v-if="desk" to="/merchant/addresses" data-testid="nav-addresses">{{ t('da.title') }}</router-link>
-        <router-link v-if="desk" to="/merchant/tables">{{ t('tables') }}</router-link>
-        <router-link v-if="desk || inStore" to="/kitchen">{{ t('kitchen') }}</router-link>
-        <router-link v-if="desk" to="/merchant/messages" data-testid="nav-messages" @click="countChats">{{ t('ch.nav') }}<span v-if="chatUnread" class="navnum" data-testid="nav-chat-unread">{{ chatUnread > 99 ? '99+' : chatUnread }}</span></router-link>
-        <router-link v-if="desk || inStore" to="/merchant/menu">{{ t('menu_admin') }}</router-link>
-        <router-link v-if="manager" to="/merchant/templates">{{ t('templates') }}</router-link>
-        <router-link v-if="manager" to="/merchant/media">{{ t('promo_media') }}</router-link>
-        <router-link v-if="manager" to="/merchant/promos">{{ t('promos') }}</router-link>
-        <router-link v-if="manager" to="/merchant/cash">{{ t('cash') }}</router-link>
-        <router-link v-if="manager" to="/merchant/bills" data-testid="nav-bills">{{ t('bl.nav') }}</router-link>
-        <router-link v-if="desk" to="/merchant/riders">{{ t('riders') }}</router-link>
-        <router-link v-if="manager" to="/merchant/delivery-map">{{ t('delivery_map') }}</router-link>
-        <router-link v-if="manager" to="/merchant/staff">{{ t('staff') }}</router-link>
-        <router-link v-if="manager" to="/merchant/settings">{{ t('settings') }}</router-link>
-        <router-link v-if="desk" to="/merchant/support" data-testid="nav-support" @click="countChats">{{ t('sp.title') }}<span v-if="supportUnread" class="navnum" data-testid="nav-support-unread">{{ supportUnread > 99 ? '99+' : supportUnread }}</span></router-link>
+        <router-link v-if="show('/merchant/orders')" to="/merchant/orders">{{ t('orders') }}</router-link>
+        <router-link v-if="show('/merchant/members')" to="/merchant/members" data-testid="nav-members">{{ t('sm.title') }}</router-link>
+        <router-link v-if="show('/merchant/addresses')" to="/merchant/addresses" data-testid="nav-addresses">{{ t('da.title') }}</router-link>
+        <router-link v-if="show('/merchant/tables')" to="/merchant/tables">{{ t('tables') }}</router-link>
+        <router-link v-if="show('/kitchen')" to="/kitchen">{{ t('kitchen') }}</router-link>
+        <router-link v-if="show('/merchant/messages')" to="/merchant/messages" data-testid="nav-messages" @click="countChats">{{ t('ch.nav') }}<span v-if="chatUnread" class="navnum" data-testid="nav-chat-unread">{{ chatUnread > 99 ? '99+' : chatUnread }}</span></router-link>
+        <router-link v-if="show('/merchant/menu')" to="/merchant/menu">{{ t('menu_admin') }}</router-link>
+        <router-link v-if="show('/merchant/templates')" to="/merchant/templates">{{ t('templates') }}</router-link>
+        <router-link v-if="show('/merchant/media')" to="/merchant/media">{{ t('promo_media') }}</router-link>
+        <router-link v-if="show('/merchant/promos')" to="/merchant/promos">{{ t('promos') }}</router-link>
+        <router-link v-if="show('/merchant/cash')" to="/merchant/cash">{{ t('cash') }}</router-link>
+        <router-link v-if="show('/merchant/bills')" to="/merchant/bills" data-testid="nav-bills">{{ t('bl.nav') }}</router-link>
+        <router-link v-if="show('/merchant/riders')" to="/merchant/riders">{{ t('riders') }}</router-link>
+        <router-link v-if="show('/merchant/delivery-map')" to="/merchant/delivery-map">{{ t('delivery_map') }}</router-link>
+        <router-link v-if="show('/merchant/staff')" to="/merchant/staff" data-testid="nav-staff">{{ t('staff') }}</router-link>
+        <router-link v-if="show('/merchant/settings')" to="/merchant/settings">{{ t('settings') }}</router-link>
+        <router-link v-if="show('/merchant/support')" to="/merchant/support" data-testid="nav-support" @click="countChats">{{ t('sp.title') }}<span v-if="supportUnread" class="navnum" data-testid="nav-support-unread">{{ supportUnread > 99 ? '99+' : supportUnread }}</span></router-link>
         <router-link v-if="posts.length" to="/work">{{ t('my_workbench') }}</router-link>
       </div>
       <div class="shell-foot">
@@ -120,6 +126,7 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
       <div v-if="viewing" class="banner info no-print" style="border-radius:0" data-testid="admin-viewing">
         {{ t('admin_viewing') }} <button class="btn small" style="margin-inline-start:8px" @click="backToAdmin">{{ t('admin_back') }}</button></div>
       <div v-if="!session.branchId" class="page"><div class="banner warn">{{ t('not_found') }}</div></div>
+      <div v-else-if="blocked" class="page"><div class="banner warn" data-testid="no-perm">{{ t('rp.no_page') }}</div></div>
       <router-view v-else :key="session.branchId" />
     </main>
   </div>

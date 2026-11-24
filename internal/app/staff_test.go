@@ -136,12 +136,12 @@ func TestStaffEditRules(t *testing.T) {
 	off := false
 
 	// A manager cannot touch an owner or make one.
-	wantCode(t, a.UpdateStaff(ctx, s.branchID, owner.ID, app.StaffPatch{DisplayName: str("x")}, manager), "FORBIDDEN")
-	wantCode(t, a.ResetStaffPassword(ctx, s.branchID, owner.ID, "password2", manager), "FORBIDDEN")
-	wantCode(t, a.DeleteStaff(ctx, s.branchID, owner.ID, manager), "FORBIDDEN")
-	wantCode(t, a.UpdateStaff(ctx, s.branchID, s.rider1, app.StaffPatch{Role: str("owner")}, manager), "FORBIDDEN")
+	wantCode(t, a.UpdateStaff(ctx, s.branchID, owner.ID, app.StaffPatch{DisplayName: str("x")}, manager), "OWNER_ONLY")
+	wantCode(t, a.ResetStaffPassword(ctx, s.branchID, owner.ID, "password2", manager), "OWNER_ONLY")
+	wantCode(t, a.DeleteStaff(ctx, s.branchID, owner.ID, manager), "OWNER_ONLY")
+	wantCode(t, a.UpdateStaff(ctx, s.branchID, s.rider1, app.StaffPatch{Role: str("owner")}, manager), "OWNER_ONLY")
 	_, err = a.CreateStaffBy(ctx, s.branchID, app.NewUser{Username: uniq("o"), Password: "password1", DisplayName: "O", Role: "owner"}, manager)
-	wantCode(t, err, "FORBIDDEN")
+	wantCode(t, err, "OWNER_ONLY")
 
 	// Nobody locks themselves out, and the store keeps an owner.
 	wantCode(t, a.UpdateStaff(ctx, s.branchID, owner.ID, app.StaffPatch{Role: str("manager")}, owner), "VALIDATION")

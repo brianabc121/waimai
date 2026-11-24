@@ -24,7 +24,7 @@ func (s *Server) billRoutes(auth, admin *gin.RouterGroup) {
 }
 
 func (s *Server) bills(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pBills)
 	if !ok {
 		return
 	}
@@ -105,7 +105,7 @@ func (s *Server) bills(c *gin.Context) {
 }
 
 func (s *Server) billSummary(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pBills)
 	if !ok {
 		return
 	}
@@ -114,7 +114,7 @@ func (s *Server) billSummary(c *gin.Context) {
 }
 
 func (s *Server) settlementOrders(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pBills)
 	if !ok {
 		return
 	}

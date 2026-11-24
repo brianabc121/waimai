@@ -126,7 +126,7 @@ func (s *Server) customerChatRead(c *gin.Context) {
 // ---- store ----
 
 func (s *Server) storeChats(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pChat)
 	if !ok {
 		return
 	}
@@ -139,14 +139,14 @@ func (s *Server) storeChats(c *gin.Context) {
 }
 
 func (s *Server) storeChatLogin(c *gin.Context) {
-	if bid, ok := branchScope(c, deskRoles); ok {
+	if bid, ok := branchScope(c, pChat); ok {
 		l, err := s.App.StoreChatLogin(c, bid)
 		reply(c, l, err)
 	}
 }
 
 func (s *Server) storeChat(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pChat)
 	if !ok {
 		return
 	}
@@ -157,7 +157,7 @@ func (s *Server) storeChat(c *gin.Context) {
 }
 
 func (s *Server) storeChatRead(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pChat)
 	if !ok {
 		return
 	}
@@ -241,7 +241,7 @@ func (s *Server) customerChatReport(c *gin.Context) {
 }
 
 func (s *Server) storeChatBlock(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pChat)
 	var in struct {
 		Blocked bool `json:"blocked"`
 	}
@@ -254,7 +254,7 @@ func (s *Server) storeChatBlock(c *gin.Context) {
 }
 
 func (s *Server) storeChatReport(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pChat)
 	var in chatReportIn
 	if !ok || !bind(c, &in) {
 		return
@@ -392,7 +392,7 @@ func (s *Server) customerChatImage(c *gin.Context) {
 }
 
 func (s *Server) storeChatImage(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pChat)
 	if !ok {
 		return
 	}
@@ -418,14 +418,14 @@ func (s *Server) chatImage(c *gin.Context) {
 }
 
 func (s *Server) chatSetup(c *gin.Context) {
-	if bid, ok := branchScope(c, deskRoles); ok {
+	if bid, ok := branchScope(c, pChat); ok {
 		v, err := s.App.ChatSetup(c, bid)
 		reply(c, v, err)
 	}
 }
 
 func (s *Server) addQuickReply(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pChat)
 	if !ok {
 		return
 	}
@@ -439,7 +439,7 @@ func (s *Server) addQuickReply(c *gin.Context) {
 }
 
 func (s *Server) deleteQuickReply(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pChat)
 	if !ok {
 		return
 	}
@@ -449,7 +449,7 @@ func (s *Server) deleteQuickReply(c *gin.Context) {
 }
 
 func (s *Server) setChatAutoReply(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pChatSettings)
 	if !ok {
 		return
 	}
@@ -463,7 +463,7 @@ func (s *Server) setChatAutoReply(c *gin.Context) {
 }
 
 func (s *Server) chatOrderCustomer(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pChat)
 	if !ok {
 		return
 	}

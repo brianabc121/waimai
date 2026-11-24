@@ -250,7 +250,7 @@ func (s *Server) customerAftersale(c *gin.Context) {
 }
 
 func (s *Server) handleAftersale(c *gin.Context) {
-	id, ok := s.orderScope(c, deskRoles)
+	id, ok := s.orderScope(c, pAftersale)
 	if !ok {
 		return
 	}
@@ -370,7 +370,7 @@ func (s *Server) logout(c *gin.Context) {
 // ---- merchant order desk ----
 
 func (s *Server) listOrders(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pOrderView)
 	if !ok {
 		return
 	}
@@ -383,7 +383,7 @@ func (s *Server) listOrders(c *gin.Context) {
 }
 
 func (s *Server) branchEvents(c *gin.Context) {
-	bid, ok := branchScope(c, allStaff)
+	bid, ok := branchScope(c, pAny)
 	if !ok {
 		return
 	}
@@ -391,7 +391,7 @@ func (s *Server) branchEvents(c *gin.Context) {
 }
 
 func (s *Server) listRiders(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pRiders)
 	if !ok {
 		return
 	}
@@ -404,7 +404,7 @@ func (s *Server) listRiders(c *gin.Context) {
 }
 
 func (s *Server) getOrder(c *gin.Context) {
-	id, ok := s.orderScope(c, allStaff)
+	id, ok := s.orderScope(c, pAny)
 	if !ok {
 		return
 	}
@@ -440,31 +440,31 @@ func (s *Server) orderCmd(c *gin.Context, roles []string, fn func(id int64, in o
 }
 
 func (s *Server) acceptOrder(c *gin.Context) {
-	s.orderCmd(c, deskRoles, func(id int64, in orderCommand) (*app.Order, error) {
+	s.orderCmd(c, pHandle, func(id int64, in orderCommand) (*app.Order, error) {
 		return s.App.Accept(c, id, in.ExpectedVersion, staffActor(c))
 	})
 }
 
 func (s *Server) rejectOrder(c *gin.Context) {
-	s.orderCmd(c, deskRoles, func(id int64, in orderCommand) (*app.Order, error) {
+	s.orderCmd(c, pHandle, func(id int64, in orderCommand) (*app.Order, error) {
 		return s.App.Reject(c, id, in.ExpectedVersion, in.Reason, staffActor(c))
 	})
 }
 
 func (s *Server) cancelOrder(c *gin.Context) {
-	s.orderCmd(c, deskRoles, func(id int64, in orderCommand) (*app.Order, error) {
+	s.orderCmd(c, pCancel, func(id int64, in orderCommand) (*app.Order, error) {
 		return s.App.StaffCancel(c, id, in.ExpectedVersion, in.Reason, staffActor(c))
 	})
 }
 
 func (s *Server) assignRider(c *gin.Context) {
-	s.orderCmd(c, deskRoles, func(id int64, in orderCommand) (*app.Order, error) {
+	s.orderCmd(c, pHandle, func(id int64, in orderCommand) (*app.Order, error) {
 		return s.App.AssignRider(c, id, in.RiderID, staffActor(c))
 	})
 }
 
 func (s *Server) handoffOrder(c *gin.Context) {
-	s.orderCmd(c, kitchenRoles, func(id int64, _ orderCommand) (*app.Order, error) {
+	s.orderCmd(c, pHandoff, func(id int64, _ orderCommand) (*app.Order, error) {
 		return s.App.StaffHandoff(c, id, staffActor(c))
 	})
 }
@@ -472,7 +472,7 @@ func (s *Server) handoffOrder(c *gin.Context) {
 // ---- merchant configuration ----
 
 func (s *Server) adminMenu(c *gin.Context) {
-	bid, ok := branchScope(c, allStaff)
+	bid, ok := branchScope(c, pAny)
 	if !ok {
 		return
 	}
@@ -493,7 +493,7 @@ func optionalID(c *gin.Context) (int64, bool) {
 }
 
 func (s *Server) saveCategory(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMenuEdit)
 	if !ok {
 		return
 	}
@@ -514,7 +514,7 @@ func (s *Server) saveCategory(c *gin.Context) {
 }
 
 func (s *Server) saveItem(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMenuEdit)
 	if !ok {
 		return
 	}
@@ -536,7 +536,7 @@ func (s *Server) saveItem(c *gin.Context) {
 
 // patchItem covers the quick sold-out toggle, which kitchen staff may also use.
 func (s *Server) patchItem(c *gin.Context) {
-	bid, ok := branchScope(c, allStaff)
+	bid, ok := branchScope(c, pSoldOut)
 	if !ok {
 		return
 	}
@@ -548,9 +548,8 @@ func (s *Server) patchItem(c *gin.Context) {
 	if !bind(c, &in) {
 		return
 	}
-	role := currentUser(c).RoleIn(bid)
-	if (in.Published != nil || in.Archived != nil) && role != "owner" && role != "manager" {
-		fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "only managers can publish or remove items"))
+	if (in.Published != nil || in.Archived != nil) && !currentUser(c).Can(bid, app.PermMenuEdit) {
+		fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "only people who may edit the menu can publish or remove items"))
 		return
 	}
 	if err := s.App.PatchItem(c, bid, id, in); err != nil {
@@ -561,7 +560,7 @@ func (s *Server) patchItem(c *gin.Context) {
 }
 
 func (s *Server) saveZone(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMap)
 	if !ok {
 		return
 	}
@@ -583,7 +582,7 @@ func (s *Server) saveZone(c *gin.Context) {
 
 // saveZones changes several zones as one (see app.ZoneBatch).
 func (s *Server) saveZones(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMap)
 	if !ok {
 		return
 	}
@@ -600,7 +599,7 @@ func (s *Server) saveZones(c *gin.Context) {
 }
 
 func (s *Server) deleteZone(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMap)
 	if !ok {
 		return
 	}
@@ -616,7 +615,7 @@ func (s *Server) deleteZone(c *gin.Context) {
 }
 
 func (s *Server) reorderZones(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMap)
 	if !ok {
 		return
 	}
@@ -634,7 +633,7 @@ func (s *Server) reorderZones(c *gin.Context) {
 }
 
 func (s *Server) saveLocation(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMap)
 	if !ok {
 		return
 	}
@@ -651,7 +650,7 @@ func (s *Server) saveLocation(c *gin.Context) {
 }
 
 func (s *Server) saveZoneMode(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMap)
 	if !ok {
 		return
 	}
@@ -753,7 +752,7 @@ func (s *Server) deleteAddress(c *gin.Context) {
 }
 
 func (s *Server) saveSettings(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pSettings)
 	if !ok {
 		return
 	}
@@ -770,7 +769,7 @@ func (s *Server) saveSettings(c *gin.Context) {
 }
 
 func (s *Server) listStaff(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pStaffView)
 	if !ok {
 		return
 	}
@@ -783,7 +782,7 @@ func (s *Server) listStaff(c *gin.Context) {
 }
 
 func (s *Server) createStaff(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pStaffManage)
 	if !ok {
 		return
 	}
@@ -799,9 +798,9 @@ func (s *Server) createStaff(c *gin.Context) {
 	c.JSON(200, gin.H{"id": id})
 }
 
-// staffScope resolves the branch (managers only) and the staff member's id.
-func staffScope(c *gin.Context) (bid, id int64, ok bool) {
-	if bid, ok = branchScope(c, managerRoles); !ok {
+// staffScope resolves the branch and the staff member's id.
+func staffScope(c *gin.Context, need []string) (bid, id int64, ok bool) {
+	if bid, ok = branchScope(c, need); !ok {
 		return
 	}
 	id, ok = idParam(c, "id")
@@ -809,7 +808,7 @@ func staffScope(c *gin.Context) (bid, id int64, ok bool) {
 }
 
 func (s *Server) patchStaff(c *gin.Context) {
-	bid, id, ok := staffScope(c)
+	bid, id, ok := staffScope(c, pStaffManage)
 	if !ok {
 		return
 	}
@@ -825,7 +824,7 @@ func (s *Server) patchStaff(c *gin.Context) {
 }
 
 func (s *Server) deleteStaff(c *gin.Context) {
-	bid, id, ok := staffScope(c)
+	bid, id, ok := staffScope(c, pStaffManage)
 	if !ok {
 		return
 	}
@@ -837,7 +836,7 @@ func (s *Server) deleteStaff(c *gin.Context) {
 }
 
 func (s *Server) resetStaffPassword(c *gin.Context) {
-	bid, id, ok := staffScope(c)
+	bid, id, ok := staffScope(c, pStaffManage)
 	if !ok {
 		return
 	}
@@ -855,7 +854,7 @@ func (s *Server) resetStaffPassword(c *gin.Context) {
 }
 
 func (s *Server) listCash(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pCash)
 	if !ok {
 		return
 	}
@@ -877,7 +876,7 @@ func (s *Server) reconcile(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	if !allowed(c, bid, managerRoles) {
+	if !allowed(c, bid, pCash) {
 		return
 	}
 	var in struct {
@@ -898,7 +897,7 @@ func (s *Server) reconcile(c *gin.Context) {
 // ---- kitchen ----
 
 func (s *Server) kitchenBoard(c *gin.Context) {
-	bid, ok := branchScope(c, kitchenRoles)
+	bid, ok := branchScope(c, pKitchen)
 	if !ok {
 		return
 	}
@@ -924,7 +923,7 @@ func (s *Server) itemAction(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	if !allowed(c, bid, kitchenRoles) {
+	if !allowed(c, bid, pKitchen) {
 		return
 	}
 	var o *app.Order
@@ -948,7 +947,7 @@ func (s *Server) itemAction(c *gin.Context) {
 }
 
 func (s *Server) packOrder(c *gin.Context) {
-	id, ok := s.orderScope(c, kitchenRoles)
+	id, ok := s.orderScope(c, pKitchen)
 	if !ok {
 		return
 	}
@@ -1038,13 +1037,13 @@ func (s *Server) riderAction(c *gin.Context) {
 // ---- failed deliveries ----
 
 func (s *Server) redeliverOrder(c *gin.Context) {
-	s.orderCmd(c, deskRoles, func(id int64, in orderCommand) (*app.Order, error) {
+	s.orderCmd(c, pHandle, func(id int64, in orderCommand) (*app.Order, error) {
 		return s.App.Redeliver(c, id, in.RiderID, staffActor(c))
 	})
 }
 
 func (s *Server) closeFailedOrder(c *gin.Context) {
-	s.orderCmd(c, deskRoles, func(id int64, in orderCommand) (*app.Order, error) {
+	s.orderCmd(c, pHandle, func(id int64, in orderCommand) (*app.Order, error) {
 		return s.App.CloseFailed(c, id, in.Reason, staffActor(c))
 	})
 }
@@ -1052,7 +1051,7 @@ func (s *Server) closeFailedOrder(c *gin.Context) {
 // ---- kitchen stations ----
 
 func (s *Server) listStations(c *gin.Context) {
-	bid, ok := branchScope(c, allStaff)
+	bid, ok := branchScope(c, pAny)
 	if !ok {
 		return
 	}
@@ -1065,7 +1064,7 @@ func (s *Server) listStations(c *gin.Context) {
 }
 
 func (s *Server) saveStation(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pSettings)
 	if !ok {
 		return
 	}
@@ -1086,7 +1085,7 @@ func (s *Server) saveStation(c *gin.Context) {
 }
 
 func (s *Server) assignStation(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pSettings)
 	if !ok {
 		return
 	}
@@ -1108,7 +1107,7 @@ func (s *Server) assignStation(c *gin.Context) {
 // ---- promotions ----
 
 func (s *Server) listPromotions(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pPromo)
 	if !ok {
 		return
 	}
@@ -1121,7 +1120,7 @@ func (s *Server) listPromotions(c *gin.Context) {
 }
 
 func (s *Server) savePromotion(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pPromo)
 	if !ok {
 		return
 	}
@@ -1142,7 +1141,7 @@ func (s *Server) savePromotion(c *gin.Context) {
 }
 
 func (s *Server) setPromotionStatus(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pPromo)
 	if !ok {
 		return
 	}
@@ -1164,7 +1163,7 @@ func (s *Server) setPromotionStatus(c *gin.Context) {
 }
 
 func (s *Server) trialPromotions(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pPromo)
 	if !ok {
 		return
 	}
@@ -1183,7 +1182,7 @@ func (s *Server) trialPromotions(c *gin.Context) {
 // ---- menu import (Excel) ----
 
 func (s *Server) menuImportTemplate(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMenuEdit)
 	if !ok {
 		return
 	}
@@ -1221,7 +1220,7 @@ func readImportFile(c *gin.Context) ([]byte, bool) {
 // uploadMenuImport takes the .xlsx as the raw request body; the file name
 // comes in the query string. The body is capped before it is read.
 func (s *Server) uploadMenuImport(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMenuEdit)
 	if !ok {
 		return
 	}
@@ -1238,7 +1237,7 @@ func (s *Server) uploadMenuImport(c *gin.Context) {
 }
 
 func (s *Server) listMenuImports(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMenuEdit)
 	if !ok {
 		return
 	}
@@ -1251,7 +1250,7 @@ func (s *Server) listMenuImports(c *gin.Context) {
 }
 
 func (s *Server) getMenuImport(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMenuEdit)
 	if !ok {
 		return
 	}
@@ -1268,7 +1267,7 @@ func (s *Server) getMenuImport(c *gin.Context) {
 }
 
 func (s *Server) applyMenuImport(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMenuEdit)
 	if !ok {
 		return
 	}
@@ -1476,7 +1475,7 @@ func (s *Server) addressPhoto(c *gin.Context) {
 }
 
 func (s *Server) orderAddressPhoto(c *gin.Context) {
-	id, ok := s.orderScope(c, deskRoles)
+	id, ok := s.orderScope(c, pOrderView)
 	if !ok {
 		return
 	}
@@ -1494,7 +1493,7 @@ func (s *Server) riderAddressPhoto(c *gin.Context) {
 }
 
 func (s *Server) orderProofPhoto(c *gin.Context) {
-	id, ok := s.orderScope(c, deskRoles)
+	id, ok := s.orderScope(c, pOrderView)
 	if !ok {
 		return
 	}

@@ -71,9 +71,12 @@ func TestStaffPostsOverHTTP(t *testing.T) {
 	owner.want(200, "", "POST", staffURL, map[string]any{"username": mgrName, "password": "password1", "display_name": "M", "role": "manager"})
 	mgr := login(t, mgrName)
 	ownerID := owner.want(200, "", "GET", "/auth/me", nil)["id"]
-	mgr.want(403, "FORBIDDEN", "PATCH", fmt.Sprintf("%s/%v", staffURL, ownerID), map[string]any{"display_name": "hacked"})
-	mgr.want(403, "FORBIDDEN", "POST", fmt.Sprintf("%s/%v/password", staffURL, ownerID), map[string]any{"password": "password2"})
-	mgr.want(403, "FORBIDDEN", "POST", staffURL, map[string]any{"username": uniq("o"), "password": "password1", "display_name": "O", "role": "owner"})
+	mgr.want(403, "OWNER_ONLY", "PATCH", fmt.Sprintf("%s/%v", staffURL, ownerID), map[string]any{"display_name": "hacked"})
+	mgr.want(403, "OWNER_ONLY", "POST", fmt.Sprintf("%s/%v/password", staffURL, ownerID), map[string]any{"password": "password2"})
+	mgr.want(403, "OWNER_ONLY", "POST", staffURL, map[string]any{"username": uniq("o"), "password": "password1", "display_name": "O", "role": "owner"})
+	// Only the owner appoints managers (docs/STAFF_ACCESS_DESIGN.md §6.3).
+	mgr.want(403, "OWNER_ONLY", "POST", staffURL, map[string]any{"username": uniq("m"), "password": "password1", "display_name": "M2", "role": "manager"})
+	mgr.want(403, "OWNER_ONLY", "PATCH", fmt.Sprintf("%s/%v", staffURL, cook), map[string]any{"role": "manager"})
 	mgr.want(200, "", "POST", fmt.Sprintf("%s/%v/password", staffURL, cook), map[string]any{"password": "password2"})
 	c.want(401, "UNAUTHENTICATED", "GET", "/auth/me", nil) // signed out by the reset
 

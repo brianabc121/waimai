@@ -7,7 +7,7 @@ import (
 )
 
 func (s *Server) listTemplates(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pDesign)
 	if !ok {
 		return
 	}
@@ -20,7 +20,7 @@ func (s *Server) listTemplates(c *gin.Context) {
 }
 
 func (s *Server) saveTemplateDraft(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pDesign)
 	if !ok {
 		return
 	}
@@ -37,7 +37,7 @@ func (s *Server) saveTemplateDraft(c *gin.Context) {
 
 // templateAction publishes or discards one channel's draft.
 func (s *Server) templateAction(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pDesign)
 	if !ok {
 		return
 	}

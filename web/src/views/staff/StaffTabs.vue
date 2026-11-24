@@ -1,15 +1,18 @@
 <script setup lang="ts">
 // The row of sub-pages under "Staff".
 import { t } from '../../i18n'
+import { can, isOwner } from '../../session'
+import '../../perms'
 import './strings'
 </script>
 
 <template>
   <nav class="stafftabs no-print" data-testid="staff-tabs">
-    <router-link to="/merchant/staff" exact-active-class="on" data-tab="list">{{ t('sr.tab.list') }}</router-link>
-    <router-link to="/merchant/staff/attendance" active-class="on" data-tab="attendance">{{ t('sr.tab.attendance') }}</router-link>
-    <router-link to="/merchant/staff/kitchen" active-class="on" data-tab="kitchen">{{ t('sr.tab.kitchen') }}</router-link>
-    <router-link to="/merchant/staff/riders" active-class="on" data-tab="riders">{{ t('sr.tab.riders') }}</router-link>
+    <router-link v-if="can('staff.view')" to="/merchant/staff" exact-active-class="on" data-tab="list">{{ t('sr.tab.list') }}</router-link>
+    <router-link v-if="can('staff.attendance')" to="/merchant/staff/attendance" active-class="on" data-tab="attendance">{{ t('sr.tab.attendance') }}</router-link>
+    <router-link v-if="can('staff.reports')" to="/merchant/staff/kitchen" active-class="on" data-tab="kitchen">{{ t('sr.tab.kitchen') }}</router-link>
+    <router-link v-if="can('staff.reports')" to="/merchant/staff/riders" active-class="on" data-tab="riders">{{ t('sr.tab.riders') }}</router-link>
+    <router-link v-if="isOwner()" to="/merchant/staff/roles" active-class="on" data-tab="roles">{{ t('rp.nav') }}</router-link>
   </nav>
 </template>
 

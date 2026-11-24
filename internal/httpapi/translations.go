@@ -47,12 +47,12 @@ func (s *Server) platformChanged(c *gin.Context) {
 
 func (s *Server) translationRoutes(auth, admin *gin.RouterGroup) {
 	// the merchant's own store
-	auth.GET("/merchant/branches/:bid/translations", s.withBranch(managerRoles, s.getTranslations))
-	auth.PUT("/merchant/branches/:bid/translations", s.withBranch(managerRoles, s.saveTranslation))
-	auth.PUT("/merchant/branches/:bid/menu-langs", s.withBranch(managerRoles, s.saveMenuLangs))
-	auth.POST("/merchant/branches/:bid/translations/retranslate", s.withBranch(managerRoles, s.retranslate))
-	auth.GET("/merchant/branches/:bid/store-texts", s.withBranch(managerRoles, s.storeTexts))
-	auth.PUT("/merchant/branches/:bid/store-texts", s.withBranch(managerRoles, s.saveStoreText))
+	auth.GET("/merchant/branches/:bid/translations", s.withBranch(pTranslate, s.getTranslations))
+	auth.PUT("/merchant/branches/:bid/translations", s.withBranch(pTranslate, s.saveTranslation))
+	auth.PUT("/merchant/branches/:bid/menu-langs", s.withBranch(pTranslate, s.saveMenuLangs))
+	auth.POST("/merchant/branches/:bid/translations/retranslate", s.withBranch(pTranslate, s.retranslate))
+	auth.GET("/merchant/branches/:bid/store-texts", s.withBranch(pTranslate, s.storeTexts))
+	auth.PUT("/merchant/branches/:bid/store-texts", s.withBranch(pTranslate, s.saveStoreText))
 	// the platform, for any store
 	admin.GET("/branches/:bid/translations", s.withAnyBranch(s.getTranslations))
 	admin.PUT("/branches/:bid/translations", s.withAnyBranch(s.saveTranslation))

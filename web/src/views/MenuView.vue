@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { get, patch, post, put } from '../api'
 import { both, money, t } from '../i18n'
-import { currentRole, session } from '../session'
+import { can, currentRole, session } from '../session'
 import type { Category, Item, Station } from '../types'
 import ItemForm from './ItemForm.vue'
 import MenuImportDialog from './MenuImportDialog.vue'
@@ -11,7 +11,9 @@ import './translateStrings'
 
 const bid = session.branchId!
 const cur = currentRole()?.currency ?? 'PHP'
-const manager = computed(() => ['owner', 'manager'].includes(currentRole()?.role ?? ''))
+const manager = computed(() => can('menu.edit'))
+const translator = computed(() => can('menu.translate'))
+const soldOut = computed(() => can('menu.soldout', 'menu.edit', 'kitchen'))
 const cats = ref<Category[]>([])
 const stations = ref<Station[]>([])
 const error = ref('')
@@ -57,7 +59,7 @@ const trFailed = ref(false)
 async function checkTranslations() {
   trFailed.value = !!(await get<{ error: string }>(`/merchant/branches/${bid}/translations`).catch(() => ({ error: '' }))).error
 }
-onMounted(checkTranslations)
+onMounted(() => { if (translator.value) void checkTranslations() })
 function closeLangs() { langs.open = false; void checkTranslations() }
 
 // ---- Excel import (MenuImportDialog.vue) ----
@@ -73,15 +75,17 @@ async function saved() { form.open = false; await load() }
   <div class="page stack">
     <div class="row between wrap">
       <h1>{{ t('menu_admin') }}</h1>
-      <div class="row wrap" v-if="manager">
-        <button class="btn" :title="t('mtr.open_hint')" data-testid="open-langs" @click="showLangs(null)">{{ t('mtr.open') }}</button>
+      <div class="row wrap" v-if="manager || translator">
+        <button v-if="translator" class="btn" :title="t('mtr.open_hint')" data-testid="open-langs" @click="showLangs(null)">{{ t('mtr.open') }}</button>
+        <template v-if="manager">
         <button class="btn" data-testid="open-import" @click="importing = true">{{ t('import_excel') }}</button>
         <button class="btn" @click="newCategory">{{ t('new_category') }}</button>
         <button class="btn primary" :disabled="cats.length === 0" @click="edit(null)">{{ t('new_item') }}</button>
+        </template>
       </div>
     </div>
     <div v-if="error" class="banner bad">{{ error }}</div>
-    <div v-if="trFailed && manager" class="banner bad row between" data-testid="tr-failed-banner">{{ t('mtr.failed', { at: '' }) }}
+    <div v-if="trFailed && translator" class="banner bad row between" data-testid="tr-failed-banner">{{ t('mtr.failed', { at: '' }) }}
       <button class="btn small" @click="showLangs(null)">{{ t('mtr.open') }}</button></div>
 
     <div v-for="c in cats" :key="c.id" class="card" style="padding:0;overflow:auto">
@@ -105,8 +109,11 @@ async function saved() { form.open = false; await load() }
             </td>
             <td class="right">
               <div class="row wrap" style="justify-content:flex-end;gap:6px">
+                <template v-if="soldOut">
                 <button class="btn small" @click="quick(it, { sold_out: !it.sold_out })">{{ it.sold_out ? t('restore') : t('mark_sold_out') }}</button>
                 <button class="btn small" @click="setStock(it)">{{ t('stock') }}</button>
+                </template>
+                <button v-if="translator && !manager" class="btn small" :data-testid="'item-langs-' + it.id" @click="showLangs(it)">{{ t('mtr.open') }}</button>
                 <template v-if="manager">
                   <button class="btn small" @click="quick(it, { published: !it.published })">{{ it.published ? t('unpublish') : t('publish') }}</button>
                   <button class="btn small" @click="edit(it)">{{ t('edit') }}</button>
