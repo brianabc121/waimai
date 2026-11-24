@@ -2892,5 +2892,13 @@
 "kp.done.waiting":"還在店裡",
 "kp.order_tag":"{a}/{b} 份做好",
 "kp.set.target":"出餐目標時間（分鐘）",
-"kp.set.target_hint":"烹飪進度和後廚屏的計時到這個時間的 2/3 變黃，超過變紅"
+"kp.set.target_hint":"烹飪進度和後廚屏的計時到這個時間的 2/3 變黃，超過變紅",
+"ck.tab_delivery":"外賣活動",
+"ck.tab_dine":"堂食活動",
+"ck.tab_coupons":"優惠券（外賣）",
+"ck.new_dine":"新建堂食活動",
+"ck.delivery_hint":"外賣活動只用於外賣和自取訂單，不會減堂食帳單。",
+"ck.dine_hint":"堂食活動只減堂食帳單（店員開台、顧客掃碼點菜），不會出現在外賣店鋪頁，外賣活動也不會減堂食帳單。一張帳單最多用一個活動，自動挑省得最多的；名額在結帳時才扣。",
+"ck.dine_time_hint":"每天時段按開台時間算：開台時在時段內，結帳晚了也照樣減。",
+"ck.dine_offers":"堂食優惠"
 }

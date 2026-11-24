@@ -169,7 +169,7 @@ func priceWithAddon(ctx context.Context, q Querier, b *Branch, m *orderMoney, ex
 		}
 	}
 	res := &addonPrice{promo: keep, promoD: keepD}
-	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active'", m.Phone)
+	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope='delivery'", m.Phone)
 	if err != nil {
 		return nil, err
 	}
