@@ -5,14 +5,15 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ApiError, get, post, put } from '../api'
 import { both, t, toMajor, toMinor } from '../i18n'
-import type { Item, NoteTemplate, Station } from '../types'
+import type { Item, NoteTemplate, Station, ToppingTemplate } from '../types'
 import '../notes'
+import '../toppings'
 import ImageUpload from './ImageUpload.vue'
 import PhotoList from './PhotoList.vue'
 import './manualStrings'
 
 const props = defineProps<{ item: Item | null; categoryId?: number; cats: { id: number; name: string }[]; stations: Station[]; cur: string; base: string }>()
-const emit = defineEmits<{ saved: []; close: []; 'manage-notes': [] }>()
+const emit = defineEmits<{ saved: []; close: []; 'manage-notes': []; 'manage-toppings': [] }>()
 
 interface OptForm { name: string; name_en: string; extra: number; sold_out: boolean }
 interface GroupForm { name: string; name_en: string; min_select: number; max_select: number; options: OptForm[] }
@@ -20,12 +21,12 @@ interface Form { id: number; category_id: number; code: string; name: string; na
   photos: string[]; details: string
   price: number; published: boolean; sold_out: boolean; limited: boolean; stock: number; needs_prep: boolean
   delivery_available: boolean; pickup_available: boolean; dine_in_available: boolean; sort: number; station_id: number | null; groups: GroupForm[]
-  note_template_ids: number[] }
+  note_template_ids: number[]; topping_template_ids: number[] }
 
 function blank(): Form {
   return { id: 0, category_id: 0, code: '', name: '', name_en: '', description: '', image_url: '', photos: [], details: '', price: 0, published: false, sold_out: false,
     limited: false, stock: 0, needs_prep: true, delivery_available: true, pickup_available: true, dine_in_available: true, sort: 0, station_id: null, groups: [],
-    note_template_ids: [] }
+    note_template_ids: [], topping_template_ids: [] }
 }
 
 const it = props.item
@@ -34,9 +35,11 @@ const f = reactive<Form>(it ? {
   photos: [...(it.photos ?? [])], details: it.details ?? '',
   price: toMajor(it.price), published: it.published, sold_out: it.sold_out, limited: it.stock_qty !== null, stock: it.stock_qty ?? 0,
   needs_prep: it.needs_prep, delivery_available: it.delivery_available, pickup_available: it.pickup_available, dine_in_available: it.dine_in_available ?? true, sort: it.sort, station_id: it.station_id,
-  groups: it.groups.map(g => ({ name: g.name, name_en: g.name_en, min_select: g.min_select, max_select: g.max_select,
+  // groups that come from a topping template are edited on the toppings page, not here
+  groups: it.groups.filter(g => !g.topping_template_id).map(g => ({ name: g.name, name_en: g.name_en, min_select: g.min_select, max_select: g.max_select,
     options: g.options.map(o => ({ name: o.name, name_en: o.name_en, extra: toMajor(o.price_delta), sold_out: o.sold_out })) })),
   note_template_ids: [...(it.note_template_ids ?? [])],
+  topping_template_ids: [...(it.topping_template_ids ?? [])],
 } : { ...blank(), category_id: props.categoryId || props.cats[0]?.id || 0 })
 const error = ref('')
 const busy = ref(false)
@@ -55,6 +58,20 @@ function toggleNote(id: number) {
   if (i >= 0) f.note_template_ids.splice(i, 1)
   else if (f.note_template_ids.length < MAX_NOTES) f.note_template_ids.push(id)
 }
+// The store's topping (加料) templates: up to three per dish. null when the
+// list could not be loaded (the platform back office has no such endpoint), in
+// which case the dish keeps the templates it has.
+const MAX_TOPPINGS = 3
+const toppings = ref<ToppingTemplate[] | null>(null)
+onMounted(async () => {
+  toppings.value = (await get<{ templates: ToppingTemplate[] }>(`${props.base}/topping-templates`).catch(() => null))?.templates ?? null
+})
+function toggleTopping(id: number) {
+  const i = f.topping_template_ids.indexOf(id)
+  if (i >= 0) f.topping_template_ids.splice(i, 1)
+  else if (f.topping_template_ids.length < MAX_TOPPINGS) f.topping_template_ids.push(id)
+}
+const toppingSummary = (x: ToppingTemplate) => x.options.map(o => (o.code ? o.code + ' ' : '') + o.name).join('、')
 const tplSummary = (x: NoteTemplate) => x.groups.map(g => (g.name ? g.name + '：' : '') + g.tags.filter(t => t.active).map(t => t.name).join('、')).join(' · ')
 
 async function save() {
@@ -65,6 +82,7 @@ async function save() {
     groups: f.groups.map(g => ({ name: g.name, name_en: g.name_en, min_select: Number(g.min_select), max_select: Number(g.max_select),
       options: g.options.map(o => ({ name: o.name, name_en: o.name_en, price_delta: toMinor(o.extra), sold_out: o.sold_out })) })),
     note_template_ids: f.note_template_ids,
+    ...(toppings.value ? { topping_template_ids: f.topping_template_ids } : {}),
   }
   error.value = ''; busy.value = true
   try {
@@ -131,6 +149,20 @@ async function save() {
             <a href="#" @click.prevent="emit('manage-notes')">{{ t('nt.manage') }}</a>
             <a v-if="shownTemplates.length < templates.length" href="#" @click.prevent="showAllNotes = true">+{{ templates.length - shownTemplates.length }}</a>
           </div>
+        </section>
+
+        <section v-if="toppings" class="notes" data-testid="item-toppings">
+          <h3>{{ t('tp.form') }}</h3>
+          <div class="muted small" style="margin-bottom:8px">{{ t('tp.form_hint') }}</div>
+          <div v-if="!toppings.length" class="muted small">{{ t('tp.none') }} <a href="#" @click.prevent="emit('manage-toppings')">{{ t('tp.manage') }}</a></div>
+          <div class="tplpick">
+            <label v-for="x in toppings" :key="x.id" :class="{ on: f.topping_template_ids.includes(x.id), off: !f.topping_template_ids.includes(x.id) && f.topping_template_ids.length >= MAX_TOPPINGS }">
+              <input type="checkbox" :checked="f.topping_template_ids.includes(x.id)" :disabled="!f.topping_template_ids.includes(x.id) && f.topping_template_ids.length >= MAX_TOPPINGS"
+                :data-testid="'item-topping-' + x.name" @change="toggleTopping(x.id)" />
+              <div><b>{{ x.name }}</b><small>{{ toppingSummary(x) }}</small></div>
+            </label>
+          </div>
+          <div v-if="toppings.length" class="small" style="margin-top:6px"><a href="#" @click.prevent="emit('manage-toppings')">{{ t('tp.manage') }}</a></div>
         </section>
 
         <h3 style="margin:14px 0 8px">{{ t('option_groups') }}</h3>

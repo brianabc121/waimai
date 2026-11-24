@@ -22,8 +22,12 @@ export type LatLngPair = [number, number]
 export interface Zone { id: number; name: string; name_en: string; fee: number; min_order: number; active: boolean; sort: number
   polygon: LatLngPair[]; color: string; eta_minutes: number | null }
 // name_tr and the like: the text in the customer's language, when it differs (customer pages only)
-export interface Option { id: number; name: string; name_en: string; price_delta: number; sold_out: boolean; name_tr?: string }
-export interface OptionGroup { id: number; name: string; name_en: string; min_select: number; max_select: number; options: Option[]; name_tr?: string }
+export interface Option { id: number; name: string; name_en: string; price_delta: number; sold_out: boolean; name_tr?: string; code?: string }
+export interface OptionGroup { id: number; name: string; name_en: string; min_select: number; max_select: number; options: Option[]; name_tr?: string
+  // set when the group comes from a topping template (加料模板)
+  topping_template_id?: number }
+export interface ToppingOption { id: number; code: string; name: string; name_en: string; price: number; sold_out: boolean }
+export interface ToppingTemplate { id: number; name: string; title: string; max_select: number; options: ToppingOption[]; item_ids: number[]; updated_at: string }
 export interface Item {
   id: number; category_id: number; name: string; name_en: string; description: string; image_url: string
   price: number; published: boolean; sold_out: boolean; stock_qty: number | null; needs_prep: boolean
@@ -38,6 +42,8 @@ export interface Item {
   // Flavour note templates (docs/NOTE_TEMPLATE_DESIGN.md): the ones the dish
   // shows, and their groups with the tags on offer.
   note_template_ids?: number[]; notes?: NoteGroup[]
+  // topping templates (加料模板) the dish uses; their groups are in groups
+  topping_template_ids?: number[]
 }
 export interface NoteTag { id: number; name: string; name_en: string; active: boolean; name_tr?: string }
 export interface NoteGroup { id: number; name: string; name_en: string; multi: boolean; tags: NoteTag[]; name_tr?: string }

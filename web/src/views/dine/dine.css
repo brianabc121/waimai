@@ -94,6 +94,7 @@
 .dd-ch.on { border-color: var(--red); background: var(--gold-soft); color: var(--red-deep) !important; font-weight: 700; }
 .dd-ch small { color: var(--muted); font-size: 12.5px; }
 .dd-ch.on small { color: var(--red-deep); }
+.dd-ocode { font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--red); background: var(--gold-soft); border-radius: 4px; padding: 1px 5px; }
 .dd-ch.add { border-style: dashed; color: var(--muted) !important; }
 .dd-ch.red { border-color: #d9665a; color: #b83226 !important; }
 .dd-ch:disabled { opacity: .4; }
