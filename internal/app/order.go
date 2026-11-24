@@ -40,6 +40,14 @@ type OrderItem struct {
 	RoundTags []string   `json:"round_tags"`
 	BatchBy   string     `json:"batch_by,omitempty"`
 	RushAt    *time.Time `json:"rush_at"`
+	// When the dish reached the kitchen (the order's release or acceptance;
+	// for an add-on or a dine-in round, that batch), who started it and who
+	// marked it ready, and when (docs/COOKING_PROGRESS_DESIGN.md).
+	KitchenAt     *time.Time `json:"kitchen_at"`
+	PrepStartedAt *time.Time `json:"prep_started_at"`
+	StartedBy     string     `json:"started_by,omitempty"`
+	ReadyAt       *time.Time `json:"ready_at"`
+	ReadyBy       string     `json:"ready_by,omitempty"`
 	// Basket is the customer's basket this line was put in (1 to 4).
 	Basket int `json:"basket"`
 	// ImageURL is the dish's current picture; only the customer's order page gets it.
@@ -272,8 +280,12 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 	rows, err = q.Query(ctx, `SELECT i.id, i.order_id, i.item_id, i.name, i.name_en, i.unit_price, i.qty, i.line_total,
 		i.options, i.note, i.needs_prep, i.prep_status, i.station_id, i.station_name, b.seq, b.source, i.served_at,
 		i.void_reason, i.basket_no, i.name_customer, i.note_tags, b.created_at, b.round_tags,
-		COALESCE((SELECT u.display_name FROM users u WHERE u.id = b.placed_by), ''), i.rush_at
-		FROM order_items i JOIN order_batches b ON b.id = i.batch_id
+		COALESCE((SELECT u.display_name FROM users u WHERE u.id = b.placed_by), ''), i.rush_at,
+		CASE WHEN o.service_type = 'dine_in' OR b.seq > 1 THEN COALESCE(b.decided_at, b.created_at)
+			ELSE GREATEST(o.accepted_at, o.release_at) END,
+		i.prep_started_at, COALESCE((SELECT u.display_name FROM users u WHERE u.id = i.prep_started_by), ''),
+		i.ready_at, COALESCE((SELECT u.display_name FROM users u WHERE u.id = i.ready_by), '')
+		FROM order_items i JOIN order_batches b ON b.id = i.batch_id JOIN orders o ON o.id = i.order_id
 		WHERE i.order_id = ANY($1) ORDER BY i.id`, ids)
 	if err != nil {
 		return nil, err
@@ -285,7 +297,8 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 		if err := rows.Scan(&it.ID, &orderID, &it.ItemID, &it.Name, &it.NameEn, &it.UnitPrice, &it.Qty,
 			&it.LineTotal, &opts, &it.Note, &it.NeedsPrep, &it.PrepStatus, &it.StationID, &it.StationName,
 			&it.BatchSeq, &it.BatchSource, &it.ServedAt, &it.VoidReason, &it.Basket, &it.NameTr, &tags,
-			&it.BatchAt, &it.RoundTags, &it.BatchBy, &it.RushAt); err != nil {
+			&it.BatchAt, &it.RoundTags, &it.BatchBy, &it.RushAt,
+			&it.KitchenAt, &it.PrepStartedAt, &it.StartedBy, &it.ReadyAt, &it.ReadyBy); err != nil {
 			rows.Close()
 			return nil, err
 		}

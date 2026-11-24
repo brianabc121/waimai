@@ -38,6 +38,7 @@ export const router = createRouter({
         { path: '', redirect: '/merchant/orders' },
         { path: 'orders', component: () => import('./views/OrdersView.vue') },
         { path: 'orders/new', component: () => import('./views/ManualOrderView.vue') },
+        { path: 'progress', component: () => import('./views/ProgressView.vue') },
         { path: 'members', component: () => import('./views/MembersView.vue') },
         { path: 'addresses', component: () => import('./views/CustomerAddressesView.vue') },
         { path: 'tables', component: () => import('./views/TablesView.vue') },

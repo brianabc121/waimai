@@ -7,10 +7,13 @@ import { both, minutesSince, t, whenText } from '../i18n'
 import { useLive } from '../live'
 import { session } from '../session'
 import type { Order, OrderItem, Station } from '../types'
+import { timerClass } from '../progress'
 import { addonNo, addons } from '../addon'
 
 const bid = session.branchId!
 const orders = ref<Order[]>([])
+// the store's cooking target colours the timers (docs/COOKING_PROGRESS_DESIGN.md §8)
+const target = ref(15)
 const stations = ref<Station[]>([])
 // Station filter for the cooking tab: 'all', 'none' (unassigned) or a station id.
 // Remembered per device, since a screen usually sits at one station.
@@ -31,8 +34,9 @@ function check(o: Order) {
 }
 
 const { online, lastSync, refreshNow } = useLive(() => `/merchant/branches/${bid}/events`, async () => {
-  const [b, s] = await Promise.all([get<{ orders: Order[] }>(`/kitchen/branches/${bid}/board`), get<{ stations: Station[] }>(`/merchant/branches/${bid}/stations`)])
+  const [b, s] = await Promise.all([get<{ orders: Order[]; target_minutes?: number }>(`/kitchen/branches/${bid}/board`), get<{ stations: Station[] }>(`/merchant/branches/${bid}/stations`)])
   orders.value = b.orders; stations.value = s.stations
+  if (b.target_minutes) target.value = b.target_minutes
   if (typeof station.value === 'number' && !s.stations.some(x => x.id === station.value)) setStation('all')
 })
 
@@ -124,7 +128,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
               <span class="tag brand" style="margin-inline-start:4px">{{ t(o.service_type) }}</span>
               <span v-if="addedTo(o)" class="tag kaddtag" style="margin-inline-start:4px" data-testid="k-addon">{{ t('ao.tag') }}</span>
               <span class="tag info" v-if="o.scheduled_for" style="margin-inline-start:4px">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span></h2>
-            <span v-if="!dine(o)" class="tag" :class="waited(o) >= 20 ? 'bad' : waited(o) >= 10 ? 'warn' : ''">{{ waited(o) }} {{ t('min') }}</span>
+            <span v-if="!dine(o)" class="tag" :class="timerClass(waited(o), target)">{{ waited(o) }} {{ t('min') }}</span>
             <span v-else class="small muted">{{ o.public_no }}</span>
           </div>
           <div v-if="o.note" class="banner warn small">{{ t('order_note') }}: {{ o.note }}</div>
