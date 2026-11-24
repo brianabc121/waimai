@@ -130,6 +130,9 @@ func majorText(minor int64) string {
 func formatSpecs(groups []OptionGroup) string {
 	lines := make([]string, 0, len(groups))
 	for _, g := range groups {
+		if g.ToppingTemplateID != nil {
+			continue // from a topping template: the template keeps it
+		}
 		tag := ""
 		n := len(g.Options)
 		switch {

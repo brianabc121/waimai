@@ -112,6 +112,10 @@ type ItemInput struct {
 	Groups          []OptionGroupInput `json:"groups"`
 	// NoteTemplateIDs are the flavour note templates to show; nil keeps them.
 	NoteTemplateIDs *[]int64 `json:"note_template_ids"`
+	// ToppingTemplateIDs are the topping templates to use; nil keeps them.
+	// Groups are the dish's own groups only: template groups follow the
+	// templates.
+	ToppingTemplateIDs *[]int64 `json:"topping_template_ids"`
 }
 
 // The dish page holds the main picture and up to this many more.
@@ -220,8 +224,13 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 		} else if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `DELETE FROM option_groups WHERE item_id=$1`, id); err != nil {
+		if _, err := tx.Exec(ctx, `DELETE FROM option_groups WHERE item_id=$1 AND topping_template_id IS NULL`, id); err != nil {
 			return err
+		}
+		if in.ToppingTemplateIDs != nil {
+			if err := setItemToppingTemplates(ctx, tx, branchID, id, *in.ToppingTemplateIDs); err != nil {
+				return err
+			}
 		}
 		if in.NoteTemplateIDs != nil {
 			if err := setItemNoteTemplates(ctx, tx, branchID, id, *in.NoteTemplateIDs); err != nil {
@@ -240,6 +249,9 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 					return err
 				}
 			}
+		}
+		if err := syncItemToppings(ctx, tx, id); err != nil {
+			return err
 		}
 		return branchChanged(ctx, tx, branchID)
 	})

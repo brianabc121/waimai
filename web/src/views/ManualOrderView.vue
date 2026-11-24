@@ -170,8 +170,11 @@ const addonHits = computed(() => {
   const l = lines.value.find(x => x.key === selKey.value)
   const q = addonQ.value.trim().toLowerCase()
   if (!l || !q) return []
-  return optionsOf(l).filter(x => !isSpec(x.g) && !x.o.sold_out &&
-    (x.o.name.toLowerCase().includes(q) || x.o.name_en.toLowerCase().includes(q))).slice(0, 6)
+  // an exact topping code (AC02) comes first, then codes and names that contain the text
+  const rank = (o: { code?: string; name: string; name_en: string }) => (o.code ?? '').toLowerCase() === q ? 0
+    : (o.code ?? '').toLowerCase().startsWith(q) ? 1 : o.name.toLowerCase().includes(q) || o.name_en.toLowerCase().includes(q) ? 2 : 9
+  return optionsOf(l).filter(x => !isSpec(x.g) && !x.o.sold_out && rank(x.o) < 9)
+    .sort((x, y) => rank(x.o) - rank(y.o)).slice(0, 6)
 })
 function addAddon(l: Line) {
   const x = addonHits.value[0]
@@ -757,7 +760,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
                   <input v-model="addonQ" :placeholder="'＋ ' + t('vo.addon_ph')" data-testid="mo-addon-q" @keydown.enter.prevent="addAddon(l)" />
                   <span class="addon-hits">
                     <button v-for="x in (addonQ ? addonHits : optionsOf(l).filter(x => !isSpec(x.g) && !x.o.sold_out).slice(0, 8))" :key="x.o.id" class="chip"
-                      @click="setAddon(l, x.g, x.o.id, 1); addonQ = ''">{{ mn(x.o) }} {{ x.o.price_delta ? '+' + m(x.o.price_delta) : '' }}</button>
+                      @click="setAddon(l, x.g, x.o.id, 1); addonQ = ''"><small v-if="x.o.code" class="ocode">{{ x.o.code }}</small>{{ mn(x.o) }} {{ x.o.price_delta ? '+' + m(x.o.price_delta) : '' }}</button>
                   </span>
                 </div>
               </div>
@@ -993,7 +996,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
               <span class="muted small">{{ g.min_select ? t('vo.spec_need', { n: g.min_select }) : t('vo.spec_upto', { n: g.max_select }) }}</span></div>
             <div class="row wrap">
               <button v-for="o in g.options" :key="o.id" class="chip" :class="{ on: spec.picks[o.id] }" :disabled="o.sold_out" @click="specToggle(g, o.id)">
-                {{ mn(o) }}<template v-if="o.price_delta"> +{{ m(o.price_delta) }}</template><template v-if="o.sold_out"> · {{ t('vo.sold_out') }}</template></button>
+                <small v-if="o.code" class="ocode">{{ o.code }}</small>{{ mn(o) }}<template v-if="o.price_delta"> +{{ m(o.price_delta) }}</template><template v-if="o.sold_out"> · {{ t('vo.sold_out') }}</template></button>
             </div>
           </div>
         </div>
@@ -1104,6 +1107,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 .addon-add { display: flex; flex-direction: column; gap: 4px; }
 .addon-add input { border: 1px dashed #c9a24a; border-radius: 6px; padding: 3px 8px; font-size: 12.5px; background: rgba(255,255,255,.7); max-width: 360px; }
 .addon-hits { display: flex; flex-wrap: wrap; gap: 4px; }
+.ocode { font-size: 11px; font-weight: 700; color: var(--red, #b3261e); margin-inline-end: 4px; }
 .chip { border: 1px solid var(--edge); background: #fff; color: var(--ink); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; }
 .chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
 .chip:disabled { opacity: .45; }

@@ -96,7 +96,8 @@ const roundTags = computed(() => presetList(props.presets, 'round_tags'))
 function toggleRound(x: string) { const i = round.tags.indexOf(x); if (i >= 0) round.tags.splice(i, 1); else round.tags.push(x) }
 
 // ---- tapping a dish ----
-const needsSheet = (it: Item) => it.groups.some(g => g.min_select > 0) || hasNotes(it)
+// a dish with toppings (加料 templates) opens the sheet too, so they can be picked
+const needsSheet = (it: Item) => it.groups.some(g => g.min_select > 0 || g.topping_template_id) || hasNotes(it)
 function tapDish(it: Item) {
   if (it.sold_out) return
   if (needsSheet(it)) openSheet(it)
@@ -291,7 +292,7 @@ const cartOpen = ref(false)
             <div class="dd-lbl">{{ mn(g) }} <span v-if="g.min_select > 0" class="req">{{ t('dd.required') }}</span><small>{{ groupHint(g) }}</small></div>
             <div class="dd-chs">
               <button v-for="o in g.options" :key="o.id" class="dd-ch" :class="{ on: sheet.chosen.includes(o.id) }" :disabled="o.sold_out" data-testid="dd-opt" @click="toggleOpt(g, o.id)">
-                {{ mn(o) }}<small v-if="o.price_delta">+{{ m(o.price_delta) }}</small><small v-if="o.sold_out">{{ t('sold_out') }}</small></button>
+                <i v-if="o.code" class="dd-ocode">{{ o.code }}</i>{{ mn(o) }}<small v-if="o.price_delta">+{{ m(o.price_delta) }}</small><small v-if="o.sold_out">{{ t('sold_out') }}</small></button>
             </div>
           </div>
           <div v-if="hasNotes(sheet.item)" class="grp notes">

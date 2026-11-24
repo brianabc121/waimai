@@ -31,7 +31,7 @@ type Branch struct {
 	NotifySMS            bool   `json:"notify_sms"`
 	SchedulingEnabled    bool   `json:"scheduling_enabled"`
 	PrepMinutes          int    `json:"prep_minutes"`
-	// AddonConfirmMinutes is how long the store has to confirm a customer's add-on.
+	// AddonConfirmMinutes is how long the store has to confirm a customer's topping.
 	AddonConfirmMinutes int `json:"addon_confirm_minutes"`
 	// CookTargetMinutes is how long an order should take in the kitchen.
 	CookTargetMinutes int `json:"cook_target_minutes"`
@@ -217,6 +217,8 @@ type Option struct {
 	SoldOut    bool   `json:"sold_out"`
 	// NameTr is the name in the customer's language, when it differs.
 	NameTr string `json:"name_tr,omitempty"`
+	// Code is the topping's code (AC02), for options from a topping template.
+	Code string `json:"code,omitempty"`
 }
 
 type OptionGroup struct {
@@ -227,6 +229,9 @@ type OptionGroup struct {
 	MaxSelect int      `json:"max_select"`
 	Options   []Option `json:"options"`
 	NameTr    string   `json:"name_tr,omitempty"`
+	// ToppingTemplateID is set when the group comes from a topping template:
+	// the dish form does not edit it, the template does.
+	ToppingTemplateID *int64 `json:"topping_template_id,omitempty"`
 }
 
 type Item struct {
@@ -253,8 +258,11 @@ type Item struct {
 	Groups            []OptionGroup `json:"groups"`
 	// NoteTemplateIDs are the flavour note templates the dish shows; Notes
 	// are their groups with the tags on offer (note_templates.go).
-	NoteTemplateIDs []int64     `json:"note_template_ids"`
-	Notes           []NoteGroup `json:"notes"`
+	NoteTemplateIDs []int64 `json:"note_template_ids"`
+	// ToppingTemplateIDs are the topping templates the dish uses; their groups
+	// are among Groups.
+	ToppingTemplateIDs []int64     `json:"topping_template_ids"`
+	Notes              []NoteGroup `json:"notes"`
 	// Sold is how many were ordered so far; only the storefront fills it in.
 	Sold int `json:"sold"`
 	// The name, description and details in the customer's language, when
@@ -332,7 +340,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 	items := []*Item{}
 	byID := map[int64]*Item{}
 	for rows.Next() {
-		it := &Item{Groups: []OptionGroup{}, NoteTemplateIDs: []int64{}, Notes: []NoteGroup{}}
+		it := &Item{Groups: []OptionGroup{}, NoteTemplateIDs: []int64{}, Notes: []NoteGroup{}, ToppingTemplateIDs: []int64{}}
 		if err := rows.Scan(&it.ID, &it.CategoryID, &it.Name, &it.NameEn, &it.Description, &it.ImageURL,
 			&it.Price, &it.Published, &it.SoldOut, &it.StockQty, &it.NeedsPrep, &it.DeliveryAvailable,
 			&it.PickupAvailable, &it.Sort, &it.StationID, &it.Photos, &it.Details, &it.DineInAvailable, &it.Code); err != nil {
@@ -347,7 +355,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 		return nil, err
 	}
 
-	rows, err = q.Query(ctx, `SELECT g.id, g.item_id, g.name, g.name_en, g.min_select, g.max_select
+	rows, err = q.Query(ctx, `SELECT g.id, g.item_id, g.name, g.name_en, g.min_select, g.max_select, g.topping_template_id
 		FROM option_groups g JOIN menu_items i ON i.id = g.item_id
 		WHERE i.branch_id=$1 AND NOT i.archived ORDER BY g.sort, g.id`, branchID)
 	if err != nil {
@@ -361,7 +369,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 	for rows.Next() {
 		var g OptionGroup
 		var itemID int64
-		if err := rows.Scan(&g.ID, &itemID, &g.Name, &g.NameEn, &g.MinSelect, &g.MaxSelect); err != nil {
+		if err := rows.Scan(&g.ID, &itemID, &g.Name, &g.NameEn, &g.MinSelect, &g.MaxSelect, &g.ToppingTemplateID); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -376,7 +384,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 		return nil, err
 	}
 
-	rows, err = q.Query(ctx, `SELECT o.id, o.group_id, o.name, o.name_en, o.price_delta, o.sold_out
+	rows, err = q.Query(ctx, `SELECT o.id, o.group_id, o.name, o.name_en, o.price_delta, o.sold_out, o.code
 		FROM options o JOIN option_groups g ON g.id = o.group_id JOIN menu_items i ON i.id = g.item_id
 		WHERE i.branch_id=$1 AND NOT i.archived ORDER BY o.sort, o.id`, branchID)
 	if err != nil {
@@ -386,7 +394,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 	for rows.Next() {
 		var o Option
 		var groupID int64
-		if err := rows.Scan(&o.ID, &groupID, &o.Name, &o.NameEn, &o.PriceDelta, &o.SoldOut); err != nil {
+		if err := rows.Scan(&o.ID, &groupID, &o.Name, &o.NameEn, &o.PriceDelta, &o.SoldOut, &o.Code); err != nil {
 			return nil, err
 		}
 		if ref, ok := groups[groupID]; ok {
@@ -398,6 +406,24 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 	}
 	rows.Close()
 	if err := attachNotes(ctx, q, branchID, items); err != nil {
+		return nil, err
+	}
+	rows, err = q.Query(ctx, `SELECT l.item_id, l.template_id FROM menu_item_topping_templates l JOIN menu_items i ON i.id = l.item_id
+		WHERE i.branch_id=$1 AND NOT i.archived ORDER BY l.sort, l.template_id`, branchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var iid, tid int64
+		if err := rows.Scan(&iid, &tid); err != nil {
+			return nil, err
+		}
+		if it, ok := byID[iid]; ok {
+			it.ToppingTemplateIDs = append(it.ToppingTemplateIDs, tid)
+		}
+	}
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil

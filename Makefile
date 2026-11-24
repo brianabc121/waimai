@@ -30,6 +30,7 @@ e2e:
 	node e2e/admin.cjs
 	node e2e/dinedesk.cjs
 	node e2e/void.cjs
+	node e2e/toppings.cjs
 	node e2e/mapzones.cjs
 	node e2e/mapgoogle.cjs
 	node e2e/staff.cjs
