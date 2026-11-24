@@ -242,3 +242,14 @@ brian 的原话，分成四件事：
 | 7 | 骑手门口收了 GCash 怎么记 | **骑手“确认送达”时选收现金还是在线付** | 不管，骑手照样按现金交账 |
 | 8 | 外卖单的结账优惠截止到什么时候 | **和加单一样：骑手取餐前、自取取走前** | 只能下单时设 |
 | 9 | 加单、退菜后抹零和改实收怎么办 | **自动清掉，提示重新设**；打折按新金额重算 | 保留抹零金额不变 |
+
+## 13. 实现说明
+
+三批都已实现：第一批活动拆分 PR #110，第二批付款方式和结账优惠 PR #111，第三批对账页（本节之后的 PR）。实现截图在项目文件夹 `checkout-discount-screens/impl/`，浏览器测试 `e2e/checkout.cjs`。
+
+- **迁移**：00060 `promotions.scope`；00061 `pay_channels`、`branches.pay_settings` / `discount_reasons`、`orders` 的 `pay_type`、`pay_channel_id`、`adj_percent_bp`、`staff_discount`、`adj_mode`、`round_off`、`adj_reason`、`adj_by`、`adj_approved_by`、`adj_at`（第 9 节写的 `adj_discount`、`adj_round` 实际叫 `staff_discount`、`round_off`），`payment_method` 多一个 `prepaid`（代客下单已在线付款）；00062 `orders.paid_at`（触发器在付款状态变成已付款时写入）、`payment_checks`、`cash_counts`。
+- **计算**：没改 `ComputeTotals`，在外面包了 `adjustTotals`（`internal/app/checkout.go`）。`percent_bp` 存的是“还收几成”，9000 = 9 折。加单、退菜后调用 `reapplyAdjust`：打折按新金额重算，抹零和改实收清掉。
+- **预览**：结账面板每改一下都请服务器算（`POST /merchant/orders/:id/adjust-preview`，代客下单用 `staff-quotes` 带 `adjust`），提交时带 `expected_total`，对不上返回“账单变了”。
+- **授权**：没有 `checkout.discount` 的人提交带结账优惠的请求时要带 `X-Approval`（经理授权码换来的一次性令牌）。
+- **对账**：一天按门店时区，订单按付款时间（`paid_at`）算。钱箱应有现金 = 店里收的现金（堂食、自取）+ 骑手已交回并核款的现金，不含备用金。导出 Excel 三张表：收款汇总、在线支付核对、让利记录。
+- **和方案不一样**：支付方式图标先填图片链接，没做上传和裁剪。

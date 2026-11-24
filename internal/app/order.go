@@ -148,6 +148,10 @@ type Order struct {
 	// says which method, PayMethod its name then); "" when not recorded.
 	PayType      string `json:"pay_type"`
 	PayChannelID int64  `json:"pay_channel_id"`
+	// PayCheck is the owner's check of an online payment on the
+	// reconciliation page: "", ok or problem (with PayCheckNote).
+	PayCheck     string `json:"pay_check"`
+	PayCheckNote string `json:"pay_check_note"`
 	// Who gave the discount at checkout (Totals.StaffDiscount, RoundOff), why
 	// and the manager who approved it; staff only.
 	AdjReason     string     `json:"adj_reason"`
@@ -245,7 +249,8 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	o.adj_percent_bp, o.staff_discount, o.adj_mode, o.round_off, o.adj_reason,
 	COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.adj_by), ''),
 	COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.adj_approved_by), ''), o.adj_at, o.pay_type,
-	COALESCE(o.pay_channel_id, 0)`
+	COALESCE(o.pay_channel_id, 0), COALESCE((SELECT pc.status FROM payment_checks pc WHERE pc.order_id = o.id), ''),
+	COALESCE((SELECT pc.note FROM payment_checks pc WHERE pc.order_id = o.id), '')`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}, Discounts: []OrderDiscount{}, Voids: []OrderVoid{}, Refunds: []OrderRefund{}}
@@ -262,7 +267,7 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.ContactWhatsapp, &o.AddressPhoto, &t.MerchantDiscount, &t.PlatformSubsidy, &o.MemberNo, &o.OrderSource,
 		&o.PlacedBy, &o.StaffNote, &o.PayMethod, &o.TableTags,
 		&t.AdjPercentBP, &t.StaffDiscount, &t.AdjMode, &t.RoundOff, &o.AdjReason, &o.AdjBy, &o.AdjApprovedBy, &o.AdjAt,
-		&o.PayType, &o.PayChannelID)
+		&o.PayType, &o.PayChannelID, &o.PayCheck, &o.PayCheckNote)
 	if err != nil {
 		return nil, err
 	}

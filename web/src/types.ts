@@ -132,6 +132,7 @@ export interface Order {
   pay_method?: string; table_tags?: string[]
   // how it was paid and who gave the discount at checkout (staff only)
   pay_type?: '' | 'cash' | 'card' | 'online'; pay_channel_id?: number; adj_reason?: string; adj_by?: string; adj_approved_by?: string; adj_at?: string | null
+  pay_check?: '' | 'ok' | 'problem'; pay_check_note?: string
   aftersale: Aftersale | null; store?: OrderStore; completed_at?: string | null; accepted_at?: string | null; closed_at?: string | null
   // the promotion and each coupon taken off; the coupon this order earned (customer page only)
   discounts?: OrderDiscount[]; gift?: CustomerCoupon | null
