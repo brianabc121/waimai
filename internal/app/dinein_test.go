@@ -59,12 +59,12 @@ func TestDineInFullLoop(t *testing.T) {
 	_, err = a.ExchangeTableCode(ctx, "no-such-code")
 	wantCode(t, err, "NOT_FOUND")
 
-	bill, err := a.OpenTable(ctx, tableID, 2, s.staff)
+	bill, err := a.OpenTable(ctx, tableID, 2, nil, s.staff)
 	noErr(t, err)
 	if bill.Status != "open" || bill.Order.Totals.Total != 0 || bill.Order.ServiceType != "dine_in" || bill.Order.TableName != "08" {
 		t.Fatalf("new bill: %+v", bill.Order)
 	}
-	_, err = a.OpenTable(ctx, tableID, 2, s.staff)
+	_, err = a.OpenTable(ctx, tableID, 2, nil, s.staff)
 	wantCode(t, err, "TABLE_OCCUPIED")
 
 	// phone: scan, then order fried chicken
@@ -221,7 +221,7 @@ func TestDineInFullLoop(t *testing.T) {
 	}
 
 	// next guests: a new session, a new bill, a new token
-	next, err := a.OpenTable(ctx, tableID, 4, s.staff)
+	next, err := a.OpenTable(ctx, tableID, 4, nil, s.staff)
 	noErr(t, err)
 	token2, err := a.ExchangeTableCode(ctx, code)
 	noErr(t, err)
@@ -259,7 +259,7 @@ func TestDineInPricesStockAndVoid(t *testing.T) {
 	ctx := context.Background()
 	a := testApp
 	tableID, _ := s.table(t, "A1")
-	bill, err := a.OpenTable(ctx, tableID, 1, s.staff)
+	bill, err := a.OpenTable(ctx, tableID, 1, nil, s.staff)
 	noErr(t, err)
 	sid := bill.SessionID
 	guest := app.Actor{Type: "guest"}
@@ -302,15 +302,15 @@ func TestDineInPricesStockAndVoid(t *testing.T) {
 			limitedLine = it.ID
 		}
 	}
-	_, err = a.VoidItem(ctx, limitedLine, " ", s.staff)
+	_, err = a.VoidItem(ctx, limitedLine, " ", 0, s.staff)
 	wantCode(t, err, "VALIDATION")
 	before := bill.Order.ManifestVersion
-	bill, err = a.VoidItem(ctx, limitedLine, "guest changed their mind", s.staff)
+	bill, err = a.VoidItem(ctx, limitedLine, "guest changed their mind", 0, s.staff)
 	noErr(t, err)
 	if bill.Order.Totals.Subtotal != 6900 || bill.Order.ManifestVersion == before || len(live(bill.Order)) != 1 {
 		t.Fatalf("after void: %+v", bill.Order.Totals)
 	}
-	bill, err = a.VoidItem(ctx, limitedLine, "again", s.staff) // twice is harmless
+	bill, err = a.VoidItem(ctx, limitedLine, "again", 0, s.staff) // twice is harmless
 	noErr(t, err)
 	s.place(t, "pickup", []app.QuoteLineInput{{ItemID: s.limited, Qty: 1}}) // the portion is back
 
@@ -319,22 +319,22 @@ func TestDineInPricesStockAndVoid(t *testing.T) {
 	for _, it := range live(bill.Order) {
 		teaLine = it.ID
 	}
-	bill, err = a.VoidItem(ctx, teaLine, "kitchen ran out", s.staff)
+	bill, err = a.VoidItem(ctx, teaLine, "kitchen ran out", 0, s.staff)
 	noErr(t, err)
 	closed, err := a.CloseTable(ctx, sid, app.CloseInput{ExpectedManifest: bill.Order.ManifestVersion}, s.staff)
 	noErr(t, err)
 	if closed.Status != "closed" || closed.Order.Totals.Total != 0 {
 		t.Fatalf("empty bill: %+v", closed.Order.Totals)
 	}
-	_, err = a.VoidItem(ctx, teaLine, "late", s.staff)
+	_, err = a.VoidItem(ctx, teaLine, "late", 0, s.staff)
 	wantCode(t, err, "TABLE_SESSION_CLOSED") // a closed bill is final
 	// a disabled table cannot be opened; a busy one cannot be disabled
 	_, err = a.SaveTable(ctx, s.branchID, tableID, app.TableInput{Name: "A1", Active: false})
 	noErr(t, err)
-	_, err = a.OpenTable(ctx, tableID, 1, s.staff)
+	_, err = a.OpenTable(ctx, tableID, 1, nil, s.staff)
 	wantCode(t, err, "INVALID_STATE")
 	t2, _ := s.table(t, "A2")
-	_, err = a.OpenTable(ctx, t2, 1, s.staff)
+	_, err = a.OpenTable(ctx, t2, 1, nil, s.staff)
 	noErr(t, err)
 	_, err = a.SaveTable(ctx, s.branchID, t2, app.TableInput{Name: "A2", Active: false})
 	wantCode(t, err, "INVALID_STATE")
@@ -351,7 +351,7 @@ func TestDineInCloseVersusAddOn(t *testing.T) {
 	a := testApp
 	for round := 0; round < 12; round++ {
 		tableID, _ := s.table(t, uniq("T"))
-		bill, err := a.OpenTable(ctx, tableID, 1, s.staff)
+		bill, err := a.OpenTable(ctx, tableID, 1, nil, s.staff)
 		noErr(t, err)
 		bill, err = a.AddBatch(ctx, bill.SessionID, "qr", uniq("k"), batch(app.QuoteLineInput{ItemID: s.water, Qty: 1}), app.Actor{Type: "guest"})
 		noErr(t, err)
@@ -392,7 +392,7 @@ func TestDineInSameBatchSubmittedTwiceAtOnce(t *testing.T) {
 	ctx := context.Background()
 	a := testApp
 	tableID, _ := s.table(t, "B1")
-	bill, err := a.OpenTable(ctx, tableID, 1, s.staff)
+	bill, err := a.OpenTable(ctx, tableID, 1, nil, s.staff)
 	noErr(t, err)
 	key := uniq("k")
 	in := batch(app.QuoteLineInput{ItemID: s.tea, Qty: 2})
@@ -422,7 +422,7 @@ func TestDineInSameBatchSubmittedTwiceAtOnce(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, err := a.OpenTable(ctx, t2, 1, s.staff); err == nil {
+			if _, err := a.OpenTable(ctx, t2, 1, nil, s.staff); err == nil {
 				mu.Lock()
 				opened++
 				mu.Unlock()
@@ -444,7 +444,7 @@ func TestDineInChannelOfADish(t *testing.T) {
 	ctx := context.Background()
 	a := testApp
 	tableID, _ := s.table(t, "A1")
-	bill, err := a.OpenTable(ctx, tableID, 1, s.staff)
+	bill, err := a.OpenTable(ctx, tableID, 1, nil, s.staff)
 	noErr(t, err)
 	guest := app.Actor{Type: "guest"}
 	menu, err := a.AdminMenu(ctx, s.branchID)

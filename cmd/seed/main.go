@@ -257,9 +257,16 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 		must(a.PublishTemplate(ctx, bid, ch, app.Actor{Type: "system"}))
 	}
 
-	// Dine-in tables 01 to 08. Their QR links are shown on the Tables screen.
+	// Dine-in tables 01 to 08: five in the hall, two private rooms and a
+	// table for two on the terrace. Their QR links are on the Tables screen.
 	for i := 1; i <= 8; i++ {
-		_, err := a.SaveTable(ctx, bid, 0, app.TableInput{Name: fmt.Sprintf("%02d", i), Active: true, Sort: i})
+		area, seats := "大厅", 4
+		if i == 6 || i == 7 {
+			area, seats = "包间", 8
+		} else if i == 8 {
+			area, seats = "露台", 2
+		}
+		_, err := a.SaveTable(ctx, bid, 0, app.TableInput{Name: fmt.Sprintf("%02d", i), Area: area, Seats: seats, Active: true, Sort: i})
 		must(err)
 	}
 
