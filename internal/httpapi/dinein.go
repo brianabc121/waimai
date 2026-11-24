@@ -166,17 +166,24 @@ func (s *Server) billItem(c *gin.Context) {
 		}
 		bill, err = s.App.ServeItem(c, itemID, staffActor(c))
 	case "void":
-		if !allowed(c, bid, pTable) {
+		// The table's void: the desk's people, and a dish already started
+		// needs "void dishes already made" or a manager's approval.
+		_, canMade, ok := s.voidScope(c)
+		if !ok {
 			return
 		}
-		var in struct {
-			Reason string `json:"reason"`
-			Qty    int    `json:"qty"`
-		}
+		var in app.VoidInput
 		if !bind(c, &in) {
 			return
 		}
-		bill, err = s.App.VoidItem(c, itemID, in.Reason, in.Qty, staffActor(c))
+		var r *app.VoidResult
+		if r, err = s.App.VoidLine(c, itemID, in, staffActor(c), canMade); err == nil {
+			if r.SessionID == nil {
+				err = app.ErrInvalidState("this is not a dine-in item")
+			} else {
+				bill, err = s.App.GetBill(c, *r.SessionID)
+			}
+		}
 	case "rush":
 		if !allowed(c, bid, pTable) {
 			return

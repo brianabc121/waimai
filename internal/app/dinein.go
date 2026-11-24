@@ -415,6 +415,13 @@ func lockSession(ctx context.Context, tx pgx.Tx, id int64) (*lockedSession, erro
 
 // recomputeBill sets the order's amounts from its live lines.
 func recomputeBill(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64) (Totals, error) {
+	return recomputeBillKeep(ctx, tx, b, orderID, 0, 0)
+}
+
+// recomputeBillKeep is recomputeBill that keeps promotion keepID taking off
+// at least keepAmount (a dish voided through the store's fault does not
+// lower the guests' promotion, docs/VOID_ITEM_DESIGN.md §6).
+func recomputeBillKeep(ctx context.Context, tx pgx.Tx, b *Branch, orderID, keepID, keepAmount int64) (Totals, error) {
 	var subtotal int64
 	if err := tx.QueryRow(ctx, `SELECT COALESCE(sum(line_total), 0) FROM order_items
 		WHERE order_id=$1 AND prep_status <> 'cancelled'`, orderID).Scan(&subtotal); err != nil {
@@ -423,6 +430,17 @@ func recomputeBill(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64) (To
 	t, err := dineTotals(ctx, tx, b, orderID, subtotal)
 	if err != nil {
 		return Totals{}, err
+	}
+	if keepID != 0 && t.PromotionDiscount < min(keepAmount, subtotal) {
+		ps, err := loadPromotions(ctx, tx, b.ID, "p.id = "+fmt.Sprint(keepID), "")
+		if err != nil {
+			return Totals{}, err
+		}
+		if len(ps) == 1 {
+			keep := min(keepAmount, subtotal)
+			t = ComputeTotals(subtotal, 0, b.dineInTax(), Discount{Goods: keep})
+			t.PromotionID, t.PromotionName, t.PromotionNameEn, t.PromotionDiscount = ps[0].ID, ps[0].Name, ps[0].NameEn, keep
+		}
 	}
 	var promoID *int64
 	if t.PromotionID != 0 {

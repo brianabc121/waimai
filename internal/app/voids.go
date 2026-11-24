@@ -283,7 +283,8 @@ func (a *App) voidLine(ctx context.Context, tx pgx.Tx, itemID int64, in VoidInpu
 	// unless it already went out with the order.
 	wasted := was != "pending" && (needsPrep || was == "served" || was == "packed")
 	q := &VoidQuote{Name: name, Qty: qty, MaxQty: lineQty, Amount: unit * int64(qty), WasStatus: was,
-		StartedAt: started, Wasted: wasted, NeedsApproval: wasted && !canMade, Packed: was == "packed"}
+		StartedAt: started, Wasted: wasted, NeedsApproval: wasted && !canMade, Packed: was == "packed",
+		Version: o.Version}
 	if !dry && q.NeedsApproval {
 		return nil, errVoidApproval
 	}
@@ -301,6 +302,9 @@ func (a *App) voidLine(ctx context.Context, tx pgx.Tx, itemID int64, in VoidInpu
 		if d.Kind == "promotion" {
 			promoBefore += d.Amount
 		}
+	}
+	if o.ServiceType == "dine_in" && before.Totals.PromotionID != 0 {
+		promoBefore = before.Totals.MerchantDiscount
 	}
 
 	// The line: all of it, or split with the voided portions on a new line.
@@ -334,7 +338,11 @@ func (a *App) voidLine(ctx context.Context, tx pgx.Tx, itemID int64, in VoidInpu
 	// The money.
 	var after Totals
 	if o.ServiceType == "dine_in" {
-		if after, err = recomputeBill(ctx, tx, b, o.ID); err != nil {
+		var keepID, keepAmount int64
+		if in.ReasonKind == "store" {
+			keepID, keepAmount = before.Totals.PromotionID, before.Totals.MerchantDiscount
+		}
+		if after, err = recomputeBillKeep(ctx, tx, b, o.ID, keepID, keepAmount); err != nil {
 			return nil, err
 		}
 	} else {
@@ -357,7 +365,7 @@ func (a *App) voidLine(ctx context.Context, tx pgx.Tx, itemID int64, in VoidInpu
 	q.After = after
 	q.Less = q.Before.Total - after.Total
 	q.PromoAfter = after.PromotionName
-	q.PromoDown = o.ServiceType != "dine_in" && after.PromotionDiscount < promoBefore
+	q.PromoDown = after.PromotionDiscount < promoBefore
 	if dry {
 		return q, nil
 	}
@@ -1029,4 +1037,15 @@ func sortSums(s []VoidSum) {
 
 func sortRows(r []VoidLogRow) {
 	sort.SliceStable(r, func(i, j int) bool { return r[i].At.After(r[j].At) })
+}
+
+// ItemDineIn says whether a line is on a table bill.
+func (a *App) ItemDineIn(ctx context.Context, itemID int64) (bool, error) {
+	var dine bool
+	err := a.DB.QueryRow(ctx, `SELECT o.service_type = 'dine_in' FROM order_items i JOIN orders o ON o.id = i.order_id
+		WHERE i.id=$1`, itemID).Scan(&dine)
+	if isNoRows(err) {
+		return false, ErrNotFound
+	}
+	return dine, err
 }

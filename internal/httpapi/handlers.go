@@ -192,6 +192,15 @@ func customerView(o *app.Order) *app.Order {
 		o.Items[i].BatchBy, o.Items[i].RoundTags = "", []string{}
 		o.Items[i].StartedBy, o.Items[i].ReadyBy = "", ""
 	}
+	// who voided or refunded, and the kitchen's side of it, too
+	for i := range o.Voids {
+		v := &o.Voids[i]
+		v.By, v.ApprovedBy, v.AckBy, v.Wasted, v.WasStatus, v.NeedsAck, v.AckAt, v.StationID = "", "", "", false, "", false, nil, nil
+	}
+	for i := range o.Refunds {
+		o.Refunds[i].By, o.Refunds[i].ApprovedBy = "", ""
+	}
+	o.VoidOpen, o.RefundOpen = false, false
 	return o
 }
 
