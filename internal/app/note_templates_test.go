@@ -1,10 +1,12 @@
 package app_test
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
 	"github.com/brianabc121/waimai/internal/app"
+	"github.com/xuri/excelize/v2"
 )
 
 // milkTea adds the sweetness / temperature / extras template and binds it to tea.
@@ -191,5 +193,53 @@ func TestStarterNoteTemplatesAndTranslation(t *testing.T) {
 	noErr(t, err)
 	if x := q.Lines[0].NoteTags[0]; x.Name != "少糖" || x.NameTr != "Less sugar" || x.GroupTr != "Sweetness" {
 		t.Fatalf("line tag: %+v", x)
+	}
+}
+
+// The 口味模板 column of the menu sheet: names of the store's templates; an
+// unknown name is a row error, "无" takes them off, a blank cell keeps them;
+// the exported sheet lists them.
+func TestNoteTemplatesInMenuImport(t *testing.T) {
+	need(t)
+	s := newStore(t, false)
+	ctx := context.Background()
+	a := testApp
+	tpl, _ := s.milkTea(t)
+	other, err := a.SaveNoteTemplate(ctx, s.branchID, 0, app.NoteTemplateInput{Name: "通用",
+		Groups: []app.NoteGroupInput{{Multi: true, Tags: []app.NoteTagInput{{Name: "不要餐具"}}}}})
+	noErr(t, err)
+	head := []any{"分类 *", "菜名 *", "价格 *", "口味模板"}
+	m := runImport(t, s.branchID, sheet(t, [][]any{head,
+		{"C", "奶盖", 90, "奶茶类，通用"},
+		{"C", "water", 30, "奶茶类, 没有这个"},
+		{"C", "tea", 69, "无"},
+		{"C", "chicken", 169, ""},
+	}))
+	if m.Status != "parsed" || m.ValidRows != 3 || m.Rows[1].Errors[0] != "note_template_unknown:没有这个" {
+		t.Fatalf("parsed: %+v", m.Rows)
+	}
+	_, err = a.ApplyMenuImport(ctx, s.branchID, m.ID, app.Actor{Type: "staff"})
+	noErr(t, err)
+	items := itemsByName(t, s.branchID)
+	if ids := items["奶盖"].NoteTemplateIDs; len(ids) != 2 || ids[0] != tpl || ids[1] != other {
+		t.Fatalf("new dish: %v", ids)
+	}
+	if len(items["tea"].NoteTemplateIDs) != 0 || len(items["water"].NoteTemplateIDs) != 0 {
+		t.Fatalf("tea %v water %v", items["tea"].NoteTemplateIDs, items["water"].NoteTemplateIDs)
+	}
+	b, err := a.MenuTemplate(ctx, s.branchID, true)
+	noErr(t, err)
+	f, err := excelize.OpenReader(bytes.NewReader(b))
+	noErr(t, err)
+	rows, err := f.GetRows("菜品")
+	noErr(t, err)
+	found := false
+	for _, r := range rows {
+		if len(r) > 1 && r[1] == "奶盖" && r[len(r)-1] == "奶茶类，通用" {
+			found = true
+		}
+	}
+	if !found || rows[0][len(rows[0])-1] != "口味模板" {
+		t.Fatalf("export: %v", rows)
 	}
 }

@@ -2553,5 +2553,10 @@
  "nt.on": "Préférences : {names}",
  "nt.taken": "Un modèle porte déjà ce nom",
  "nt.tag_twice": "L’étiquette « {name} » apparaît deux fois dans un groupe",
- "nt.need_tag": "Chaque groupe doit avoir au moins une étiquette"
+ "nt.need_tag": "Chaque groupe doit avoir au moins une étiquette",
+ "nt.done": "Terminé",
+ "nt.enter_note": "Appuyez sur Entrée pour garder « {s} » comme note",
+ "ie.note_template_unknown": "Aucun modèle de goût nommé {n}",
+ "ie.note_templates_too_many": "{n} modèles de goût au maximum",
+ "mtr.k_note": "Préférences de goût"
 }

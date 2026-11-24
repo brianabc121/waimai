@@ -186,19 +186,20 @@ func templateCols(currency string) []templateCol {
 		{"需要制作", 10, false, true, "是 / 否。瓶装饮料这类不用后厨做的填“否”。"},
 		{"工作台", 12, false, false, "选填。填后厨工作台的名称，要和系统里的一致。"},
 		{"限量库存", 10, false, false, "选填。填数字限量；填“不限”取消限量。"},
+		{"口味模板", 16, false, false, "选填。填店里口味模板的名字，多个用逗号隔开，最多 3 个，例如：奶茶类，通用。模板要先在菜单页“口味模板”里建好。更新时填“无”去掉。"},
 	}
 }
 
 // The examples are new dishes, so a template uploaded as it is only adds
 // three drafts and never changes a dish the store already has.
 var templateExamples = [][]any{
-	{"小吃", "椒盐杏鲍菇", 129, "Salt & Pepper Mushroom", "现炸，外酥里嫩", "辣度：不辣，小辣，大辣\n加料[多选]：九层塔+10，蒜片+10", "", "", "选用新鲜杏鲍菇，现点现炸。", "", "是", "是", "是", "是", "", ""},
-	{"饮品", "柠檬气泡水", 45, "Lemon Soda", "", "", "", "", "", "", "是", "是", "是", "否", "", ""},
-	{"主食", "招牌鸡腿饭", 219.5, "Chicken Leg Rice", "每日限量", "饮料[可选]：冰红茶+20，柠檬气泡水+30", "", "", "", "", "否", "是", "否", "是", "", 5},
+	{"小吃", "椒盐杏鲍菇", 129, "Salt & Pepper Mushroom", "现炸，外酥里嫩", "辣度：不辣，小辣，大辣\n加料[多选]：九层塔+10，蒜片+10", "", "", "选用新鲜杏鲍菇，现点现炸。", "", "是", "是", "是", "是", "", "", ""},
+	{"饮品", "柠檬气泡水", 45, "Lemon Soda", "", "", "", "", "", "", "是", "是", "是", "否", "", "", ""},
+	{"主食", "招牌鸡腿饭", 219.5, "Chicken Leg Rice", "每日限量", "饮料[可选]：冰红茶+20，柠檬气泡水+30", "", "", "", "", "否", "是", "否", "是", "", 5, ""},
 }
 
 // MenuImportTemplate builds the blank template with three example rows.
-func MenuImportTemplate() ([]byte, error) { return buildTemplate("", nil, nil, nil) }
+func MenuImportTemplate() ([]byte, error) { return buildTemplate("", nil, nil, nil, nil) }
 
 // MenuTemplate builds the template for one store: its currency in the price
 // header, its categories and stations on the help sheet, and with withMenu
@@ -215,6 +216,16 @@ func (a *App) MenuTemplate(ctx context.Context, branchID int64, withMenu bool) (
 		if s.Active {
 			stations = append(stations, s.Name)
 		}
+	}
+	tpls, err := loadNoteTemplates(ctx, a.DB, branchID)
+	if err != nil {
+		return nil, err
+	}
+	tplName := map[int64]string{}
+	notes := []string{}
+	for _, t := range tpls {
+		tplName[t.ID] = t.Name
+		notes = append(notes, t.Name)
 	}
 	cats := []string{}
 	var rows [][]any
@@ -238,20 +249,24 @@ func (a *App) MenuTemplate(ctx context.Context, branchID int64, withMenu bool) (
 				stock = *it.StockQty
 			}
 			price, _ := strconv.ParseFloat(majorText(it.Price), 64)
+			names := []string{}
+			for _, id := range it.NoteTemplateIDs {
+				names = append(names, tplName[id])
+			}
 			rows = append(rows, []any{c.Name, it.Name, price, it.NameEn, it.Description, formatSpecs(it.Groups),
 				it.ImageURL, strings.Join(it.Photos, "\n"), it.Details, yn(it.Published), yn(it.DineInAvailable),
-				yn(it.DeliveryAvailable), yn(it.PickupAvailable), yn(it.NeedsPrep), station, stock})
+				yn(it.DeliveryAvailable), yn(it.PickupAvailable), yn(it.NeedsPrep), station, stock, strings.Join(names, "，")})
 		}
 	}
 	if withMenu && rows == nil {
 		rows = [][]any{}
 	}
-	return buildTemplate(m.Branch.Currency, rows, cats, stations)
+	return buildTemplate(m.Branch.Currency, rows, cats, stations, notes)
 }
 
 // buildTemplate writes the 菜品 sheet (rows nil: the examples) and the
 // 填写说明 sheet.
-func buildTemplate(currency string, rows [][]any, cats, stations []string) ([]byte, error) {
+func buildTemplate(currency string, rows [][]any, cats, stations, notes []string) ([]byte, error) {
 	f := excelize.NewFile()
 	defer f.Close()
 	const sheet, help = "菜品", "填写说明"
@@ -345,7 +360,10 @@ func buildTemplate(currency string, rows [][]any, cats, stations []string) ([]by
 	if len(stations) > 0 {
 		lines = append(lines, []any{""}, []any{"店里的工作台"}, []any{strings.Join(stations, "、")})
 	}
-	titles := map[string]bool{"怎么用": true, "规格怎么写": true, "图片": true, "各列说明": true, "店里现有的分类": true, "店里的工作台": true}
+	if len(notes) > 0 {
+		lines = append(lines, []any{""}, []any{"店里现有的口味模板"}, []any{strings.Join(notes, "、")})
+	}
+	titles := map[string]bool{"怎么用": true, "规格怎么写": true, "图片": true, "各列说明": true, "店里现有的分类": true, "店里的工作台": true, "店里现有的口味模板": true}
 	for i, l := range lines {
 		cell, _ := excelize.CoordinatesToCellName(1, i+1)
 		l := l

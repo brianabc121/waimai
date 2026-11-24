@@ -9,6 +9,8 @@ import { t } from '../i18n'
 import '../notes'
 import type { Category, NoteTemplate } from '../types'
 import NotePicker from './NotePicker.vue'
+import MenuTranslations from './MenuTranslations.vue'
+import './translateStrings'
 
 const props = defineProps<{ base: string; cats: Category[]; canEdit: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -26,6 +28,8 @@ const sel = ref<number>(0)
 const form = reactive<Form>({ id: 0, name: '', icon: '', groups: [] })
 const dirty = ref(false)
 const busy = ref(false)
+// the template's group names and tags in the customers' languages
+const langsOpen = ref(false)
 
 async function load(keep = sel.value) {
   try {
@@ -192,6 +196,7 @@ async function saveApply() {
           <span class="muted small nt-hide-sm">{{ t('nt.name_hint') }}</span>
           <span class="grow"></span>
           <template v-if="canEdit && current">
+            <button type="button" class="btn" data-testid="nt-langs" :title="t('mtr.open_hint')" @click="langsOpen = true">{{ t('mtr.open') }}</button>
             <button type="button" class="btn" data-testid="nt-apply" @click="openApply">{{ t('nt.apply', { n: current.item_ids.length }) }}</button>
             <button type="button" class="btn danger" data-testid="nt-delete" @click="remove">{{ t('delete') }}</button>
           </template>
@@ -255,6 +260,8 @@ async function saveApply() {
         </div>
       </div>
     </div>
+
+    <MenuTranslations v-if="langsOpen && current" :base="base" :cats="cats" :tpl="current" :readonly="!canEdit" @close="langsOpen = false" />
 
     <!-- apply to dishes -->
     <div v-if="apply.open && current" class="sheet-mask" @click.self="apply.open = false">

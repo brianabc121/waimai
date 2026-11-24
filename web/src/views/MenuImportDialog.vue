@@ -7,6 +7,7 @@ import { reactive } from 'vue'
 import { get, post, upload } from '../api'
 import { importError, money, t } from '../i18n'
 import type { ImportRow, MenuImport } from '../types'
+import '../notes'
 
 const props = defineProps<{ base: string; cur: string; title?: string }>()
 const emit = defineEmits<{ close: []; imported: [] }>()
@@ -94,7 +95,9 @@ const template = (menu: boolean) => `/api/v1${props.base}/menu-imports/template$
                   <td class="price right"><span v-if="r.action === 'update' && r.old_price !== r.price" class="muted strike" style="margin-inline-end:4px">{{ money(r.old_price ?? 0, cur) }}</span>{{ priceBad(r) ? '—' : money(r.price, cur) }}</td>
                   <td class="small imp-specs"><template v-if="r.specs.length">{{ specText(r) }}</template>
                     <span v-else-if="r.specs_set && r.action === 'update'" class="muted">{{ t('import_none') }}</span>
-                    <span v-else class="muted">{{ r.action === 'update' ? t('import_keep') : '—' }}</span></td>
+                    <span v-else class="muted">{{ r.action === 'update' ? t('import_keep') : '—' }}</span>
+                    <div v-if="r.note_templates?.length" class="muted" data-testid="import-notes">{{ t('nt.on', { names: r.note_templates.join('、') }) }}</div>
+                    <div v-else-if="r.note_templates_set && r.action === 'update'" class="muted">{{ t('nt.on', { names: t('import_none') }) }}</div></td>
                   <td><span class="imp-ch">
                     <i v-for="c in (['dine_in', 'delivery', 'pickup'] as const)" :key="c" :class="channel(r, r[c])">{{ t('ich.' + c) }}</i></span></td>
                   <td><span v-if="r.errors.length" class="small" style="color:var(--bad)">{{ r.errors.map(importError).join('；') }}</span>

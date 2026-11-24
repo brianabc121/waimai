@@ -117,6 +117,55 @@ if (!/半糖/.test(text) || !/去冰/.test(text) || !/珍珠多一点/.test(text
 await shot(owner, 'nt-08-store-order')
 step('the store sees the tags and the note on the order')
 
+// ---- the template in other languages ----
+await owner.goto(BASE + '/merchant/menu?tab=notes')
+await owner.click(tid('nt-item-奶茶类'))
+await owner.click(tid('nt-langs'))
+await owner.waitForSelector(tid('tr-dialog'))
+await owner.locator(`${tid('tr-dialog')} :text("少糖")`).first().waitFor()
+await shot(owner, 'nt-09-template-langs')
+await owner.click(tid('tr-close'))
+step('the template opens its own translations')
+
+// ---- an order taken by staff: the note cell offers the tags ----
+async function staffNote(page, name) {
+  await page.goto(BASE + '/merchant/orders/new')
+  await page.waitForSelector(tid('mo-pick'))
+  await page.fill(tid('mo-pick'), 'd2')
+  await page.press(tid('mo-pick'), 'Enter')
+  const cell = page.locator(tid('mo-line')).filter({ hasText: '珍珠奶茶' }).locator(tid('mo-note-in'))
+  await cell.click()
+  await page.waitForSelector(tid('mo-note-pop'))
+  // on a phone the panel covers the row and has its own box
+  const box = (await page.locator(tid('mo-note-pop-in')).isVisible()) ? page.locator(tid('mo-note-pop-in')) : cell
+  await box.fill('少')
+  await box.press('Enter')   // the first match: 少糖
+  await page.locator(`${tid('mo-note-pop')} ${tid('note-tag')}`, { hasText: /^去冰$/ }).click()
+  await box.fill('加珍珠')
+  await shot(page, name)
+  await box.press('Enter')   // no tag matches: kept as the note
+  await page.waitForSelector(tid('mo-note-pop'), { state: 'detached' })
+  const chips = await page.locator(`${tid('mo-line')} ${tid('mo-note')} .nchip`).allInnerTexts()
+  if (chips.map(x => x.replace('✕', '').trim()).join(',') !== '少糖,去冰' || await cell.inputValue() !== '加珍珠') throw new Error('note cell: ' + chips + ' / ' + await cell.inputValue())
+}
+await staffNote(owner, 'nt-10-staff-order')
+const ownerPhone = await open({ width: 390, height: 844 })
+await login(ownerPhone, 'owner1')
+await staffNote(ownerPhone, 'nt-11-staff-order-phone')
+step('staff pick tags in the note cell by typing, on a computer and a phone')
+
+// ---- the platform edits the store's templates ----
+const admin = await open({ width: 1366, height: 900 })
+await login(admin, 'admin', '/admin/login')
+const branches = (await (await admin.request.get(BASE + '/api/v1/admin/branches')).json()).branches
+const makati = branches.find(b => b.slug === 'makati')
+await admin.goto(BASE + '/admin/items?branch_id=' + makati.id)
+await admin.waitForSelector(tid('editing-banner'))
+await admin.click(tid('open-notes'))
+await admin.waitForSelector(`${tid('notes-drawer')} ${tid('nt-item-奶茶类')}`)
+await shot(admin, 'nt-12-admin')
+step('the platform opens the store\'s templates')
+
 // ---- clean up ----
 await owner.goto(BASE + '/merchant/menu?tab=notes')
 await owner.click(tid('nt-item-E2E测试'))

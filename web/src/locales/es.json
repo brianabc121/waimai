@@ -2553,5 +2553,10 @@
  "nt.on": "Preferencias: {names}",
  "nt.taken": "Ya existe una plantilla con ese nombre",
  "nt.tag_twice": "La etiqueta \"{name}\" está repetida en un grupo",
- "nt.need_tag": "Cada grupo necesita al menos una etiqueta"
+ "nt.need_tag": "Cada grupo necesita al menos una etiqueta",
+ "nt.done": "Listo",
+ "nt.enter_note": "Pulsa Intro para guardar «{s}» como nota",
+ "ie.note_template_unknown": "No hay ninguna plantilla de sabor llamada {n}",
+ "ie.note_templates_too_many": "Máximo {n} plantillas de sabor",
+ "mtr.k_note": "Notas de sabor"
 }

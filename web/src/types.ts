@@ -145,6 +145,7 @@ export interface ImportRow {
   published: boolean | null; dine_in: boolean | null; delivery: boolean | null; pickup: boolean | null
   image_url: string; image_set: boolean; photos: string[]; photos_set: boolean; details: string; details_set: boolean
   specs: ImportSpecGroup[]; specs_set: boolean; new_category?: boolean
+  note_templates?: string[]; note_templates_set?: boolean
   action: string; old_price?: number; errors: string[]
 }
 export interface MenuImport {

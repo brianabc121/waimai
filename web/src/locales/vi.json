@@ -2553,5 +2553,10 @@
  "nt.on": "Ghi chú: {names}",
  "nt.taken": "Đã có mẫu cùng tên",
  "nt.tag_twice": "Nhãn \"{name}\" bị trùng trong nhóm",
- "nt.need_tag": "Mỗi nhóm cần ít nhất một nhãn"
+ "nt.need_tag": "Mỗi nhóm cần ít nhất một nhãn",
+ "nt.done": "Xong",
+ "nt.enter_note": "Nhấn Enter để giữ \"{s}\" làm ghi chú",
+ "ie.note_template_unknown": "Không có mẫu khẩu vị tên {n}",
+ "ie.note_templates_too_many": "Tối đa {n} mẫu khẩu vị",
+ "mtr.k_note": "Ghi chú khẩu vị"
 }

@@ -2553,5 +2553,10 @@
  "nt.on": "味の好み：{names}",
  "nt.taken": "同じ名前のテンプレートがあります",
  "nt.tag_twice": "「{name}」がグループ内で重複しています",
- "nt.need_tag": "各グループに1つ以上の項目が必要です"
+ "nt.need_tag": "各グループに1つ以上の項目が必要です",
+ "nt.done": "完了",
+ "nt.enter_note": "Enter で「{s}」を備考にします",
+ "ie.note_template_unknown": "味のテンプレート「{n}」はありません",
+ "ie.note_templates_too_many": "味のテンプレートは {n} 個まで",
+ "mtr.k_note": "味のリクエスト"
 }

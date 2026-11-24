@@ -41,6 +41,8 @@ extend({
   'nt.on': ['口味：{names}', 'Notes: {names}'], 'nt.taken': ['已经有同名的模板', 'A template with this name exists'],
   'nt.tag_twice': ['同一组里有重复的标签：{name}', 'The tag "{name}" is twice in a group'],
   'nt.need_tag': ['每组至少要有一个标签', 'Every group needs at least one tag'],
+  // ordering for a customer
+  'nt.done': ['完成', 'Done'], 'nt.enter_note': ['按回车，把“{s}”记成备注', 'Press Enter to keep "{s}" as a note'],
 })
 
 // The chosen tags of an order line, for the customer (their language) or the

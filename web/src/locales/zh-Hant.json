@@ -2553,5 +2553,10 @@
 "nt.on":"口味：{names}",
 "nt.taken":"已經有同名的模板",
 "nt.tag_twice":"同一組裡有重複的標籤：{name}",
-"nt.need_tag":"每組至少要有一個標籤"
+"nt.need_tag":"每組至少要有一個標籤",
+"nt.done":"完成",
+"nt.enter_note":"按回車，把“{s}”記成備註",
+"ie.note_template_unknown":"沒有這個口味模板：{n}",
+"ie.note_templates_too_many":"口味模板最多 {n} 個",
+"mtr.k_note":"口味模板"
 }
