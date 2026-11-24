@@ -216,7 +216,7 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		return nil, ErrD(http.StatusUnprocessableEntity, "BELOW_MINIMUM", "order is below the minimum amount",
 			map[string]any{"minimum": minOrder, "subtotal": subtotal})
 	}
-	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active'", phone)
+	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope='delivery'", phone)
 	if err != nil {
 		return nil, err
 	}

@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>结账优惠和对账 · 原型</title>
+<!-- 方案见 ../CHECKOUT_DISCOUNT_DESIGN.md。数据都是示意。打开 index.html#s1 到 #s8 看各张效果图。
+     收银和代客下单用系统真实样式表的 .warm 配色（深红米金），商家后台、平台后台用深色侧栏。 -->
+<link rel="stylesheet" href="../../web/src/styles.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #ddd; font-family: -apple-system, "PingFang SC", "Noto Sans CJK SC", "WenQuanYi Zen Hei", "Microsoft YaHei", sans-serif; color: #1f2328; }
+  section { display: none; } section.show { display: block; }
+  .tip { position: absolute; z-index: 40; background: #2b1a14; color: #fff; font-size: 13.5px; line-height: 1.5; border-radius: 10px; padding: 8px 12px; box-shadow: 0 8px 20px rgba(0,0,0,.25); max-width: 360px; }
+  .tip b.n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #f4cf73; color: #3b1f14; font-size: 12px; margin-inline-end: 6px; }
+
+  /* ---- 商家后台 / 平台后台（深色侧栏） ---- */
+  .pc { width: 1440px; height: 900px; overflow: hidden; display: flex; position: relative; font-size: 14px; background: #f6f6f4; }
+  .nav { width: 200px; flex: none; background: #1c1f24; color: #d6d8dc; padding: 18px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .nav .brand { font-size: 18px; font-weight: 800; color: #fff; padding: 0 10px 4px; }
+  .nav .role { padding: 0 10px 14px; font-size: 12px; color: #9aa0a8; } .nav .role b { background: #dbe7ff; color: #1d4ed8; border-radius: 999px; padding: 1px 8px; margin-inline-end: 6px; }
+  .nav a { padding: 9px 12px; border-radius: 8px; font-size: 15px; color: #d6d8dc; }
+  .nav a.on { background: #2b3037; color: #fff; box-shadow: inset 3px 0 0 #e0582b; }
+  .nav .new { background: #e0582b; color: #fff; font-size: 10px; border-radius: 4px; padding: 0 4px; margin-inline-start: 6px; vertical-align: 2px; }
+  .content { flex: 1; min-width: 0; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+  h1.pt { margin: 0; font-size: 22px; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid #e5e7eb; }
+  .tabs span { padding: 10px 18px; font-weight: 700; color: #6b7280; font-size: 15px; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+  .tabs span.on { color: #c2410c; border-color: #e0582b; }
+  .tabs small { font-weight: 500; color: #9ca3af; margin-inline-start: 4px; }
+  .seg { display: inline-flex; background: #eceae6; border-radius: 10px; padding: 3px; }
+  .seg span { padding: 6px 14px; border-radius: 8px; font-weight: 600; color: #4b5563; font-size: 13.5px; }
+  .seg span.on { background: #fff; color: #c2410c; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 7px 14px; font-weight: 700; font-size: 14px; border: 1px solid #e0582b; color: #c2410c; background: #fff; }
+  .btn.pri { background: #e0582b; color: #fff; }
+  .btn.sm { padding: 4px 10px; font-size: 12.5px; }
+  .note { background: #fff8ec; border: 1px solid #f3dcb2; color: #8a5a12; border-radius: 10px; padding: 9px 14px; font-size: 13.5px; }
+  .note.bad { background: #fff3f0; border-color: #f3b4a8; color: #b42318; }
+  .box { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; }
+  table.d { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.d th { text-align: start; font-weight: 600; color: #6b7280; font-size: 12.5px; padding: 9px 12px; border-bottom: 1px solid #e5e7eb; background: #fafaf9; }
+  table.d td { padding: 10px 12px; border-bottom: 1px solid #f0f0ee; vertical-align: middle; }
+  table.d td.r, table.d th.r { text-align: end; }
+  table.d tr.sub td { background: #fbfaf8; color: #4b5563; font-size: 13px; }
+  table.d tr.sel td { background: #fff7ed; }
+  .tag { font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 1px 8px; white-space: nowrap; display: inline-block; }
+  .t-ok { background: #e3f1e6; color: #1f7a45; } .t-warn { background: #fef3c7; color: #a15c00; } .t-bad { background: #fde2dd; color: #b42318; } .t-gray { background: #eceef0; color: #4b5563; }
+  .t-del { background: #fde9cf; color: #c2650a; } .t-pick { background: #e0f2fe; color: #0369a1; } .t-dine { background: #ede9fe; color: #6d28d9; }
+  .muted { color: #6b7280; } .small { font-size: 12.5px; }
+  .tog { width: 38px; height: 22px; border-radius: 999px; background: #22a05a; position: relative; display: inline-block; vertical-align: middle; }
+  .tog::after { content: ""; position: absolute; top: 3px; inset-inline-end: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .tog.off { background: #cfd3d8; } .tog.off::after { inset-inline-end: auto; inset-inline-start: 3px; }
+  .ico { width: 30px; height: 30px; border-radius: 8px; display: inline-grid; place-items: center; color: #fff; font-weight: 800; font-size: 13px; flex: none; }
+  .stats { display: flex; gap: 10px; }
+  .stat { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 11px 16px; flex: 1; }
+  .stat b { font-size: 23px; display: block; } .stat small { color: #6b7280; font-size: 12.5px; } .stat i { font-style: normal; font-size: 12px; color: #6b7280; display: block; margin-top: 2px; }
+  .stat.gold { background: #fffaf0; border-color: #f2d48a; } .stat.gold b { color: #a15c00; }
+  .stat.red b { color: #b42318; }
+  .field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: #4b5563; font-weight: 600; }
+  .inp { border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 10px; font-size: 14px; color: #1f2328; font-weight: 500; background: #fff; }
+
+  /* ---- 收银（iPad，深红米金） ---- */
+  .pad { width: 1180px; height: 820px; overflow: hidden; display: flex; flex-direction: column; position: relative; font-size: 14px; }
+  .warm { --ok: #2f7d4a; --ok-soft: #e3f1e6; --warn: #c2650a; --warn-soft: #fde9cf; }
+  .top { background: var(--red-bg); color: #fff; display: flex; align-items: center; gap: 14px; padding: 0 18px; height: 58px; flex: none; }
+  .top h1 { font-size: 18px; margin: 0; } .top .back { color: var(--gold); font-weight: 600; }
+  .top .pill { background: var(--gold); color: var(--red-deep); border-radius: 10px; padding: 6px 14px; font-weight: 800; font-size: 17px; }
+  .top .pill small { font-size: 13px; font-weight: 600; }
+  .top .pill2 { border: 1px solid rgba(244,207,115,.6); border-radius: 999px; padding: 6px 14px; font-weight: 600; }
+  .top .sp { flex: 1; } .top .who { font-size: 13px; color: #f3d9c9; }
+  .tseg { display: inline-flex; background: rgba(0,0,0,.25); border-radius: 999px; padding: 3px; }
+  .tseg span { padding: 6px 20px; border-radius: 999px; font-weight: 700; color: #f3d9c9; font-size: 14.5px; }
+  .tseg span.on { background: var(--gold); color: var(--red-deep); }
+  .body { flex: 1; display: flex; min-height: 0; }
+  .bill { flex: 1; background: var(--paper); display: flex; flex-direction: column; min-width: 0; }
+  .rh { background: #f3e7d4; padding: 7px 16px; font-size: 13.5px; color: var(--muted); } .rh b { color: var(--ink); }
+  .it { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .it .n { flex: 1; font-size: 15.5px; } .it .n small { display: block; font-size: 12.5px; color: var(--muted); }
+  .it .q { width: 40px; color: var(--muted); } .it .p { width: 70px; text-align: end; font-weight: 700; }
+  .st { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 8px; background: var(--ok-soft); color: var(--ok); }
+  .side { width: 470px; flex: none; background: #fff; border-inline-start: 1px solid var(--line); display: flex; flex-direction: column; padding: 14px 18px; gap: 10px; }
+  .lbl { font-size: 15px; font-weight: 800; color: var(--red-deep); display: flex; align-items: center; gap: 6px; }
+  .lbl::before { content: ""; width: 3px; height: 15px; background: var(--red); border-radius: 2px; }
+  .lbl small { font-weight: 500; color: var(--muted); font-size: 12.5px; margin-inline-start: auto; }
+  .kv { display: flex; justify-content: space-between; font-size: 14px; padding: 2px 0; } .kv span:first-child { color: var(--muted); }
+  .kv.gold { background: #fdf3d6; border-radius: 6px; padding: 4px 8px; margin: 0 -8px; color: #8a5a12; font-weight: 700; } .kv.gold span:first-child { color: #8a5a12; }
+  .kv.disc { color: var(--red); font-weight: 700; } .kv.disc span:first-child { color: var(--red); }
+  .due { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px dashed var(--line); padding-top: 8px; }
+  .due b { font-size: 34px; color: var(--red); } .due s { color: var(--muted); font-size: 16px; margin-inline-end: 8px; }
+  .adj { display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--paper); }
+  .adj.on { border-color: var(--red); background: #fff6ef; }
+  .adj .k { font-weight: 800; color: var(--ink); } .adj .v { flex: 1; color: var(--muted); font-size: 13.5px; } .adj .go { color: var(--red); font-weight: 700; }
+  .types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .types div { border: 1.5px solid var(--line); border-radius: 12px; text-align: center; padding: 12px 0; font-size: 16px; font-weight: 700; background: #fff; }
+  .types div.on { background: var(--gold-soft); border-color: var(--red); color: var(--red-deep); }
+  .types div small { display: block; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border: 1.5px solid var(--line); border-radius: 10px; padding: 9px 14px; font-size: 15px; font-weight: 700; background: #fff; color: var(--ink); }
+  .chip.on { background: var(--gold-soft); border-color: var(--red); color: var(--red-deep); }
+  .chip small { font-size: 12px; font-weight: 500; color: var(--muted); margin-inline-start: 4px; }
+  .chip.ghost { color: var(--muted); border-style: dashed; }
+  .chip.sm { padding: 6px 11px; font-size: 13.5px; }
+  .recv { border: 2px solid var(--red); border-radius: 12px; display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: var(--paper); }
+  .recv b { font-size: 28px; }
+  .numgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .numgrid div { height: 46px; border-radius: 10px; background: #f6ebdb; display: grid; place-items: center; font-size: 21px; font-weight: 700; }
+  .chg { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; } .chg b { font-size: 26px; color: var(--ok); }
+  .bigbtn { background: var(--red); color: #fff; border-radius: 12px; text-align: center; padding: 14px 0; font-size: 17px; font-weight: 800; margin-top: auto; }
+  .wallets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .wallets div { border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-weight: 700; background: #fff; }
+  .wallets div.on { border-color: var(--red); background: var(--gold-soft); }
+  .hint { font-size: 12.5px; color: var(--muted); background: #f8efe1; border-radius: 8px; padding: 7px 10px; }
+  .auth { font-size: 12.5px; background: #e3f1e6; color: #1f7a45; border-radius: 999px; padding: 2px 10px; font-weight: 700; }
+
+  /* 结账优惠面板 */
+  .sheet { position: absolute; z-index: 30; inset-inline-end: 0; top: 58px; bottom: 0; width: 640px; background: var(--paper); box-shadow: -18px 0 40px rgba(0,0,0,.25); border-radius: 0; display: flex; flex-direction: column; }
+  .sheet .sh { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .sheet .sh h2 { margin: 0; font-size: 19px; }
+  .sheet .sh .x { margin-inline-start: auto; width: 34px; height: 34px; border-radius: 50%; background: #f3e7d4; display: grid; place-items: center; color: var(--muted); }
+  .sheet .sb { padding: 14px 20px; display: flex; flex-direction: column; gap: 14px; flex: 1; overflow: hidden; }
+  .sheet .sf { padding: 12px 20px 16px; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
+  .sheet .sf .bigbtn { margin: 0; flex: 1; }
+  .sheet .sf .bigbtn.ghost { background: #fff; color: var(--red); border: 1.5px solid var(--red); flex: 0 0 150px; }
+  .mode { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .mode div { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; background: #fff; }
+  .mode div b { display: block; font-size: 16px; } .mode div small { color: var(--muted); font-size: 12px; }
+  .mode div.on { border-color: var(--red); background: var(--gold-soft); }
+  .mode div.dim { opacity: .55; }
+  .cmp { display: flex; align-items: baseline; gap: 10px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+  .cmp s { color: var(--muted); font-size: 18px; } .cmp b { font-size: 30px; color: var(--red); } .cmp .sv { margin-inline-start: auto; background: #fdf3d6; color: #8a5a12; font-weight: 800; border-radius: 999px; padding: 3px 12px; }
+
+  /* 代客下单 PC */
+  .mo { width: 1440px; height: 900px; overflow: hidden; display: flex; flex-direction: column; position: relative; font-size: 14px; }
+  .menu { flex: 1; padding: 14px 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; align-content: start; background: var(--bg); }
+  .dish { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .dish .ph { height: 88px; background: linear-gradient(135deg, #f1d9b5, #e6b98a); }
+  .dish .dn { padding: 7px 10px; font-weight: 700; display: flex; justify-content: space-between; } .dish .dn span { color: var(--red); }
+  .cart { width: 520px; flex: none; background: #fff; border-inline-start: 1px solid var(--line); display: flex; flex-direction: column; }
+  .cart .cs { padding: 12px 18px; border-bottom: 1px solid var(--line); }
+  .ci { display: flex; gap: 8px; padding: 7px 0; font-size: 14.5px; } .ci .n { flex: 1; } .ci .n small { display: block; color: var(--muted); font-size: 12px; }
+  .ci b { width: 70px; text-align: end; }
+  .row2 { display: flex; align-items: center; gap: 10px; }
+  .row2 .k { width: 74px; color: var(--muted); font-size: 13.5px; flex: none; }
+</style>
+</head>
+<body>
+
+<!-- ============ s1 商家后台 优惠活动：外卖 / 堂食 / 优惠券 ============ -->
+<section id="s1">
+<div class="pc">
+  <div class="nav" data-nav="promo"></div>
+  <div class="content">
+    <h1 class="pt">优惠</h1>
+    <div class="tabs"><span>外卖活动<small>3</small></span><span class="on">堂食活动<small>2</small></span><span>优惠券（外卖）<small>4</small></span></div>
+    <div class="note">堂食活动只减堂食账单（店员开台、顾客扫码点菜），不会出现在外卖店铺页；外卖活动也不会减堂食账单。两边互不通用。</div>
+    <div style="display:flex;gap:16px;flex:1;min-height:0">
+      <div class="box" style="flex:1;align-self:flex-start">
+        <div style="display:flex;align-items:center;padding:12px 14px"><b style="font-size:16px">堂食活动</b><span class="btn pri" style="margin-inline-start:auto">＋ 新建堂食活动</span></div>
+        <table class="d">
+          <thead><tr><th>活动</th><th>优惠</th><th>时间</th><th>名额</th><th>状态</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><b>堂食满 1000 减 150</b><div class="muted small">Dine-in ₱150 off ₱1,000</div></td><td>满 ₱1,000 减 ₱150</td><td>每天 11:00–14:00<div class="muted small">按开台时间</div></td><td>38 / 不限</td><td><span class="tag t-ok">进行中</span></td><td><span class="btn sm">编辑</span> <span class="btn sm">暂停</span></td></tr>
+            <tr><td><b>晚市 9 折</b><div class="muted small">Dinner 10% off</div></td><td>满 ₱500 打 9 折，最多减 ₱200</td><td>每天 17:00–21:00</td><td>12 / 200</td><td><span class="tag t-warn">不在时段</span></td><td><span class="btn sm">编辑</span> <span class="btn sm">暂停</span></td></tr>
+          </tbody>
+        </table>
+        <div class="muted small" style="padding:10px 14px">一张账单最多用一个活动，自动挑省得最多的。名额在结账时才扣。</div>
+      </div>
+      <div class="box" style="width:430px;padding:16px;display:flex;flex-direction:column;gap:12px;align-self:flex-start">
+        <div style="display:flex;align-items:center"><b style="font-size:16px">新建堂食活动</b><span class="tag t-dine" style="margin-inline-start:8px">堂食</span></div>
+        <label class="field">名称<span class="inp">午市满减</span></label>
+        <label class="field">类型<span style="display:flex;gap:8px"><span class="seg"><span class="on">满减</span><span>折扣</span></span><span class="muted small" style="align-self:center">堂食没有“免配送费”</span></span></label>
+        <div style="display:flex;gap:10px"><label class="field" style="flex:1">满（菜品金额）<span class="inp">₱ 800</span></label><label class="field" style="flex:1">减<span class="inp">₱ 100</span></label></div>
+        <div style="display:flex;gap:10px"><label class="field" style="flex:1">开始日期<span class="inp">2026-12-01</span></label><label class="field" style="flex:1">结束日期<span class="inp">不限</span></label></div>
+        <label class="field">每天时段<span class="inp">11:00 – 14:00　<span class="muted small">开台时在时段内就算</span></span></label>
+        <label class="field">总名额<span class="inp">不限</span></label>
+        <div class="muted small">堂食多数不留手机号，所以没有“每个手机号限用”。</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn">存为草稿</span><span class="btn pri">保存并开始</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ============ s2 堂食结账：结账优惠面板 ============ -->
+<section id="s2">
+<div class="pad warm">
+  <div class="top"><span class="back">‹ 桌台</span><span class="pill">A3 <small>3 人 · 1 时 12 分</small></span><span class="pill2">账单 · D20261124-031</span><span class="sp"></span><span class="who">接单员 · 阿玲</span></div>
+  <div class="body">
+    <div class="bill" data-bill></div>
+    <div class="side" style="opacity:.35" data-side-cash></div>
+  </div>
+  <div class="sheet">
+    <div class="sh"><h2>结账优惠</h2><span class="auth">✓ 经理 王姐 已授权（5 分钟内有效）</span><span class="x">✕</span></div>
+    <div class="sb">
+      <div class="cmp"><span class="muted">应付</span><s>₱1,320</s><span class="muted">→</span><b>₱1,180</b><span class="sv">优惠 ₱140</span></div>
+      <div class="mode">
+        <div class="on"><b>打折</b><small>只打菜品，服务费和税跟着算</small></div>
+        <div class="on"><b>抹零</b><small>最后去掉零头</small></div>
+        <div class="dim"><b>改实收</b><small>直接填顾客付多少</small></div>
+      </div>
+      <div class="lbl">打折<small>菜品 ₱1,200（已减活动） → ₱1,080</small></div>
+      <div class="chips"><span class="chip">95 折</span><span class="chip on">9 折</span><span class="chip">88 折</span><span class="chip">85 折</span><span class="chip">8 折</span><span class="chip">7 折</span><span class="chip ghost">其他…</span><span class="chip ghost">不打折</span></div>
+      <div class="lbl">抹零<small>打折后应付 ₱1,188</small></div>
+      <div class="chips"><span class="chip on">₱1,180<small>抹 ₱8</small></span><span class="chip">₱1,100<small>抹 ₱88</small></span><span class="chip ghost">其他…</span><span class="chip ghost">不抹零</span></div>
+      <div class="lbl">原因<small>打折、抹零可以不选；改实收必须选</small></div>
+      <div class="chips"><span class="chip sm on">熟客</span><span class="chip sm">老板朋友</span><span class="chip sm">员工餐</span><span class="chip sm">投诉补偿</span><span class="chip sm">上菜慢</span><span class="chip sm">其他</span></div>
+    </div>
+    <div class="sf"><span class="bigbtn ghost">全部清除</span><span class="bigbtn">确定，去收款</span></div>
+  </div>
+  <div class="tip" style="left:24px;top:640px"><b class="n">1</b>堂食账单自动减堂食活动（金色一行），不用店员操作。</div>
+  <div class="tip" style="left:24px;top:720px"><b class="n">2</b>接单员默认没有“结账优惠”权限，点开时请经理输授权码；店主、经理直接用。</div>
+</div>
+</section>
+
+<!-- ============ s3 堂食结账：现金找零 ============ -->
+<section id="s3">
+<div class="pad warm">
+  <div class="top"><span class="back">‹ 桌台</span><span class="pill">A3 <small>3 人 · 1 时 12 分</small></span><span class="pill2">账单 · D20261124-031</span><span class="sp"></span><span class="who">接单员 · 阿玲</span></div>
+  <div class="body">
+    <div class="bill" data-bill></div>
+    <div class="side" data-side-cash></div>
+  </div>
+  <div class="tip" style="left:330px;top:250px"><b class="n">3</b>结账优惠一行：默认“不参与”，点开就是上一张的面板。设了以后写清楚是什么、谁授权的。</div>
+  <div class="tip" style="left:330px;top:560px"><b class="n">4</b>现金：点快捷金额或用键盘输入收了多少，下面直接显示找零。</div>
+</div>
+</section>
+
+<!-- ============ s4 堂食结账：在线支付 ============ -->
+<section id="s4">
+<div class="pad warm">
+  <div class="top"><span class="back">‹ 桌台</span><span class="pill">A3 <small>3 人 · 1 时 12 分</small></span><span class="pill2">账单 · D20261124-031</span><span class="sp"></span><span class="who">接单员 · 阿玲</span></div>
+  <div class="body">
+    <div class="bill" data-bill></div>
+    <div class="side">
+      <div data-sum></div>
+      <div class="lbl">付款类型</div>
+      <div class="types"><div>现金</div><div>刷卡</div><div class="on">在线支付</div></div>
+      <div class="lbl">在线方式<small>菲律宾 · 平台后台配置</small></div>
+      <div class="wallets">
+        <div class="on"><span class="ico" style="background:#0a5bd3">G</span>GCash</div>
+        <div><span class="ico" style="background:#1e9e5a">M</span>Maya</div>
+        <div><span class="ico" style="background:#ee4d2d">S</span>ShopeePay</div>
+        <div><span class="ico" style="background:#1a73e8">Q</span>QR Ph</div>
+        <div><span class="ico" style="background:#6b7280">🏦</span>银行转账</div>
+      </div>
+      <div class="hint">在线支付只记下付款方式，不扫码、不会自动知道到没到账。店主在“对账”里对着 GCash 流水核对。</div>
+      <div class="kv" style="font-size:16px"><span>收款</span><b>GCash ₱1,180</b></div>
+      <div class="bigbtn">收款并关台</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ============ s5 代客下单（外卖）：结账优惠 + 付款 ============ -->
+<section id="s5">
+<div class="mo warm">
+  <div class="top"><span class="back">‹ 返回订单</span><h1>代客下单</h1><span class="tseg"><span class="on">外卖 / 自取</span><span>堂食</span></span><span class="sp"></span><span class="who">经理 · 王姐　马卡蒂小馆</span></div>
+  <div class="body">
+    <div class="menu" data-menu></div>
+    <div class="cart">
+      <div class="cs"><div class="row2"><span class="k">会员</span><b>Ana Cruz · 0917 *** 4521</b><span class="tag t-gray">No.100238</span></div>
+        <div class="row2" style="margin-top:6px"><span class="k">送到</span><span>Unit 5B, Salcedo Tower, Makati</span></div></div>
+      <div class="cs">
+        <div class="ci"><span class="n">卤肉饭<small>大份</small></span><span>×2</span><b>₱300</b></div>
+        <div class="ci"><span class="n">盐酥鸡</span><span>×1</span><b>₱180</b></div>
+        <div class="ci"><span class="n">珍珠奶茶<small>少糖 · 去冰</small></span><span>×2</span><b>₱240</b></div>
+      </div>
+      <div class="cs" style="display:grid;gap:3px">
+        <div class="kv"><span>菜品</span><span>₱720</span></div>
+        <div class="kv gold"><span>外卖活动 · 满 600 减 60</span><span>−₱60</span></div>
+        <div class="kv disc"><span>结账优惠 · 9 折 · 熟客</span><span>−₱66</span></div>
+        <div class="kv"><span>包装费</span><span>₱20</span></div>
+        <div class="kv"><span>配送费</span><span>₱49</span></div>
+        <div class="kv disc"><span>抹零</span><span>−₱3</span></div>
+        <div class="due"><span class="muted">应付</span><span><s>₱729</s><b>₱660</b></span></div>
+      </div>
+      <div class="cs" style="display:grid;gap:10px">
+        <div class="adj on"><span class="k">结账优惠</span><span class="v">9 折 −₱66 · 抹零 −₱3 · 熟客</span><span class="go">修改 ›</span></div>
+        <div class="row2"><span class="k">付款</span><span class="chips"><span class="chip sm">货到付款</span><span class="chip sm on">已在线付款</span></span></div>
+        <div class="row2"><span class="k"></span><span class="chips"><span class="chip sm on">GCash</span><span class="chip sm">Maya</span><span class="chip sm">ShopeePay</span><span class="chip sm">银行转账</span></span></div>
+        <div class="hint">已在线付款：骑手 App 显示“已付款，不用收钱”，这单不进核款，进对账的在线支付核对。</div>
+      </div>
+      <div style="padding:12px 18px;margin-top:auto"><div class="bigbtn">下单 · ₱660</div></div>
+    </div>
+  </div>
+  <div class="tip" style="left:440px;top:560px"><b class="n">5</b>外卖、自取也能打折和抹零，和下单一起提交；骑手取餐前在订单详情里还能改。加单或退菜后抹零自动取消，打折按新金额重算。</div>
+</div>
+</section>
+
+<!-- ============ s6 平台后台：支付方式 ============ -->
+<section id="s6">
+<div class="pc">
+  <div class="nav" data-nav="admin"></div>
+  <div class="content">
+    <h1 class="pt">支付方式</h1>
+    <div class="muted">这里配置各国家的“在线支付”方式。门店结账选“在线支付”时，列出店铺所在国家启用的方式；门店可以在自己的“收款方式”里勾掉不收的。只是付款类型，不接支付接口。</div>
+    <div style="display:flex;gap:16px;flex:1;min-height:0">
+      <div class="box" style="width:240px;align-self:flex-start;padding:6px">
+        <div style="padding:8px 10px;font-weight:700;background:#fff3ea;border-radius:8px;color:#c2410c;display:flex">🇵🇭 菲律宾<span style="margin-inline-start:auto">5</span></div>
+        <div style="padding:8px 10px;display:flex">🇹🇭 泰国<span class="muted" style="margin-inline-start:auto">3</span></div>
+        <div style="padding:8px 10px;display:flex">🇻🇳 越南<span class="muted" style="margin-inline-start:auto">3</span></div>
+        <div style="padding:8px 10px;display:flex">🇲🇾 马来西亚<span class="muted" style="margin-inline-start:auto">3</span></div>
+        <div style="padding:8px 10px;display:flex">🇸🇬 新加坡<span class="muted" style="margin-inline-start:auto">3</span></div>
+        <div style="padding:8px 10px;display:flex">🇲🇲 缅甸<span class="muted" style="margin-inline-start:auto">3</span></div>
+        <div style="padding:8px 10px;display:flex">🇨🇳 中国<span class="muted" style="margin-inline-start:auto">3</span></div>
+        <div style="padding:8px 10px;display:flex">🇹🇼 台湾<span class="muted" style="margin-inline-start:auto">3</span></div>
+        <div style="padding:8px 10px;display:flex">🇯🇵 日本<span class="muted" style="margin-inline-start:auto">2</span></div>
+        <div style="padding:8px 10px;color:#c2410c;font-weight:700">＋ 添加国家</div>
+      </div>
+      <div class="box" style="flex:1;align-self:flex-start">
+        <div style="display:flex;align-items:center;padding:12px 14px"><b style="font-size:16px">🇵🇭 菲律宾 · 在线支付方式</b><span class="btn pri" style="margin-inline-start:auto">＋ 添加方式</span></div>
+        <table class="d">
+          <thead><tr><th style="width:40px"></th><th>方式</th><th>其他语言</th><th class="r">在用的门店</th><th class="r">近 30 天笔数</th><th>启用</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="muted">⋮⋮</td><td><span style="display:flex;align-items:center;gap:10px"><span class="ico" style="background:#0a5bd3">G</span><b>GCash</b></span></td><td class="muted small">品牌名，不翻译</td><td class="r">42</td><td class="r">3,816</td><td><span class="tog"></span></td><td><span class="btn sm">编辑</span></td></tr>
+            <tr><td class="muted">⋮⋮</td><td><span style="display:flex;align-items:center;gap:10px"><span class="ico" style="background:#1e9e5a">M</span><b>Maya</b></span></td><td class="muted small">品牌名，不翻译</td><td class="r">40</td><td class="r">1,207</td><td><span class="tog"></span></td><td><span class="btn sm">编辑</span></td></tr>
+            <tr><td class="muted">⋮⋮</td><td><span style="display:flex;align-items:center;gap:10px"><span class="ico" style="background:#ee4d2d">S</span><b>ShopeePay</b></span></td><td class="muted small">—</td><td class="r">18</td><td class="r">266</td><td><span class="tog"></span></td><td><span class="btn sm">编辑</span></td></tr>
+            <tr><td class="muted">⋮⋮</td><td><span style="display:flex;align-items:center;gap:10px"><span class="ico" style="background:#1a73e8">Q</span><b>QR Ph</b></span></td><td class="muted small">—</td><td class="r">21</td><td class="r">402</td><td><span class="tog"></span></td><td><span class="btn sm">编辑</span></td></tr>
+            <tr><td class="muted">⋮⋮</td><td><span style="display:flex;align-items:center;gap:10px"><span class="ico" style="background:#6b7280">🏦</span><b>银行转账</b></span></td><td class="muted small">English: Bank transfer · Filipino: Bank transfer</td><td class="r">42</td><td class="r">95</td><td><span class="tog"></span></td><td><span class="btn sm">编辑</span></td></tr>
+            <tr><td class="muted">⋮⋮</td><td><span style="display:flex;align-items:center;gap:10px"><span class="ico" style="background:#9ca3af">C</span><b class="muted">Coins.ph</b></span></td><td class="muted small">—</td><td class="r">0</td><td class="r">3</td><td><span class="tog off"></span></td><td><span class="btn sm">编辑</span></td></tr>
+          </tbody>
+        </table>
+        <div class="muted small" style="padding:10px 14px">拖动 ⋮⋮ 排序，结账页按这个顺序显示。用过的方式不能删除，只能停用；老订单照常显示原来的名字。</div>
+      </div>
+      <div class="box" style="width:330px;align-self:flex-start;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <b style="font-size:16px">添加方式 · 菲律宾</b>
+        <label class="field">名字<span class="inp">GrabPay</span></label>
+        <label class="field">图标<span style="display:flex;gap:10px;align-items:center"><span class="ico" style="background:#00b14f;width:44px;height:44px">G</span><span class="btn sm">上传（正方形裁剪）</span></span></label>
+        <label class="field">其他语言的名字（可不填）<span class="inp muted">不填就都显示 GrabPay</span></label>
+        <label class="field">启用<span><span class="tog"></span></span></label>
+        <div style="display:flex;justify-content:flex-end;gap:8px"><span class="btn">取消</span><span class="btn pri">保存</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ============ s7 对账：收款汇总 + 现金盘点 ============ -->
+<section id="s7">
+<div class="pc">
+  <div class="nav" data-nav="recon"></div>
+  <div class="content">
+    <div style="display:flex;align-items:center;gap:12px"><h1 class="pt">对账</h1>
+      <span class="seg"><span class="on">今天 11-24</span><span>昨天</span><span>本周</span><span>本月</span><span>自选…</span></span>
+      <span class="btn" style="margin-inline-start:auto">导出 Excel</span></div>
+    <div class="tabs"><span class="on">收款汇总</span><span>在线支付核对<small>还有 8 笔没核对</small></span><span>让利记录</span></div>
+    <div class="stats">
+      <div class="stat"><b>₱38,460</b><small>应收合计 · 126 单</small><i>堂食 ₱21,380 · 外卖 ₱17,080</i></div>
+      <div class="stat"><b>₱19,240</b><small>现金</small><i>收银 ₱12,480 · 骑手交回 ₱6,760</i></div>
+      <div class="stat"><b>₱3,150</b><small>刷卡 · 6 笔</small></div>
+      <div class="stat"><b>₱16,070</b><small>在线支付 · 58 笔</small><i>已核对 49 · 有问题 1 · 没核对 8</i></div>
+      <div class="stat gold"><b>₱2,315</b><small>让利合计</small><i>活动 ₱1,640 · 结账优惠 ₱592 · 抹零 ₱83</i></div>
+    </div>
+    <div style="display:flex;gap:16px;flex:1;min-height:0">
+      <div class="box" style="flex:1;align-self:flex-start">
+        <table class="d">
+          <thead><tr><th>付款方式</th><th class="r">笔数</th><th class="r">金额</th><th class="r">堂食</th><th class="r">外卖 / 自取</th><th class="r">已到账</th><th class="r">有问题</th><th class="r">没核对</th></tr></thead>
+          <tbody>
+            <tr><td><b>现金</b></td><td class="r">58</td><td class="r"><b>₱19,240</b></td><td class="r">₱12,480</td><td class="r">₱6,760</td><td class="r muted">—</td><td class="r muted">—</td><td class="r muted">—</td></tr>
+            <tr class="sub"><td>　└ 堂食收银（实收 ₱15,900 − 找零 ₱3,420）</td><td class="r">31</td><td class="r">₱12,480</td><td></td><td></td><td colspan="3" class="muted small">和下面的现金盘点比</td></tr>
+            <tr class="sub"><td>　└ 骑手已交回</td><td class="r">27</td><td class="r">₱6,760</td><td></td><td></td><td colspan="3" class="muted small">见“核款”</td></tr>
+            <tr class="sub"><td>　└ 骑手还没交回 <span class="tag t-warn">2 位骑手</span></td><td class="r">4</td><td class="r">₱1,120</td><td></td><td></td><td colspan="3" class="muted small">不算进现金合计</td></tr>
+            <tr><td><b>刷卡</b></td><td class="r">6</td><td class="r"><b>₱3,150</b></td><td class="r">₱3,150</td><td class="r">—</td><td class="r muted">—</td><td class="r muted">—</td><td class="r muted">—</td></tr>
+            <tr><td><span style="display:flex;align-items:center;gap:8px"><span class="ico" style="background:#0a5bd3;width:22px;height:22px;font-size:11px">G</span><b>GCash</b></span></td><td class="r">41</td><td class="r"><b>₱11,860</b></td><td class="r">₱4,210</td><td class="r">₱7,650</td><td class="r">35</td><td class="r"><span class="tag t-bad">1</span></td><td class="r"><span class="tag t-warn">5</span></td></tr>
+            <tr><td><span style="display:flex;align-items:center;gap:8px"><span class="ico" style="background:#1e9e5a;width:22px;height:22px;font-size:11px">M</span><b>Maya</b></span></td><td class="r">12</td><td class="r"><b>₱3,140</b></td><td class="r">₱1,540</td><td class="r">₱1,600</td><td class="r">10</td><td class="r">0</td><td class="r"><span class="tag t-warn">2</span></td></tr>
+            <tr><td><span style="display:flex;align-items:center;gap:8px"><span class="ico" style="background:#6b7280;width:22px;height:22px;font-size:11px">🏦</span><b>银行转账</b></span></td><td class="r">5</td><td class="r"><b>₱1,070</b></td><td class="r">—</td><td class="r">₱1,070</td><td class="r">4</td><td class="r">0</td><td class="r"><span class="tag t-warn">1</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="box" style="width:340px;align-self:flex-start;padding:16px;display:flex;flex-direction:column;gap:10px">
+        <b style="font-size:16px">现金盘点 · 今天</b>
+        <div class="muted small">收工前数一下钱箱，和系统里的现金比。</div>
+        <div style="display:flex;justify-content:space-between"><span class="muted">应有现金</span><b>₱12,480</b></div>
+        <div class="muted small" style="margin-top:-6px">堂食收银现金，不含骑手交回（骑手交回的另见核款）</div>
+        <label class="field">实点<span class="inp" style="font-size:18px;font-weight:700">₱ 12,430</span></label>
+        <div style="display:flex;justify-content:space-between;background:#fff3f0;border-radius:8px;padding:8px 10px"><span style="color:#b42318">差额</span><b style="color:#b42318">−₱50</b></div>
+        <label class="field">备注<span class="inp">A5 找零可能多找了 50</span></label>
+        <span class="btn pri" style="justify-content:center">保存盘点</span>
+        <div class="muted small">昨天：应有 ₱10,920，实点 ₱10,920，王姐 22:41 盘点</div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ============ s8 对账：在线支付逐笔核对 + 让利 ============ -->
+<section id="s8">
+<div class="pc">
+  <div class="nav" data-nav="recon"></div>
+  <div class="content">
+    <div style="display:flex;align-items:center;gap:12px"><h1 class="pt">对账</h1>
+      <span class="seg"><span class="on">今天 11-24</span><span>昨天</span><span>本周</span><span>本月</span><span>自选…</span></span>
+      <span class="btn" style="margin-inline-start:auto">导出 Excel</span></div>
+    <div class="tabs"><span>收款汇总</span><span class="on">在线支付核对<small>还有 8 笔没核对</small></span><span>让利记录</span></div>
+    <div class="note bad">1 笔有问题：#A1071 GCash ₱420（12:18，骑手 小明）“GCash 里没看到这笔，已联系顾客”。</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="seg"><span>全部 58</span><span class="on">GCash 41</span><span>Maya 12</span><span>银行转账 5</span></span>
+      <span class="seg"><span class="on">没核对 5</span><span>已到账 35</span><span>有问题 1</span><span>全部</span></span>
+      <span class="muted small" style="margin-inline-start:12px">这一页合计 <b style="color:#1f2328">₱1,940</b>，和 GCash 流水对一下总数</span>
+      <span class="btn" style="margin-inline-start:auto">这一页全部标为已到账</span>
+    </div>
+    <div class="box">
+      <table class="d">
+        <thead><tr><th>时间</th><th>单号</th><th>类型</th><th>方式</th><th class="r">金额</th><th>收款人</th><th>核对</th><th>备注</th></tr></thead>
+        <tbody>
+          <tr><td>13:42</td><td><b>D20261124-031</b></td><td><span class="tag t-dine">堂食 A3</span></td><td>GCash</td><td class="r"><b>₱1,180</b></td><td>阿玲</td><td><span class="btn sm">已到账</span> <span class="btn sm" style="border-color:#d1d5db;color:#6b7280">有问题</span></td><td class="muted small">—</td></tr>
+          <tr><td>13:20</td><td><b>#A1093</b></td><td><span class="tag t-del">外卖</span></td><td>GCash</td><td class="r"><b>₱660</b></td><td>王姐 · 代客下单</td><td><span class="btn sm">已到账</span> <span class="btn sm" style="border-color:#d1d5db;color:#6b7280">有问题</span></td><td class="muted small">—</td></tr>
+          <tr class="sel"><td>12:55</td><td><b>#A1088</b></td><td><span class="tag t-del">外卖</span></td><td>GCash</td><td class="r"><b>₱385</b></td><td>骑手 小明 · 门口收</td><td><span class="btn sm">已到账</span> <span class="btn sm" style="border-color:#d1d5db;color:#6b7280">有问题</span></td><td class="muted small">—</td></tr>
+          <tr><td>12:31</td><td><b>D20261124-024</b></td><td><span class="tag t-dine">堂食 包1</span></td><td>GCash</td><td class="r"><b>₱4,860</b></td><td>阿玲</td><td><span class="btn sm">已到账</span> <span class="btn sm" style="border-color:#d1d5db;color:#6b7280">有问题</span></td><td class="muted small">—</td></tr>
+          <tr><td>11:50</td><td><b>#A1064</b></td><td><span class="tag t-pick">自取</span></td><td>GCash</td><td class="r"><b>₱215</b></td><td>阿玲 · 到店付</td><td><span class="btn sm">已到账</span> <span class="btn sm" style="border-color:#d1d5db;color:#6b7280">有问题</span></td><td class="muted small">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:16px">
+      <div class="box" style="flex:1">
+        <div style="padding:10px 14px;font-weight:700">让利记录（预览）· 按员工</div>
+        <table class="d">
+          <thead><tr><th>员工</th><th class="r">笔数</th><th class="r">打折</th><th class="r">抹零</th><th class="r">改实收 / 免单</th><th>其中经理授权</th></tr></thead>
+          <tbody>
+            <tr><td>阿玲 · 接单员</td><td class="r">6</td><td class="r">₱268</td><td class="r">₱41</td><td class="r">—</td><td>6 笔（王姐）</td></tr>
+            <tr><td>王姐 · 经理</td><td class="r">4</td><td class="r">₱192</td><td class="r">₱30</td><td class="r">₱132 <span class="tag t-gray">投诉补偿</span></td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="box" style="width:430px">
+        <div style="padding:10px 14px;font-weight:700">活动优惠</div>
+        <table class="d">
+          <tbody>
+            <tr><td><span class="tag t-dine">堂食</span> 满 1000 减 150</td><td class="r">8 单</td><td class="r">₱1,200</td></tr>
+            <tr><td><span class="tag t-del">外卖</span> 满 600 减 60</td><td class="r">7 单</td><td class="r">₱420</td></tr>
+            <tr><td><span class="tag t-del">外卖</span> 免配送费</td><td class="r">1 单</td><td class="r">₱20</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<script>
+  const navs = {
+    promo: ['订单', '代客下单', '烹饪进度', '菜单', '优惠', '会员', '核款', '账单', '对账 NEW', '员工', '设置'],
+    recon: ['订单', '代客下单', '烹饪进度', '菜单', '优惠', '会员', '核款', '账单', '对账 NEW', '员工', '设置'],
+    admin: ['总览', 'API 监控', 'Worker', '商户', '入驻审核', '顾客服务', '优惠券', '账单', '支付方式 NEW', '地址库', '语言', '设置'],
+  }
+  const on = { promo: '优惠', recon: '对账 NEW', admin: '支付方式 NEW' }
+  document.querySelectorAll('[data-nav]').forEach(n => {
+    const k = n.dataset.nav
+    const head = k === 'admin' ? '<div class="brand">平台后台</div><div class="role"><b>管理员</b>Brian</div>'
+      : '<div class="brand">马卡蒂小馆</div><div class="role"><b>店主</b>Brian</div>'
+    n.innerHTML = head + navs[k].map(x => `<a class="${x === on[k] ? 'on' : ''}">${x.replace(' NEW', '<span class="new">新</span>')}</a>`).join('')
+  })
+
+  const items = [['第 1 轮', '18:02 · 店员 阿玲'], ['小炒黄牛肉', '大份 · 微辣', 1, 340], ['珍珠奶茶', '中杯 · 少糖', 2, 240], ['蒜蓉菜心', '', 1, 120],
+    ['第 2 轮', '18:20 · 顾客扫码'], ['酸菜鱼', '大份 · 加粉丝', 1, 560], ['柠檬绿茶', '常温', 1, 90]]
+  const billHtml = items.map(x => x.length === 2 ? `<div class="rh"><b>${x[0]}</b>　${x[1]}</div>`
+    : `<div class="it"><span class="n">${x[0]}${x[1] ? `<small>${x[1]}</small>` : ''}</span><span class="q">×${x[2]}</span><span class="st">已上桌</span><span class="p">₱${x[3]}</span></div>`).join('')
+  document.querySelectorAll('[data-bill]').forEach(b => b.innerHTML = billHtml)
+
+  const sum = `
+    <div class="lbl">结账关台</div>
+    <div class="kv"><span>菜品 6 份</span><span>₱1,350</span></div>
+    <div class="kv gold"><span>堂食活动 · 满 1000 减 150</span><span>−₱150</span></div>
+    <div class="kv disc"><span>结账优惠 · 9 折</span><span>−₱120</span></div>
+    <div class="kv"><span>服务费 10%</span><span>₱108</span></div>
+    <div class="kv"><span>含税 12%</span><span>₱127</span></div>
+    <div class="kv disc"><span>抹零</span><span>−₱8</span></div>
+    <div class="due"><span class="muted">应付</span><span><s>₱1,320</s><b>₱1,180</b></span></div>
+    <div class="adj on" style="margin-top:6px"><span class="k">结账优惠</span><span class="v">9 折 · 抹零 · 熟客 · 王姐授权</span><span class="go">修改 ›</span></div>`
+  document.querySelectorAll('[data-sum]').forEach(s => s.innerHTML = sum)
+  document.querySelectorAll('[data-side-cash]').forEach(s => s.innerHTML = sum + `
+    <div class="lbl">付款类型</div>
+    <div class="types"><div class="on">现金</div><div>刷卡</div><div>在线支付<small>GCash / Maya …</small></div></div>
+    <div class="recv"><span class="muted">收了</span><b>₱2,000</b></div>
+    <div class="chips"><span class="chip sm">刚好</span><span class="chip sm">₱1,200</span><span class="chip sm">₱1,500</span><span class="chip sm on">₱2,000</span><span class="chip sm">₱3,000</span><span class="chip sm ghost">键盘输入</span></div>
+    <div class="chg"><span>找零</span><b>₱820</b></div>
+    <div class="bigbtn">收款并关台</div>`)
+
+  const dishes = ['卤肉饭 ₱150', '盐酥鸡 ₱180', '珍珠奶茶 ₱120', '番茄牛腩面 ₱220', '宫保鸡丁 ₱200', '酸菜鱼 ₱560', '蒜蓉菜心 ₱120', '小炒黄牛肉 ₱340',
+    '椒盐排骨 ₱260', '扬州炒饭 ₱160', '柠檬绿茶 ₱90', '瓶装水 ₱30']
+  document.querySelectorAll('[data-menu]').forEach(m => m.innerHTML = dishes.map(d => { const [n, p] = d.split(' '); return `<div class="dish"><div class="ph"></div><div class="dn">${n}<span>${p}</span></div></div>` }).join(''))
+
+  const show = () => { const id = (location.hash || '#s1').slice(1); document.querySelectorAll('section').forEach(s => s.classList.toggle('show', s.id === id)) }
+  addEventListener('hashchange', show); show()
+</script>
+</body>
+</html>

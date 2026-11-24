@@ -2892,5 +2892,13 @@
  "kp.done.waiting": "Encore au restaurant",
  "kp.order_tag": "{a}/{b} prêts",
  "kp.set.target": "Objectif de préparation (minutes)",
- "kp.set.target_hint": "Les minuteurs de l’avancement et de l’écran cuisine passent au jaune aux deux tiers, puis au rouge au-delà"
+ "kp.set.target_hint": "Les minuteurs de l’avancement et de l’écran cuisine passent au jaune aux deux tiers, puis au rouge au-delà",
+ "ck.tab_delivery": "Offres livraison",
+ "ck.tab_dine": "Offres sur place",
+ "ck.tab_coupons": "Bons (livraison)",
+ "ck.new_dine": "Nouvelle offre sur place",
+ "ck.delivery_hint": "Les offres livraison s’appliquent seulement aux commandes en livraison et à emporter, jamais aux additions sur place.",
+ "ck.dine_hint": "Les offres sur place ne réduisent que les additions de table (ouvertes par le personnel ou commandées par QR code) et n’apparaissent pas sur la boutique en livraison ; les offres livraison ne réduisent jamais une addition de table. Une offre par addition, celle qui fait le plus économiser ; son quota est utilisé au paiement.",
+ "ck.dine_time_hint": "Les horaires du jour comptent à partir de l’ouverture de la table : une table ouverte pendant ces horaires garde l’offre même si elle paie plus tard.",
+ "ck.dine_offers": "Offres sur place"
 }

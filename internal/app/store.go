@@ -441,6 +441,9 @@ type Storefront struct {
 	Zones      []Zone      `json:"zones"`
 	Categories []Category  `json:"categories"`
 	Promotions []Promotion `json:"promotions"`
+	// DinePromotions are the dine-in offers running now, shown on the table's
+	// QR menu; the delivery storefront never shows them.
+	DinePromotions []Promotion `json:"dine_promotions"`
 	// Slots are the times an order can be scheduled for (empty when the store
 	// does not take scheduled orders).
 	Slots []time.Time `json:"slots"`
@@ -497,7 +500,11 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	if err != nil {
 		return nil, err
 	}
-	promos, err := livePromotions(ctx, a.DB, b)
+	promos, err := livePromotions(ctx, a.DB, b, "delivery")
+	if err != nil {
+		return nil, err
+	}
+	dinePromos, err := livePromotions(ctx, a.DB, b, "dine_in")
 	if err != nil {
 		return nil, err
 	}
@@ -509,6 +516,6 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &Storefront{Branch: b, Zones: zones, Categories: cats, Promotions: promos, Slots: b.Slots(time.Now()), Templates: tpl,
+	return &Storefront{Branch: b, Zones: zones, Categories: cats, Promotions: promos, DinePromotions: dinePromos, Slots: b.Slots(time.Now()), Templates: tpl,
 		Sales: sales, Rating: *rating, Media: media}, nil
 }

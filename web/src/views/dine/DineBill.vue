@@ -4,7 +4,8 @@
 // (docs/DINE_IN_ORDER_DESIGN.md §8, §9).
 import { computed, reactive, ref, watch } from 'vue'
 import { ApiError, post } from '../../api'
-import { money, t, toMinor } from '../../i18n'
+import { money, pick, t, toMinor } from '../../i18n'
+import '../../checkout'
 import type { Bill, DinePresets, Item, OrderItem } from '../../types'
 import type { DeskLine } from './DineOrder.vue'
 import { presetList, sinceText } from './strings'
@@ -158,6 +159,7 @@ const done = ref(false)
       <section v-if="paying && bill.status === 'open'" class="dd-pay" data-testid="dd-pay-panel">
         <div class="ph"><div class="dd-lbl">{{ t('dd.pay_title') }}</div><button v-if="phone" class="lnk" @click="paying = false">✕</button></div>
         <div class="kv"><span>{{ t('dd.items_n', { n: live.reduce((s, i) => s + i.qty, 0) }) }}</span><span>{{ m(o.totals.subtotal) }}</span></div>
+        <div v-if="o.totals.discount" class="kv promo" data-testid="dd-promo"><span>{{ t('ck.tab_dine') }} · {{ pick(o.totals.promotion_name, o.totals.promotion_name_en) }}</span><span>−{{ m(o.totals.discount) }}</span></div>
         <div v-if="o.totals.service_charge" class="kv"><span>{{ t('dd.service') }}</span><span>{{ m(o.totals.service_charge) }}</span></div>
         <div v-if="o.totals.tax_amount" class="kv"><span>{{ o.totals.tax_inclusive ? t('dd.tax_incl') : t('dd.tax') }} {{ o.totals.tax_rate_bp / 100 }}%</span><span>{{ m(o.totals.tax_amount) }}</span></div>
         <div class="due"><span>{{ t('dd.due') }}</span><b data-testid="dd-due">{{ m(o.totals.total) }}</b></div>

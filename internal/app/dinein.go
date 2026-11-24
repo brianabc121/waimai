@@ -420,11 +420,43 @@ func recomputeBill(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64) (To
 		WHERE order_id=$1 AND prep_status <> 'cancelled'`, orderID).Scan(&subtotal); err != nil {
 		return Totals{}, err
 	}
-	t := ComputeTotals(subtotal, 0, b.dineInTax(), Discount{})
-	_, err := tx.Exec(ctx, `UPDATE orders SET subtotal=$2, service_charge=$3, tax_amount=$4, tax_inclusive=$5,
-		tax_rate_bp=$6, total=$7, version=version+1, manifest_version=manifest_version+1, updated_at=now() WHERE id=$1`,
-		orderID, t.Subtotal, t.ServiceCharge, t.TaxAmount, t.TaxInclusive, t.TaxRateBP, t.Total)
+	t, err := dineTotals(ctx, tx, b, orderID, subtotal)
+	if err != nil {
+		return Totals{}, err
+	}
+	var promoID *int64
+	if t.PromotionID != 0 {
+		promoID = &t.PromotionID
+	}
+	_, err = tx.Exec(ctx, `UPDATE orders SET subtotal=$2, service_charge=$3, tax_amount=$4, tax_inclusive=$5,
+		tax_rate_bp=$6, total=$7, discount=$8, merchant_discount=$8, promotion_id=$9, promotion_name=$10,
+		promotion_name_en=$11, version=version+1, manifest_version=manifest_version+1, updated_at=now() WHERE id=$1`,
+		orderID, t.Subtotal, t.ServiceCharge, t.TaxAmount, t.TaxInclusive, t.TaxRateBP, t.Total, t.Discount,
+		promoID, t.PromotionName, t.PromotionNameEn)
 	return t, err
+}
+
+// dineTotals prices a table bill: the best dine-in promotion for the dishes
+// (docs/CHECKOUT_DISCOUNT_DESIGN.md §4.2), then service charge and tax. A
+// promotion's dates and daily hours are checked at the time the table was
+// opened, so a lunch offer still applies when the lunch guests pay at 14:20;
+// its status and quota are checked now.
+func dineTotals(ctx context.Context, q Querier, b *Branch, orderID, subtotal int64) (Totals, error) {
+	var opened time.Time
+	if err := q.QueryRow(ctx, `SELECT COALESCE((SELECT s.opened_at FROM dining_sessions s WHERE s.id = o.session_id), o.created_at)
+		FROM orders o WHERE o.id=$1`, orderID).Scan(&opened); err != nil {
+		return Totals{}, err
+	}
+	ps, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope='dine_in'", "")
+	if err != nil {
+		return Totals{}, err
+	}
+	best, d := bestPromotion(ps, opened, b.location(), "dine_in", subtotal, 0)
+	t := ComputeTotals(subtotal, 0, b.dineInTax(), d)
+	if best != nil {
+		t.PromotionID, t.PromotionName, t.PromotionNameEn, t.PromotionDiscount = best.ID, best.Name, best.NameEn, d.total()
+	}
+	return t, nil
 }
 
 type BatchInput struct {
@@ -626,6 +658,7 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 	if len(in.Note) > 200 || len([]rune(in.PayMethod)) > 20 {
 		return nil, ErrValidation("note too long")
 	}
+	promoGone := false
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
 		s, err := lockSession(ctx, tx, sessionID)
 		if err != nil {
@@ -653,6 +686,20 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 		if in.AmountReceived < o.Total {
 			return ErrValidation("the amount received is less than the bill")
 		}
+		// The dine-in promotion takes its quota only now: an open table holds none.
+		var promoID, discount int64
+		if err := tx.QueryRow(ctx, `SELECT COALESCE(promotion_id, 0), discount FROM orders WHERE id=$1`, o.ID).
+			Scan(&promoID, &discount); err != nil {
+			return err
+		}
+		if promoID != 0 {
+			if err := claimPromotion(ctx, tx, s.BranchID, promoID, o.ID, "", discount); err != nil {
+				if isCode(err, "QUOTE_CHANGED") {
+					promoGone = true
+				}
+				return err
+			}
+		}
 		// Dishes that were ready but not ticked off are taken as served.
 		if _, err := tx.Exec(ctx, `UPDATE order_items SET served_at = now()
 			WHERE order_id=$1 AND prep_status='ready' AND served_at IS NULL`, o.ID); err != nil {
@@ -677,6 +724,32 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 		}
 		return notify(ctx, tx, Event{BranchID: s.BranchID, OrderID: o.ID})
 	})
+	if promoGone {
+		// Another table took the promotion's last use: price the bill again
+		// without it and have the cashier confirm the new amount.
+		if err := a.inTx(ctx, func(tx pgx.Tx) error {
+			var branchID, orderID int64
+			if err := tx.QueryRow(ctx, `SELECT branch_id, order_id FROM dining_sessions WHERE id=$1`, sessionID).
+				Scan(&branchID, &orderID); err != nil {
+				return err
+			}
+			if _, err := lockOrder(ctx, tx, orderID); err != nil {
+				return err
+			}
+			b, err := scanBranch(tx.QueryRow(ctx, `SELECT `+branchCols+` FROM branches WHERE id=$1`, branchID))
+			if err != nil {
+				return err
+			}
+			if _, err := recomputeBill(ctx, tx, b, orderID); err != nil {
+				return err
+			}
+			return notify(ctx, tx, Event{BranchID: branchID, OrderID: orderID})
+		}); err != nil {
+			return nil, err
+		}
+		return nil, ErrD(http.StatusConflict, "VERSION_CONFLICT", "the promotion's quota ran out; the bill was priced again",
+			map[string]any{"reason": "promotion_used_up"})
+	}
 	if err != nil {
 		return nil, err
 	}

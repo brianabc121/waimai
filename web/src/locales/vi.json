@@ -2892,5 +2892,13 @@
  "kp.done.waiting": "Còn trong quán",
  "kp.order_tag": "{a}/{b} đã xong",
  "kp.set.target": "Mục tiêu nấu (phút)",
- "kp.set.target_hint": "Đồng hồ ở trang tiến độ và màn hình bếp chuyển vàng ở 2/3 thời gian này và đỏ khi vượt quá"
+ "kp.set.target_hint": "Đồng hồ ở trang tiến độ và màn hình bếp chuyển vàng ở 2/3 thời gian này và đỏ khi vượt quá",
+ "ck.tab_delivery": "Ưu đãi giao hàng",
+ "ck.tab_dine": "Ưu đãi ăn tại quán",
+ "ck.tab_coupons": "Phiếu giảm giá (giao hàng)",
+ "ck.new_dine": "Tạo ưu đãi ăn tại quán",
+ "ck.delivery_hint": "Ưu đãi giao hàng chỉ áp dụng cho đơn giao hàng và tự lấy, không giảm hóa đơn ăn tại quán.",
+ "ck.dine_hint": "Ưu đãi ăn tại quán chỉ giảm hóa đơn bàn (nhân viên mở bàn hoặc khách quét mã QR gọi món), không hiện trên trang cửa hàng giao hàng; ưu đãi giao hàng cũng không giảm hóa đơn bàn. Mỗi hóa đơn dùng một ưu đãi, chọn cái giảm nhiều nhất; lượt dùng được tính khi thanh toán.",
+ "ck.dine_time_hint": "Khung giờ hằng ngày tính theo lúc mở bàn: bàn mở trong khung giờ vẫn được giảm dù thanh toán muộn hơn.",
+ "ck.dine_offers": "Ưu đãi ăn tại quán"
 }
