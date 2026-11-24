@@ -50,10 +50,11 @@ func TestPricingFixDineRefundPromo(t *testing.T) {
 	if o.Totals.Total != 30912 || rq.Suggested != 2520 {
 		t.Fatalf("customer's fault: total=%d suggested=%d", o.Totals.Total, rq.Suggested)
 	}
-	// the store's fault: the promotion keeps its amount, so all of the 30.00 and its service
+	// the store's fault: the promotion keeps its share of what is left, so
+	// also 30.00 less its 20% and its service
 	rq, _, err = a.Refund(ctx, o.ID, app.RefundInput{Lines: refundLines(water, 1), ReasonKind: "store", Dry: true}, s.staff)
 	noErr(t, err)
-	if rq.Suggested != 3150 {
+	if rq.Suggested != 2520 {
 		t.Fatalf("store's fault: suggested=%d", rq.Suggested)
 	}
 	// it is paid back in cash: the drawer expects that much less
@@ -66,8 +67,8 @@ func TestPricingFixDineRefundPromo(t *testing.T) {
 	day := time.Now().In(loc).Format("2006-01-02")
 	rc, err := a.Reconciliation(ctx, s.branchID, day, day)
 	noErr(t, err)
-	if rc.Refunds.Count != 1 || rc.Refunds.Cash != 3150 || rc.Cash.Refunded != 3150 ||
-		rc.Cash.Expected != rc.Cash.Counter+rc.Cash.RiderReturned-3150 || rc.Net != rc.Total-3150 {
+	if rc.Refunds.Count != 1 || rc.Refunds.Cash != 2520 || rc.Cash.Refunded != 2520 ||
+		rc.Cash.Expected != rc.Cash.Counter+rc.Cash.RiderReturned-2520 || rc.Net != rc.Total-2520 {
 		t.Fatalf("reconcile: %+v %+v net=%d", rc.Refunds, rc.Cash, rc.Net)
 	}
 }
@@ -174,7 +175,8 @@ func TestPricingFixStaffOrderPromotion(t *testing.T) {
 	noErr(t, err)
 	r, err := a.VoidLine(ctx, itemByName(o, "water").ID, app.VoidInput{Reason: "沽清", ReasonKind: "store"}, s.staff, true)
 	noErr(t, err)
-	if r.Order.Totals.PromotionDiscount != 5000 && r.Order.Totals.Discount != 5000 {
+	// the promotion stays, at its share of what is left: 50.00 × 338/368
+	if r.Order.Totals.Discount != 4592 || len(r.Order.Discounts) != 1 || r.Order.Discounts[0].Amount != 4592 {
 		t.Fatalf("after a store void: %+v", r.Order.Totals)
 	}
 }

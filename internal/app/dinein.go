@@ -422,10 +422,11 @@ func recomputeBill(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64) (To
 // promotion for the dishes (docs/CHECKOUT_DISCOUNT_DESIGN.md §4.2), its dates
 // and daily hours checked at the time the table was opened, so a lunch offer
 // still applies when the lunch guests pay at 14:20; its status and quota are
-// checked now. A dish voided through the store's fault never lowers the
-// guests' promotion (docs/VOID_ITEM_DESIGN.md §6).
+// checked now. A dish voided through the store's fault keeps the guests'
+// promotion even below its threshold, scaled to the dishes still bought
+// (docs/VOID_ITEM_DESIGN.md §6).
 func dinePolicy(m *orderMoney, storeFault bool) promoPolicy {
-	return promoPolicy{at: m.Opened, pick: true, current: storeFault, floor: storeFault}
+	return promoPolicy{at: m.Opened, pick: true, current: storeFault, floor: storeFault, prorate: storeFault}
 }
 
 // repriceTable prices a table bill again and saves it.

@@ -15,7 +15,7 @@ extend({
   'vd.kind.customer': ['顾客原因', 'Customer’s reason'],
   'vd.kind.store': ['店铺原因', 'Store’s reason'],
   'vd.kind_hint.customer': ['满减按剩下的菜重新算，可能降档', 'The offer is worked out again on what is left and may drop'],
-  'vd.kind_hint.store': ['店里的原因，满减照旧不降', 'The store’s fault: the offer stays as it was'],
+  'vd.kind_hint.store': ['店里的原因：满减不按门槛降档，按剩下菜品的比例保留', 'The store’s fault: the offer stays, in proportion to the dishes left'],
   'vd.reasons.customer': ['点错了|顾客不要了', 'Wrong order|Guest changed mind'],
   'vd.reasons.store': ['上太慢|菜品有问题|沽清了', 'Too slow|Quality issue|Ran out'],
   'vd.st.free': ['还没开始做，退了库存退回', 'Not started: the stock goes back'],
