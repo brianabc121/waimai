@@ -3169,5 +3169,13 @@
  "pr.dish_percent": "Plats choisis {pct} % de remise",
  "pr.dish_second": "Deuxième {pct} % de remise",
  "pr.dish_half": "Deuxième à moitié prix",
- "pr.dish_free": "Un acheté, un offert"
+ "pr.dish_free": "Un acheté, un offert",
+ "vo.by_pic": "🖼 Choisir en images",
+ "vo.pic_title": "Choisir en images",
+ "vo.pic_hint": "Touchez pour en ajouter un ; les plats à options demandent d’abord. Les notes se mettent sur les lignes",
+ "vo.pic_added": "Ajoutés",
+ "vo.pic_empty": "Touchez un plat pour l’ajouter",
+ "vo.pic_sum": "{n} articles",
+ "vo.pic_done": "Terminé",
+ "vo.pic_none": "Aucun plat disponible ici"
 }
