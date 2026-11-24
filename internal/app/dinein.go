@@ -415,6 +415,13 @@ func lockSession(ctx context.Context, tx pgx.Tx, id int64) (*lockedSession, erro
 
 // recomputeBill sets the order's amounts from its live lines.
 func recomputeBill(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64) (Totals, error) {
+	return recomputeBillKeep(ctx, tx, b, orderID, 0, 0)
+}
+
+// recomputeBillKeep is recomputeBill that keeps promotion keepID taking off
+// at least keepAmount (a dish voided through the store's fault does not
+// lower the guests' promotion, docs/VOID_ITEM_DESIGN.md §6).
+func recomputeBillKeep(ctx context.Context, tx pgx.Tx, b *Branch, orderID, keepID, keepAmount int64) (Totals, error) {
 	var subtotal int64
 	if err := tx.QueryRow(ctx, `SELECT COALESCE(sum(line_total), 0) FROM order_items
 		WHERE order_id=$1 AND prep_status <> 'cancelled'`, orderID).Scan(&subtotal); err != nil {
@@ -423,6 +430,17 @@ func recomputeBill(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64) (To
 	t, err := dineTotals(ctx, tx, b, orderID, subtotal)
 	if err != nil {
 		return Totals{}, err
+	}
+	if keepID != 0 && t.PromotionDiscount < min(keepAmount, subtotal) {
+		ps, err := loadPromotions(ctx, tx, b.ID, "p.id = "+fmt.Sprint(keepID), "")
+		if err != nil {
+			return Totals{}, err
+		}
+		if len(ps) == 1 {
+			keep := min(keepAmount, subtotal)
+			t = ComputeTotals(subtotal, 0, b.dineInTax(), Discount{Goods: keep})
+			t.PromotionID, t.PromotionName, t.PromotionNameEn, t.PromotionDiscount = ps[0].ID, ps[0].Name, ps[0].NameEn, keep
+		}
 	}
 	var promoID *int64
 	if t.PromotionID != 0 {
@@ -629,82 +647,6 @@ func (a *App) ServeItem(ctx context.Context, itemID int64, actor Actor) (*Bill, 
 			return err
 		}
 		if err := bump(ctx, tx, o.ID); err != nil {
-			return err
-		}
-		return notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID})
-	})
-	if err != nil {
-		return nil, err
-	}
-	return loadBill(ctx, a.DB, sessionID)
-}
-
-// VoidItem takes a line off an open bill (wrong dish, complaint). The reason
-// is recorded, limited stock is returned and the bill is recomputed.
-// qty 0 voids the whole line; fewer than the line's portions splits it, the
-// voided portions going to a new cancelled line.
-func (a *App) VoidItem(ctx context.Context, itemID int64, reason string, qty int, actor Actor) (*Bill, error) {
-	if qty < 0 {
-		return nil, ErrValidation("qty must be positive")
-	}
-	reason = strings.TrimSpace(reason)
-	if reason == "" || len(reason) > 200 {
-		return nil, ErrValidation("reason is required")
-	}
-	var sessionID int64
-	err := a.inTx(ctx, func(tx pgx.Tx) error {
-		s, o, err := a.dineItem(ctx, tx, itemID)
-		if err != nil {
-			return err
-		}
-		sessionID = s.ID
-		if s.Status != "open" {
-			return ErrSessionClosed
-		}
-		var status, name string
-		var menuItem, unit int64
-		var lineQty int
-		if err := tx.QueryRow(ctx, `SELECT prep_status, name, item_id, qty, unit_price FROM order_items WHERE id=$1 FOR UPDATE`, itemID).
-			Scan(&status, &name, &menuItem, &lineQty, &unit); err != nil {
-			return err
-		}
-		if status == "cancelled" {
-			return nil
-		}
-		if qty == 0 || qty >= lineQty {
-			qty = lineQty
-			if _, err := tx.Exec(ctx, `UPDATE order_items SET prep_status='cancelled', void_reason=$2 WHERE id=$1`, itemID, reason); err != nil {
-				return err
-			}
-		} else {
-			// Part of the line: the rest keeps cooking or stays served.
-			if _, err := tx.Exec(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name, name_en,
-				unit_price, qty, line_total, options, note, needs_prep, prep_status, name_customer, note_tags,
-				station_id, station_name, served_at, void_reason, basket_no)
-				SELECT order_id, branch_id, batch_id, item_id, name, name_en, unit_price, $2::int, unit_price * $2::int, options, note,
-				needs_prep, 'cancelled', name_customer, note_tags, station_id, station_name, served_at, $3, basket_no
-				FROM order_items WHERE id=$1`, itemID, qty, reason); err != nil {
-				return wrap("split voided line", err)
-			}
-			if _, err := tx.Exec(ctx, `UPDATE order_items SET qty = qty - $2::int, line_total = unit_price * (qty - $2::int) WHERE id=$1`,
-				itemID, qty); err != nil {
-				return err
-			}
-		}
-		if _, err := tx.Exec(ctx, `UPDATE menu_items SET stock_qty = stock_qty + $2 WHERE id=$1 AND stock_qty IS NOT NULL`,
-			menuItem, qty); err != nil {
-			return err
-		}
-		b, err := scanBranch(tx.QueryRow(ctx, `SELECT `+branchCols+` FROM branches WHERE id=$1`, o.BranchID))
-		if err != nil {
-			return err
-		}
-		t, err := recomputeBill(ctx, tx, b, o.ID)
-		if err != nil {
-			return err
-		}
-		if err := audit(ctx, tx, o.BranchID, o.ID, actor, "table.item_voided",
-			map[string]any{"item_id": itemID, "name": name, "qty": qty, "reason": reason, "was": status, "total": t.Total}); err != nil {
 			return err
 		}
 		return notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID})

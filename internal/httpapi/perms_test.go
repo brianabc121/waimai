@@ -37,7 +37,7 @@ func TestRolePermissions(t *testing.T) {
 	if p := permsOf(t, mgr); !slices.Contains(p, "bills") || !slices.Contains(p, "staff.manage") {
 		t.Fatalf("manager defaults: %v", p)
 	}
-	if p := permsOf(t, owner); len(p) != 31 {
+	if p := permsOf(t, owner); len(p) != 32 {
 		t.Fatalf("owner: %d perms", len(p))
 	}
 	mgr.want(403, "OWNER_ONLY", "GET", permsURL, nil)

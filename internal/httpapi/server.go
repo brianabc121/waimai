@@ -533,6 +533,7 @@ func (s *Server) Router() *gin.Engine {
 	auth.POST("/merchant/order-items/:id/rush", s.rushDish)
 	auth.POST("/kitchen/items/:id/:action", s.itemAction)
 	auth.POST("/kitchen/orders/:id/pack", s.packOrder)
+	s.voidRoutes(auth)
 
 	// clocking on and off, for everyone who works in a store
 	auth.GET("/work/shift", s.shiftState)

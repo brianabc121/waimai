@@ -22,6 +22,7 @@ const (
 	// PermCheckoutDiscount gives a discount, a round-off or a set amount at
 	// checkout (docs/CHECKOUT_DISCOUNT_DESIGN.md §5.3).
 	PermCheckoutDiscount = "checkout.discount"
+	PermOrderVoid        = "order.void"
 	PermTableUse         = "table.use"
 	PermTableManage      = "table.manage"
 	PermMemberView       = "member.view"
@@ -70,6 +71,7 @@ var PermCatalog = []PermDef{
 	{Code: PermOrderManual, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderCancel, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderAftersale, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
+	{Code: PermOrderVoid, Group: "order", Cashier: false, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermCheckoutDiscount, Group: "order", Cashier: false, Manager: true},
 	{Code: PermTableUse, Group: "table", Cashier: true, Manager: true},
 	{Code: PermTableManage, Group: "table", Cashier: false, Manager: true, Requires: []string{PermTableUse}},

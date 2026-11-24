@@ -9,6 +9,7 @@ import './dine/strings'
 import { useRoute } from 'vue-router'
 import { addonNo } from '../addon'
 import './manualStrings'
+import '../voids'
 
 // A browser-printable ticket (80mm-friendly). There is no printer integration
 // in the first version; staff print from the browser when they need paper.
@@ -23,11 +24,24 @@ const mine = computed(() => (o.value?.items ?? []).filter(i => !batch || i.batch
 const batchInfo = computed(() => o.value?.batches?.find(b => b.seq === batch) ?? null)
 const batchSum = computed(() => mine.value.filter(i => i.prep_status !== 'cancelled').reduce((s, i) => s + i.line_total, 0))
 const multi = computed(() => mine.value.some(i => i.basket > 1))
+// ?void=ID prints a void slip for the kitchen (docs/VOID_ITEM_DESIGN.md §8.3).
+const voidId = Number(useRoute().query.void) || 0
+const slip = computed(() => voidId ? o.value?.voids?.find(v => v.id === voidId) ?? null : null)
 const sorted = computed(() => [...mine.value].sort((a, b) => a.basket - b.basket || a.id - b.id))
 </script>
 
 <template>
-  <div class="ticket" v-if="o">
+  <div class="ticket" v-if="o && slip" data-testid="ticket-void">
+    <button class="btn primary no-print" @click="print">{{ t('print') }}</button>
+    <h1 class="bhead vhead">{{ t('vd.t.head') }}</h1>
+    <p><b>{{ o.service_type === 'dine_in' ? t('table') + ' ' + o.table_name + ' · ' + o.public_no : t('vd.t.no', { no: o.public_no }) }}</b></p>
+    <hr />
+    <p class="vline"><b>{{ slip.qty }} × {{ slip.name }}</b></p>
+    <p><b>{{ t('vd.t.reason', { r: slip.reason }) }}</b></p>
+    <p>{{ t('vd.stage.' + slip.was_status) }} · {{ whenText(slip.at, o.timezone) }}</p>
+    <p v-if="slip.by">{{ t('vd.t.by', { by: slip.by }) }}<template v-if="slip.approved_by"> · {{ t('vd.t.approved', { by: slip.approved_by }) }}</template></p>
+  </div>
+  <div class="ticket" v-else-if="o">
     <button class="btn primary no-print" @click="print">{{ t('print') }}</button>
     <template v-if="batch">
       <h1 class="bhead" data-testid="ticket-batch">{{ o.service_type === 'dine_in' ? t('dd.round_head', { n: batch }) : t('ao.t.head', { n: addonNo(batch) }) }}</h1>
@@ -46,11 +60,11 @@ const sorted = computed(() => [...mine.value].sort((a, b) => a.basket - b.basket
     <hr />
     <div v-for="(it, i) in sorted" :key="it.id" class="line">
       <p v-if="multi && (i === 0 || sorted[i - 1].basket !== it.basket)" class="bk"><b>—— {{ t('basket_n', { n: it.basket }) }} ——</b></p>
-      <div><b>{{ it.qty }} × {{ both(it.name, it.name_en) }}</b><span>{{ money(it.line_total, o.currency) }}</span></div>
+      <div :class="{ strike: it.prep_status === 'cancelled' }"><b>{{ it.qty }} × {{ both(it.name, it.name_en) }}</b><span>{{ money(it.line_total, o.currency) }}</span></div>
       <small v-if="it.options.length">{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</small>
       <small v-if="it.note_tags?.length" class="nt" data-testid="ticket-notes">※ {{ it.note_tags.map(x => x.name).join(' ') }}</small>
       <small v-if="it.note" class="nt">{{ t('note') }}: {{ it.note }}</small>
-      <small v-if="it.prep_status === 'cancelled'" class="nt">{{ t('dd.voided', { r: it.void_reason || '—' }) }}</small>
+      <small v-if="it.prep_status === 'cancelled'" class="nt">✕ {{ t('dd.voided', { r: it.void_reason || '—' }) }}</small>
     </div>
     <hr />
     <p v-if="batch" class="line"><span>{{ t('vo.total') }}</span> <b>{{ money(batchSum, o.currency) }}</b>
@@ -70,5 +84,7 @@ const sorted = computed(() => [...mine.value].sort((a, b) => a.basket - b.basket
 .line small { display: block; }
 .line small.nt { font-weight: 700; padding-inline-start: 10px; }
 .bhead { font-size: 26px; text-align: center; border: 2px solid #000; padding: 4px; }
+.vhead { font-size: 32px; letter-spacing: 6px; }
+.vline { font-size: 20px; }
 hr { border: 0; border-top: 1px dashed #000; margin: 8px 0; }
 </style>

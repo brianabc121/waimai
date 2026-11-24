@@ -140,7 +140,23 @@ export interface Order {
   member_no?: number | null; order_source?: string; placed_by?: string; staff_note?: string
   // the order, each add-on and the customer's add-ons waiting for the store (docs/ADD_ON_ORDER_DESIGN.md)
   batches?: OrderBatch[]; addon?: AddonState
+  // dishes taken off and money given back by dish (docs/VOID_ITEM_DESIGN.md)
+  voids?: OrderVoid[]; refunds?: OrderRefund[]; void_open?: boolean; refund_open?: boolean; refunded?: number
 }
+// One void; who did it and how far the dish had got are only on the store's pages.
+export interface OrderVoid {
+  id: number; item_id: number; batch_seq: number; name: string; qty: number; amount: number; reason: string; reason_kind: 'store' | 'customer'
+  was_status: string; wasted: boolean; station_id: number | null; total_before: number; total_after: number
+  by?: string; approved_by?: string; needs_ack: boolean; ack_at: string | null; ack_by?: string; at: string
+}
+export interface RefundLine { item_id: number; name: string; qty: number; amount: number }
+export interface OrderRefund { id: number; lines: RefundLine[]; amount: number; method: string; reason: string; reason_kind: string; by?: string; approved_by?: string; at: string }
+export interface VoidQuote {
+  name: string; qty: number; max_qty: number; amount: number; was_status: string; started_at: string | null; wasted: boolean
+  needs_approval: boolean; before: Totals; after: Totals; less: number; promo_before: string; promo_after: string; promo_down: boolean
+  rider: string; packed: boolean; version: number
+}
+export interface RefundQuote { lines: RefundLine[]; dishes: number; suggested: number; left: number }
 export interface QuoteLine { item_id: number; name: string; name_en: string; name_tr?: string; unit_price: number; qty: number; line_total: number
   options: LineOption[]; note: string; note_tags?: LineNoteTag[]; needs_prep?: boolean; basket?: number }
 export interface OrderBatch {

@@ -125,6 +125,34 @@
   "my": "ဆိုင်က သင့်အော်ဒါထဲ ဟင်းပွဲ ထပ်ထည့်ပေးပါပြီ",
   "km": "ហាងបានបន្ថែមម្ហូបទៅក្នុងការកម្ម៉ង់របស់អ្នក"
  },
+ "sys.order.item_voided": {
+  "zh": "商家退了你订单里的菜",
+  "en": "The store took dishes off your order",
+  "zh-Hant": "商家退了你訂單裡的菜",
+  "th": "ร้านได้ยกเลิกบางรายการในออเดอร์ของคุณ",
+  "vi": "Cửa hàng đã bỏ bớt món trong đơn của bạn",
+  "fr": "Le restaurant a retiré des plats de votre commande",
+  "ar": "أزال المتجر أطباقًا من طلبك",
+  "es": "La tienda quitó platos de tu pedido",
+  "ru": "Заведение убрало блюда из вашего заказа",
+  "ja": "お店が注文から料理を取り消しました",
+  "my": "ဆိုင်က သင့်အော်ဒါထဲမှ ဟင်းပွဲအချို့ ပယ်ဖျက်လိုက်ပါသည်",
+  "km": "ហាងបានដកម្ហូបខ្លះចេញពីការកម្ម៉ង់របស់អ្នក"
+ },
+ "sys.order.refunded": {
+  "zh": "商家给你的订单退了款",
+  "en": "The store refunded part of your order",
+  "zh-Hant": "商家給你的訂單退了款",
+  "th": "ร้านได้คืนเงินบางส่วนของออเดอร์ของคุณ",
+  "vi": "Cửa hàng đã hoàn tiền một phần đơn của bạn",
+  "fr": "Le restaurant vous a remboursé une partie de la commande",
+  "ar": "أعاد المتجر جزءًا من مبلغ طلبك",
+  "es": "La tienda te devolvió parte del pedido",
+  "ru": "Заведение вернуло деньги за часть заказа",
+  "ja": "お店が注文の一部を返金しました",
+  "my": "ဆိုင်က သင့်အော်ဒါ၏ တစ်စိတ်တစ်ပိုင်း ငွေပြန်အမ်းပေးပါပြီ",
+  "km": "ហាងបានសងប្រាក់ខ្លះនៃការកម្ម៉ង់របស់អ្នកវិញ"
+ },
  "sys.order.addon_accepted": {
   "zh": "商家已确认你加的菜",
   "en": "The store accepted the dishes you added",
@@ -236,6 +264,20 @@
   "ja": "料理が追加されました。再梱包をお待ちください",
   "my": "ဟင်းပွဲ ထပ်ထည့်ထားသည်၊ ဆိုင်က ပြန်ထုပ်သည်အထိ စောင့်ပါ",
   "km": "មានម្ហូបបន្ថែម សូមរង់ចាំហាងវេចខ្ចប់ឡើងវិញ"
+ },
+ "sys.push.rider.voided": {
+  "zh": "订单退了菜，收款金额变了",
+  "en": "Dishes were taken off; the amount to collect changed",
+  "zh-Hant": "訂單退了菜，收款金額變了",
+  "th": "มีการยกเลิกบางรายการ ยอดเงินที่ต้องเก็บเปลี่ยนไป",
+  "vi": "Đơn bị bỏ bớt món, số tiền cần thu đã thay đổi",
+  "fr": "Des plats ont été retirés ; le montant à encaisser a changé",
+  "ar": "أُزيلت أطباق؛ تغيّر المبلغ المطلوب تحصيله",
+  "es": "Se quitaron platos; cambió el importe a cobrar",
+  "ru": "Из заказа убрали блюда, сумма к оплате изменилась",
+  "ja": "料理が取り消され、集金額が変わりました",
+  "my": "ဟင်းပွဲ ပယ်ဖျက်ထားသဖြင့် ကောက်ခံရမည့်ငွေ ပြောင်းသွားပါပြီ",
+  "km": "មានម្ហូបត្រូវដកចេញ ចំនួនប្រាក់ត្រូវប្រមូលបានផ្លាស់ប្ដូរ"
  },
  "sys.push.chat.store_title": {
   "zh": "有新的顾客消息",

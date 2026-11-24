@@ -505,7 +505,8 @@ func reserveStock(ctx context.Context, tx pgx.Tx, lines []QuoteLine) error {
 // releaseStock returns limited stock when an order is rejected or cancelled.
 func releaseStock(ctx context.Context, tx pgx.Tx, orderID int64) error {
 	_, err := tx.Exec(ctx, `UPDATE menu_items m SET stock_qty = m.stock_qty + s.qty
-		FROM (SELECT item_id, sum(qty)::int AS qty FROM order_items WHERE order_id=$1 GROUP BY item_id) s
+		FROM (SELECT item_id, sum(qty)::int AS qty FROM order_items WHERE order_id=$1 AND void_id IS NULL AND void_reason = ''
+			GROUP BY item_id) s
 		WHERE m.id = s.item_id AND m.stock_qty IS NOT NULL`, orderID)
 	return err
 }

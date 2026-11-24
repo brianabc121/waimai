@@ -21,6 +21,10 @@ import './manualStrings'
 import { readyTag } from '../progress'
 import { useRoute } from 'vue-router'
 import { addons, batchSource, batchTitle, itemsByBatch, pendingAddon, addonErr, presetSplit } from '../addon'
+import VoidSheet from './VoidSheet.vue'
+import RefundSheet from './RefundSheet.vue'
+import { copyText, voidMessage, voidNote, voidsOf } from '../voids'
+import type { OrderItem, OrderVoid } from '../types'
 
 const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 
@@ -214,6 +218,29 @@ const lineCount = (lines: { qty: number }[] | undefined) => (lines ?? []).reduce
 const pendingSum = (o: Order) => { const b = pendingAddon(o); return b ? (b.total_after ?? 0) - (b.total_before ?? 0) : 0 }
 const leftMin = (iso: string | null) => { void now.value; return iso ? Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 60000)) : 0 }
 const rejecting = ref(false)
+
+// ---- voids and refunds by dish (docs/VOID_ITEM_DESIGN.md §8.1, §7) ----
+const voiding = ref<OrderItem | null>(null)
+const voidDone = ref<{ order: Order; v: OrderVoid; text: string; copied: boolean } | null>(null)
+const refunding = ref(false)
+const refundDone = ref('')
+const canVoid = (o: Order, it: OrderItem) => !!o.void_open && it.prep_status !== 'cancelled' && can('order.handle')
+const voidClosed = (o: Order) => o.acceptance_status === 'accepted' && o.service_type !== 'dine_in' && !o.void_open && o.fulfillment_status === 'out_for_delivery'
+async function voided(r: { order: Order; access_token?: string }) {
+  voiding.value = null
+  const v = (r.order.voids ?? []).slice(-1)[0]
+  await refreshNow()
+  if (!v) return
+  const text = voidMessage(r.order, v, r.access_token ?? '', contactName(r.order))
+  voidDone.value = { order: r.order, v, text, copied: false }
+  try { await copyText(text); voidDone.value.copied = true } catch { /* the button copies it */ }
+}
+async function copyVoid() { if (voidDone.value) { await copyText(voidDone.value.text); voidDone.value.copied = true } }
+async function refunded(_: Order, amount: number) {
+  refunding.value = false
+  refundDone.value = t('vd.r.done', { s: money(amount, selected.value?.currency) })
+  await refreshNow()
+}
 async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', reason = '') {
   error.value = ''; rejecting.value = false
   try { await post(`/merchant/orders/${o.id}/batches/${seq}/${action}`, action === 'reject' ? { reason } : {}) }
@@ -355,18 +382,28 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
                 <span v-if="g.seq > 1 && g.batch?.total_before != null" class="muted"> · {{ money(g.batch.total_before, selected.currency) }} → {{ money(g.batch.total_after ?? 0, selected.currency) }}</span>
                 <a v-if="g.seq > 1" class="small" style="margin-inline-start:auto" :href="`/ticket/${selected.id}?batch=${g.seq}`" target="_blank" data-testid="batch-print">{{ t('ao.print_batch') }}</a>
               </div>
-              <div v-for="it in g.items" :key="it.id" class="row top between">
+              <div v-for="it in g.items" :key="it.id" class="row top between" :class="{ voidline: it.prep_status === 'cancelled' }" data-testid="order-line">
                 <div class="grow"><span v-if="baskets(selected)" class="tag info" style="margin-inline-end:4px">{{ t('basket_short', { n: it.basket }) }}</span><b>{{ it.qty }} ×</b> {{ both(it.name, it.name_en) }}
                   <div class="muted small" v-if="it.options.length">{{ it.options.map(o => both(o.name, o.name_en)).join(' · ') }}</div>
-                  <KitchenNote :it="it" /></div>
+                  <KitchenNote :it="it" />
+                  <div v-for="v in voidsOf(selected, it)" :key="v.id" class="small voidnote" data-testid="void-note">{{ voidNote(v, selected.timezone) }}
+                    <a v-if="v.wasted" :href="`/ticket/${selected.id}?void=${v.id}`" target="_blank" rel="noopener">{{ t('vd.print') }}</a></div></div>
                 <span class="tag" v-if="selected.acceptance_status === 'accepted'" :class="it.prep_status === 'ready' ? 'ok' : ''">{{ t('i.' + it.prep_status) }}</span>
+                <button v-if="canVoid(selected, it)" class="btn small voidbtn" data-testid="void-btn" @click="voiding = it">{{ t('vd.btn') }}</button>
                 <span class="price">{{ money(it.line_total, selected.currency) }}</span>
               </div>
             </template>
             <div v-for="b in (selected.batches ?? []).filter(b => b.seq > 1 && b.status !== 'accepted' && b.status !== 'pending')" :key="'x' + b.seq" class="small muted" data-testid="batch-dropped">
               {{ batchTitle(b.seq) }} · {{ t('ao.src.customer') }} · {{ t('ao.st.' + b.status) }}<template v-if="b.reject_reason">（{{ b.reject_reason }}）</template></div>
           </div>
+          <div v-if="voidClosed(selected)" class="small muted" data-testid="void-closed">{{ t('vd.closed') }}</div>
           <TotalsTable :totals="selected.totals" :currency="selected.currency" :delivery="selected.service_type === 'delivery'" :discounts="selected.discounts" />
+          <div v-if="selected.refunds?.length || selected.refund_open" class="stack refunds" data-testid="refunds">
+            <div v-for="r in selected.refunds" :key="r.id" class="small">{{ t('vd.r.row', { s: money(r.amount, selected.currency), m: r.method, r: r.reason, at: whenText(r.at, selected.timezone) }) }}
+              <span class="muted"> · {{ r.lines.map(l => `${l.name} ×${l.qty}`).join('、') }}</span></div>
+            <div v-if="refundDone" class="banner ok small">{{ refundDone }}</div>
+            <button v-if="selected.refund_open" class="btn small" style="align-self:flex-start" data-testid="refund-btn" @click="refundDone = ''; refunding = true">{{ t('vd.r.btn') }}</button>
+          </div>
           <div v-if="selected.totals.adj_percent_bp || selected.totals.adj_mode" class="row between adjrow" data-testid="adj-row">
             <span class="muted">{{ t('ck.adj') }}</span><span>{{ adjText(selected) }}</span></div>
           <div v-if="selected.payment_status === 'paid' && selected.pay_type" class="row between" data-testid="pay-row">
@@ -433,6 +470,19 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
         <button class="btn primary" :disabled="payPick.type === 'online' && !payPick.channel_id" data-testid="pay-save" @click="savePay">{{ t('ck.save') }}</button>
       </div>
     </div>
+    <VoidSheet v-if="voiding && selected" :item="voiding" :branch-id="bid" :currency="selected.currency" @done="voided" @close="voiding = null" />
+    <RefundSheet v-if="refunding && selected" :order="selected" :branch-id="bid" @done="refunded" @close="refunding = false" />
+    <div v-if="voidDone" class="vdone-mask" @click.self="voidDone = null">
+      <div class="card stack vdone" data-testid="void-done">
+        <h3 style="margin:0">{{ t('vd.done') }} · {{ voidDone.v.name }} ×{{ voidDone.v.qty }}</h3>
+        <div class="small muted">{{ t('vd.done_hint') }}</div>
+        <textarea v-model="voidDone.text" rows="5" data-testid="void-message"></textarea>
+        <div class="row" style="justify-content:flex-end;gap:8px">
+          <a v-if="voidDone.v.wasted" class="btn" :href="`/ticket/${voidDone.order.id}?void=${voidDone.v.id}`" target="_blank" rel="noopener">{{ t('vd.print') }}</a>
+          <button class="btn" @click="copyVoid">{{ voidDone.copied ? t('vd.copied') : t('vd.copy') }}</button>
+          <button class="btn primary" data-testid="void-done-ok" @click="voidDone = null">{{ t('vd.close') }}</button></div>
+      </div>
+    </div>
     <ApproveDialog v-if="approving" :branch-id="bid" :perm="approving.perm" :what="approving.what" @approved="approved" @close="approving = null" />
   </div>
 </template>
@@ -440,6 +490,15 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
 <style scoped>
 .paybox { position: fixed; left: 50%; top: 16vh; transform: translateX(-50%); width: min(440px, calc(100vw - 32px)); z-index: 41; }
 .adjrow span:last-child { color: #8a5a12; text-align: end; }
+.voidline > .grow > b, .voidline > .grow { text-decoration: line-through; color: var(--muted); }
+.voidline .voidnote, .voidline :deep(*) { text-decoration: none; }
+.voidnote { color: #b42318; text-decoration: none; display: inline-block; width: 100%; }
+.voidnote a { margin-inline-start: 6px; }
+.voidbtn { color: #b42318; border-color: #f1b4ae; }
+.refunds { border-top: 1px dashed var(--line); padding-top: 8px; }
+.vdone-mask { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 30; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.vdone { width: min(440px, 100%); }
+.vdone textarea { width: 100%; font: inherit; }
 .cp-tag { cursor: pointer; border: 1px solid currentColor; }
 .desk { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 14px; align-items: start; }
 .list { display: flex; flex-direction: column; gap: 10px; }

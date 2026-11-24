@@ -1,6 +1,6 @@
 # 退菜（堂食、外卖、自取）设计方案 v0.1
 
-> 状态：2026-11-24 v0.1，brian 确认第 12 节全部按推荐（“按推荐来”），开始实现。
+> 状态：2026-11-24 v0.1，brian 确认第 12 节全部按推荐（“按推荐来”），已实现（见文末“实现说明”）。
 > 效果图：[docs/void-item-screens/](void-item-screens/)，原型 [docs/void-item-prototype/index.html](void-item-prototype/index.html)（地址后加 `#s1` 到 `#s6` 切换）。
 >
 > | 效果图 | 内容 |
@@ -280,3 +280,21 @@ brian 的原话：还需要新增退菜的功能，堂食和外卖都需要。
 7. **退菜记录页**：这次一起做吗？（做，在“订单”下，店长能看，按原因、员工、菜品小计）
 8. **骑手取餐后、送达前**：要不要也能退？（不能，送达后按菜退款）
 9. **券**：退菜后券不退、金额不变（最多抵到剩下的菜品金额）？（是。整单取消才退券，和美团等平台一致）
+
+## 13. 实现说明（2026-11-24）
+
+- 迁移 `00063_order_voids.sql`：`order_voids`（每次退菜一行）、`order_items.void_id`、`order_refunds`（按菜退款），给已有的店长角色加上 `order.void`。
+- 接口：
+  - `POST /merchant/order-items/:id/void-quote`：退菜面板的试算（真实执行一遍再回滚，金额、满减、骑手、打包提示和真正退时完全一样）；
+  - `POST /merchant/order-items/:id/void`：退菜（外卖、自取、堂食通用；`qty`、`reason`、`reason_kind` store/customer、`expected_version`；已做的菜没有 `order.void` 时带 `X-Approval` 授权）；堂食账单的 `POST /merchant/bill-items/:id/void` 走同一套逻辑；
+  - `POST /kitchen/voids/:id/ack`：后厨点“知道了”；
+  - `POST /merchant/orders/:id/refunds`：按菜退款（`dry: true` 只算金额）；
+  - `GET /merchant/branches/:bid/voids?date=`：退菜记录页。
+- 退菜后会重算结账优惠（`reapplyAdjust`，PR #111）：百分比按新金额重算，抹零和改实收作废。
+- 订单取消时退回库存只算没退掉的菜，退过的菜不会重复退库存。
+- 与方案的差别：
+  - 第 7 节说“当天的现金退款从现金应收里扣掉”，这一版**没做**，按菜退款只在退菜记录页单独一栏；
+  - 系统还没有接打印机，“退菜单”是订单详情和退菜完成弹窗里的“打印退菜单”链接（`/ticket/:id?void=<id>`），不会自动打到工位；
+  - 退菜原因的“顾客/店铺”标签按预设原因自动判断（点错了、顾客不要了算顾客原因），面板上可以手动切换；堂食自定义的退菜原因沿用堂食设置。
+- 测试：`internal/app/voids_test.go`、`internal/httpapi/voids_test.go`，浏览器 `e2e/void.cjs`（截图在项目文件夹 `void-item-screens/implemented/`）。
+

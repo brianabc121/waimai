@@ -37,7 +37,7 @@ const name = (it: OrderItem) => props.staff ? both(it.name, it.name_en) : mn(it)
           <div>{{ it.qty }} × {{ name(it) }}</div>
           <div class="small muted" v-if="it.options.length">{{ it.options.map(x => props.staff ? pick(x.name, x.name_en) : mn(x)).join(' · ') }}</div>
           <KitchenNote :it="it" />
-          <div class="small muted" v-if="it.void_reason">{{ t('reason') }}: {{ it.void_reason }}</div>
+          <div class="small voidr" v-if="it.void_reason">{{ t('reason') }}: {{ it.void_reason }}</div>
         </div>
         <span class="tag" :class="state(it)[1]">{{ state(it)[0] }}</span>
         <span class="price">{{ money(it.line_total, order.currency) }}</span>
@@ -54,5 +54,6 @@ const name = (it: OrderItem) => props.staff ? both(it.name, it.name_en) : mn(it)
 .batch { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: #fff; }
 .bline { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px dashed var(--line); }
 .bline.strike > .grow, .bline.strike > .price { text-decoration: line-through; color: var(--muted); }
+.voidr { color: #b42318; }
 .price { font-variant-numeric: tabular-nums; white-space: nowrap; }
 </style>
