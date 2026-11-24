@@ -324,7 +324,35 @@ func (s *Server) customerEvents(c *gin.Context) {
 
 // ---- auth ----
 
+// login signs in to a store's back office ("office", the default) or the
+// staff workbench ("work"). The platform signs in at adminLogin.
 func (s *Server) login(c *gin.Context) {
+	var in struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Entry    string `json:"entry"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	if in.Entry == "" {
+		in.Entry = app.EntryOffice
+	}
+	if in.Entry != app.EntryOffice && in.Entry != app.EntryWork {
+		fail(c, app.ErrValidation("entry must be office or work"))
+		return
+	}
+	token, u, err := s.App.LoginTo(c, in.Username, in.Password, in.Entry)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	s.setCookie(c, staffCookie, token, int(app.SessionTTL.Seconds()))
+	c.JSON(200, u)
+}
+
+// adminLogin is the platform's own sign-in, kept in its own cookie.
+func (s *Server) adminLogin(c *gin.Context) {
 	var in struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -332,12 +360,38 @@ func (s *Server) login(c *gin.Context) {
 	if !bind(c, &in) {
 		return
 	}
-	token, u, err := s.App.Login(c, in.Username, in.Password)
+	token, u, err := s.App.LoginTo(c, in.Username, in.Password, app.EntryAdmin)
 	if err != nil {
 		fail(c, err)
 		return
 	}
-	s.setCookie(c, staffCookie, token, int(app.SessionTTL.Seconds()))
+	s.setCookie(c, adminCookie, token, int(app.SessionTTL.Seconds()))
+	c.JSON(200, u)
+}
+
+func (s *Server) adminLogout(c *gin.Context) {
+	if token, _ := c.Cookie(adminCookie); token != "" {
+		_ = s.App.Logout(c, token)
+	}
+	s.setCookie(c, adminCookie, "", -1)
+	c.JSON(200, gin.H{"ok": true})
+}
+
+// switchEntry moves the sign-in between the back office and the workbench.
+func (s *Server) switchEntry(c *gin.Context) {
+	var in struct {
+		Entry    string `json:"entry"`
+		Password string `json:"password"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	token, _ := sessionFor(c)
+	u, err := s.App.SwitchEntry(c, token, in.Entry, in.Password)
+	if err != nil {
+		fail(c, err)
+		return
+	}
 	c.JSON(200, u)
 }
 

@@ -12,7 +12,15 @@ func adminClient(t *testing.T) *client {
 	if err := a.EnsurePlatformAdmin(context.Background(), "admin-test", "password1"); err != nil {
 		t.Fatal(err)
 	}
-	return login(t, "admin-test")
+	return adminLogin(t, "admin-test")
+}
+
+// adminLogin signs in on the platform's own sign-in page.
+func adminLogin(t *testing.T, user string) *client {
+	t.Helper()
+	c := newClient(t)
+	c.want(200, "", "POST", "/admin/auth/login", map[string]string{"username": user, "password": "password1"})
+	return c
 }
 
 func TestAdminBackOffice(t *testing.T) {
@@ -24,7 +32,7 @@ func TestAdminBackOffice(t *testing.T) {
 	for _, r := range [][2]string{{"GET", "/admin/merchants"}, {"GET", "/admin/items"}, {"GET", "/admin/audit"},
 		{"GET", "/admin/branches/" + bid + "/menu"}, {"POST", "/admin/branches/" + bid + "/items/bulk"},
 		{"DELETE", "/admin/branches/" + bid}, {"POST", "/admin/users/1/reset-password"}} {
-		owner.want(403, "FORBIDDEN", r[0], r[1], map[string]any{})
+		owner.want(401, "UNAUTHENTICATED", r[0], r[1], map[string]any{})
 		newClient(t).want(401, "UNAUTHENTICATED", r[0], r[1], map[string]any{})
 	}
 
@@ -133,7 +141,7 @@ func TestAdminWorkerAndJobs(t *testing.T) {
 
 	for _, r := range [][2]string{{"GET", "/admin/worker"}, {"GET", "/admin/jobs"}, {"GET", job},
 		{"POST", job + "/retry"}, {"POST", job + "/discard"}, {"POST", "/admin/jobs/retry-failed"}} {
-		owner.want(403, "FORBIDDEN", r[0], r[1], map[string]any{})
+		owner.want(401, "UNAUTHENTICATED", r[0], r[1], map[string]any{})
 		newClient(t).want(401, "UNAUTHENTICATED", r[0], r[1], map[string]any{})
 	}
 
@@ -182,7 +190,7 @@ func TestAdminSettingsOverHTTP(t *testing.T) {
 	t.Cleanup(reset)
 
 	for _, r := range [][2]string{{"GET", "/admin/settings"}, {"PUT", "/admin/settings"}, {"POST", "/admin/settings/vapid"}} {
-		owner.want(403, "FORBIDDEN", r[0], r[1], map[string]any{})
+		owner.want(401, "UNAUTHENTICATED", r[0], r[1], map[string]any{})
 		newClient(t).want(401, "UNAUTHENTICATED", r[0], r[1], map[string]any{})
 	}
 

@@ -26,11 +26,11 @@ async function signIn(user, viewport) {
   const page = await ctx.newPage()
   page.on('pageerror', e => errors.push(`pageerror: ${e.message}`))
   page.on('console', m => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) errors.push(`console: ${m.text()}`) })
-  await page.goto(BASE + '/login')
+  await page.goto(BASE + (/^admin/.test(viewport) ? '/admin/login' : /^((kitchen|rider|zhang|wang)\d|e2e\d+$)/.test(viewport) ? '/login?next=/work' : '/login'))
   await page.fill('input[autocomplete=username]', user)
   await page.fill('input[type=password]', 'demo1234')
   await page.click('button.primary')
-  await page.waitForURL(u => !u.pathname.startsWith('/login'))
+  await page.waitForURL(u => !/\/login$/.test(u.pathname))
   return page
 }
 const noSideScroll = async (page, what) =>

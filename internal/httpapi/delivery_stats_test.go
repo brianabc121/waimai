@@ -34,8 +34,8 @@ func TestDeliveryStatsOverHTTP(t *testing.T) {
 	if err := a.EnsurePlatformAdmin(context.Background(), "admin-test", "password1"); err != nil {
 		t.Fatal(err)
 	}
-	admin := login(t, "admin-test")
-	owner1.want(403, "FORBIDDEN", "GET", "/admin/delivery-addresses", nil)
+	admin := adminLogin(t, "admin-test")
+	owner1.want(401, "UNAUTHENTICATED", "GET", "/admin/delivery-addresses", nil)
 	admin.want(200, "", "GET", "/admin/delivery-addresses?page_size=5", nil)
 	admin.want(200, "", "GET", "/admin/delivery-addresses?branch_id="+b1, nil)
 	admin.want(200, "", "GET", "/admin/delivery-stats/top?country=PH&"+nov, nil)

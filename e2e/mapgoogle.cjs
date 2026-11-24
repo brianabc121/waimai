@@ -37,7 +37,7 @@ await page.goto(BASE + '/login')
 await page.fill('input[autocomplete=username]', 'owner2') // a store no other test draws on
 await page.fill('input[type=password]', 'demo1234')
 await page.click('button.primary')
-await page.waitForURL(u => !u.pathname.startsWith('/login'))
+await page.waitForURL(u => !/\/login$/.test(u.pathname))
 
 // A store location and one drawn zone of this test's own, set up through the API.
 const own = async (method, url, data) => {

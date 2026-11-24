@@ -26,7 +26,7 @@ func TestPlatformSupport(t *testing.T) {
 	refund, menu := uniq("refund"), uniq("menu") // words only this run's messages have
 
 	// the administrators sign in to one shared account
-	owner.want(403, "FORBIDDEN", "POST", "/admin/support/login", nil)
+	owner.want(401, "UNAUTHENTICATED", "POST", "/admin/support/login", nil)
 	if l := admin.want(200, "", "POST", "/admin/support/login", nil); l["user_id"] != pIM {
 		t.Fatalf("platform login: %v", l)
 	}
@@ -58,7 +58,7 @@ func TestPlatformSupport(t *testing.T) {
 	}
 
 	// the platform's inbox
-	owner.want(403, "FORBIDDEN", "GET", "/admin/support", nil)
+	owner.want(401, "UNAUTHENTICATED", "GET", "/admin/support", nil)
 	l := admin.want(200, "", "GET", "/admin/support?q="+refund, nil)["list"].(map[string]any)
 	rows := list(l, "chats")
 	if len(rows) != 1 {

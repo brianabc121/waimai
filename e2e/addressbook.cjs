@@ -30,11 +30,11 @@ const shot = (name) => page.screenshot({ path: `${SHOTS}/${name}.png` })
 const run = Date.now().toString(36).slice(-4)
 
 async function login(user) {
-  await page.goto(BASE + '/login')
+  await page.goto(BASE + (/^admin/.test(user) ? '/admin/login' : /^((kitchen|rider|zhang|wang)\d|e2e\d+$)/.test(user) ? '/login?next=/work' : '/login'))
   await page.fill('input[autocomplete=username]', user)
   await page.fill('input[type=password]', 'demo1234')
   await page.click('button.primary')
-  await page.waitForURL(u => !u.pathname.startsWith('/login'))
+  await page.waitForURL(u => !/\/login$/.test(u.pathname))
 }
 await login('owner1')
 // The store's region is read off the map when its delivery map page opens.

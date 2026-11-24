@@ -87,7 +87,7 @@ step('?lang= in a link wins and is remembered')
 
 // ---- the back office stays Chinese or English ----
 const adm = watch(await (await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'th-TH', ignoreHTTPSErrors: insecure })).newPage())
-await adm.goto(BASE + '/login')
+await adm.goto(BASE + '/admin/login')
 await adm.fill('input[autocomplete=username]', 'admin'); await adm.fill('input[type=password]', 'demo1234')
 await adm.click('button.primary')
 await adm.waitForURL(/\/admin/)

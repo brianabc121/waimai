@@ -26,11 +26,11 @@ const expect = (got, want, what) => { if (got !== want) throw new Error(`${what}
 const tid = (id) => `[data-testid=${id}]`
 const text = async (page, sel) => (await page.locator(sel).first().innerText()).replace(/\s+/g, ' ').trim()
 async function signIn(page, user) {
-  await page.goto(BASE + '/login')
+  await page.goto(BASE + (/^admin/.test(user) ? '/admin/login' : /^((kitchen|rider|zhang|wang)\d|e2e\d+$)/.test(user) ? '/login?next=/work' : '/login'))
   await page.fill('input[autocomplete=username]', user)
   await page.fill('input[type=password]', 'demo1234')
   await page.click('button.primary')
-  await page.waitForURL(u => !u.pathname.startsWith('/login'))
+  await page.waitForURL(u => !/\/login$/.test(u.pathname))
   return async (method, path, data) => {
     const r = await page.request.fetch(BASE + '/api/v1' + path, { method, data, headers: { 'X-Requested-With': 'e2e' } })
     if (!r.ok()) throw new Error(`${method} ${path}: ${r.status()} ${await r.text()}`)

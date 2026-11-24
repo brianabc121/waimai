@@ -284,7 +284,7 @@ func TestTenantIsolationAndRoles(t *testing.T) {
 	owner2.want(404, "NOT_FOUND", "PUT", "/merchant/branches/"+b1+"/items/"+fmt.Sprint(f1.itemID), map[string]any{"name": "x"})
 	// an item id from store 1 cannot be edited through store 2's branch
 	owner2.want(404, "NOT_FOUND", "PATCH", "/merchant/branches/"+b2+"/items/"+fmt.Sprint(f1.itemID), map[string]any{"sold_out": true})
-	owner2.want(403, "FORBIDDEN", "GET", "/admin/merchants", nil)
+	owner2.want(401, "UNAUTHENTICATED", "GET", "/admin/merchants", nil)
 
 	// roles inside one store
 	cashier, kitchen, rider := login(t, f1.cashier), login(t, f1.kitchen), login(t, f1.rider)
@@ -365,13 +365,13 @@ func TestLoginAndAdmin(t *testing.T) {
 	if err := a.EnsurePlatformAdmin(context.Background(), "admin-test", "password1"); err != nil {
 		t.Fatal(err)
 	}
-	admin := login(t, "admin-test")
+	admin := adminLogin(t, "admin-test")
 	slug := uniq("new")
 	body := map[string]any{"merchant_name": "N", "branch_name": "N", "slug": slug,
 		"owner": map[string]any{"username": uniq("no"), "password": "password1", "display_name": "N"}}
 	admin.want(200, "", "POST", "/admin/merchants", body)
 	admin.want(409, "SLUG_TAKEN", "POST", "/admin/merchants", body)
-	admin.want(200, "", "POST", "/auth/logout", nil)
+	admin.want(200, "", "POST", "/admin/auth/logout", nil)
 	admin.want(401, "UNAUTHENTICATED", "GET", "/admin/merchants", nil)
 }
 
@@ -654,7 +654,7 @@ func TestImportAndScheduleOverHTTP(t *testing.T) {
 	// a platform admin imports for the store through the admin routes
 	admin := adminClient(t)
 	apath := "/admin/branches/" + b1 + "/menu-imports"
-	if code, _ := raw(owner, apath+"?filename=m.xlsx", tpl); code != 403 {
+	if code, _ := raw(owner, apath+"?filename=m.xlsx", tpl); code != 401 {
 		t.Fatalf("owner on the admin route: %d", code)
 	}
 	if st, _, _ := admin.raw(apath + "/template"); st != 200 {
@@ -953,7 +953,7 @@ func TestMapZonesOverHTTP(t *testing.T) {
 	if err := a.EnsurePlatformAdmin(context.Background(), "admin-map", "password1"); err != nil {
 		t.Fatal(err)
 	}
-	admin := login(t, "admin-map")
+	admin := adminLogin(t, "admin-map")
 	if zs := admin.want(200, "", "GET", b+"/menu", nil)["zones"].([]any); len(zs) != 2 ||
 		len(zs[0].(map[string]any)["polygon"].([]any)) != 4 {
 		t.Fatalf("admin view of zones: %v", zs)

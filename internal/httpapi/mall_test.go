@@ -170,9 +170,9 @@ func TestMallOverHTTP(t *testing.T) {
 
 	// The platform takes it off, and sees why a store does not show.
 	anon.want(401, "UNAUTHENTICATED", "GET", "/admin/mall", nil)
-	owner.want(403, "FORBIDDEN", "GET", "/admin/mall", nil)
+	owner.want(401, "UNAUTHENTICATED", "GET", "/admin/mall", nil)
 	hide := fmt.Sprintf("/admin/mall/stores/%d", near.branchID)
-	owner.want(403, "FORBIDDEN", "PUT", hide, map[string]any{"hidden": true})
+	owner.want(401, "UNAUTHENTICATED", "PUT", hide, map[string]any{"hidden": true})
 	admin.want(200, "", "PUT", hide, map[string]any{"hidden": true})
 	if stores, _ = list(anon, here); stores[near.slug] != nil {
 		t.Fatalf("a store the platform took off is listed: %v", stores)

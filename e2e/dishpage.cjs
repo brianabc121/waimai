@@ -35,7 +35,7 @@ await owner.goto(BASE + '/login')
 await owner.fill('input[autocomplete=username]', 'owner2')
 await owner.fill('input[type=password]', 'demo1234')
 await owner.click('button.primary')
-await owner.waitForURL(u => !u.pathname.startsWith('/login'))
+await owner.waitForURL(u => !/\/login$/.test(u.pathname))
 const png = await owner.evaluate(async () => {
   const c = document.createElement('canvas'); c.width = 400; c.height = 300
   const g = c.getContext('2d'); g.fillStyle = '#c0392b'; g.fillRect(0, 0, 400, 300); g.fillStyle = '#f5d76e'; g.beginPath(); g.arc(200, 150, 100, 0, 7); g.fill()

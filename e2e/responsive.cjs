@@ -29,7 +29,7 @@ const sessions = {}
 async function as(user, size) {
   if (sessions[user]) return open(size, sessions[user])
   const page = await open(size)
-  await page.goto(BASE + '/login')
+  await page.goto(BASE + (/^admin/.test(size) ? '/admin/login' : /^((kitchen|rider|zhang|wang)\d|e2e\d+$)/.test(size) ? '/login?next=/work' : '/login'))
   for (let i = 0; ; i++) {
     await page.fill('input[autocomplete=username]', user)
     await page.fill('input[type=password]', 'demo1234')
@@ -38,7 +38,7 @@ async function as(user, size) {
     if ((await res).status() !== 429 || i >= 5) break
     await page.waitForTimeout(7000)
   }
-  await page.waitForURL(u => !u.pathname.startsWith('/login'))
+  await page.waitForURL(u => !/\/login$/.test(u.pathname))
   sessions[user] = await page.context().storageState()
   return page
 }

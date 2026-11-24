@@ -29,11 +29,11 @@ const expect = (ok, what) => { if (!ok) throw new Error(what) }
 const local = '9' + String(Math.floor(Math.random() * 1e9)).padStart(9, '0')
 const tail = local.slice(-4)
 const staffLogin = async (p, user) => {
-  await p.goto(BASE + '/login')
+  await p.goto(BASE + (/^admin/.test(user) ? '/admin/login' : /^((kitchen|rider|zhang|wang)\d|e2e\d+$)/.test(user) ? '/login?next=/work' : '/login'))
   await p.fill('input[autocomplete=username]', user)
   await p.fill('input[type=password]', 'demo1234')
   await p.click('button.primary')
-  await p.waitForURL(u => !u.pathname.startsWith('/login'))
+  await p.waitForURL(u => !/\/login$/.test(u.pathname))
 }
 const pc = { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, ...opts }
 const phoneSize = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, ...opts }

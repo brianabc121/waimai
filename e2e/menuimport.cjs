@@ -27,11 +27,11 @@ const shot = (page, name) => page.screenshot({ path: `${SHOTS}/${name}.png` })
 const expect = (got, want, what) => { if (got !== want) throw new Error(`${what}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`) }
 const tid = (id) => `[data-testid=${id}]`
 async function signIn(page, user) {
-  await page.goto(BASE + '/login')
+  await page.goto(BASE + (/^admin/.test(user) ? '/admin/login' : /^((kitchen|rider|zhang|wang)\d|e2e\d+$)/.test(user) ? '/login?next=/work' : '/login'))
   await page.fill('input[autocomplete=username]', user)
   await page.fill('input[type=password]', 'demo1234')
   await page.click('button.primary')
-  await page.waitForURL(u => !u.pathname.startsWith('/login'))
+  await page.waitForURL(u => !/\/login$/.test(u.pathname))
 }
 async function download(page, selector, name) {
   const dl = page.waitForEvent('download')

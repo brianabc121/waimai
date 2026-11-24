@@ -12,6 +12,10 @@ export class ApiError extends Error {
   }
 }
 
+// The platform's back office signs in apart from the stores
+// (docs/STAFF_ACCESS_DESIGN.md §5.5); its requests say so.
+export const apiScope = { admin: false }
+
 export async function api<T = any>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
   if (method !== 'GET' && body !== undefined) {
     const z = await fixZawgyi(path, body)
@@ -23,7 +27,7 @@ export async function api<T = any>(method: string, path: string, body?: unknown,
     res = await fetch('/api/v1' + path, {
       method,
       credentials: 'same-origin',
-      headers: { 'X-Requested-With': 'waimai-web', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
+      headers: { 'X-Requested-With': 'waimai-web', 'X-Session': apiScope.admin ? 'admin' : 'staff', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
@@ -48,7 +52,7 @@ export async function upload<T = any>(path: string, file: Blob): Promise<T> {
   let res: Response
   try {
     res = await fetch('/api/v1' + path, { method: 'POST', credentials: 'same-origin',
-      headers: { 'X-Requested-With': 'waimai-web', 'Content-Type': 'application/octet-stream' }, body: file })
+      headers: { 'X-Requested-With': 'waimai-web', 'X-Session': apiScope.admin ? 'admin' : 'staff', 'Content-Type': 'application/octet-stream' }, body: file })
   } catch {
     throw new ApiError(0, 'NETWORK', 'network error')
   }

@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { homeFor, loadSession } from './session'
+import { homeFor, loadSession, officeRoles, scopeFor, useScope } from './session'
 import { adminScope } from './i18n'
 
 export const router = createRouter({
@@ -13,6 +13,8 @@ export const router = createRouter({
     { path: '/t/:code', component: () => import('./views/TableView.vue'), props: true },
     { path: '/ipad', component: () => import('./views/TableView.vue') },
     { path: '/login', component: () => import('./views/LoginView.vue') },
+    { path: '/login/pick', component: () => import('./views/LoginPick.vue'), meta: { staff: true } },
+    { path: '/admin/login', component: () => import('./views/admin/AdminLogin.vue') },
     { path: '/account/login', component: () => import('./views/AccountLogin.vue') },
     { path: '/me', component: () => import('./views/me/MeHome.vue') },
     { path: '/me/profile', component: () => import('./views/me/MeProfile.vue') },
@@ -90,10 +92,30 @@ export const router = createRouter({
   ],
 })
 
+// The store's back office needs a back-office sign-in: a workbench sign-in
+// goes to the page that asks for the password again (docs/STAFF_ACCESS_DESIGN.md
+// §5.4), and someone without a back-office role goes to the workbench. The
+// kitchen screen and the printed ticket belong to the workbench too.
+const officePage = (p: string) => /^\/merchant(\/|$)/.test(p)
+
 router.beforeEach(async to => {
+  const scope = scopeFor(to.path)
+  if (to.meta.staff || to.path === '/login' || to.path === '/admin/login') useScope(scope)
+  if (to.path === '/admin/login') {
+    const u = await loadSession()
+    return u?.entry === 'admin' ? '/admin' : true
+  }
   if (to.meta.staff) {
     const u = await loadSession()
+    if (scope === 'admin') {
+      if (!u?.is_platform_admin) return { path: '/admin/login', query: { next: to.fullPath } }
+      return true
+    }
     if (!u) return { path: '/login', query: { next: to.fullPath } }
+    if (officePage(to.path)) {
+      if (!officeRoles(u).length) return '/work'
+      if (u.entry === 'work') return { path: '/login/pick', query: { next: to.fullPath } }
+    }
   }
   if (to.path === '/login') {
     const u = await loadSession()

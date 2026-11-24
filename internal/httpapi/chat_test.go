@@ -207,7 +207,7 @@ func TestChatOverHTTP(t *testing.T) {
 	login(t, g.owner).want(404, "NOT_FOUND", "GET", fmt.Sprintf("/merchant/branches/%d/chats/%d", g.branchID, custID), nil)
 
 	// the platform sees every conversation, and looking is written down
-	owner.want(403, "FORBIDDEN", "GET", "/admin/chats", nil)
+	owner.want(401, "UNAUTHENTICATED", "GET", "/admin/chats", nil)
 	al := admin.want(200, "", "GET", "/admin/chats?branch_id="+bid, nil)
 	if al["total"].(float64) != 2 || len(list(al, "chats")) != 2 {
 		t.Fatalf("admin chats: %v", al)

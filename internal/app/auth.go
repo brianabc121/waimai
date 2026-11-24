@@ -51,6 +51,26 @@ type User struct {
 	Phone           string       `json:"phone"`
 	IsPlatformAdmin bool         `json:"is_platform_admin"`
 	Roles           []BranchRole `json:"roles"`
+	// Entry is where this sign-in leads: the store's back office, the staff
+	// workbench or the platform's back office (docs/STAFF_ACCESS_DESIGN.md §5).
+	Entry string `json:"entry,omitempty"`
+}
+
+// Where a sign-in leads.
+const (
+	EntryOffice = "office"
+	EntryWork   = "work"
+	EntryAdmin  = "admin"
+)
+
+// InOffice reports whether the person has a back-office role in any store.
+func (u *User) InOffice() bool {
+	for _, r := range u.Roles {
+		if r.Role != "staff" {
+			return true
+		}
+	}
+	return false
 }
 
 // RoleIn returns the user's role in a branch, or "".
@@ -135,19 +155,28 @@ var errBadLogin = Err(http.StatusUnauthorized, "BAD_CREDENTIALS", "wrong usernam
 // dummyHash keeps login timing similar when the username does not exist.
 var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("not-a-real-password"), bcrypt.DefaultCost)
 
-// Login verifies credentials and creates a server-side session.
+// Login verifies credentials and creates a server-side session for the
+// store's back office.
 func (a *App) Login(ctx context.Context, username, password string) (token string, u *User, err error) {
-	return a.login(ctx, username, password, "cookie", SessionTTL)
+	return a.LoginTo(ctx, username, password, EntryOffice)
+}
+
+// LoginTo signs in to the back office, the workbench or the platform. The
+// platform's accounts sign in only to the platform and nobody else does; the
+// refusal does not say that the account exists. Someone without a back-office
+// role who asks for it gets a workbench session.
+func (a *App) LoginTo(ctx context.Context, username, password, entry string) (token string, u *User, err error) {
+	return a.login(ctx, username, password, "cookie", entry, SessionTTL)
 }
 
 // TokenLogin signs the app in. The app keeps the token itself and sends it in
 // a header, so the session lasts longer than a browser's.
 func (a *App) TokenLogin(ctx context.Context, username, password string) (token string, u *User, expires time.Time, err error) {
-	token, u, err = a.login(ctx, username, password, "token", TokenSessionTTL)
+	token, u, err = a.login(ctx, username, password, "token", EntryWork, TokenSessionTTL)
 	return token, u, time.Now().Add(TokenSessionTTL), err
 }
 
-func (a *App) login(ctx context.Context, username, password, kind string, ttl time.Duration) (token string, u *User, err error) {
+func (a *App) login(ctx context.Context, username, password, kind, entry string, ttl time.Duration) (token string, u *User, err error) {
 	var id int64
 	var hash string
 	err = a.DB.QueryRow(ctx, `SELECT id, password_hash FROM users WHERE username=$1 AND active`,
@@ -161,16 +190,66 @@ func (a *App) login(ctx context.Context, username, password, kind string, ttl ti
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
 		return "", nil, errBadLogin
 	}
+	if u, err = a.loadUser(ctx, id); err != nil {
+		return "", nil, err
+	}
+	switch {
+	case entry != EntryOffice && entry != EntryWork && entry != EntryAdmin:
+		return "", nil, ErrValidation("entry must be office, work or admin")
+	case (entry == EntryAdmin) != u.IsPlatformAdmin:
+		return "", nil, errBadLogin
+	case entry == EntryOffice && !u.InOffice():
+		entry = EntryWork
+	}
 	token, th := newToken()
-	if _, err = a.DB.Exec(ctx, `INSERT INTO sessions (token_hash, user_id, expires_at, kind) VALUES ($1,$2,$3,$4)`,
-		th, id, time.Now().Add(ttl), kind); err != nil {
+	if _, err = a.DB.Exec(ctx, `INSERT INTO sessions (token_hash, user_id, expires_at, kind, entry) VALUES ($1,$2,$3,$4,$5)`,
+		th, id, time.Now().Add(ttl), kind, entry); err != nil {
 		return "", nil, err
 	}
 	if _, err = a.DB.Exec(ctx, `UPDATE users SET last_login_at = now() WHERE id=$1`, id); err != nil {
 		return "", nil, err
 	}
-	u, err = a.loadUser(ctx, id)
-	return token, u, err
+	u.Entry = entry
+	return token, u, nil
+}
+
+var errNoOffice = Err(http.StatusForbidden, "NO_OFFICE_ROLE", "this account can only use the staff workbench")
+
+// SwitchEntry moves a store's sign-in between the back office and the
+// workbench (docs/STAFF_ACCESS_DESIGN.md §5.4). Going to the back office asks
+// for the password again, so that a workbench left open on a shared tablet
+// does not open the back office; going to the workbench does not.
+func (a *App) SwitchEntry(ctx context.Context, token, entry, password string) (*User, error) {
+	th := hashToken(token)
+	var id int64
+	var cur, hash string
+	err := a.DB.QueryRow(ctx, `SELECT s.user_id, s.entry, u.password_hash FROM sessions s JOIN users u ON u.id = s.user_id
+		WHERE s.token_hash=$1 AND s.expires_at > now() AND u.active`, th).Scan(&id, &cur, &hash)
+	if isNoRows(err) {
+		return nil, Err(http.StatusUnauthorized, "UNAUTHENTICATED", "please sign in")
+	} else if err != nil {
+		return nil, err
+	}
+	if cur == EntryAdmin || (entry != EntryOffice && entry != EntryWork) {
+		return nil, ErrValidation("entry must be office or work")
+	}
+	u, err := a.loadUser(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if entry == EntryOffice && cur != EntryOffice {
+		if !u.InOffice() {
+			return nil, errNoOffice
+		}
+		if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+			return nil, Err(http.StatusUnauthorized, "BAD_PASSWORD", "wrong password")
+		}
+	}
+	if _, err := a.DB.Exec(ctx, `UPDATE sessions SET entry=$2 WHERE token_hash=$1`, th, entry); err != nil {
+		return nil, err
+	}
+	u.Entry = entry
+	return u, nil
 }
 
 // Logout ends the session and forgets the devices registered in it. A shift
@@ -215,14 +294,20 @@ func (a *App) Logout(ctx context.Context, token string) error {
 // change or deactivation takes effect immediately.
 func (a *App) UserBySession(ctx context.Context, token string) (*User, error) {
 	var id int64
-	err := a.DB.QueryRow(ctx, `SELECT user_id FROM sessions WHERE token_hash=$1 AND expires_at > now()`,
-		hashToken(token)).Scan(&id)
+	var entry string
+	err := a.DB.QueryRow(ctx, `SELECT user_id, entry FROM sessions WHERE token_hash=$1 AND expires_at > now()`,
+		hashToken(token)).Scan(&id, &entry)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
-	return a.loadUser(ctx, id)
+	u, err := a.loadUser(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	u.Entry = entry
+	return u, nil
 }
 
 func hashPassword(pw string) (string, error) {

@@ -36,7 +36,7 @@ await page.goto(BASE + '/login')
 await page.fill('input[autocomplete=username]', 'owner1')
 await page.fill('input[type=password]', 'demo1234')
 await page.click('button.primary')
-await page.waitForURL(u => !u.pathname.startsWith('/login'))
+await page.waitForURL(u => !/\/login$/.test(u.pathname))
 // Start from a clean slate so the test can run again on the same database:
 // "pick from a list", no outlines on the seeded zones, no zones of its own.
 const own = async (method, path, data) => {

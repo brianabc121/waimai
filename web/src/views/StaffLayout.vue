@@ -7,7 +7,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { get, post } from '../api'
 import { locale, setLocale, t } from '../i18n'
-import { can, currentRole, logout, reloadUser, session, setAdminView, setBranch } from '../session'
+import { can, currentRole, logout, reloadUser, session, setAdminView } from '../session'
+import './loginStrings'
 import { pagePerms } from '../perms'
 import { useShell } from '../shell'
 import { storeChats } from '../chat'
@@ -67,7 +68,6 @@ watch(() => route.path, p => { if (p === '/merchant/messages') chatNew.value = f
 async function out() { await logout(); session.loaded = true; router.replace('/login') }
 const viewing = computed(() => !!session.user?.is_platform_admin)
 function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' }
-function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).value)); location.reload() }
 </script>
 
 <template>
@@ -81,10 +81,7 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
     <div class="shell-mask no-print" @click="shell.open.value = false"></div>
     <nav class="staffbar no-print">
       <div class="shell-brand">
-        <select v-if="(session.user?.roles.length ?? 0) > 1" :value="session.branchId ?? undefined" @change="change">
-          <option v-for="r in session.user!.roles" :key="r.branch_id" :value="r.branch_id">{{ r.branch_name }}</option>
-        </select>
-        <b v-else class="grow">{{ currentRole()?.branch_name }}</b>
+        <b class="grow">{{ currentRole()?.branch_name }}</b>
         <button v-if="!shell.narrow.value" class="shell-fold" data-testid="nav-fold" :title="t('nav_fold')" :aria-label="t('nav_fold')" @click="shell.fold()">«</button>
         <button v-else class="shell-fold" :aria-label="t('close')" @click="shell.open.value = false">×</button>
       </div>
@@ -116,6 +113,7 @@ function change(e: Event) { setBranch(Number((e.target as HTMLSelectElement).val
           <span class="small grow who">{{ session.user?.display_name }}</span>
           <LangButton class="lang" />
         </div>
+        <router-link v-if="!viewing" class="btn link" to="/login/pick" data-testid="switch-identity">{{ t('lg.switch') }}</router-link>
         <button class="btn link" @click="out">{{ t('sign_out') }}</button>
       </div>
     </nav>

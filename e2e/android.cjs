@@ -27,7 +27,7 @@ async function open(viewport) {
   return ctx.newPage()
 }
 async function login(page, user, base = BASE) {
-  if (!/\/login/.test(page.url())) await page.goto(base + '/login')
+  if (!/\/login/.test(page.url())) await page.goto(base + (/^admin/.test(user) ? '/admin/login' : /^((kitchen|rider|zhang|wang)\d|e2e\d+$)/.test(user) ? '/login?next=/work' : '/login'))
   for (let i = 0; ; i++) {
     await page.fill('input[autocomplete=username]', user)
     await page.fill('input[type=password]', 'demo1234')

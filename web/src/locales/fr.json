@@ -2473,5 +2473,20 @@
  "rp.d.settings": "Horaires, ouverture et fermeture, commandes, postes de cuisine, images",
  "rp.p.kitchen.screen": "Écran cuisine",
  "rp.d.kitchen.screen": "Ouvrir l'écran cuisine",
- "st.e.OWNER_ONLY": "Seul un propriétaire peut nommer ou gérer les gérants et propriétaires"
+ "st.e.OWNER_ONLY": "Seul un propriétaire peut nommer ou gérer les gérants et propriétaires",
+ "lg.office": "Back-office",
+ "lg.work": "Espace du personnel",
+ "lg.hint": "Propriétaires, gérants et preneurs de commandes utilisent le back-office ; cuisine, emballage et livreurs utilisent l’espace du personnel.",
+ "lg.staff_only": "Votre compte est un compte du personnel : il ne donne accès qu’à l’espace du personnel",
+ "lg.go_work": "Ouvrir l’espace du personnel",
+ "lg.pick": "Choisir où travailler",
+ "lg.pick_hint": "Choisissez un établissement et un rôle. Vous pourrez changer plus tard via « Changer d’identité » dans le menu.",
+ "lg.work_hint": "Cuisine, emballage, livraisons",
+ "lg.last": "Dernier utilisé",
+ "lg.again": "Pour ouvrir le back-office depuis l’espace du personnel, saisissez à nouveau votre mot de passe",
+ "lg.enter": "Entrer",
+ "lg.bad_password": "Mot de passe incorrect",
+ "lg.switch": "Changer d’identité",
+ "lg.admin_title": "Administration de la plateforme",
+ "lg.admin_hint": "Réservé aux administrateurs de la plateforme"
 }
