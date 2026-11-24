@@ -131,22 +131,22 @@ type Order struct {
 	// Timezone is the store's, so every screen shows times on the store's clock.
 	Timezone string `json:"timezone"`
 	// Dine-in only.
-	SessionID      *int64          `json:"session_id"`
-	TableName      string          `json:"table_name"`
-	AmountReceived *int64          `json:"amount_received"`
-	PaymentNote    string          `json:"payment_note"`
-	PayMethod      string          `json:"pay_method"`
+	SessionID      *int64 `json:"session_id"`
+	TableName      string `json:"table_name"`
+	AmountReceived *int64 `json:"amount_received"`
+	PaymentNote    string `json:"payment_note"`
+	PayMethod      string `json:"pay_method"`
 	// TableTags are the sitting's notes (children, birthday) for the kitchen.
-	TableTags []string        `json:"table_tags"`
-	CreatedAt      time.Time       `json:"created_at"`
-	AcceptedAt     *time.Time      `json:"accepted_at"`
-	PackedAt       *time.Time      `json:"packed_at"`
-	HandedOffAt    *time.Time      `json:"handed_off_at"`
-	CompletedAt    *time.Time      `json:"completed_at"`
-	ClosedAt       *time.Time      `json:"closed_at"`
-	Items          []OrderItem     `json:"items"`
-	Delivery       *DeliveryTask   `json:"delivery"`
-	Cash           *CashCollection `json:"cash"`
+	TableTags   []string        `json:"table_tags"`
+	CreatedAt   time.Time       `json:"created_at"`
+	AcceptedAt  *time.Time      `json:"accepted_at"`
+	PackedAt    *time.Time      `json:"packed_at"`
+	HandedOffAt *time.Time      `json:"handed_off_at"`
+	CompletedAt *time.Time      `json:"completed_at"`
+	ClosedAt    *time.Time      `json:"closed_at"`
+	Items       []OrderItem     `json:"items"`
+	Delivery    *DeliveryTask   `json:"delivery"`
+	Cash        *CashCollection `json:"cash"`
 	// Aftersale is the customer's after-sales request, nil when there is none.
 	Aftersale *Aftersale `json:"aftersale"`
 	// Discounts lists the promotion and each coupon taken off.

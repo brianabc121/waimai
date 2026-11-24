@@ -83,6 +83,8 @@ export interface OrderItem {
   note_tags?: LineNoteTag[]
   station_id: number | null; station_name: string
   batch_seq: number; batch_source: string; served_at: string | null; void_reason?: string
+  // dine-in: when the round was sent, its notes, who sent it, and when the kitchen was asked to hurry
+  batch_at?: string; round_tags?: string[]; batch_by?: string; rush_at?: string | null
   basket: number
   // the dish's picture; only on the customer's order page
   image_url?: string
@@ -116,6 +118,7 @@ export interface Order {
   dest_lat: number | null; dest_lng: number | null; zone_distance_m: number | null
   accept_deadline: string; scheduled_for: string | null; release_at: string | null; timezone: string; created_at: string; items: OrderItem[]; delivery: DeliveryTask | null; cash: Cash | null
   session_id: number | null; table_name: string; amount_received: number | null; payment_note: string
+  pay_method?: string; table_tags?: string[]
   aftersale: Aftersale | null; store?: OrderStore; completed_at?: string | null
   // the promotion and each coupon taken off; the coupon this order earned (customer page only)
   discounts?: OrderDiscount[]; gift?: CustomerCoupon | null
@@ -131,9 +134,14 @@ export interface StoreMember {
 }
 export interface AddressHint { line: string; unit: string; note: string; lat: number | null; lng: number | null; mine: boolean; kind?: 'mine' | 'book' | 'store'; zone_name: string; fee: number | null }
 export interface TableDevice { id: number; name: string; paired: boolean; paired_at: string | null }
-export interface TableSummary { id: number; order_id: number; public_no: string; guests: number; opened_at: string; total: number; item_count: number; unserved: number }
-export interface DiningTable { id: number; name: string; qr_token: string; active: boolean; sort: number; session: TableSummary | null; devices: TableDevice[] }
-export interface Bill { session_id: number; table_id: number; table_name: string; status: 'open' | 'closed'; guests: number; opened_at: string; closed_at: string | null; order: Order }
+export interface TableSummary { id: number; order_id: number; public_no: string; guests: number; opened_at: string; total: number; item_count: number; unserved: number
+  unserved_qty: number; rounds: number; tags: string[] }
+export interface DiningTable { id: number; name: string; qr_token: string; active: boolean; sort: number; area: string; seats: number; session: TableSummary | null; devices: TableDevice[] }
+export interface Bill { session_id: number; table_id: number; table_name: string; status: 'open' | 'closed'; guests: number; opened_at: string; closed_at: string | null; order: Order
+  tags: string[]; moved_from: string; area: string; seats: number }
+// The dine-in desk's tap-to-choose lists (docs/DINE_IN_ORDER_DESIGN.md); null lists mean the built-in ones.
+export interface DinePresets { table_tags: string[] | null; round_tags: string[] | null; void_reasons: string[] | null; pay_methods: string[] | null
+  long_minutes: number; stay_after_send: boolean; show_photos: boolean | null }
 export interface TableAccess { slug: string; store_name: string; table_name: string; mode: 'qr' | 'ipad' }
 export interface BatchLine { item_id: number; qty: number; option_ids: number[]; note: string; note_tag_ids?: number[] }
 export interface Quote { id: string; currency: string; service_type: string; zone_name: string; zone_distance_m: number | null; scheduled_for: string | null; totals: Totals; expires_at: string

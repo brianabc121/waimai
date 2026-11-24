@@ -5,7 +5,7 @@ import { extend } from './i18n'
 // Each page of the back office and the permissions that open it (any of them).
 // "kitchen" is anyone who works a station or the packing counter.
 const pages: [string, string[]][] = [
-  ['/merchant/orders/new', ['order.manual']],
+  ['/merchant/orders/new', ['order.manual', 'table.use']],
   ['/merchant/orders', ['order.view']],
   ['/merchant/members', ['member.view']],
   ['/merchant/addresses', ['member.view']],
