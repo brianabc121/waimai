@@ -1,16 +1,18 @@
 <script setup lang="ts">
-// Front desk for dine-in: open tables, see each bill by round, add dishes,
-// void, take payment and close. Managers also maintain tables and tablets.
+// The tables of a store: managers add them (name, area, seats) and pair
+// tablets; everyone sees which are in use and the bills closed today. Opening,
+// ordering and payment are on the dine-in desk (代客下单 > 堂食).
 import { computed, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import QRCode from 'qrcode'
 import { ApiError, get, post, put } from '../api'
-import { money, minutesSince, t, toMajor, toMinor } from '../i18n'
+import { money, minutesSince, t } from '../i18n'
 import { useLive } from '../live'
 import { can, currentRole, session } from '../session'
-import type { BatchLine, Bill, DiningTable, OrderItem, Storefront } from '../types'
+import type { Bill, DiningTable } from '../types'
 import BillLines from './BillLines.vue'
-import DineMenu from './DineMenu.vue'
 import TotalsTable from './TotalsTable.vue'
+import './dine/strings'
 
 const bid = session.branchId!
 const role = currentRole()!
@@ -19,119 +21,30 @@ const cur = role.currency
 
 const tables = ref<DiningTable[]>([])
 const recent = ref<Bill[]>([])
-const bill = ref<Bill | null>(null)       // the bill panel
 const error = ref('')
-const panelError = ref('')
 const now = ref(Date.now())
 setInterval(() => (now.value = Date.now()), 30000)
 
-async function loadBill(id: number) {
-  const b = await get<Bill>(`/merchant/table-sessions/${id}`)
-  if (bill.value?.session_id === id && b.order.version < bill.value.order.version) return
-  if (bill.value?.session_id === id) bill.value = b
-}
 const { online, refreshNow } = useLive(() => `/merchant/branches/${bid}/events`, async () => {
   const r = await get<{ tables: DiningTable[]; recent: Bill[] }>(`/merchant/branches/${bid}/tables`)
   tables.value = r.tables; recent.value = r.recent
-  if (bill.value?.status === 'open') await loadBill(bill.value.session_id)
 })
 
 const shown = computed(() => tables.value.filter(x => x.active || x.session || manager))
 const waited = (iso: string) => { void now.value; return minutesSince(iso) }
 
-function fail(e: unknown, panel = false) {
-  let msg = (e as Error).message
-  if (e instanceof ApiError) {
-    if (e.code === 'VERSION_CONFLICT') msg = t('bill_changed')
-    else if (e.code === 'ITEMS_IN_PROGRESS') msg = t('items_in_progress', { n: e.details?.count ?? '' })
-    else if (e.code === 'QUOTE_CHANGED') msg = t('amount_changed')
-    else if (e.status === 0) msg = t('submit_failed')
-  }
-  if (panel) panelError.value = msg; else error.value = msg
+function fail(e: unknown) {
+  error.value = e instanceof ApiError && e.status === 0 ? t('submit_failed') : (e as Error).message
 }
 
-// ---- open ----
-const opening = reactive<{ table: DiningTable | null; guests: number }>({ table: null, guests: 2 })
-async function click(tb: DiningTable) {
-  error.value = ''; panelError.value = ''
-  if (tb.session) {
-    try { bill.value = await get<Bill>(`/merchant/table-sessions/${tb.session.id}`); mode.value = 'bill' } catch (e) { fail(e) }
-  } else if (tb.active) { opening.table = tb; opening.guests = 2 }
+// Ordering, the bill and payment happen on the dine-in desk
+// (docs/DINE_IN_ORDER_DESIGN.md): a tap on a table opens it there.
+const router = useRouter()
+function click(tb: DiningTable) {
+  if (!tb.active && !tb.session) return
+  void router.push({ path: '/merchant/orders/new', query: { mode: 'dine', table: String(tb.id), ...(tb.session ? { view: 'bill' } : {}) } })
 }
-async function openTable() {
-  const tb = opening.table!
-  try {
-    bill.value = await post<Bill>(`/merchant/tables/${tb.id}/open`, { guests: opening.guests })
-    opening.table = null; mode.value = 'bill'
-  } catch (e) { fail(e); opening.table = null }
-  await refreshNow()
-}
-
-// ---- bill panel ----
-const mode = ref<'bill' | 'add' | 'pay'>('bill')
-const store = ref<Storefront | null>(null)
-const busy = ref(false)
-const menu = ref<InstanceType<typeof DineMenu> | null>(null)
-const pay = reactive({ received: 0, note: '', manifest: 0 })
-
-async function startAdd() {
-  panelError.value = ''
-  try { store.value = await get<Storefront>(`/stores/${role.slug}`); mode.value = 'add' } catch (e) { fail(e, true) }
-}
-async function addBatch(lines: BatchLine[], expectedTotal: number, key: string) {
-  busy.value = true; panelError.value = ''
-  try {
-    bill.value = await post<Bill>(`/merchant/table-sessions/${bill.value!.session_id}/batches`, { items: lines, expected_total: expectedTotal }, { 'Idempotency-Key': key })
-    menu.value?.clear(); mode.value = 'bill'
-  } catch (e) {
-    fail(e, true)
-    store.value = await get<Storefront>(`/stores/${role.slug}`).catch(() => store.value)
-  }
-  busy.value = false
-  void refreshNow()
-}
-async function itemAction(it: OrderItem, action: 'serve' | 'void') {
-  panelError.value = ''
-  let body = {}
-  if (action === 'void') {
-    const reason = prompt(t('void_reason'))
-    if (reason === null) return
-    if (!reason.trim()) { panelError.value = t('reason_required'); return }
-    body = { reason: reason.trim() }
-  }
-  try { bill.value = await post<Bill>(`/merchant/bill-items/${it.id}/${action}`, body) } catch (e) { fail(e, true) }
-  void refreshNow()
-}
-function startPay() {
-  const o = bill.value!.order
-  pay.received = toMajor(o.totals.total); pay.note = ''; pay.manifest = o.manifest_version
-  panelError.value = ''; mode.value = 'pay'
-}
-// A round added or a dish voided while the cashier is on the payment step:
-// show the new amount and make them confirm again.
-watch(() => bill.value?.order.manifest_version, v => {
-  if (mode.value === 'pay' && bill.value && v !== pay.manifest) {
-    pay.manifest = v!; pay.received = toMajor(bill.value.order.totals.total); panelError.value = t('bill_changed')
-  }
-})
-const change = computed(() => bill.value ? toMinor(pay.received) - bill.value.order.totals.total : 0)
-async function closeTable() {
-  busy.value = true; panelError.value = ''
-  try {
-    bill.value = await post<Bill>(`/merchant/table-sessions/${bill.value!.session_id}/close`,
-      { expected_manifest_version: pay.manifest, amount_received: toMinor(pay.received), note: pay.note })
-    mode.value = 'bill'
-  } catch (e) {
-    fail(e, true)
-    if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') {
-      bill.value = await get<Bill>(`/merchant/table-sessions/${bill.value!.session_id}`)
-      pay.manifest = bill.value.order.manifest_version; pay.received = toMajor(bill.value.order.totals.total)
-    }
-  }
-  busy.value = false
-  void refreshNow()
-}
-const unserved = computed(() => bill.value?.order.items.filter(i => i.prep_status !== 'cancelled' && !i.served_at).length ?? 0)
+const bill = ref<Bill | null>(null) // a closed bill from the list below, read only
 
 // ---- table settings: QR, tablets, rename ----
 const setup = reactive<{ table: DiningTable | null; qr: string; code: string; copied: boolean }>({ table: null, qr: '', code: '', copied: false })
@@ -151,18 +64,28 @@ async function unpair(id: number) {
   try { await post(`/merchant/branches/${bid}/table-devices/${id}/revoke`) } catch (e) { fail(e) }
   await refreshNow()
 }
-async function saveTable(tb: DiningTable | null, patch: Partial<DiningTable> = {}) {
-  let name = tb?.name ?? ''
-  if (!tb || patch.name !== undefined) {
-    const v = prompt(t('table_name'), name)
-    if (v === null || !v.trim()) return
-    name = v.trim()
-  }
-  const body = { name, active: patch.active ?? tb?.active ?? true, sort: tb?.sort ?? tables.value.length }
+// name, area and seats in one small form (docs/DINE_IN_ORDER_DESIGN.md §5.1)
+const edit = reactive<{ table: DiningTable | null; open: boolean; name: string; area: string; seats: number; busy: boolean }>({ table: null, open: false, name: '', area: '', seats: 4, busy: false })
+const areas = computed(() => [...new Set(tables.value.map(x => x.area).filter(Boolean))])
+function startEdit(tb: DiningTable | null) {
+  Object.assign(edit, { table: tb, open: true, name: tb?.name ?? '', area: tb?.area ?? '', seats: tb?.seats || 4, busy: false })
+  error.value = ''
+}
+async function saveEdit() {
+  if (!edit.name.trim()) return
+  edit.busy = true
+  const tb = edit.table
+  const body = { name: edit.name.trim(), area: edit.area.trim(), seats: edit.seats, active: tb?.active ?? true, sort: tb?.sort ?? tables.value.length }
   try {
     if (tb) await put(`/merchant/branches/${bid}/tables/${tb.id}`, body)
     else await post(`/merchant/branches/${bid}/tables`, body)
+    edit.open = false
   } catch (e) { fail(e) }
+  edit.busy = false
+  await refreshNow()
+}
+async function setActive(tb: DiningTable, active: boolean) {
+  try { await put(`/merchant/branches/${bid}/tables/${tb.id}`, { name: tb.name, area: tb.area, seats: tb.seats, active, sort: tb.sort }) } catch (e) { fail(e) }
   await refreshNow()
 }
 </script>
@@ -171,7 +94,10 @@ async function saveTable(tb: DiningTable | null, patch: Partial<DiningTable> = {
   <div class="page">
     <div class="row between wrap" style="margin-bottom:12px">
       <h1>{{ t('tables') }}</h1>
-      <button v-if="manager" class="btn" @click="saveTable(null)">{{ t('new_table') }}</button>
+      <div class="row" style="gap:8px">
+        <router-link class="btn primary" to="/merchant/orders/new?mode=dine" data-test="to-desk">{{ t('dd.go_desk') }}</router-link>
+        <button v-if="manager" class="btn" data-test="new-table" @click="startEdit(null)">{{ t('new_table') }}</button>
+      </div>
     </div>
     <div v-if="!online" class="banner warn" style="margin-bottom:12px">{{ t('offline') }}</div>
     <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
@@ -183,12 +109,12 @@ async function saveTable(tb: DiningTable | null, patch: Partial<DiningTable> = {
           <b class="tname">{{ tb.name }}</b>
           <span class="tag" :class="tb.session ? 'brand' : tb.active ? 'ok' : ''">{{ tb.session ? t('occupied') : tb.active ? t('free') : t('disabled') }}</span>
         </div>
+        <div class="small muted">{{ [tb.area, t('dd.seats', { n: tb.seats || 4 })].filter(Boolean).join(' · ') }}</div>
         <template v-if="tb.session">
           <div class="price bold" style="font-size:18px">{{ money(tb.session.total, cur) }}</div>
           <div class="small muted">{{ t('n_guests', { n: tb.session.guests }) }} · {{ waited(tb.session.opened_at) }} {{ t('min') }}</div>
           <div class="small"><span v-if="tb.session.unserved" class="tag warn">{{ t('not_served_n', { n: tb.session.unserved }) }}</span></div>
         </template>
-        <div v-else class="small muted">{{ tb.active ? t('open_table') : '' }}</div>
         <button class="btn link small gear" @click.stop="openSetup(tb)">{{ t('qr_code') }}</button>
       </div>
     </div>
@@ -199,68 +125,48 @@ async function saveTable(tb: DiningTable | null, patch: Partial<DiningTable> = {
       <tbody>
         <tr v-for="b in recent" :key="b.session_id">
           <td>{{ b.table_name }}</td><td>{{ b.order.public_no }}</td><td>{{ money(b.order.totals.total, cur) }}</td>
-          <td>{{ b.order.amount_received != null ? money(b.order.amount_received, cur) : '—' }}</td>
+          <td>{{ b.order.amount_received != null ? money(b.order.amount_received, cur) : '—' }}<span v-if="b.order.pay_method" class="muted"> · {{ b.order.pay_method }}</span></td>
           <td>{{ b.closed_at ? new Date(b.closed_at).toLocaleString() : '' }}</td>
-          <td><button class="btn small" @click="bill = b; mode = 'bill'; panelError = ''">{{ t('bill') }}</button></td>
+          <td><button class="btn small" @click="bill = b">{{ t('bill') }}</button></td>
         </tr>
       </tbody>
     </table>
 
-    <!-- open a table -->
-    <div class="sheet-mask" v-if="opening.table" @click.self="opening.table = null">
-      <div class="sheet center">
-        <div class="sheet-head"><h2>{{ t('open_table') }} · {{ opening.table.name }}</h2></div>
-        <div class="sheet-body row between">
-          <span>{{ t('guests') }}</span>
-          <span class="stepper"><button @click="opening.guests = Math.max(1, opening.guests - 1)">−</button><b>{{ opening.guests }}</b><button class="fill" @click="opening.guests = Math.min(99, opening.guests + 1)">+</button></span>
-        </div>
-        <div class="sheet-foot row between"><button class="btn" @click="opening.table = null">{{ t('cancel') }}</button>
-          <button class="btn primary" data-test="confirm-open" @click="openTable">{{ t('open_table') }}</button></div>
-      </div>
-    </div>
-
-    <!-- bill panel -->
+    <!-- a closed bill -->
     <div class="sheet-mask" v-if="bill" @click.self="bill = null">
-      <div class="sheet center" :class="{ big: mode === 'add' }">
+      <div class="sheet center">
         <div class="sheet-head row between">
           <h2>{{ t('table') }} {{ bill.table_name }} · {{ bill.order.public_no }}
             <span class="tag" :class="bill.status === 'open' ? 'brand' : 'ok'" data-test="bill-status">{{ bill.status === 'open' ? t('occupied') : t('f.dined') }}</span></h2>
-          <button class="btn link" @click="mode === 'bill' ? (bill = null) : (mode = 'bill')">{{ mode === 'bill' ? '✕' : t('back') }}</button>
+          <button class="btn link" @click="bill = null">✕</button>
         </div>
-        <div class="sheet-body stack" :style="mode === 'add' ? 'padding:0' : ''">
-          <div v-if="panelError" class="banner bad" :style="mode === 'add' ? 'margin:12px 14px 0' : ''" data-test="panel-error">{{ panelError }}</div>
-
-          <template v-if="mode === 'bill'">
-            <div class="small muted">{{ t('n_guests', { n: bill.guests }) }} · {{ t('opened_at') }} {{ new Date(bill.opened_at).toLocaleTimeString() }}
-              <span v-if="bill.closed_at"> · {{ t('closed_at') }} {{ new Date(bill.closed_at).toLocaleTimeString() }}</span></div>
-            <BillLines :order="bill.order" staff :readonly="bill.status !== 'open'" @serve="itemAction($event, 'serve')" @void="itemAction($event, 'void')" />
-            <TotalsTable :totals="bill.order.totals" :currency="cur" :delivery="false" />
-            <div v-if="bill.status === 'closed' && bill.order.amount_received != null" class="small muted">
-              {{ t('amount_received') }} {{ money(bill.order.amount_received, cur) }} · {{ t('change_due') }} {{ money(bill.order.amount_received - bill.order.totals.total, cur) }}
-              <span v-if="bill.order.payment_note"> · {{ bill.order.payment_note }}</span></div>
-          </template>
-
-          <DineMenu v-else-if="mode === 'add' && store" ref="menu" :categories="store.categories" :currency="cur" :busy="busy" layout="grid"
-            :storage-key="`staff-cart:${bill.session_id}`" @submit="addBatch" />
-
-          <template v-else-if="mode === 'pay'">
-            <TotalsTable :totals="bill.order.totals" :currency="cur" :delivery="false" />
-            <div v-if="unserved" class="banner warn small">{{ t('not_served_n', { n: unserved }) }}</div>
-            <label class="field"><span>{{ t('amount_received') }} ({{ cur }})</span><input type="number" step="0.01" min="0" v-model.number="pay.received" name="received" /></label>
-            <div class="row between"><span>{{ t('change_due') }}</span><b :style="{ color: change < 0 ? 'var(--bad)' : '' }">{{ change < 0 ? t('amount_short') : money(change, cur) }}</b></div>
-            <label class="field"><span>{{ t('payment_note') }}</span><input v-model="pay.note" maxlength="200" /></label>
-          </template>
+        <div class="sheet-body stack">
+          <div class="small muted">{{ t('n_guests', { n: bill.guests }) }} · {{ t('opened_at') }} {{ new Date(bill.opened_at).toLocaleTimeString() }}
+            <span v-if="bill.closed_at"> · {{ t('closed_at') }} {{ new Date(bill.closed_at).toLocaleTimeString() }}</span></div>
+          <BillLines :order="bill.order" staff readonly />
+          <TotalsTable :totals="bill.order.totals" :currency="cur" :delivery="false" />
+          <div v-if="bill.order.amount_received != null" class="small muted">
+            {{ t('amount_received') }} {{ money(bill.order.amount_received, cur) }} · {{ t('change_due') }} {{ money(bill.order.amount_received - bill.order.totals.total, cur) }}
+            <span v-if="bill.order.pay_method"> · {{ bill.order.pay_method }}</span>
+            <span v-if="bill.order.payment_note"> · {{ bill.order.payment_note }}</span></div>
+          <router-link class="btn small" :to="`/ticket/${bill.order.id}`" target="_blank">{{ t('dd.print') }}</router-link>
         </div>
-        <div class="sheet-foot row between" v-if="bill.status === 'open' && mode !== 'add'">
-          <template v-if="mode === 'bill'">
-            <button class="btn" data-test="add-dishes" @click="startAdd">{{ t('add_dishes') }}</button>
-            <button class="btn primary" data-test="pay" @click="startPay">{{ t('close_table') }}</button>
-          </template>
-          <template v-else>
-            <span class="price bold">{{ money(bill.order.totals.total, cur) }}</span>
-            <button class="btn primary" data-test="confirm-close" :disabled="busy || change < 0" @click="closeTable">{{ t('confirm_close') }}</button>
-          </template>
+      </div>
+    </div>
+
+    <!-- add or change a table -->
+    <div class="sheet-mask" v-if="edit.open" @click.self="edit.open = false">
+      <div class="sheet center" data-test="table-form">
+        <div class="sheet-head row between"><h2>{{ edit.table ? t('dd.edit_table') : t('new_table') }}</h2><button class="btn link" @click="edit.open = false">✕</button></div>
+        <div class="sheet-body stack">
+          <label class="field"><span>{{ t('table_name') }}</span><input v-model="edit.name" maxlength="20" name="table-name" /></label>
+          <label class="field"><span>{{ t('dd.area') }}</span><input v-model="edit.area" maxlength="20" name="table-area" list="table-areas" :placeholder="t('dd.area_ph')" /></label>
+          <datalist id="table-areas"><option v-for="a in areas" :key="a" :value="a" /></datalist>
+          <div class="row between"><span>{{ t('dd.seats_lbl') }}</span>
+            <span class="stepper"><button @click="edit.seats = Math.max(1, edit.seats - 1)">−</button><b data-test="seats">{{ edit.seats }}</b><button class="fill" @click="edit.seats = Math.min(99, edit.seats + 1)">+</button></span></div>
         </div>
+        <div class="sheet-foot row between"><button class="btn" @click="edit.open = false">{{ t('cancel') }}</button>
+          <button class="btn primary" data-test="save-table" :disabled="edit.busy || !edit.name.trim()" @click="saveEdit">{{ t('save') }}</button></div>
       </div>
     </div>
 
@@ -288,8 +194,8 @@ async function saveTable(tb: DiningTable | null, patch: Partial<DiningTable> = {
           </div>
           <button class="btn" data-test="pair-tablet" @click="pairTablet">{{ t('pair_tablet') }}</button>
           <div class="row" v-if="manager" style="gap:8px">
-            <button class="btn small" @click="saveTable(setup.table, { name: '' })">{{ t('rename') }}</button>
-            <button class="btn small" :disabled="!!setup.table.session && setup.table.active" @click="saveTable(setup.table, { active: !setup.table.active })">{{ setup.table.active ? t('disable') : t('enable') }}</button>
+            <button class="btn small" data-test="edit-table" @click="startEdit(setup.table); setup.table = null">{{ t('dd.edit_table') }}</button>
+            <button class="btn small" :disabled="!!setup.table.session && setup.table.active" @click="setActive(setup.table, !setup.table.active)">{{ setup.table.active ? t('disable') : t('enable') }}</button>
           </div>
         </div>
       </div>
@@ -304,5 +210,4 @@ async function saveTable(tb: DiningTable | null, patch: Partial<DiningTable> = {
 .tcard.off { opacity: .55; }
 .tname { font-size: 22px; }
 .gear { position: absolute; inset-inline-end: 8px; bottom: 6px; }
-.sheet.big { max-width: 980px; height: 88vh; }
 </style>

@@ -76,7 +76,7 @@ export interface Totals {
   // the promotion's part (quotes only); the store's and the platform's parts of discount
   promotion_discount?: number; merchant_discount: number; platform_subsidy: number
 }
-export interface LineOption { group: string; group_en: string; name: string; name_en: string; price_delta: number; group_tr?: string; name_tr?: string; qty?: number }
+export interface LineOption { option_id?: number; group: string; group_en: string; name: string; name_en: string; price_delta: number; group_tr?: string; name_tr?: string; qty?: number }
 export interface OrderItem {
   id: number; item_id: number; name: string; name_en: string; name_tr?: string; unit_price: number; qty: number; line_total: number
   options: LineOption[]; note: string; needs_prep: boolean; prep_status: string

@@ -51,6 +51,8 @@ type QuoteInput struct {
 }
 
 type LineOption struct {
+	// OptionID is the menu option chosen (lines from before it was kept have 0).
+	OptionID   int64  `json:"option_id,omitempty"`
 	Group      string `json:"group"`
 	GroupEn    string `json:"group_en"`
 	Name       string `json:"name"`
@@ -391,7 +393,7 @@ func priceLines(ctx context.Context, q Querier, branchID int64, service string, 
 					optionGone = true
 				}
 				unit += o.PriceDelta * int64(k)
-				lo := LineOption{Group: g.Name, GroupEn: g.NameEn, Name: o.Name, NameEn: o.NameEn, PriceDelta: o.PriceDelta}
+				lo := LineOption{OptionID: o.ID, Group: g.Name, GroupEn: g.NameEn, Name: o.Name, NameEn: o.NameEn, PriceDelta: o.PriceDelta}
 				if k > 1 {
 					lo.Qty, lo.PriceDelta = k, o.PriceDelta*int64(k)
 					lo.Name, lo.NameEn = fmt.Sprintf("%s ×%d", o.Name, k), ""
