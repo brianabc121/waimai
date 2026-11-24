@@ -2,6 +2,7 @@
 // The customer confirms the dishes they add to an order (docs/ADD_ON_ORDER_DESIGN.md §8.2):
 // no address, time or payment to choose, all of it stays as on the order. The
 // page shows the order before and after, and what the add-on costs more.
+import '../checkout'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError, get, newKey, post } from '../api'

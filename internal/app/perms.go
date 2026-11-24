@@ -19,29 +19,33 @@ const (
 	PermOrderManual    = "order.manual"
 	PermOrderCancel    = "order.cancel"
 	PermOrderAftersale = "order.aftersale"
-	PermTableUse       = "table.use"
-	PermTableManage    = "table.manage"
-	PermMemberView     = "member.view"
-	PermMemberEdit     = "member.edit"
-	PermChatReply      = "chat.reply"
-	PermChatSettings   = "chat.settings"
-	PermSupport        = "support"
-	PermMenuSoldOut    = "menu.soldout"
-	PermMenuEdit       = "menu.edit"
-	PermMenuTranslate  = "menu.translate"
-	PermStoreDesign    = "store.design"
-	PermPromo          = "promo"
-	PermMall           = "mall"
-	PermCash           = "cash"
-	PermBills          = "bills"
-	PermRiderView      = "rider.view"
-	PermDeliveryMap    = "delivery.map"
-	PermStaffView      = "staff.view"
-	PermStaffManage    = "staff.manage"
-	PermStaffAttend    = "staff.attendance"
-	PermStaffReports   = "staff.reports"
-	PermSettings       = "settings"
-	PermKitchenScreen  = "kitchen.screen"
+	// PermCheckoutDiscount gives a discount, a round-off or a set amount at
+	// checkout (docs/CHECKOUT_DISCOUNT_DESIGN.md §5.3).
+	PermCheckoutDiscount = "checkout.discount"
+	PermTableUse         = "table.use"
+	PermTableManage      = "table.manage"
+	PermMemberView       = "member.view"
+	PermMemberEdit       = "member.edit"
+	PermChatReply        = "chat.reply"
+	PermChatSettings     = "chat.settings"
+	PermSupport          = "support"
+	PermMenuSoldOut      = "menu.soldout"
+	PermMenuEdit         = "menu.edit"
+	PermMenuTranslate    = "menu.translate"
+	PermStoreDesign      = "store.design"
+	PermPromo            = "promo"
+	PermMall             = "mall"
+	PermCash             = "cash"
+	PermBills            = "bills"
+	PermReconcile        = "reconcile"
+	PermRiderView        = "rider.view"
+	PermDeliveryMap      = "delivery.map"
+	PermStaffView        = "staff.view"
+	PermStaffManage      = "staff.manage"
+	PermStaffAttend      = "staff.attendance"
+	PermStaffReports     = "staff.reports"
+	PermSettings         = "settings"
+	PermKitchenScreen    = "kitchen.screen"
 )
 
 // PermDef is one line of the role permissions table.
@@ -66,6 +70,7 @@ var PermCatalog = []PermDef{
 	{Code: PermOrderManual, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderCancel, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderAftersale, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
+	{Code: PermCheckoutDiscount, Group: "order", Cashier: false, Manager: true},
 	{Code: PermTableUse, Group: "table", Cashier: true, Manager: true},
 	{Code: PermTableManage, Group: "table", Cashier: false, Manager: true, Requires: []string{PermTableUse}},
 	{Code: PermMemberView, Group: "customer", Cashier: true, Manager: true},
@@ -81,6 +86,7 @@ var PermCatalog = []PermDef{
 	{Code: PermMall, Group: "store", Cashier: false, Manager: true},
 	{Code: PermCash, Group: "money", Cashier: false, Manager: true},
 	{Code: PermBills, Group: "money", Cashier: false, Manager: true},
+	{Code: PermReconcile, Group: "money", Cashier: false, Manager: true},
 	{Code: PermRiderView, Group: "delivery", Cashier: true, Manager: true},
 	{Code: PermDeliveryMap, Group: "delivery", Cashier: false, Manager: true},
 	{Code: PermStaffView, Group: "staff", Cashier: false, Manager: true},

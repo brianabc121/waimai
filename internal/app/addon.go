@@ -98,14 +98,16 @@ type orderMoney struct {
 	// What the order's discounts took off, by who pays and on what.
 	promoAmount                    int64
 	couponGoods, couponShip, platf int64
+	// adjPercentBP is the percentage off given at checkout, 0 for none.
+	adjPercentBP int
 }
 
 func readOrderMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, error) {
 	var m orderMoney
 	if err := q.QueryRow(ctx, `SELECT subtotal, delivery_fee, packaging_fee, tax_rate_bp, tax_inclusive,
-		promotion_id, customer_phone, service_type, total FROM orders WHERE id=$1`, orderID).Scan(&m.Subtotal,
+		promotion_id, customer_phone, service_type, total, adj_percent_bp FROM orders WHERE id=$1`, orderID).Scan(&m.Subtotal,
 		&m.DeliveryFee, &m.PackagingFee, &m.TaxRateBP, &m.TaxInclusive, &m.PromotionID, &m.Phone, &m.ServiceType,
-		&m.Total); err != nil {
+		&m.Total, &m.adjPercentBP); err != nil {
 		return nil, err
 	}
 	rows, err := q.Query(ctx, `SELECT kind, amount FROM order_discounts WHERE order_id=$1`, orderID)
@@ -186,6 +188,16 @@ func priceWithAddon(ctx context.Context, q Querier, b *Branch, m *orderMoney, ex
 		t.PromotionDiscount = min(res.promoD.total(), t.MerchantDiscount)
 	}
 	t.applyPlatform(m.platf)
+	// A percentage off given at checkout carries over to the new amount; a
+	// round-off does not (docs/CHECKOUT_DISCOUNT_DESIGN.md §5.4).
+	if m.adjPercentBP > 0 {
+		base := adjBase{subtotal: sub, fee: m.DeliveryFee, cfg: cfg, d: d, platf: m.platf, promoID: t.PromotionID,
+			promoName: t.PromotionName, promoNameEn: t.PromotionNameEn, promoAmount: t.PromotionDiscount}
+		var err error
+		if t, err = base.price(Adjust{PercentBP: m.adjPercentBP}); err != nil {
+			return nil, err
+		}
+	}
 	res.Totals = t
 	return res, nil
 }
@@ -362,6 +374,16 @@ func (a *App) applyAddon(ctx context.Context, tx pgx.Tx, b *Branch, o *lockedOrd
 			return Totals{}, err
 		}
 	}
+	// The discount at checkout: the percentage is taken off the new amount,
+	// a round-off or a typed amount to pay is dropped.
+	if _, err := reapplyAdjust(ctx, tx, b, o.ID); err != nil {
+		return Totals{}, err
+	}
+	if err := tx.QueryRow(ctx, `SELECT service_charge, tax_amount, total, staff_discount, round_off, adj_mode
+		FROM orders WHERE id=$1`, o.ID).Scan(&t.ServiceCharge, &t.TaxAmount, &t.Total, &t.StaffDiscount, &t.RoundOff,
+		&t.AdjMode); err != nil {
+		return Totals{}, err
+	}
 	if _, err := tx.Exec(ctx, `UPDATE order_batches SET total_before=$2, total_after=$3 WHERE id=$1`,
 		batchID, m.Total, t.Total); err != nil {
 		return Totals{}, err
@@ -418,13 +440,23 @@ func priceWithAddonOnly(ctx context.Context, q Querier, b *Branch, m *orderMoney
 	}
 	cfg := b.taxConfig()
 	cfg.PackagingFee, cfg.TaxRateBP, cfg.TaxInclusive = m.PackagingFee, m.TaxRateBP, m.TaxInclusive
-	t := ComputeTotals(sub, m.DeliveryFee, cfg, Discount{Goods: res.promoD.Goods + m.couponGoods,
-		Delivery: res.promoD.Delivery + m.couponShip})
+	d := Discount{Goods: res.promoD.Goods + m.couponGoods, Delivery: res.promoD.Delivery + m.couponShip}
+	t := ComputeTotals(sub, m.DeliveryFee, cfg, d)
 	if res.promo != nil {
 		t.PromotionID, t.PromotionName, t.PromotionNameEn = res.promo.ID, res.promo.Name, res.promo.NameEn
 		t.PromotionDiscount = min(res.promoD.total(), t.MerchantDiscount)
 	}
 	t.applyPlatform(m.platf)
+	// A percentage off given at checkout carries over to the new amount; a
+	// round-off does not (docs/CHECKOUT_DISCOUNT_DESIGN.md §5.4).
+	if m.adjPercentBP > 0 {
+		base := adjBase{subtotal: sub, fee: m.DeliveryFee, cfg: cfg, d: d, platf: m.platf, promoID: t.PromotionID,
+			promoName: t.PromotionName, promoNameEn: t.PromotionNameEn, promoAmount: t.PromotionDiscount}
+		var err error
+		if t, err = base.price(Adjust{PercentBP: m.adjPercentBP}); err != nil {
+			return nil, err
+		}
+	}
 	res.Totals = t
 	return res, nil
 }

@@ -446,6 +446,47 @@ type StaffOrderInput struct {
 	StaffNote   string `json:"staff_note"`
 	// Accept accepts the order at once, as it was taken by the store itself.
 	Accept bool `json:"accept"`
+	// Adjust is the discount at checkout (docs/CHECKOUT_DISCOUNT_DESIGN.md §5);
+	// the caller checked who may give it.
+	Adjust *Adjust `json:"adjust"`
+	// Pay is set when the customer already paid online; nil means cash on
+	// delivery or at the counter.
+	Pay *PayInput `json:"pay"`
+	// ExpectedTotal is the amount the staff member saw; another amount means
+	// prices or the discount changed meanwhile.
+	ExpectedTotal *int64 `json:"expected_total"`
+}
+
+// HasAdjust says whether the order comes with a discount at checkout.
+func (in *StaffOrderInput) HasAdjust() bool { return !in.Adjust.empty() }
+
+// staffAdjust adds the discount at checkout to a staff quote. Staff orders use
+// no coupons, so the store's discount is the promotion alone.
+func staffAdjust(ctx context.Context, q Querier, b *Branch, quote *Quote, j *Adjust) error {
+	if j.empty() {
+		return nil
+	}
+	t := quote.Totals
+	base := adjBase{subtotal: t.Subtotal, fee: t.DeliveryFee, cfg: b.taxConfig(), promoID: t.PromotionID,
+		promoName: t.PromotionName, promoNameEn: t.PromotionNameEn, promoAmount: t.PromotionDiscount}
+	base.cfg.PackagingFee = t.PackagingFee
+	if t.PromotionID != 0 {
+		var kind string
+		if err := q.QueryRow(ctx, `SELECT kind FROM promotions WHERE id=$1`, t.PromotionID).Scan(&kind); err != nil {
+			return err
+		}
+		if kind == "free_delivery" {
+			base.d.Delivery = t.MerchantDiscount
+		} else {
+			base.d.Goods = t.MerchantDiscount
+		}
+	}
+	nt, err := base.price(*j)
+	if err != nil {
+		return err
+	}
+	quote.Totals = nt
+	return nil
 }
 
 func (in *StaffOrderInput) quoteInput() QuoteInput {
@@ -462,6 +503,14 @@ func (in *StaffOrderInput) quoteInput() QuoteInput {
 func (in *StaffOrderInput) check() error {
 	if in.DeliveryFee != nil && (*in.DeliveryFee < 0 || *in.DeliveryFee > 100000000) {
 		return ErrValidation("invalid delivery fee")
+	}
+	if in.Adjust != nil {
+		if err := in.Adjust.validate(); err != nil {
+			return err
+		}
+	}
+	if in.Pay != nil && in.Pay.Type != "online" {
+		return ErrValidation("only an online payment can be recorded when ordering")
 	}
 	if len([]rune(in.Note)) > 300 || len([]rune(in.StaffNote)) > 300 {
 		return ErrValidation("text too long")
@@ -480,7 +529,14 @@ func (a *App) StaffQuote(ctx context.Context, branchID int64, in StaffOrderInput
 		return nil, err
 	}
 	phone := strings.TrimSpace(in.Member.Phone)
-	return computeQuote(ctx, a.DB, a.forCustomer(b), in.quoteInput(), phone)
+	q, err := computeQuote(ctx, a.DB, a.forCustomer(b), in.quoteInput(), phone)
+	if err != nil {
+		return nil, err
+	}
+	if err := staffAdjust(ctx, a.DB, b, q, in.Adjust); err != nil {
+		return nil, err
+	}
+	return q, nil
 }
 
 // StaffOrder is the answer to placing an order for a customer.
@@ -537,6 +593,20 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 		if err != nil {
 			return err
 		}
+		if err := staffAdjust(ctx, tx, b, cur, in.Adjust); err != nil {
+			return err
+		}
+		if in.ExpectedTotal != nil && *in.ExpectedTotal != cur.Totals.Total {
+			return ErrD(http.StatusConflict, "QUOTE_CHANGED", "the amount changed, please confirm it again",
+				map[string]any{"total": cur.Totals.Total})
+		}
+		var payChannel *int64
+		var payName string
+		if in.Pay != nil {
+			if payChannel, payName, err = resolvePay(ctx, tx, b.ID, *in.Pay); err != nil {
+				return err
+			}
+		}
 		if err := reserveStock(ctx, tx, cur.Lines); err != nil {
 			return err
 		}
@@ -554,6 +624,9 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 		payMethod := "cod"
 		if cur.ServiceType == "pickup" {
 			payMethod = "pay_at_pickup"
+		}
+		if payChannel != nil {
+			payMethod = "prepaid"
 		}
 		var wechat, line, whatsapp string
 		switch m.Source {
@@ -609,6 +682,22 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 		}
 		if t.PromotionID != 0 {
 			if err := claimPromotion(ctx, tx, b.ID, t.PromotionID, orderID, phone, t.PromotionDiscount); err != nil {
+				return err
+			}
+		}
+		if !in.Adjust.empty() {
+			if err := writeAdjusted(ctx, tx, orderID, t, in.Adjust.Reason, actor); err != nil {
+				return err
+			}
+			if err := audit(ctx, tx, b.ID, orderID, actor, "order.adjusted", map[string]any{"adjust": in.Adjust,
+				"total_after": t.Total, "staff_discount": t.StaffDiscount, "round_off": t.RoundOff}); err != nil {
+				return err
+			}
+		}
+		if payChannel != nil {
+			// Paid before it left: the rider collects nothing.
+			if _, err := tx.Exec(ctx, `UPDATE orders SET payment_status='paid', pay_type='online', pay_channel_id=$2,
+				pay_method=$3, amount_received=total WHERE id=$1`, orderID, *payChannel, payName); err != nil {
 				return err
 			}
 		}

@@ -76,7 +76,15 @@ export interface Totals {
   promotion_id: number; promotion_name: string; promotion_name_en: string
   // the promotion's part (quotes only); the store's and the platform's parts of discount
   promotion_discount?: number; merchant_discount: number; platform_subsidy: number
+  // the discount at checkout (docs/CHECKOUT_DISCOUNT_DESIGN.md §5): adj_percent_bp is the share
+  // of the dishes still charged (9000 = 10% off), staff_discount what it took off, round_off
+  // what the round-off or the typed amount took off what is paid
+  adj_percent_bp?: number; staff_discount?: number; adj_mode?: '' | 'round' | 'set_total'; round_off?: number
 }
+export interface PayChannel { id: number; country: string; name: string; names: Record<string, string>; icon_url: string; sort: number; active: boolean; stores?: number; uses?: number }
+export interface PayOptions { cash: boolean; card: boolean; channels: PayChannel[]; all: PayChannel[]; off: number[]; reasons: string[] | null; country: string }
+export interface Adjust { percent_bp: number; mode: '' | 'round' | 'set_total'; amount: number; reason: string }
+export interface PayChoice { type: 'cash' | 'card' | 'online'; channel_id: number }
 export interface LineOption { option_id?: number; group: string; group_en: string; name: string; name_en: string; price_delta: number; group_tr?: string; name_tr?: string; qty?: number }
 export interface OrderItem {
   id: number; item_id: number; name: string; name_en: string; name_tr?: string; unit_price: number; qty: number; line_total: number
@@ -122,6 +130,8 @@ export interface Order {
   accept_deadline: string; scheduled_for: string | null; release_at: string | null; timezone: string; created_at: string; items: OrderItem[]; delivery: DeliveryTask | null; cash: Cash | null
   session_id: number | null; table_name: string; amount_received: number | null; payment_note: string
   pay_method?: string; table_tags?: string[]
+  // how it was paid and who gave the discount at checkout (staff only)
+  pay_type?: '' | 'cash' | 'card' | 'online'; pay_channel_id?: number; adj_reason?: string; adj_by?: string; adj_approved_by?: string; adj_at?: string | null
   aftersale: Aftersale | null; store?: OrderStore; completed_at?: string | null; accepted_at?: string | null; closed_at?: string | null
   // the promotion and each coupon taken off; the coupon this order earned (customer page only)
   discounts?: OrderDiscount[]; gift?: CustomerCoupon | null

@@ -245,7 +245,11 @@ func (a *App) handoff(ctx context.Context, tx pgx.Tx, o *lockedOrder, actor Acto
 		if err := a.endPendingAddons(ctx, tx, o.ID, "expired"); err != nil {
 			return err
 		}
+		// Paid at the counter in cash unless recorded otherwise (prepaid, or
+		// corrected on the order page afterwards).
 		if _, err := tx.Exec(ctx, `UPDATE orders SET fulfillment_status='picked_up', payment_status='paid',
+			pay_type = CASE WHEN pay_type = '' THEN 'cash' ELSE pay_type END,
+			amount_received = COALESCE(amount_received, total),
 			handed_off_at=now(), completed_at=now(), version=version+1, updated_at=now() WHERE id=$1`, o.ID); err != nil {
 			return err
 		}
@@ -565,8 +569,18 @@ func (a *App) RiderArrive(ctx context.Context, taskID, riderID int64) (*Order, e
 // RiderDeliver records delivery and the cash actually collected in one
 // transaction. A repeat call returns the current state and records nothing.
 func (a *App) RiderDeliver(ctx context.Context, taskID, riderID, collected int64) (*Order, error) {
+	return a.RiderDeliverPaid(ctx, taskID, riderID, collected, nil)
+}
+
+// RiderDeliverPaid is RiderDeliver where the customer may have paid the rider
+// online at the door (pay.Type "online"): then no cash is collected and the
+// method is recorded (docs/CHECKOUT_DISCOUNT_DESIGN.md §6.2).
+func (a *App) RiderDeliverPaid(ctx context.Context, taskID, riderID, collected int64, pay *PayInput) (*Order, error) {
 	if collected < 0 {
 		return nil, ErrValidation("collected_amount must not be negative")
+	}
+	if pay != nil && pay.Type != "online" && pay.Type != "cash" {
+		return nil, ErrValidation("payment type must be cash or online")
 	}
 	return a.riderCommand(ctx, taskID, riderID, func(tx pgx.Tx, o *lockedOrder, status string) error {
 		if status == "delivered" {
@@ -578,19 +592,32 @@ func (a *App) RiderDeliver(ctx context.Context, taskID, riderID, collected int64
 		if _, err := tx.Exec(ctx, `UPDATE delivery_tasks SET status='delivered', delivered_at=now() WHERE id=$1`, taskID); err != nil {
 			return err
 		}
-		pay := o.Payment
-		if o.Payment == "unpaid" {
+		paid := o.Payment
+		if o.Payment == "unpaid" && pay != nil && pay.Type == "online" {
+			ch, name, err := resolvePay(ctx, tx, o.BranchID, *pay)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `UPDATE orders SET pay_type='online', pay_channel_id=$2, pay_method=$3,
+				amount_received=total WHERE id=$1`, o.ID, ch, name); err != nil {
+				return err
+			}
+			paid, collected = "paid", 0
+		} else if o.Payment == "unpaid" {
+			if _, err := tx.Exec(ctx, `UPDATE orders SET pay_type='cash' WHERE id=$1 AND pay_type=''`, o.ID); err != nil {
+				return err
+			}
 			if _, err := tx.Exec(ctx, `INSERT INTO cash_collections (order_id, branch_id, rider_id, amount_due,
 				amount_collected) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (order_id) DO NOTHING`,
 				o.ID, o.BranchID, riderID, o.Total, collected); err != nil {
 				return err
 			}
 			if collected == o.Total {
-				pay = "paid"
+				paid = "paid"
 			}
 		}
 		if _, err := tx.Exec(ctx, `UPDATE orders SET fulfillment_status='delivered', payment_status=$2,
-			completed_at=now(), version=version+1, updated_at=now() WHERE id=$1`, o.ID, pay); err != nil {
+			completed_at=now(), version=version+1, updated_at=now() WHERE id=$1`, o.ID, paid); err != nil {
 			return err
 		}
 		if err := tripDrop(ctx, tx, o.ID, "delivered"); err != nil {

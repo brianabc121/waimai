@@ -10,7 +10,10 @@ import { ApiError, get, newKey, post, put } from '../api'
 import { has, mn, money, pick, promoLabel, t, whenText } from '../i18n'
 import { can, currentRole, session } from '../session'
 import { dialOf, e164, localDigits, splitPhone } from '../dial'
-import type { AddonQuote, AddressHint, DinePresets, Item, OptionGroup, Order, Quote, Storefront, StoreMember } from '../types'
+import type { AddonQuote, AddressHint, Adjust, DinePresets, Item, OptionGroup, Order, PayOptions, Quote, Storefront, StoreMember, Totals } from '../types'
+import AdjustSheet from './checkout/AdjustSheet.vue'
+import ApproveDialog from './ApproveDialog.vue'
+import { channelName, pctText } from '../checkout'
 import { addonErr, addonNo, batchSource, batchTitle, itemsByBatch } from '../addon'
 import { presetList } from './dine/strings'
 import type { Picked } from './PlacePicker.vue'
@@ -62,6 +65,7 @@ onMounted(async () => {
   if (!slug) return
   try { store.value = await get<Storefront>(`/stores/${slug}`) } catch (e) { loadError.value = (e as Error).message }
   if (store.value && !store.value.branch.delivery_enabled && store.value.branch.pickup_enabled) service.value = 'pickup'
+  try { payOpts.value = await get<PayOptions>(`${base}/pay-options`) } catch { /* only cash on delivery */ }
 })
 
 // ---------- adding to an order ----------
@@ -436,9 +440,44 @@ const orderBody = () => ({
     option_ids: Object.entries(l.picks).flatMap(([id, n]) => Array(n).fill(Number(id))) })),
   scheduled_for: when.value || null, delivery_fee: service.value === 'delivery' ? feeOverride.value : null,
   note: orderNote.value, staff_note: staffNote.value, accept: accept.value,
+  adjust: adjust.value, pay: payChannel.value ? { type: 'online', channel_id: payChannel.value } : null,
+})
+
+// ---------- discount at checkout, paid online (docs/CHECKOUT_DISCOUNT_DESIGN.md §5, §6.2) ----------
+const adjust = ref<Adjust | null>(null)
+const adjOpen = ref(false)
+const approval = ref('')
+const approving = ref(false)
+const approvedNote = ref('')
+const payOpts = ref<PayOptions | null>(null)
+const payChannel = ref(0)
+function openAdjust() {
+  if (can('checkout.discount') || approval.value) adjOpen.value = true
+  else approving.value = true
+}
+function approved(token: string, name: string) {
+  approving.value = false; approval.value = token
+  approvedNote.value = t('ck.approved', { name }); adjOpen.value = true
+}
+const previewAdj = async (a: Adjust): Promise<Totals> => (await post<Quote>(`${base}/staff-quotes`, { ...orderBody(), adjust: a.percent_bp || a.mode ? a : null })).totals
+const isNarrow = () => window.matchMedia('(max-width: 700px)').matches
+function setAdjust(a: Adjust | null) { adjOpen.value = false; adjust.value = a }
+// a round-off or a typed amount no longer fits once the dishes change (§5.4)
+watch(() => JSON.stringify(orderBody().items), () => {
+  const a = adjust.value
+  if (a?.mode) adjust.value = a.percent_bp ? { ...a, mode: '', amount: 0 } : null
+})
+const adjLabel = computed(() => {
+  const a = adjust.value, x = totals.value
+  if (!a) return t('ck.adj_none')
+  const parts: string[] = []
+  if (a.percent_bp) parts.push(pctText(a.percent_bp) + (x?.staff_discount ? ` −${m(x.staff_discount)}` : ''))
+  if (a.mode === 'round') parts.push(t('ck.round_off') + (x?.round_off ? ` −${m(x.round_off)}` : ''))
+  if (a.mode === 'set_total') parts.push(a.amount === 0 ? t('ck.free') : t('ck.set_off') + (x?.round_off ? ` −${m(x.round_off)}` : ''))
+  return parts.join(' · ') + (a.reason ? ` · ${a.reason}` : '')
 })
 let quoteTimer = 0, quoteSeq = 0
-watch(() => JSON.stringify([orderBody().items, service.value, zoneId.value, f.lat, f.lng, feeOverride.value, when.value, phoneE164.value, roundTags.value]), () => {
+watch(() => JSON.stringify([orderBody().items, service.value, zoneId.value, f.lat, f.lng, feeOverride.value, when.value, phoneE164.value, roundTags.value, adjust.value]), () => {
   clearTimeout(quoteTimer)
   quoteTimer = window.setTimeout(requote, 300)
 })
@@ -549,7 +588,10 @@ async function place() {
   if (appendId) return placeAddon()
   placing.value = true
   try {
-    const r = await post<{ order: Order; member: StoreMember; access_token: string }>(`${base}/staff-orders`, orderBody(), { 'Idempotency-Key': newKey() })
+    const body = { ...orderBody(), expected_total: adjust.value || payChannel.value ? totals.value?.total ?? null : null }
+    const r = await post<{ order: Order; member: StoreMember; access_token: string }>(`${base}/staff-orders`, body,
+      { 'Idempotency-Key': newKey(), ...(adjust.value && approval.value ? { 'X-Approval': approval.value } : {}) })
+    if (adjust.value) approval.value = ''
     const text = message(r.order, r.access_token)
     done.value = { order: r.order, token: r.access_token, text }
     await copy(text)
@@ -593,6 +635,7 @@ function next() {
   done.value = null
   lines.value = []; clearMember()
   feeOverride.value = null; zoneId.value = null; when.value = ''; orderNote.value = ''; staffNote.value = ''
+  adjust.value = null; payChannel.value = 0; approvedNote.value = ''
   quote.value = null; quoteError.value = ''; error.value = ''
   void nextTick(() => document.querySelector<HTMLInputElement>('[data-testid="mo-member"]')?.focus())
 }
@@ -706,6 +749,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
             <span><span class="k">{{ t('vo.packaging') }}</span>{{ totals ? m(totals.packaging_fee) : '—' }}</span>
             <span><span class="k">{{ t('vo.delivery_fee') }}</span>{{ feeText }}</span>
             <span><span class="k">{{ t('vo.discount') }}</span>{{ totals?.discount ? '−' + m(totals.discount) : '—' }}</span>
+            <span v-if="totals?.staff_discount || totals?.round_off" class="gold-k" data-testid="mo-adj-amt"><span class="k">{{ t('ck.staff_disc') }}</span>−{{ m((totals.staff_discount ?? 0) + (totals.round_off ?? 0)) }}</span>
             <span><span class="k">{{ t('vo.total') }}</span><b data-testid="mo-total">{{ m(total) }}</b></span>
             <span class="grow"></span>
             <button class="btn copy" :disabled="!lines.length" @click="copyDraft">{{ t('vo.copy_order') }}</button>
@@ -856,8 +900,16 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
               <option value="">{{ service === 'pickup' ? t('vo.asap_pickup') : t('vo.asap') }}</option>
               <option v-for="s in store?.slots ?? []" :key="s" :value="s">{{ whenText(s, store?.branch.timezone) }}</option>
             </select>
-            <span class="k auto">{{ t('vo.pay') }}</span><span class="inp ro">{{ t(service === 'pickup' ? 'pay_at_pickup' : 'cod') }}</span>
+            <span class="k auto">{{ t('vo.pay') }}</span>
+            <select v-model="payChannel" class="inp" data-testid="mo-pay">
+              <option :value="0">{{ t(service === 'pickup' ? 'ck.pay_store' : 'ck.cod') }}</option>
+              <option v-for="c in payOpts?.channels ?? []" :key="c.id" :value="c.id">{{ t('ck.paid_online') }} · {{ channelName(c) }}</option>
+            </select>
           </div>
+          <div class="sec"><span class="k">{{ t('ck.adj') }}</span>
+            <button class="inp adjbtn" :class="{ set: !!adjust }" data-testid="mo-adj" @click="openAdjust">{{ adjLabel }}</button>
+          </div>
+          <div v-if="approvedNote && adjust" class="sec"><span class="k"></span><span class="muted small">{{ approvedNote }}</span></div>
           <div class="sec"><span class="k">{{ t('vo.order_note') }}</span><input v-model="orderNote" class="inp" maxlength="300" :placeholder="t('vo.order_note_ph')" /></div>
           <div class="sec"><span class="k">{{ t('vo.staff_note') }}</span><input v-model="staffNote" class="inp" maxlength="300" data-testid="mo-staff-note" :placeholder="t('vo.staff_note_ph')" /></div>
           </template>
@@ -919,6 +971,9 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
       :name="f.line" :shop="store.branch.lat != null && store.branch.lng != null ? { lat: store.branch.lat, lng: store.branch.lng, name: store.branch.name, country: store.branch.country_code } : null"
       keepable @done="picked" @close="picking = false" />
 
+    <AdjustSheet v-if="adjOpen" :currency="cur" :reasons="payOpts?.reasons" :initial="adjust" :bottom="isNarrow()" :preview="previewAdj"
+      @close="adjOpen = false" @apply="setAdjust" />
+    <ApproveDialog v-if="approving" :branch-id="bid" perm="checkout.discount" :what="t('ck.approve_what')" @approved="approved" @close="approving = false" />
     <div v-if="toast" class="toast">✓ {{ toast }}</div>
     <div v-if="done && appendId" class="sheet-mask center">
       <div class="modal" data-testid="ao-done">
@@ -1035,6 +1090,9 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 .sec .k.auto { width: auto; }
 .brandc { color: var(--brand-dark) !important; }
 .inp { flex: 1; border: 1px solid var(--edge); border-radius: 8px; padding: 6px 10px; background: #fff; min-height: 34px; display: flex; align-items: center; gap: 6px; min-width: 0; font: inherit; }
+.adjbtn { cursor: pointer; color: var(--muted, #8a7a70); text-align: start; border-style: dashed; }
+.adjbtn.set { border-style: solid; border-color: #e8c97a; background: #fdf3d6; color: #8a5a12; font-weight: 600; }
+.gold-k { color: #8a5a12; font-weight: 600; }
 .inp:focus, .inp:focus-within { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(160, 44, 32, .15); }
 .inp input { border: 0; outline: 0; flex: 1; min-width: 0; font: inherit; padding: 0; }
 .inp .cc { background: var(--row); border-radius: 5px; padding: 0 6px; font-weight: 600; }

@@ -12,7 +12,7 @@ import { presetList } from './strings'
 const props = defineProps<{ presets: DinePresets | null; country: string }>()
 const emit = defineEmits<{ close: []; saved: [p: DinePresets] }>()
 type Which = 'table_tags' | 'round_tags' | 'void_reasons' | 'pay_methods'
-const LISTS: [Which, string][] = [['table_tags', 'dd.set.table_tags'], ['round_tags', 'dd.set.round_tags'], ['void_reasons', 'dd.set.void'], ['pay_methods', 'dd.set.pay']]
+const LISTS: [Which, string][] = [['table_tags', 'dd.set.table_tags'], ['round_tags', 'dd.set.round_tags'], ['void_reasons', 'dd.set.void']]
 
 const form = reactive({
   lists: Object.fromEntries(LISTS.map(([w]) => [w, [...presetList(props.presets, w, props.country)]])) as Record<Which, string[]>,
