@@ -5,20 +5,43 @@
 // dish search. The store's own members are found by number, phone or name;
 // "new member" holds the next number for an hour.
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ApiError, get, newKey, post, put } from '../api'
 import { has, mn, money, pick, promoLabel, t, whenText } from '../i18n'
-import { currentRole, session } from '../session'
+import { can, currentRole, session } from '../session'
 import { dialOf, e164, localDigits, splitPhone } from '../dial'
 import type { AddressHint, Item, OptionGroup, Order, Quote, Storefront, StoreMember } from '../types'
 import type { Picked } from './PlacePicker.vue'
 import { googleMapsLink, mapsKey, suggestPlaces, type Place } from '../maps'
 import './manualStrings'
+import './dine/strings'
 import NotePicker from './NotePicker.vue'
 import { cartTags, hasNotes, toggleTag } from '../notes'
 
 const PlacePicker = defineAsyncComponent(() => import('./PlacePicker.vue'))
+const DineDesk = defineAsyncComponent(() => import('./dine/DineDesk.vue'))
 const router = useRouter()
+const route = useRoute()
+
+// Two modes (docs/DINE_IN_ORDER_DESIGN.md §3): delivery/pickup taken over the
+// phone, and the dine-in desk. The choice is remembered on this device; a link
+// with ?mode=dine or ?table= opens the desk, and staff who may only work the
+// tables always get the desk.
+type Mode = 'delivery' | 'dine'
+const canDine = can('table.use'), canDelivery = can('order.manual')
+function firstMode(): Mode {
+  if (!canDelivery) return 'dine'
+  if (!canDine) return 'delivery'
+  if (route.query.mode === 'dine' || route.query.table) return 'dine'
+  if (route.query.mode === 'delivery') return 'delivery'
+  try { return localStorage.getItem('mo-mode') === 'dine' ? 'dine' : 'delivery' } catch { return 'delivery' }
+}
+const mode = ref<Mode>(firstMode())
+function setMode(v: Mode) {
+  mode.value = v
+  try { localStorage.setItem('mo-mode', v) } catch { /* private window */ }
+  if (route.query.mode || route.query.table) void router.replace({ query: {} })
+}
 const bid = session.branchId!
 const base = `/merchant/branches/${bid}`
 const SOURCES = ['wechat', 'line', 'whatsapp', 'phone', 'other']
@@ -494,7 +517,7 @@ function next() {
   quote.value = null; quoteError.value = ''; error.value = ''
   void nextTick(() => document.querySelector<HTMLInputElement>('[data-testid="mo-member"]')?.focus())
 }
-function onKey(e: KeyboardEvent) { if (done.value && e.key === 'Enter') { e.preventDefault(); next() } }
+function onKey(e: KeyboardEvent) { if (mode.value === 'delivery' && done.value && e.key === 'Enter') { e.preventDefault(); next() } }
 onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
@@ -511,10 +534,15 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 </script>
 
 <template>
-  <div class="mo warm" data-testid="manual-order">
+  <DineDesk v-if="mode === 'dine'" :store="store" :can-delivery="canDelivery" @switch="setMode('delivery')" />
+  <div v-else class="mo warm" data-testid="manual-order">
     <div class="mo-top">
       <button class="back" @click="router.push('/merchant/orders')"><span class="rtl-flip">‹</span> {{ t('vo.back') }}</button>
       <h1>{{ t('vo.title') }}</h1>
+      <div v-if="canDine" class="mo-modes" role="tablist">
+        <button role="tab" class="on" aria-selected="true" data-testid="mode-delivery">{{ t('dd.mode_delivery') }}</button>
+        <button role="tab" data-testid="mode-dine" @click="setMode('dine')">{{ t('dd.mode_dine') }}</button>
+      </div>
       <span class="store">{{ store?.branch.name }}</span>
     </div>
     <div v-if="loadError" class="banner bad" style="margin:12px">{{ loadError }}</div>
@@ -792,6 +820,9 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 .mo-top .back { background: none; border: 0; color: var(--gold-soft); font-weight: 600; }
 .mo-top h1 { font-size: 17px; margin: 0; }
 .mo-top .store { color: var(--gold); }
+.mo-modes { display: flex; background: rgba(0,0,0,.22); border-radius: 999px; padding: 3px; }
+.mo-modes button { background: none; border: 0; color: var(--gold-soft); padding: 5px 14px; border-radius: 999px; font-weight: 600; }
+.mo-modes button.on { background: var(--gold); color: #5a1010; }
 .mo-body { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 470px 190px; min-height: 0; }
 .c { text-align: center; } .r { text-align: right; } .b { font-weight: 700; } .red { color: #b42318; } .okc { color: #18794e; }
 .small { font-size: 12.5px; } .grow { flex: 1; min-width: 0; } .wrap { flex-wrap: wrap; }

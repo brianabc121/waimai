@@ -86,12 +86,13 @@ func (s *Server) openTable(c *gin.Context) {
 		return
 	}
 	var in struct {
-		Guests int `json:"guests"`
+		Guests int      `json:"guests"`
+		Tags   []string `json:"tags"`
 	}
 	if !bind(c, &in) {
 		return
 	}
-	bill, err := s.App.OpenTable(c, id, in.Guests, staffActor(c))
+	bill, err := s.App.OpenTable(c, id, in.Guests, in.Tags, staffActor(c))
 	if err != nil {
 		fail(c, err)
 		return
@@ -170,11 +171,17 @@ func (s *Server) billItem(c *gin.Context) {
 		}
 		var in struct {
 			Reason string `json:"reason"`
+			Qty    int    `json:"qty"`
 		}
 		if !bind(c, &in) {
 			return
 		}
-		bill, err = s.App.VoidItem(c, itemID, in.Reason, staffActor(c))
+		bill, err = s.App.VoidItem(c, itemID, in.Reason, in.Qty, staffActor(c))
+	case "rush":
+		if !allowed(c, bid, pTable) {
+			return
+		}
+		bill, err = s.App.RushItem(c, itemID, staffActor(c))
 	default:
 		if !allowed(c, bid, pKitchen) {
 			return
@@ -333,4 +340,76 @@ func (s *Server) tableEvents(c *gin.Context) {
 		return
 	}
 	s.Hub.serve(c, &subscription{order: acc.OrderID})
+}
+
+func (s *Server) patchSession(c *gin.Context) {
+	id, ok := s.sessionScope(c, pTable)
+	if !ok {
+		return
+	}
+	var in app.SessionPatch
+	if !bind(c, &in) {
+		return
+	}
+	bill, err := s.App.UpdateSession(c, id, in, staffActor(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, bill)
+}
+
+func (s *Server) moveTable(c *gin.Context) {
+	id, ok := s.sessionScope(c, pTable)
+	if !ok {
+		return
+	}
+	var in struct {
+		TableID int64 `json:"table_id"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	bill, err := s.App.MoveTable(c, id, in.TableID, staffActor(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, bill)
+}
+
+// dineDesk is what the desk needs besides the tables: the presets and the
+// dishes eaten in most often.
+func (s *Server) dineDesk(c *gin.Context) {
+	bid, ok := branchScope(c, pTable)
+	if !ok {
+		return
+	}
+	p, err := s.App.GetDinePresets(c, bid)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	top, err := s.App.DineTop(c, bid)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"presets": p, "top": top})
+}
+
+func (s *Server) saveDinePresets(c *gin.Context) {
+	bid, ok := branchScope(c, pTableManage)
+	if !ok {
+		return
+	}
+	var in app.DinePresets
+	if !bind(c, &in) {
+		return
+	}
+	if err := s.App.SaveDinePresets(c, bid, in); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
 }

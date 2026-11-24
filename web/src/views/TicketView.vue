@@ -5,6 +5,7 @@ import { both, money, t, whenText } from '../i18n'
 import type { Order } from '../types'
 import { contactApps, contactName, contactPhone } from '../addresses'
 import TotalsTable from './TotalsTable.vue'
+import './dine/strings'
 
 // A browser-printable ticket (80mm-friendly). There is no printer integration
 // in the first version; staff print from the browser when they need paper.
@@ -23,10 +24,11 @@ const sorted = computed(() => [...(o.value?.items ?? [])].sort((a, b) => a.baske
     <h1>{{ o.public_no }}</h1>
     <p v-if="o.scheduled_for"><b>{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</b></p>
     <p><b>{{ t(o.service_type) }}</b> · {{ new Date(o.created_at).toLocaleString() }}</p>
-    <p>{{ contactName(o) }} · {{ contactPhone(o) }}
+    <p v-if="o.service_type === 'dine_in'" data-testid="ticket-table"><b>{{ t('table') }} {{ o.table_name }}</b><template v-if="o.table_tags?.length"> · {{ o.table_tags.join(' · ') }}</template></p>
+    <p v-else>{{ contactName(o) }} · {{ contactPhone(o) }}
       <template v-for="c in contactApps(o)" :key="c.field"><br />{{ c.label }} {{ c.value }}</template></p>
     <p v-if="o.service_type === 'delivery'">{{ o.zone_name }} · {{ o.address_line }} {{ o.address_unit }}<br />{{ o.address_note }}</p>
-    <p v-else>{{ t('pickup_code') }}: <b>{{ o.pickup_code }}</b></p>
+    <p v-else-if="o.service_type === 'pickup'">{{ t('pickup_code') }}: <b>{{ o.pickup_code }}</b></p>
     <p v-if="o.note"><b>{{ t('order_note') }}: {{ o.note }}</b></p>
     <hr />
     <div v-for="(it, i) in sorted" :key="it.id" class="line">
@@ -35,10 +37,13 @@ const sorted = computed(() => [...(o.value?.items ?? [])].sort((a, b) => a.baske
       <small v-if="it.options.length">{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</small>
       <small v-if="it.note_tags?.length" class="nt" data-testid="ticket-notes">※ {{ it.note_tags.map(x => x.name).join(' ') }}</small>
       <small v-if="it.note" class="nt">{{ t('note') }}: {{ it.note }}</small>
+      <small v-if="it.prep_status === 'cancelled'" class="nt">{{ t('dd.voided', { r: it.void_reason || '—' }) }}</small>
     </div>
     <hr />
     <TotalsTable :totals="o.totals" :currency="o.currency" :delivery="o.service_type === 'delivery'" :discounts="o.discounts" />
-    <p>{{ t(o.payment_method) }} · {{ t(o.payment_status) }}</p>
+    <p v-if="o.service_type === 'dine_in' && o.amount_received != null" data-testid="ticket-paid">
+      {{ o.pay_method || t('dd.paid') }} {{ money(o.amount_received, o.currency) }} · {{ t('dd.change') }} {{ money(o.amount_received - o.totals.total, o.currency) }}</p>
+    <p v-else>{{ t(o.payment_method) }} · {{ t(o.payment_status) }}</p>
   </div>
 </template>
 

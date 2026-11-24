@@ -50,6 +50,10 @@ type SessionSummary struct {
 	Total     int64     `json:"total"`
 	ItemCount int       `json:"item_count"` // live lines
 	Unserved  int       `json:"unserved"`   // live lines not yet at the table
+	// UnservedQty counts portions (not lines) still to reach the table.
+	UnservedQty int      `json:"unserved_qty"`
+	Rounds      int      `json:"rounds"`
+	Tags        []string `json:"tags"`
 }
 
 type Table struct {
@@ -58,6 +62,8 @@ type Table struct {
 	QRToken string          `json:"qr_token"`
 	Active  bool            `json:"active"`
 	Sort    int             `json:"sort"`
+	Area    string          `json:"area"`
+	Seats   int             `json:"seats"`
 	Session *SessionSummary `json:"session"`
 	Devices []TableDevice   `json:"devices"`
 }
@@ -66,6 +72,9 @@ type TableInput struct {
 	Name   string `json:"name"`
 	Active bool   `json:"active"`
 	Sort   int    `json:"sort"`
+	Area   string `json:"area"`
+	// Seats left out (0) keeps a table's seats; a new table gets 4.
+	Seats int `json:"seats"`
 }
 
 func isUnique(err error, constraint string) bool {
@@ -80,11 +89,23 @@ func (a *App) SaveTable(ctx context.Context, branchID, id int64, in TableInput) 
 	if in.Name == "" || len(in.Name) > 20 {
 		return 0, ErrValidation("table name is required (up to 20 characters)")
 	}
+	in.Area = strings.TrimSpace(in.Area)
+	if len([]rune(in.Area)) > 20 {
+		return 0, ErrValidation("area name is up to 20 characters")
+	}
+	if in.Seats < 0 || in.Seats > 99 {
+		return 0, ErrValidation("seats must be between 1 and 99")
+	}
+	var seats *int
+	if in.Seats > 0 {
+		seats = &in.Seats
+	}
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
 		if id == 0 {
 			code := base64.RawURLEncoding.EncodeToString(randomBytes(12))
-			if err := tx.QueryRow(ctx, `INSERT INTO dining_tables (branch_id, name, qr_token, active, sort)
-				VALUES ($1,$2,$3,$4,$5) RETURNING id`, branchID, in.Name, code, in.Active, in.Sort).Scan(&id); err != nil {
+			if err := tx.QueryRow(ctx, `INSERT INTO dining_tables (branch_id, name, qr_token, active, sort, area, seats)
+				VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,4)) RETURNING id`, branchID, in.Name, code, in.Active, in.Sort,
+				in.Area, seats).Scan(&id); err != nil {
 				return err
 			}
 			return branchChanged(ctx, tx, branchID)
@@ -99,8 +120,8 @@ func (a *App) SaveTable(ctx context.Context, branchID, id int64, in TableInput) 
 				return ErrInvalidState("close the table before disabling it")
 			}
 		}
-		tag, err := tx.Exec(ctx, `UPDATE dining_tables SET name=$3, active=$4, sort=$5 WHERE id=$1 AND branch_id=$2`,
-			id, branchID, in.Name, in.Active, in.Sort)
+		tag, err := tx.Exec(ctx, `UPDATE dining_tables SET name=$3, active=$4, sort=$5, area=$6, seats=COALESCE($7, seats)
+			WHERE id=$1 AND branch_id=$2`, id, branchID, in.Name, in.Active, in.Sort, in.Area, seats)
 		if err != nil {
 			return err
 		}
@@ -117,10 +138,12 @@ func (a *App) SaveTable(ctx context.Context, branchID, id int64, in TableInput) 
 
 // ListTables returns the branch's tables with their open session, if any.
 func (a *App) ListTables(ctx context.Context, branchID int64) ([]Table, error) {
-	rows, err := a.DB.Query(ctx, `SELECT t.id, t.name, t.qr_token, t.active, t.sort,
+	rows, err := a.DB.Query(ctx, `SELECT t.id, t.name, t.qr_token, t.active, t.sort, t.area, t.seats,
 		s.id, s.order_id, o.public_no, s.guests, s.opened_at, o.total,
 		(SELECT count(*) FROM order_items i WHERE i.order_id = o.id AND i.prep_status <> 'cancelled'),
-		(SELECT count(*) FROM order_items i WHERE i.order_id = o.id AND i.prep_status <> 'cancelled' AND i.served_at IS NULL)
+		(SELECT count(*) FROM order_items i WHERE i.order_id = o.id AND i.prep_status <> 'cancelled' AND i.served_at IS NULL),
+		(SELECT COALESCE(sum(i.qty), 0) FROM order_items i WHERE i.order_id = o.id AND i.prep_status <> 'cancelled' AND i.served_at IS NULL),
+		(SELECT count(*) FROM order_batches b WHERE b.order_id = o.id), s.tags
 		FROM dining_tables t
 		LEFT JOIN dining_sessions s ON s.table_id = t.id AND s.status = 'open'
 		LEFT JOIN orders o ON o.id = s.order_id
@@ -134,17 +157,21 @@ func (a *App) ListTables(ctx context.Context, branchID int64) ([]Table, error) {
 		t := Table{Devices: []TableDevice{}}
 		var sid, oid *int64
 		var no *string
-		var guests, items, unserved *int
+		var guests, items, unserved, unservedQty, rounds *int
 		var opened *time.Time
 		var total *int64
-		if err := rows.Scan(&t.ID, &t.Name, &t.QRToken, &t.Active, &t.Sort, &sid, &oid, &no, &guests, &opened,
-			&total, &items, &unserved); err != nil {
+		var tags []string
+		if err := rows.Scan(&t.ID, &t.Name, &t.QRToken, &t.Active, &t.Sort, &t.Area, &t.Seats, &sid, &oid, &no, &guests, &opened,
+			&total, &items, &unserved, &unservedQty, &rounds, &tags); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		if sid != nil {
 			t.Session = &SessionSummary{ID: *sid, OrderID: *oid, PublicNo: *no, Guests: *guests, OpenedAt: *opened,
-				Total: *total, ItemCount: *items, Unserved: *unserved}
+				Total: *total, ItemCount: *items, Unserved: *unserved, UnservedQty: *unservedQty, Rounds: *rounds, Tags: tags}
+			if t.Session.Tags == nil {
+				t.Session.Tags = []string{}
+			}
 		}
 		idx[t.ID] = len(out)
 		out = append(out, t)
@@ -185,18 +212,29 @@ type Bill struct {
 	OpenedAt  time.Time  `json:"opened_at"`
 	ClosedAt  *time.Time `json:"closed_at"`
 	Order     *Order     `json:"order"`
+	// Tags are the sitting's notes (children, birthday); MovedFrom is the
+	// table it was moved from, if any; Area and Seats are the table's.
+	Tags      []string `json:"tags"`
+	MovedFrom string   `json:"moved_from"`
+	Area      string   `json:"area"`
+	Seats     int      `json:"seats"`
 }
 
 func loadBill(ctx context.Context, q Querier, sessionID int64) (*Bill, error) {
 	var b Bill
 	var orderID int64
-	err := q.QueryRow(ctx, `SELECT s.id, s.table_id, t.name, s.status, s.guests, s.opened_at, s.closed_at, s.order_id
+	err := q.QueryRow(ctx, `SELECT s.id, s.table_id, t.name, s.status, s.guests, s.opened_at, s.closed_at, s.order_id,
+		s.tags, s.moved_from, t.area, t.seats
 		FROM dining_sessions s JOIN dining_tables t ON t.id = s.table_id WHERE s.id=$1`, sessionID).
-		Scan(&b.SessionID, &b.TableID, &b.TableName, &b.Status, &b.Guests, &b.OpenedAt, &b.ClosedAt, &orderID)
+		Scan(&b.SessionID, &b.TableID, &b.TableName, &b.Status, &b.Guests, &b.OpenedAt, &b.ClosedAt, &orderID,
+			&b.Tags, &b.MovedFrom, &b.Area, &b.Seats)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	} else if err != nil {
 		return nil, err
+	}
+	if b.Tags == nil {
+		b.Tags = []string{}
 	}
 	if b.Order, err = loadOrder(ctx, q, orderID); err != nil {
 		return nil, err
@@ -263,12 +301,16 @@ func (a *App) RecentBills(ctx context.Context, branchID int64) ([]*Bill, error) 
 // OpenTable starts a session on a free table and creates its (empty) bill.
 // The table row lock and the one-open-session index make a double open
 // impossible.
-func (a *App) OpenTable(ctx context.Context, tableID int64, guests int, actor Actor) (*Bill, error) {
+func (a *App) OpenTable(ctx context.Context, tableID int64, guests int, tags []string, actor Actor) (*Bill, error) {
 	if guests < 0 || guests > 99 {
 		return nil, ErrValidation("guests must be between 0 and 99")
 	}
+	tags, err := cleanTags(tags)
+	if err != nil {
+		return nil, err
+	}
 	var sessionID int64
-	err := a.inTx(ctx, func(tx pgx.Tx) error {
+	err = a.inTx(ctx, func(tx pgx.Tx) error {
 		var branchID int64
 		var name string
 		var active bool
@@ -321,15 +363,15 @@ func (a *App) OpenTable(ctx context.Context, tableID int64, guests int, actor Ac
 			opener = &actor.ID
 		}
 		if err := tx.QueryRow(ctx, `INSERT INTO dining_sessions (branch_id, table_id, order_id, guests,
-			access_token_hash, token_nonce, opened_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-			branchID, tableID, orderID, guests, hashToken(a.sessionToken(nonce)), nonce, opener).Scan(&sessionID); err != nil {
+			access_token_hash, token_nonce, opened_by, tags) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+			branchID, tableID, orderID, guests, hashToken(a.sessionToken(nonce)), nonce, opener, tags).Scan(&sessionID); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE orders SET session_id=$2 WHERE id=$1`, orderID, sessionID); err != nil {
 			return err
 		}
 		if err := audit(ctx, tx, branchID, orderID, actor, "table.opened",
-			map[string]any{"table": name, "session_id": sessionID, "guests": guests}); err != nil {
+			map[string]any{"table": name, "session_id": sessionID, "guests": guests, "tags": tags}); err != nil {
 			return err
 		}
 		return notify(ctx, tx, Event{BranchID: branchID, OrderID: orderID})
@@ -392,6 +434,8 @@ type BatchInput struct {
 	ExpectedTotal *int64 `json:"expected_total"`
 	// Lang is the guest's language; the bill keeps the dishes' names in it.
 	Lang string `json:"lang"`
+	// RoundTags are notes for the whole round (drinks first); staff only.
+	RoundTags []string `json:"round_tags"`
 }
 
 // AddBatch sends one round of dishes to the kitchen and appends it to the
@@ -401,7 +445,18 @@ func (a *App) AddBatch(ctx context.Context, sessionID int64, source, idemKey str
 	if idemKey == "" || len(idemKey) > 100 {
 		return nil, ErrValidation("Idempotency-Key header is required")
 	}
-	err := a.inTx(ctx, func(tx pgx.Tx) error {
+	if source != "staff" {
+		in.RoundTags = nil
+	}
+	roundTags, err := cleanTags(in.RoundTags)
+	if err != nil {
+		return nil, err
+	}
+	var placedBy *int64
+	if source == "staff" && actor.ID != 0 {
+		placedBy = &actor.ID
+	}
+	err = a.inTx(ctx, func(tx pgx.Tx) error {
 		s, err := lockSession(ctx, tx, sessionID)
 		if err != nil {
 			return err
@@ -448,9 +503,9 @@ func (a *App) AddBatch(ctx context.Context, sessionID int64, source, idemKey str
 		}
 		var batchID int64
 		var seq int
-		if err := tx.QueryRow(ctx, `INSERT INTO order_batches (order_id, seq, source)
-			VALUES ($1, (SELECT COALESCE(max(seq), 0) + 1 FROM order_batches WHERE order_id=$1), $2)
-			RETURNING id, seq`, s.OrderID, source).Scan(&batchID, &seq); err != nil {
+		if err := tx.QueryRow(ctx, `INSERT INTO order_batches (order_id, seq, source, round_tags, placed_by)
+			VALUES ($1, (SELECT COALESCE(max(seq), 0) + 1 FROM order_batches WHERE order_id=$1), $2, $3, $4)
+			RETURNING id, seq`, s.OrderID, source, roundTags, placedBy).Scan(&batchID, &seq); err != nil {
 			return err
 		}
 		for _, l := range lines {
@@ -554,7 +609,12 @@ func (a *App) ServeItem(ctx context.Context, itemID int64, actor Actor) (*Bill, 
 
 // VoidItem takes a line off an open bill (wrong dish, complaint). The reason
 // is recorded, limited stock is returned and the bill is recomputed.
-func (a *App) VoidItem(ctx context.Context, itemID int64, reason string, actor Actor) (*Bill, error) {
+// qty 0 voids the whole line; fewer than the line's portions splits it, the
+// voided portions going to a new cancelled line.
+func (a *App) VoidItem(ctx context.Context, itemID int64, reason string, qty int, actor Actor) (*Bill, error) {
+	if qty < 0 {
+		return nil, ErrValidation("qty must be positive")
+	}
 	reason = strings.TrimSpace(reason)
 	if reason == "" || len(reason) > 200 {
 		return nil, ErrValidation("reason is required")
@@ -570,17 +630,34 @@ func (a *App) VoidItem(ctx context.Context, itemID int64, reason string, actor A
 			return ErrSessionClosed
 		}
 		var status, name string
-		var menuItem int64
-		var qty int
-		if err := tx.QueryRow(ctx, `SELECT prep_status, name, item_id, qty FROM order_items WHERE id=$1 FOR UPDATE`, itemID).
-			Scan(&status, &name, &menuItem, &qty); err != nil {
+		var menuItem, unit int64
+		var lineQty int
+		if err := tx.QueryRow(ctx, `SELECT prep_status, name, item_id, qty, unit_price FROM order_items WHERE id=$1 FOR UPDATE`, itemID).
+			Scan(&status, &name, &menuItem, &lineQty, &unit); err != nil {
 			return err
 		}
 		if status == "cancelled" {
 			return nil
 		}
-		if _, err := tx.Exec(ctx, `UPDATE order_items SET prep_status='cancelled', void_reason=$2 WHERE id=$1`, itemID, reason); err != nil {
-			return err
+		if qty == 0 || qty >= lineQty {
+			qty = lineQty
+			if _, err := tx.Exec(ctx, `UPDATE order_items SET prep_status='cancelled', void_reason=$2 WHERE id=$1`, itemID, reason); err != nil {
+				return err
+			}
+		} else {
+			// Part of the line: the rest keeps cooking or stays served.
+			if _, err := tx.Exec(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name, name_en,
+				unit_price, qty, line_total, options, note, needs_prep, prep_status, name_customer, note_tags,
+				station_id, station_name, served_at, void_reason, basket_no)
+				SELECT order_id, branch_id, batch_id, item_id, name, name_en, unit_price, $2::int, unit_price * $2::int, options, note,
+				needs_prep, 'cancelled', name_customer, note_tags, station_id, station_name, served_at, $3, basket_no
+				FROM order_items WHERE id=$1`, itemID, qty, reason); err != nil {
+				return wrap("split voided line", err)
+			}
+			if _, err := tx.Exec(ctx, `UPDATE order_items SET qty = qty - $2::int, line_total = unit_price * (qty - $2::int) WHERE id=$1`,
+				itemID, qty); err != nil {
+				return err
+			}
 		}
 		if _, err := tx.Exec(ctx, `UPDATE menu_items SET stock_qty = stock_qty + $2 WHERE id=$1 AND stock_qty IS NOT NULL`,
 			menuItem, qty); err != nil {
@@ -613,13 +690,16 @@ type CloseInput struct {
 	ExpectedManifest int    `json:"expected_manifest_version"`
 	AmountReceived   int64  `json:"amount_received"`
 	Note             string `json:"note"`
+	// PayMethod is how the guests paid (cash, card, a wallet), as the desk shows it.
+	PayMethod string `json:"pay_method"`
 }
 
 // CloseTable records the payment and ends the session. Afterwards the QR
 // session token and any open carts for this sitting stop working; the table
 // can be opened again for the next guests.
 func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, actor Actor) (*Bill, error) {
-	if len(in.Note) > 200 {
+	in.PayMethod = strings.TrimSpace(in.PayMethod)
+	if len(in.Note) > 200 || len([]rune(in.PayMethod)) > 20 {
 		return nil, ErrValidation("note too long")
 	}
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
@@ -655,8 +735,8 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE orders SET fulfillment_status='dined', payment_status='paid',
-			amount_received=$2, payment_note=$3, completed_at=now(), version=version+1, updated_at=now() WHERE id=$1`,
-			o.ID, in.AmountReceived, in.Note); err != nil {
+			amount_received=$2, payment_note=$3, pay_method=$4, completed_at=now(), version=version+1, updated_at=now() WHERE id=$1`,
+			o.ID, in.AmountReceived, in.Note, in.PayMethod); err != nil {
 			return err
 		}
 		var closer *int64
@@ -668,7 +748,7 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 			return err
 		}
 		if err := audit(ctx, tx, s.BranchID, o.ID, actor, "table.closed",
-			map[string]any{"table": s.TableName, "total": o.Total, "received": in.AmountReceived}); err != nil {
+			map[string]any{"table": s.TableName, "total": o.Total, "received": in.AmountReceived, "pay_method": in.PayMethod}); err != nil {
 			return err
 		}
 		return notify(ctx, tx, Event{BranchID: s.BranchID, OrderID: o.ID})
