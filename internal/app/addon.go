@@ -90,24 +90,43 @@ func addonState(ctx context.Context, q Querier, o *lockedOrder) (*AddonState, er
 // orderMoney is what an order was priced with, read under the order lock.
 type orderMoney struct {
 	Subtotal, DeliveryFee, PackagingFee int64
-	TaxRateBP                           int
+	TaxRateBP, ServiceChargeBP          int
 	TaxInclusive                        bool
 	PromotionID                         *int64
-	Phone, ServiceType                  string
-	Total                               int64
+	// PromotionKind is the kind the promotion had when the order took it.
+	PromotionKind      string
+	Phone, ServiceType string
+	Total              int64
 	// What the order's discounts took off, by who pays and on what.
 	promoAmount                    int64
 	couponGoods, couponShip, platf int64
-	// adjPercentBP is the percentage off given at checkout, 0 for none.
+	// adjPercentBP is the percentage off given at checkout, 0 for none;
+	// roundOff what a round-off or a typed amount took off.
 	adjPercentBP int
+	roundOff     int64
+}
+
+// fees is the order's own fee settings (docs/PRICING_REVIEW.md, problem 4).
+func (m *orderMoney) fees() TaxConfig {
+	return TaxConfig{TaxRateBP: m.TaxRateBP, TaxInclusive: m.TaxInclusive, ServiceChargeBP: m.ServiceChargeBP,
+		PackagingFee: m.PackagingFee}
+}
+
+// promoOn is what an amount the promotion takes off comes off: the delivery
+// fee for free delivery, the dishes otherwise.
+func promoOn(kind string, amount int64) Discount {
+	if kind == "free_delivery" {
+		return Discount{Delivery: amount}
+	}
+	return Discount{Goods: amount}
 }
 
 func readOrderMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, error) {
 	var m orderMoney
-	if err := q.QueryRow(ctx, `SELECT subtotal, delivery_fee, packaging_fee, tax_rate_bp, tax_inclusive,
-		promotion_id, customer_phone, service_type, total, adj_percent_bp FROM orders WHERE id=$1`, orderID).Scan(&m.Subtotal,
-		&m.DeliveryFee, &m.PackagingFee, &m.TaxRateBP, &m.TaxInclusive, &m.PromotionID, &m.Phone, &m.ServiceType,
-		&m.Total, &m.adjPercentBP); err != nil {
+	if err := q.QueryRow(ctx, `SELECT subtotal, delivery_fee, packaging_fee, tax_rate_bp, tax_inclusive, service_charge_bp,
+		promotion_id, promotion_kind, customer_phone, service_type, total, adj_percent_bp, round_off FROM orders WHERE id=$1`, orderID).
+		Scan(&m.Subtotal, &m.DeliveryFee, &m.PackagingFee, &m.TaxRateBP, &m.TaxInclusive, &m.ServiceChargeBP, &m.PromotionID,
+			&m.PromotionKind, &m.Phone, &m.ServiceType, &m.Total, &m.adjPercentBP, &m.roundOff); err != nil {
 		return nil, err
 	}
 	rows, err := q.Query(ctx, `SELECT kind, amount FROM order_discounts WHERE order_id=$1`, orderID)
@@ -162,11 +181,7 @@ func priceWithAddon(ctx context.Context, q Querier, b *Branch, m *orderMoney, ex
 			keep = &ps[0]
 			keepD = keep.discount(sub, m.DeliveryFee)
 			if keepD.total() < m.promoAmount { // never less than the order had
-				if keep.Kind == "free_delivery" {
-					keepD = Discount{Delivery: m.promoAmount}
-				} else {
-					keepD = Discount{Goods: m.promoAmount}
-				}
+				keepD = promoOn(m.PromotionKind, m.promoAmount)
 			}
 		}
 	}
@@ -179,8 +194,7 @@ func priceWithAddon(ctx context.Context, q Querier, b *Branch, m *orderMoney, ex
 		(keep == nil || best.ID != keep.ID) && d.total() > keepD.total() {
 		res.promo, res.promoD, res.switched = best, d, true
 	}
-	cfg := b.taxConfig()
-	cfg.PackagingFee, cfg.TaxRateBP, cfg.TaxInclusive = m.PackagingFee, m.TaxRateBP, m.TaxInclusive
+	cfg := m.fees()
 	d := Discount{Goods: res.promoD.Goods + m.couponGoods, Delivery: res.promoD.Delivery + m.couponShip}
 	t := ComputeTotals(sub, m.DeliveryFee, cfg, d)
 	if res.promo != nil {
@@ -431,15 +445,11 @@ func priceWithAddonOnly(ctx context.Context, q Querier, b *Branch, m *orderMoney
 			res.promo = &ps[0]
 			res.promoD = res.promo.discount(sub, m.DeliveryFee)
 			if res.promoD.total() < m.promoAmount {
-				res.promoD = Discount{Goods: m.promoAmount}
-				if res.promo.Kind == "free_delivery" {
-					res.promoD = Discount{Delivery: m.promoAmount}
-				}
+				res.promoD = promoOn(m.PromotionKind, m.promoAmount)
 			}
 		}
 	}
-	cfg := b.taxConfig()
-	cfg.PackagingFee, cfg.TaxRateBP, cfg.TaxInclusive = m.PackagingFee, m.TaxRateBP, m.TaxInclusive
+	cfg := m.fees()
 	d := Discount{Goods: res.promoD.Goods + m.couponGoods, Delivery: res.promoD.Delivery + m.couponShip}
 	t := ComputeTotals(sub, m.DeliveryFee, cfg, d)
 	if res.promo != nil {

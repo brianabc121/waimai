@@ -3138,5 +3138,10 @@
  "rc.col.by": "Người đặt",
  "rc.col.approved": "Người duyệt",
  "rc.someone": "(không ghi lại)",
- "rc.check_tag": "Đối soát: {s}"
+ "rc.check_tag": "Đối soát: {s}",
+ "bl.c.refunded": "Đã hoàn tiền",
+ "bl.c.refunded_sub": "Tiền trả lại theo món sau đó; chưa trừ ở trên",
+ "rc.c.refunds": "Hoàn tiền theo món",
+ "rc.c.net": "còn {v}",
+ "rc.cash_refunded": "Hoàn tiền mặt"
 }

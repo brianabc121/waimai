@@ -27,6 +27,8 @@ const picked = computed(() => lines.value.filter(l => (qty[l.it.id] ?? 0) > 0).m
 
 const s = reactive({ reason: '', writing: false, text: '', kind: 'store' as 'store' | 'customer', method: '', amount: '', busy: false })
 const methods = splitList('vd.r.methods')
+// the list is cash, transfer, e-wallet, other in every language
+const payType = () => ['cash', 'transfer', 'online', 'other'][methods.indexOf(s.method)] ?? 'other'
 s.method = methods[0] ?? ''
 const reasons = [...customerReasons(), ...splitList('vd.reasons.store')]
 const reason = computed(() => s.writing ? s.text.trim() : s.reason)
@@ -54,7 +56,7 @@ async function go(headers?: Record<string, string>) {
   s.busy = true; error.value = ''
   try {
     const r = await post<{ order: Order }>(`/merchant/orders/${props.order.id}/refunds`,
-      { lines: picked.value, amount: amount.value, method: s.method, reason: reason.value, reason_kind: s.kind }, headers)
+      { lines: picked.value, amount: amount.value, method: s.method, pay_type: payType(), reason: reason.value, reason_kind: s.kind }, headers)
     emit('done', r.order, amount.value)
   } catch (e) { error.value = voidErr(e) }
   s.busy = false

@@ -1,5 +1,7 @@
 package app
 
+import "context"
+
 // Money amounts are integers in the currency's minor unit.
 
 // TaxConfig is the branch-level fee and tax configuration.
@@ -89,4 +91,14 @@ func ComputeTotals(subtotal, deliveryFee int64, cfg TaxConfig, d Discount) Total
 		t.Total += t.TaxAmount
 	}
 	return t
+}
+
+// orderFees reads the fee settings an order was priced with: the rates are
+// kept on the order, so a later change at the store does not reach it
+// (docs/PRICING_REVIEW.md, problem 4).
+func orderFees(ctx context.Context, q Querier, orderID int64) (TaxConfig, error) {
+	var c TaxConfig
+	err := q.QueryRow(ctx, `SELECT tax_rate_bp, tax_inclusive, service_charge_bp, packaging_fee FROM orders WHERE id=$1`,
+		orderID).Scan(&c.TaxRateBP, &c.TaxInclusive, &c.ServiceChargeBP, &c.PackagingFee)
+	return c, err
 }

@@ -3138,5 +3138,10 @@
  "rc.col.by": "設定者",
  "rc.col.approved": "承認者",
  "rc.someone": "（記録なし）",
- "rc.check_tag": "照合：{s}"
+ "rc.check_tag": "照合：{s}",
+ "bl.c.refunded": "返金済み",
+ "bl.c.refunded_sub": "後から料理ごとに返金した額（上の金額からは差し引いていません）",
+ "rc.c.refunds": "料理ごとの返金",
+ "rc.c.net": "差引 {v}",
+ "rc.cash_refunded": "現金での返金"
 }

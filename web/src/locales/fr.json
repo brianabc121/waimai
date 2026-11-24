@@ -3138,5 +3138,10 @@
  "rc.col.by": "Par",
  "rc.col.approved": "Approuvé par",
  "rc.someone": "(non noté)",
- "rc.check_tag": "Rapprochement : {s}"
+ "rc.check_tag": "Rapprochement : {s}",
+ "bl.c.refunded": "Remboursé",
+ "bl.c.refunded_sub": "Rendu par plat ensuite ; non déduit ci-dessus",
+ "rc.c.refunds": "Remboursements par plat",
+ "rc.c.net": "net {v}",
+ "rc.cash_refunded": "Remboursements en espèces"
 }

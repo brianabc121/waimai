@@ -16,7 +16,8 @@ interface Row { pay_type: string; channel_id: number; name: string; names: Recor
   dine: number; takeaway: number; ok: number; problem: number; unchecked: number }
 interface CashCount { day: string; expected: number; counted: number; note: string; counted_by: string; at: string }
 interface Summary { timezone: string; currency: string; count: number; total: number; rows: Row[]; problems: number
-  cash: { counter: number; rider_collected: number; rider_returned: number; rider_pending: number; expected: number }
+  cash: { counter: number; rider_collected: number; rider_returned: number; rider_pending: number; refunded: number; expected: number }
+  refunds: { count: number; total: number; cash: number }; net: number
   discounts: { promotion: number; coupon: number; staff: number; round_off: number; total: number }; cash_count: CashCount | null }
 interface Payment { order_id: number; public_no: string; paid_at: string; service_type: string; table_name: string; channel_id: number
   method: string; names: Record<string, string>; amount: number; staff: string; status: '' | 'ok' | 'problem'; note: string; checked_by: string; checked_at: string | null }
@@ -141,6 +142,8 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
           <small>{{ t('rc.c.count', { n: r.count }) }}</small></div>
         <div class="card"><span>{{ t('rc.c.discount') }}</span><b class="neg">{{ m(sum.discounts.total) }}</b>
           <small>{{ t('rc.d.promo') }} {{ m(sum.discounts.promotion) }} · {{ t('rc.d.staff') }} {{ m(sum.discounts.staff) }} · {{ t('rc.d.round') }} {{ m(sum.discounts.round_off) }}</small></div>
+        <div v-if="sum.refunds.count" class="card" data-testid="rc-refunds"><span>{{ t('rc.c.refunds') }}</span><b class="neg">-{{ m(sum.refunds.total) }}</b>
+          <small>{{ t('rc.c.count', { n: sum.refunds.count }) }} · {{ t('rc.c.net', { v: m(sum.net) }) }}</small></div>
       </div>
       <div class="cols">
         <div class="card flush" style="overflow:auto">
@@ -164,6 +167,7 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
           <div class="kv"><span>{{ t('rc.cash_rider') }}</span><b>{{ m(sum.cash.rider_collected) }}</b></div>
           <div class="kv sub"><span>{{ t('rc.cash_returned') }}</span><span>{{ m(sum.cash.rider_returned) }}</span></div>
           <div class="kv sub"><span>{{ t('rc.cash_pending') }}</span><span :class="{ neg: sum.cash.rider_pending }">{{ m(sum.cash.rider_pending) }}</span></div>
+          <div v-if="sum.cash.refunded" class="kv"><span>{{ t('rc.cash_refunded') }}</span><b class="neg" data-testid="rc-cash-refunded">-{{ m(sum.cash.refunded) }}</b></div>
           <router-link class="small" to="/merchant/cash">{{ t('rc.to_cash') }} ›</router-link>
           <h2 style="margin-top:8px">{{ t('rc.count') }}</h2>
           <template v-if="from === to">

@@ -211,18 +211,20 @@ type BillDay struct {
 }
 
 type BillSummary struct {
-	From             string     `json:"from"`
-	To               string     `json:"to"`
-	Currency         string     `json:"currency"`
-	Orders           int        `json:"orders"` // completed
-	Cancelled        int        `json:"cancelled"`
-	Food             int64      `json:"food"`
-	MerchantDiscount int64      `json:"merchant_discount"`
-	PlatformDiscount int64      `json:"platform_discount"`
-	Paid             int64      `json:"paid"`
-	Takings          int64      `json:"takings"`
-	Kinds            []BillKind `json:"kinds"` // every kind, in the order of the bill
-	Repurchase       struct {
+	From             string `json:"from"`
+	To               string `json:"to"`
+	Currency         string `json:"currency"`
+	Orders           int    `json:"orders"` // completed
+	Cancelled        int    `json:"cancelled"`
+	Food             int64  `json:"food"`
+	MerchantDiscount int64  `json:"merchant_discount"`
+	PlatformDiscount int64  `json:"platform_discount"`
+	Paid             int64  `json:"paid"`
+	Takings          int64  `json:"takings"`
+	// Refunded is money given back by dish on the period's completed orders.
+	Refunded   int64      `json:"refunded"`
+	Kinds      []BillKind `json:"kinds"` // every kind, in the order of the bill
+	Repurchase struct {
 		Issued int   `json:"issued"`
 		Used   int   `json:"used"`
 		Sales  int64 `json:"sales"`
@@ -257,6 +259,11 @@ func (a *App) BillSummary(ctx context.Context, branchID int64, from, to string) 
 		return nil, err
 	}
 	s.Takings = s.Paid + s.PlatformDiscount
+	if err := a.DB.QueryRow(ctx, `SELECT COALESCE(sum(r.amount), 0) FROM order_refunds r
+		JOIN orders o ON o.id = r.order_id JOIN branches b ON b.id = o.branch_id WHERE `+in+done, branchID, from, to).
+		Scan(&s.Refunded); err != nil {
+		return nil, err
+	}
 
 	got := map[string]BillKind{}
 	rows, err := a.DB.Query(ctx, `SELECT d.kind, count(DISTINCT d.order_id), sum(d.amount)

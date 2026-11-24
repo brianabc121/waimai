@@ -3138,5 +3138,10 @@
  "rc.col.by": "Por",
  "rc.col.approved": "Aprobado por",
  "rc.someone": "(sin registrar)",
- "rc.check_tag": "Conciliación: {s}"
+ "rc.check_tag": "Conciliación: {s}",
+ "bl.c.refunded": "Reembolsado",
+ "bl.c.refunded_sub": "Devuelto por plato después; no se resta arriba",
+ "rc.c.refunds": "Reembolsos por plato",
+ "rc.c.net": "neto {v}",
+ "rc.cash_refunded": "Reembolsos en efectivo"
 }

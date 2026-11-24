@@ -22,7 +22,7 @@ extend({
   'bl.src.manual': ['平台发放', 'Given by the platform'], 'bl.coupon_no': ['券号 {id}', 'Coupon #{id}'],
   'bl.c.orders': ['完成订单', 'Completed orders'], 'bl.c.food': ['菜品原价合计', 'Food at full price'], 'bl.c.discount': ['优惠合计', 'Discounts'],
   'bl.c.discount_sub': ['商家 {m} · 平台 {p}', 'Store {m} · platform {p}'], 'bl.c.paid': ['顾客实付合计', 'Customers paid'],
-  'bl.c.due': ['平台应补', 'Platform owes'], 'bl.c.takings': ['商家实际收入', 'Store takings'], 'bl.c.cancelled': ['另有 {n} 单取消', '{n} more cancelled'],
+  'bl.c.due': ['平台应补', 'Platform owes'], 'bl.c.takings': ['商家实际收入', 'Store takings'], 'bl.c.refunded': ['已退款', 'Refunded'], 'bl.c.refunded_sub': ['这些订单之后按菜退给顾客的钱，未从上面扣除', 'Given back by dish on these orders later; not taken off above'], 'bl.c.cancelled': ['另有 {n} 单取消', '{n} more cancelled'],
   'bl.kinds': ['各种优惠', 'Discounts by kind'], 'bl.k.kind': ['种类', 'Kind'], 'bl.k.who': ['谁承担', 'Paid by'], 'bl.k.orders': ['用了多少单', 'Orders'],
   'bl.k.amount': ['合计减了', 'Total off'], 'bl.k.avg': ['平均每单', 'Per order'], 'bl.k.total': ['合计', 'Total'],
   'bl.who.store': ['商家', 'Store'], 'bl.who.platform': ['平台', 'Platform'],
