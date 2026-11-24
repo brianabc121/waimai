@@ -19,6 +19,7 @@ const (
 	PermOrderManual    = "order.manual"
 	PermOrderCancel    = "order.cancel"
 	PermOrderAftersale = "order.aftersale"
+	PermOrderVoid      = "order.void"
 	PermTableUse       = "table.use"
 	PermTableManage    = "table.manage"
 	PermMemberView     = "member.view"
@@ -66,6 +67,7 @@ var PermCatalog = []PermDef{
 	{Code: PermOrderManual, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderCancel, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderAftersale, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
+	{Code: PermOrderVoid, Group: "order", Cashier: false, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermTableUse, Group: "table", Cashier: true, Manager: true},
 	{Code: PermTableManage, Group: "table", Cashier: false, Manager: true, Requires: []string{PermTableUse}},
 	{Code: PermMemberView, Group: "customer", Cashier: true, Manager: true},

@@ -174,7 +174,16 @@ type Order struct {
 	// dine-in round), and the customer's add-ons waiting for the store.
 	Batches []OrderBatch `json:"batches"`
 	// Addon says whether dishes can still be added (delivery and pickup).
-	Addon      *AddonState `json:"addon,omitempty"`
+	Addon *AddonState `json:"addon,omitempty"`
+	// Voids are the dishes taken off the order, Refunds the money given back
+	// by dish once paid (docs/VOID_ITEM_DESIGN.md). VoidOpen says dishes can
+	// still be voided, RefundOpen that they can be refunded; Refunded is the
+	// sum of the refunds.
+	Voids      []OrderVoid   `json:"voids"`
+	Refunds    []OrderRefund `json:"refunds"`
+	VoidOpen   bool          `json:"void_open"`
+	RefundOpen bool          `json:"refund_open"`
+	Refunded   int64         `json:"refunded"`
 	tokenNonce []byte
 }
 
@@ -225,7 +234,7 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	o.pay_method, COALESCE((SELECT s.tags FROM dining_sessions s WHERE s.id = o.session_id), '{}')`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
-	o := &Order{Items: []OrderItem{}, Discounts: []OrderDiscount{}}
+	o := &Order{Items: []OrderItem{}, Discounts: []OrderDiscount{}, Voids: []OrderVoid{}, Refunds: []OrderRefund{}}
 	t := &o.Totals
 	err := row.Scan(&o.ID, &o.MerchantID, &o.BranchID, &o.PublicNo, &o.PickupCode, &o.Channel, &o.ServiceType,
 		&o.CustomerName, &o.CustomerPhone, &o.ZoneName, &o.AddressLine, &o.AddressUnit, &o.AddressNote, &o.Note,
@@ -339,6 +348,12 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 	}
 	if err := loadDiscounts(ctx, q, byID, ids); err != nil {
 		return nil, err
+	}
+	if err := loadVoids(ctx, q, byID, ids); err != nil {
+		return nil, err
+	}
+	for _, o := range orders {
+		o.voidState()
 	}
 	cash, err := queryCash(ctx, q, `c.order_id = ANY($1)`, ids)
 	if err != nil {
