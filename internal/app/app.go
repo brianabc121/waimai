@@ -145,6 +145,9 @@ type Actor struct {
 	// workbench, "board" the shared kitchen screen, "" unknown. Only what is
 	// done on the workbench is certain to be this person's own work.
 	Via string
+	// ApprovedBy is the manager who approved this one action for someone whose
+	// role may not do it (docs/STAFF_ACCESS_DESIGN.md §7).
+	ApprovedBy int64
 }
 
 func audit(ctx context.Context, tx pgx.Tx, branchID, orderID int64, actor Actor, action string, detail any) error {
@@ -157,10 +160,10 @@ func audit(ctx context.Context, tx pgx.Tx, branchID, orderID int64, actor Actor,
 		actorID = &actor.ID
 	}
 	// Staff actions keep the role the person had then (docs/STAFF_ACCESS_DESIGN.md §5.3).
-	_, err := tx.Exec(ctx, `INSERT INTO audit_logs (branch_id, order_id, actor_type, actor_id, action, detail, actor_role)
+	_, err := tx.Exec(ctx, `INSERT INTO audit_logs (branch_id, order_id, actor_type, actor_id, action, detail, actor_role, approved_by)
 		VALUES ($1,NULLIF($2::bigint, 0),$3,$4,$5,$6,
-			(SELECT role FROM user_branch_roles WHERE $3 = 'staff' AND user_id = $4 AND branch_id = $1))`,
-		branchID, orderID, actor.Type, actorID, action, b)
+			(SELECT role FROM user_branch_roles WHERE $3 = 'staff' AND user_id = $4 AND branch_id = $1), NULLIF($7::bigint, 0))`,
+		branchID, orderID, actor.Type, actorID, action, b, actor.ApprovedBy)
 	return err
 }
 

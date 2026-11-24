@@ -10,6 +10,8 @@ import './work/strings'
 import './translateStrings'
 import '../orders'
 import TotalsTable from './TotalsTable.vue'
+import ApproveDialog from './ApproveDialog.vue'
+import '../approve'
 import { chatEnabled } from '../chat'
 import './manualStrings'
 
@@ -85,21 +87,36 @@ const pendingCount = computed(() => orders.value.filter(o => o.acceptance_status
 function toggleSound() { sound.value = !sound.value; localStorage.setItem('order-sound', sound.value ? 'on' : 'off'); if (sound.value) chime() }
 function setScope(s: 'active' | 'history') { scope.value = s; selectedId.value = null; first = true; void refreshNow() }
 
-async function act(o: Order, action: string, body: Record<string, unknown> = {}) {
+async function act(o: Order, action: string, body: Record<string, unknown> = {}, headers?: Record<string, string>) {
   error.value = ''
   try {
-    await post(`/merchant/orders/${o.id}/${action}`, { expected_version: o.version, ...body })
+    await post(`/merchant/orders/${o.id}/${action}`, { expected_version: o.version, ...body }, headers)
   } catch (e) {
-    error.value = e instanceof ApiError && e.code === 'VERSION_CONFLICT' ? t('conflict') : (e as Error).message
+    error.value = e instanceof ApiError && e.code === 'VERSION_CONFLICT' ? t('conflict')
+      : e instanceof ApiError && e.code === 'APPROVAL_INVALID' ? t('ap.used') : (e as Error).message
   }
   await refreshNow()
 }
 
-function withReason(o: Order, action: 'reject' | 'cancel') {
+function withReason(o: Order, action: 'reject' | 'cancel', headers?: Record<string, string>) {
   const reason = prompt(t('reason'))
   if (reason === null) return
   if (!reason.trim()) { error.value = t('reason_required'); return }
-  void act(o, action, { reason })
+  void act(o, action, { reason }, headers)
+}
+
+// What this role may not do, a manager approves on the spot (docs/STAFF_ACCESS_DESIGN.md §7).
+const approving = ref<{ perm: string; what: string; then: (headers: Record<string, string>) => void } | null>(null)
+const approvedBy = ref('')
+function askApproval(perm: string, what: string, then: (headers: Record<string, string>) => void) {
+  approvedBy.value = ''
+  approving.value = { perm, what, then }
+}
+function approved(token: string, name: string) {
+  const a = approving.value!
+  approving.value = null
+  approvedBy.value = t('ap.done', { name })
+  a.then({ 'X-Approval': token })
 }
 
 function assign(o: Order, e: Event) {
@@ -121,11 +138,11 @@ function closeFailed(o: Order) {
 }
 // The customer's after-sales request: the desk settles it with the customer
 // (orders are paid in cash) and records what was agreed.
-function aftersale(o: Order, status: 'resolved' | 'declined') {
+function aftersale(o: Order, status: 'resolved' | 'declined', headers?: Record<string, string>) {
   const reply = prompt(t(status === 'resolved' ? 'as.d.how' : 'as.d.why'))
   if (reply === null) return
   if (status === 'declined' && !reply.trim()) { error.value = t('reason_required'); return }
-  void act(o, 'aftersale', { status, reply })
+  void act(o, 'aftersale', { status, reply }, headers)
 }
 const canCancel = (o: Order) => o.acceptance_status === 'accepted' && ['none', 'awaiting_handoff', 'awaiting_pickup'].includes(o.fulfillment_status)
 const canAssign = (o: Order) => can('order.handle') && o.service_type === 'delivery' && o.acceptance_status === 'accepted' && ['none', 'awaiting_handoff'].includes(o.fulfillment_status)
@@ -149,6 +166,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
       <router-link to="/merchant/settings">{{ t('mtr.store_go') }}</router-link></div>
     <div v-if="!online" class="banner warn" style="margin-bottom:12px">{{ t('offline') }}</div>
     <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
+    <div v-else-if="approvedBy" class="banner ok" style="margin-bottom:12px" data-testid="approved-by">{{ approvedBy }}</div>
 
     <div class="desk" :class="{ picked: !!selected }">
       <div class="list">
@@ -197,7 +215,10 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
                 <button class="btn primary small" data-testid="aftersale-resolve" @click="aftersale(selected, 'resolved')">{{ t('as.d.resolve') }}</button>
                 <button class="btn danger small" data-testid="aftersale-decline" @click="aftersale(selected, 'declined')">{{ t('as.d.decline') }}</button>
                 </template>
-                <button v-else class="btn small need" disabled :title="t('rp.need')" data-testid="aftersale-locked">🔒 {{ t('as.d.resolve') }} · {{ t('rp.need') }}</button>
+                <template v-else>
+                  <button class="btn small need" :title="t('rp.need')" data-testid="aftersale-locked" @click="askApproval('order.aftersale', t('as.d.resolve'), h => aftersale(selected!, 'resolved', h))">🔒 {{ t('as.d.resolve') }} · {{ t('ap.ask') }}</button>
+                  <button class="btn small need" :title="t('rp.need')" @click="askApproval('order.aftersale', t('as.d.decline'), h => aftersale(selected!, 'declined', h))">🔒 {{ t('as.d.decline') }} · {{ t('ap.ask') }}</button>
+                </template>
               </div>
             </template>
           </div>
@@ -265,7 +286,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <button v-if="selected.fulfillment_status === 'awaiting_handoff' && selected.delivery" class="btn primary" @click="act(selected, 'handoff')">{{ t('handoff_rider') }}</button>
             <button v-if="selected.fulfillment_status === 'awaiting_pickup'" class="btn primary" @click="act(selected, 'handoff')">{{ t('handoff_customer') }}</button>
             <button v-if="canCancel(selected) && can('order.cancel')" class="btn danger" data-testid="cancel-order" @click="withReason(selected, 'cancel')">{{ t('cancel_order') }}</button>
-            <button v-else-if="canCancel(selected)" class="btn need" disabled :title="t('rp.need')" data-testid="cancel-locked">🔒 {{ t('cancel_order') }} · {{ t('rp.need') }}</button>
+            <button v-else-if="canCancel(selected)" class="btn need" :title="t('rp.need')" data-testid="cancel-locked" @click="askApproval('order.cancel', t('cancel_order'), h => withReason(selected!, 'cancel', h))">🔒 {{ t('cancel_order') }} · {{ t('ap.ask') }}</button>
             <template v-if="failed(selected)">
               <div class="banner warn">{{ t('failed_hint') }}</div>
               <div class="row wrap">
@@ -281,6 +302,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
       </div>
       <div v-else-if="orders.length" class="detail card muted nopick">{{ t('pick_order') }}</div>
     </div>
+    <ApproveDialog v-if="approving" :branch-id="bid" :perm="approving.perm" :what="approving.what" @approved="approved" @close="approving = null" />
   </div>
 </template>
 

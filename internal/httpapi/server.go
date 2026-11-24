@@ -37,6 +37,8 @@ type Server struct {
 	mallLimit    *limiter // marketplace listings
 	otpLimit     *limiter
 	loginLimit   *limiter
+	// Approval codes lock after five wrong tries each; this only stops floods.
+	approveLimit *limiter
 	// Guests at the tables usually share the restaurant's one public address,
 	// so the dine-in limit is per address but much wider.
 	tableLimit *limiter
@@ -49,9 +51,10 @@ func NewServer(a *app.App, cfg config.Config, hub *Hub) *Server {
 		mallLimit:    newLimiter(120, 60),
 		// Everyone who orders logs in, and many customers can share one
 		// address; the daily caps in RequestOTP are what limit the cost.
-		otpLimit:   newLimiter(20, 20),
-		loginLimit: newLimiter(10, 10),
-		tableLimit: newLimiter(600, 200),
+		otpLimit:     newLimiter(20, 20),
+		loginLimit:   newLimiter(10, 10),
+		approveLimit: newLimiter(30, 30),
+		tableLimit:   newLimiter(600, 200),
 	}
 }
 
@@ -104,7 +107,7 @@ func currentUser(c *gin.Context) *app.User {
 }
 
 func staffActor(c *gin.Context) app.Actor {
-	a := app.Actor{Type: "staff", ID: currentUser(c).ID}
+	a := app.Actor{Type: "staff", ID: currentUser(c).ID, ApprovedBy: c.GetInt64("approved_by")}
 	// The workbench and the kitchen screen say which of them is asking.
 	if via := c.Query("via"); via == "work" || via == "board" {
 		a.Via = via
@@ -164,20 +167,26 @@ var (
 // allowed checks the user's permissions in a branch. A branch the user has no
 // role in is reported as not found, so that ids of other merchants leak nothing.
 func allowed(c *gin.Context, branchID int64, perms []string) bool {
+	if err := permError(c, branchID, perms); err != nil {
+		fail(c, err)
+		return false
+	}
+	return true
+}
+
+func permError(c *gin.Context, branchID int64, perms []string) error {
 	u := currentUser(c)
 	role := u.RoleIn(branchID)
 	if role == "" && u.Entry == app.EntryAdmin {
 		// The platform can look at any store's back office but not act in it:
 		// accepting orders or reconciling cash stays with the merchant.
 		if c.Request.Method == http.MethodGet {
-			return true
+			return nil
 		}
-		fail(c, app.Err(http.StatusForbidden, "READ_ONLY", "the platform view of a store is read-only"))
-		return false
+		return app.Err(http.StatusForbidden, "READ_ONLY", "the platform view of a store is read-only")
 	}
 	if role == "" {
-		fail(c, app.ErrNotFound)
-		return false
+		return app.ErrNotFound
 	}
 	// A workbench sign-in reaches only what the workbench uses: the live
 	// updates, the menu and stations, and what a station or the packing
@@ -185,15 +194,13 @@ func allowed(c *gin.Context, branchID int64, perms []string) bool {
 	if u.Entry == app.EntryWork {
 		for _, p := range perms {
 			if p == needAny || p == needKitchen && u.InStore(branchID) {
-				return true
+				return nil
 			}
 		}
 		if role == "staff" {
-			fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "your role cannot do this"))
-		} else {
-			fail(c, app.Err(http.StatusForbidden, "WORK_SESSION", "sign in to the back office for this"))
+			return errForbidden
 		}
-		return false
+		return app.Err(http.StatusForbidden, "WORK_SESSION", "sign in to the back office for this")
 	}
 	for _, p := range perms {
 		switch {
@@ -201,16 +208,16 @@ func allowed(c *gin.Context, branchID int64, perms []string) bool {
 			p == "owner" && role == "owner",
 			p == needKitchen && u.InStore(branchID),
 			u.Can(branchID, p):
-			return true
+			return nil
 		}
 	}
 	if len(perms) == 1 && perms[0] == "owner" {
-		fail(c, app.Err(http.StatusForbidden, "OWNER_ONLY", "only the owner can do this"))
-		return false
+		return app.Err(http.StatusForbidden, "OWNER_ONLY", "only the owner can do this")
 	}
-	fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "your role cannot do this"))
-	return false
+	return errForbidden
 }
+
+var errForbidden = app.Err(http.StatusForbidden, "FORBIDDEN", "your role cannot do this")
 
 // branchScope reads :bid and checks the role.
 func branchScope(c *gin.Context, perms []string) (int64, bool) {
@@ -232,7 +239,23 @@ func (s *Server) orderScope(c *gin.Context, roles []string) (int64, bool) {
 		fail(c, err)
 		return 0, false
 	}
-	return id, allowed(c, bid, roles)
+	err = permError(c, bid, roles)
+	// What the role may not do, a manager may approve for this one time
+	// (docs/STAFF_ACCESS_DESIGN.md §7).
+	if err == errForbidden && c.GetHeader("X-Approval") != "" {
+		by, aerr := s.App.UseApproval(c, c.GetHeader("X-Approval"), bid, currentUser(c).ID, roles)
+		if aerr != nil {
+			fail(c, aerr)
+			return 0, false
+		}
+		c.Set("approved_by", by)
+		return id, true
+	}
+	if err != nil {
+		fail(c, err)
+		return 0, false
+	}
+	return id, true
 }
 
 // ---- middleware ----

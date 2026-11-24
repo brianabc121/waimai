@@ -150,7 +150,7 @@ export interface BranchRole { branch_id: number; branch_name: string; slug: stri
 export interface StaffMember { id: number; username: string; display_name: string; phone: string; role: string; active: boolean; posts: Post[]; open_tasks: number; active_deliveries: number; on_duty: boolean }
 export interface RiderInfo extends StaffMember { lat: number | null; lng: number | null; accuracy: number | null; battery: number | null; located_at: string | null; contact: '' | 'ok' | 'none' | 'lost'; distance_m: number | null }
 export interface Tracking { active: boolean; rider_name?: string; rider_phone?: string; lat: number | null; lng: number | null; located_at: string | null; dest_lat: number | null; dest_lng: number | null; distance_m: number | null }
-export interface User { id: number; username: string; display_name: string; is_platform_admin: boolean; roles: BranchRole[]; entry?: Entry }
+export interface User { id: number; username: string; display_name: string; is_platform_admin: boolean; roles: BranchRole[]; entry?: Entry; has_approve_pin?: boolean }
 // Where a sign-in leads (docs/STAFF_ACCESS_DESIGN.md §5).
 export type Entry = 'office' | 'work' | 'admin'
 
