@@ -14,6 +14,7 @@ import (
 // owner can do everything; staff without a back-office role can do none of it.
 const (
 	PermOrderView      = "order.view"
+	PermOrderProgress  = "order.progress"
 	PermOrderHandle    = "order.handle"
 	PermOrderManual    = "order.manual"
 	PermOrderCancel    = "order.cancel"
@@ -60,6 +61,7 @@ type PermDef struct {
 
 var PermCatalog = []PermDef{
 	{Code: PermOrderView, Group: "order", Cashier: true, Manager: true, LockedCashier: true},
+	{Code: PermOrderProgress, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderHandle, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderManual, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderCancel, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},

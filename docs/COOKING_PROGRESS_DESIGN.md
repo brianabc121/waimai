@@ -1,6 +1,7 @@
 # 订单后台：烹饪进度 设计方案 v0.1（已确认）
 
-> 状态：2026-11-24 v0.1，brian 确认按这一版全部落实，第 10 节全部按推荐。
+> 状态：2026-11-24 v0.1，brian 确认按这一版全部落实，第 10 节全部按推荐，已实现（浏览器测试 `e2e/progress.cjs`）。
+> 实现时的小调整：订单页的订单卡只显示“几份做好”，跳到烹饪进度的链接放在订单详情的状态标签里（卡片本身是按钮，里面不能再放链接）。
 > 效果图：[docs/cooking-progress-screens/](cooking-progress-screens/)，原型 [docs/cooking-progress-prototype/index.html](cooking-progress-prototype/index.html)（地址后加 `#s1` 到 `#s6` 切换）。
 >
 > | 效果图 | 内容 |

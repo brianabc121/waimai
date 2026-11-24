@@ -190,6 +190,7 @@ func customerView(o *app.Order) *app.Order {
 	}
 	for i := range o.Items {
 		o.Items[i].BatchBy, o.Items[i].RoundTags = "", []string{}
+		o.Items[i].StartedBy, o.Items[i].ReadyBy = "", ""
 	}
 	return o
 }
@@ -971,7 +972,12 @@ func (s *Server) kitchenBoard(c *gin.Context) {
 	for _, o := range orders {
 		o.CustomerPhone, o.AddressLine, o.AddressUnit, o.AddressNote, o.Cash = "", "", "", "", nil
 	}
-	c.JSON(200, gin.H{"orders": orders})
+	// The timers turn yellow and red by the store's cooking target.
+	target := 15
+	if b, err := s.App.BranchByID(c, bid); err == nil {
+		target = b.CookTargetMinutes
+	}
+	c.JSON(200, gin.H{"orders": orders, "target_minutes": target})
 }
 
 func (s *Server) itemAction(c *gin.Context) {

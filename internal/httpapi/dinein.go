@@ -301,6 +301,12 @@ func (s *Server) currentTable(c *gin.Context) {
 			fail(c, err)
 			return
 		}
+		// which cook made each dish stays in the store
+		if bill.Order != nil {
+			for i := range bill.Order.Items {
+				bill.Order.Items[i].StartedBy, bill.Order.Items[i].ReadyBy = "", ""
+			}
+		}
 	}
 	c.JSON(200, gin.H{"access": acc, "bill": bill})
 }

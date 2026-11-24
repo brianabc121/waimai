@@ -9,6 +9,7 @@ import { get, post } from '../api'
 import { locale, setLocale, t } from '../i18n'
 import { can, currentRole, logout, reloadUser, session, setAdminView } from '../session'
 import './loginStrings'
+import '../progress'
 import '../approve'
 import ApprovePinDialog from './ApprovePinDialog.vue'
 import { pagePerms } from '../perms'
@@ -92,6 +93,7 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
       <div v-if="role && !viewing" class="shell-role" data-testid="nav-role"><span class="rtag" :class="role">{{ t('role.' + role) }}</span><span class="who">{{ session.user?.display_name }}</span></div>
       <div class="shell-links">
         <router-link v-if="show('/merchant/orders')" to="/merchant/orders">{{ t('orders') }}</router-link>
+        <router-link v-if="show('/merchant/progress')" to="/merchant/progress" class="navsub" data-testid="nav-progress">{{ t('kp.nav') }}</router-link>
         <router-link v-if="show('/merchant/members')" to="/merchant/members" data-testid="nav-members">{{ t('sm.title') }}</router-link>
         <router-link v-if="show('/merchant/addresses')" to="/merchant/addresses" data-testid="nav-addresses">{{ t('da.title') }}</router-link>
         <router-link v-if="show('/merchant/tables')" to="/merchant/tables">{{ t('tables') }}</router-link>
