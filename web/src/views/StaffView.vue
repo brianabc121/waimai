@@ -2,7 +2,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ApiError, del, get, patch, post } from '../api'
 import { pick, t } from '../i18n'
-import { currentRole, session } from '../session'
+import { currentRole, isOwner, session } from '../session'
+import '../perms'
 import type { Post, StaffMember, Station } from '../types'
 import StaffTabs from './staff/StaffTabs.vue'
 import './work/strings'
@@ -59,8 +60,8 @@ const nowText = (m: StaffMember) => {
   return (clocks ? t(m.on_duty ? 'st.now.on_duty' : 'st.now.off_duty') + ' · ' : '') + (parts.join(' / ') || t('st.now.idle'))
 }
 const colors = ['#d9480f', '#1d4ed8', '#18794e', '#7c3aed', '#b45309', '#0e7490', '#be185d']
-// Owners are managed by owners only.
-const editable = (m: StaffMember) => m.role !== 'owner' || myRole.value === 'owner'
+// Owners and managers are managed by owners only (docs/STAFF_ACCESS_DESIGN.md §6.3).
+const editable = (m: StaffMember) => !['owner', 'manager'].includes(m.role) || myRole.value === 'owner' || m.id === session.user?.id
 
 // ---- drawer ----
 const f = reactive({ open: false, id: 0, username: '', display_name: '', phone: '', password: '', role: 'staff', stations: [] as number[], packing: false, rider: false,
@@ -70,6 +71,7 @@ function edit(m: StaffMember | null) {
     role: m?.role ?? 'staff', stations: m ? m.posts.filter(p => p.kind === 'station').map(p => p.station_id!) : [], packing: !!m && has(m, 'packing'), rider: !!m && has(m, 'rider'),
     active: m?.active ?? true, error: '', busy: false, pw: false, newPw: '' })
   notice.value = ''
+  void loadPerms()
 }
 const self = computed(() => f.id === session.user?.id)
 // Stations offered in the form: the active ones, plus a disabled one the person still holds.
@@ -78,7 +80,19 @@ const formStations = computed(() => {
   return [...stations.value.map(s => ({ id: s.id, name: pick(s.name, s.name_en) })), ...held.map(p => ({ id: p.station_id!, name: postName(p) }))]
 })
 const toggleStation = (id: number) => { const i = f.stations.indexOf(id); i < 0 ? f.stations.push(id) : f.stations.splice(i, 1) }
-const roles = computed(() => myRole.value === 'owner' ? ['staff', 'cashier', 'manager', 'owner'] : ['staff', 'cashier', 'manager'])
+const roles = computed(() => myRole.value === 'owner' || self.value ? ['staff', 'cashier', 'manager', 'owner'] : ['staff', 'cashier'])
+const roleHint = (r: string) => r === 'staff' ? t('rp.role.staff_hint') : r === 'owner' ? t('rp.role.owner_hint') : r === 'manager' ? t('rp.manager_only_owner') : t('rp.role.cashier_hint')
+
+// What the chosen role can do in this store, for the owner (who sees the table).
+interface PermTable { catalog: { code: string }[]; cashier: string[]; manager: string[] }
+const permTable = ref<PermTable | null>(null)
+async function loadPerms() { if (isOwner() && !permTable.value) permTable.value = await get<PermTable>(`/merchant/branches/${bid}/role-perms`).catch(() => null) }
+const summary = computed(() => {
+  const tb = permTable.value
+  if (!tb || (f.role !== 'cashier' && f.role !== 'manager')) return null
+  const mine = f.role === 'cashier' ? tb.cashier : tb.manager
+  return { yes: tb.catalog.filter(c => mine.includes(c.code)).map(c => t('rp.p.' + c.code)), no: tb.catalog.filter(c => !mine.includes(c.code)).map(c => t('rp.p.' + c.code)) }
+})
 
 async function act(fn: () => Promise<unknown>, done = t('st.saved')) {
   f.error = ''; f.busy = true
@@ -133,7 +147,7 @@ const resetPw = () => act(() => post(`/merchant/branches/${bid}/staff/${f.id}/pa
             <td data-col="posts">
               <span v-for="p in m.posts" :key="p.kind + (p.station_id ?? '')" class="post" :class="p.kind">{{ postName(p) }}</span>
               <span v-if="!m.posts.length" class="post none">{{ t('st.no_posts') }}</span></td>
-            <td><span v-if="m.role !== 'staff'" class="tag" :class="{ brand: m.role === 'owner' }">{{ t('role.' + m.role) }}</span><span v-else class="muted">{{ t('st.role.none') }}</span></td>
+            <td><span class="rtag" :class="m.role" :data-role="m.role">{{ m.role === 'staff' ? t('st.role.none') : t('role.' + m.role) }}</span></td>
             <td class="small"><i class="dot" :class="{ on: m.active && (m.open_tasks > 0 || m.active_deliveries > 0 || m.on_duty) }"></i>{{ nowText(m) }}</td>
             <td class="right">
               <button v-if="!m.active && editable(m)" class="btn small" @click="restore(m)">{{ t('st.restore') }}</button>
@@ -181,7 +195,14 @@ const resetPw = () => act(() => post(`/merchant/branches/${bid}/staff/${f.id}/pa
         <div class="grp" :class="{ locked: self }">
           <div class="gh"><b>{{ t('st.col.role') }}</b> <span class="muted small">{{ t('st.role_hint') }}</span></div>
           <div class="opts">
-            <button v-for="r in roles" :key="r" type="button" class="opt radio" :class="{ on: f.role === r }" :data-role="r" :disabled="self" @click="f.role = r"><i></i>{{ r === 'staff' ? t('st.role.none') : t('role.' + r) }}</button>
+            <button v-for="r in roles" :key="r" type="button" class="opt radio" :class="{ on: f.role === r }" :data-role="r" :title="roleHint(r)" :disabled="self" @click="f.role = r"><i></i>{{ r === 'staff' ? t('st.role.none') : t('role.' + r) }}</button>
+          </div>
+          <div class="muted small">{{ roleHint(f.role) }}</div>
+          <div v-if="summary" class="permsum" data-testid="role-summary">
+            <div class="row between"><b>{{ t('rp.can', { role: t('role.' + f.role) }) }}</b>
+              <router-link class="small" to="/merchant/staff/roles">{{ t('rp.edit_link') }} ›</router-link></div>
+            <div class="y">✓ {{ summary.yes.join('、') }}</div>
+            <div v-if="summary.no.length" class="n">✗ {{ summary.no.join('、') }}</div>
           </div>
         </div>
 
@@ -221,5 +242,7 @@ const resetPw = () => act(() => post(`/merchant/branches/${bid}/staff/${f.id}/pa
 .opt i { width: 16px; height: 16px; border: 1.5px solid #9ca3af; border-radius: 4px; flex: none; position: relative; } .opt.radio i { border-radius: 50%; }
 .opt.on { border-color: var(--brand); background: var(--brand-soft); font-weight: 600; } .opt.on i { background: var(--brand); border-color: var(--brand); }
 .opt.on i::after { content: ""; position: absolute; inset-inline-start: 4.5px; top: 1.5px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.permsum { background: #f6f6f4; border-radius: 10px; padding: 10px 12px; font-size: 13px; display: grid; gap: 4px; }
+.permsum .y { color: var(--ok); } .permsum .n { color: #8b949e; }
 .foot { margin-top: auto; display: flex; gap: 8px; align-items: center; padding-top: 6px; }
 </style>

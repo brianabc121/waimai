@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { money, t } from '../i18n'
 import { useLive } from '../live'
-import { session } from '../session'
+import { can, session } from '../session'
 import { addQuickReply, chat, chatCustomerOfOrder, chatSetup, connect, day, deleteQuickReply, describeChat, lastLine, listen, setAutoReply, storeChat, storeChatBlock, storeChatRead, storeChats, type ChatOrder, type ChatSetup, type ChatThread, type StoreChat } from '../chat'
 import { chatPush, disableChatPush, enableChatPush, setupChatPush } from '../webpush'
 import ChatPane from './chat/ChatPane.vue'
@@ -56,7 +56,7 @@ async function block() {
 const pane = ref<{ put: (text: string) => void } | null>(null)
 const setup = ref<ChatSetup | null>(null), managing = ref(false), newQuick = ref(''), setupError = ref('')
 const auto = reactive({ on: true, text: '' })
-const manager = computed(() => ['owner', 'manager'].includes(session.user?.roles.find(r => r.branch_id === bid)?.role ?? ''))
+const manager = computed(() => can('chat.settings'))
 async function loadSetup() {
   try { setup.value = await chatSetup(bid); auto.on = setup.value.auto_reply_on; auto.text = setup.value.auto_reply } catch { /* the page works without them */ }
 }

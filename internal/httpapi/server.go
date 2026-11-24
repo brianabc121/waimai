@@ -111,16 +111,58 @@ func staffActor(c *gin.Context) app.Actor {
 	return a
 }
 
-var (
-	deskRoles    = []string{"owner", "manager", "cashier"}
-	managerRoles = []string{"owner", "manager"}
-	kitchenRoles = []string{"owner", "manager", "cashier", "kitchen"}
-	allStaff     = []string{"owner", "manager", "cashier", "kitchen"}
+// What a route needs, as any-of lists of permissions (docs/STAFF_ACCESS_DESIGN.md
+// §6). The owner has every permission; a manager or an order taker has what
+// the owner allowed; staff without a back-office role have none.
+//
+// Two words are not permissions: "any" is anyone with a role in the store,
+// "kitchen" is anyone who works a station or the packing counter.
+const (
+	needAny     = "any"
+	needKitchen = "kitchen"
 )
 
-// allowed checks the user's role in a branch. A branch the user has no role
-// in is reported as not found, so that ids of other merchants leak nothing.
-func allowed(c *gin.Context, branchID int64, roles []string) bool {
+func need(perms ...string) []string { return perms }
+
+var (
+	pAny          = need(needAny)
+	pOrderView    = need(app.PermOrderView)
+	pHandle       = need(app.PermOrderHandle)
+	pCancel       = need(app.PermOrderCancel)
+	pAftersale    = need(app.PermOrderAftersale)
+	pManual       = need(app.PermOrderManual)
+	pHandoff      = need(app.PermOrderHandle, needKitchen)
+	pRiders       = need(app.PermRiderView, app.PermOrderHandle)
+	pTable        = need(app.PermTableUse)
+	pTableManage  = need(app.PermTableManage)
+	pMemberView   = need(app.PermMemberView)
+	pMemberLookup = need(app.PermMemberView, app.PermOrderManual)
+	pMemberWrite  = need(app.PermMemberEdit, app.PermOrderManual)
+	pChat         = need(app.PermChatReply)
+	pChatSettings = need(app.PermChatSettings)
+	pSupport      = need(app.PermSupport)
+	pSoldOut      = need(app.PermMenuSoldOut, app.PermMenuEdit, needKitchen)
+	pMenuEdit     = need(app.PermMenuEdit)
+	pTranslate    = need(app.PermMenuTranslate)
+	pDesign       = need(app.PermStoreDesign)
+	pImage        = need(app.PermMenuEdit, app.PermStoreDesign, app.PermSettings, app.PermMall)
+	pPromo        = need(app.PermPromo)
+	pMall         = need(app.PermMall)
+	pCash         = need(app.PermCash)
+	pBills        = need(app.PermBills)
+	pMap          = need(app.PermDeliveryMap)
+	pStaffView    = need(app.PermStaffView)
+	pStaffManage  = need(app.PermStaffManage)
+	pAttend       = need(app.PermStaffAttend)
+	pReports      = need(app.PermStaffReports)
+	pSettings     = need(app.PermSettings)
+	pKitchen      = need(app.PermKitchenScreen, needKitchen)
+	pOwner        = need("owner")
+)
+
+// allowed checks the user's permissions in a branch. A branch the user has no
+// role in is reported as not found, so that ids of other merchants leak nothing.
+func allowed(c *gin.Context, branchID int64, perms []string) bool {
 	u := currentUser(c)
 	role := u.RoleIn(branchID)
 	if role == "" && u.IsPlatformAdmin {
@@ -136,25 +178,30 @@ func allowed(c *gin.Context, branchID int64, roles []string) bool {
 		fail(c, app.ErrNotFound)
 		return false
 	}
-	// "kitchen" in a role list stands for anyone who works a station or the
-	// packing counter, whatever their back-office role is.
-	inStore := u.InStore(branchID)
-	for _, r := range roles {
-		if r == role || (r == "kitchen" && inStore) {
+	for _, p := range perms {
+		switch {
+		case p == needAny,
+			p == "owner" && role == "owner",
+			p == needKitchen && u.InStore(branchID),
+			u.Can(branchID, p):
 			return true
 		}
+	}
+	if len(perms) == 1 && perms[0] == "owner" {
+		fail(c, app.Err(http.StatusForbidden, "OWNER_ONLY", "only the owner can do this"))
+		return false
 	}
 	fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "your role cannot do this"))
 	return false
 }
 
 // branchScope reads :bid and checks the role.
-func branchScope(c *gin.Context, roles []string) (int64, bool) {
+func branchScope(c *gin.Context, perms []string) (int64, bool) {
 	bid, ok := idParam(c, "bid")
 	if !ok {
 		return 0, false
 	}
-	return bid, allowed(c, bid, roles)
+	return bid, allowed(c, bid, perms)
 }
 
 // orderScope reads :id, resolves the order's branch and checks the role.
@@ -437,6 +484,7 @@ func (s *Server) Router() *gin.Engine {
 	s.couponAdminRoutes(admin)
 	s.billRoutes(auth, admin)
 	s.translationRoutes(auth, admin)
+	s.permRoutes(auth)
 	s.uiTextRoutes(api, admin)
 	s.chatAdminRoutes(auth, admin)
 	s.memberRoutes(auth)

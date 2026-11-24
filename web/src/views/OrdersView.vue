@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { ApiError, get, post } from '../api'
 import { both, has, minutesSince, money, reasonText, t, whenText } from '../i18n'
 import { useLive } from '../live'
-import { session } from '../session'
+import { can, session } from '../session'
 import type { Order, RiderInfo } from '../types'
 import { contactApps, contactName, contactPhone } from '../addresses'
 import './work/strings'
@@ -128,7 +128,7 @@ function aftersale(o: Order, status: 'resolved' | 'declined') {
   void act(o, 'aftersale', { status, reply })
 }
 const canCancel = (o: Order) => o.acceptance_status === 'accepted' && ['none', 'awaiting_handoff', 'awaiting_pickup'].includes(o.fulfillment_status)
-const canAssign = (o: Order) => o.service_type === 'delivery' && o.acceptance_status === 'accepted' && ['none', 'awaiting_handoff'].includes(o.fulfillment_status)
+const canAssign = (o: Order) => can('order.handle') && o.service_type === 'delivery' && o.acceptance_status === 'accepted' && ['none', 'awaiting_handoff'].includes(o.fulfillment_status)
 const waited = (o: Order) => { void now.value; return minutesSince(o.created_at) }
 const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'bad', cancelled: 'bad' }[s] ?? '')
 </script>
@@ -142,7 +142,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
       </div>
       <div class="row wrap">
         <label class="check" style="margin:0"><input type="checkbox" :checked="sound" @change="toggleSound" />{{ t('new_order_sound') }}</label>
-        <router-link class="btn primary small" to="/merchant/orders/new" data-testid="manual-order-new">{{ t('vo.new') }}</router-link>
+        <router-link v-if="can('order.manual')" class="btn primary small" to="/merchant/orders/new" data-testid="manual-order-new">{{ t('vo.new') }}</router-link>
       </div>
     </div>
     <div v-if="textsPending" class="banner warn" style="margin-bottom:12px" data-testid="store-texts-banner">{{ t('mtr.store_banner', { n: textsPending }) }}
@@ -193,8 +193,11 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <template v-if="selected.aftersale.status === 'open'">
               <div class="small">{{ t('as.d.hint') }}</div>
               <div class="row wrap">
+                <template v-if="can('order.aftersale')">
                 <button class="btn primary small" data-testid="aftersale-resolve" @click="aftersale(selected, 'resolved')">{{ t('as.d.resolve') }}</button>
                 <button class="btn danger small" data-testid="aftersale-decline" @click="aftersale(selected, 'declined')">{{ t('as.d.decline') }}</button>
+                </template>
+                <button v-else class="btn small need" disabled :title="t('rp.need')" data-testid="aftersale-locked">🔒 {{ t('as.d.resolve') }} · {{ t('rp.need') }}</button>
               </div>
             </template>
           </div>
@@ -247,7 +250,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
           <div v-if="selected.cash" class="row between"><span class="muted">{{ t('collected') }}</span>
             <span>{{ money(selected.cash.amount_collected, selected.currency) }} · <span class="tag">{{ t('c.' + selected.cash.reconcile_status) }}</span></span></div>
 
-          <div class="row wrap" v-if="selected.acceptance_status === 'pending'">
+          <div class="row wrap" v-if="selected.acceptance_status === 'pending' && can('order.handle')">
             <button class="btn primary grow big" @click="act(selected, 'accept')">{{ t('accept') }}</button>
             <button class="btn danger big" @click="withReason(selected, 'reject')">{{ t('reject') }}</button>
           </div>
@@ -261,7 +264,8 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             </label>
             <button v-if="selected.fulfillment_status === 'awaiting_handoff' && selected.delivery" class="btn primary" @click="act(selected, 'handoff')">{{ t('handoff_rider') }}</button>
             <button v-if="selected.fulfillment_status === 'awaiting_pickup'" class="btn primary" @click="act(selected, 'handoff')">{{ t('handoff_customer') }}</button>
-            <button v-if="canCancel(selected)" class="btn danger" @click="withReason(selected, 'cancel')">{{ t('cancel_order') }}</button>
+            <button v-if="canCancel(selected) && can('order.cancel')" class="btn danger" data-testid="cancel-order" @click="withReason(selected, 'cancel')">{{ t('cancel_order') }}</button>
+            <button v-else-if="canCancel(selected)" class="btn need" disabled :title="t('rp.need')" data-testid="cancel-locked">🔒 {{ t('cancel_order') }} · {{ t('rp.need') }}</button>
             <template v-if="failed(selected)">
               <div class="banner warn">{{ t('failed_hint') }}</div>
               <div class="row wrap">

@@ -31,7 +31,7 @@ func deliveryScope(c *gin.Context) (app.DeliveryScope, bool) {
 		return app.DeliveryScope{BranchID: queryInt(c, "branch_id"), MerchantID: queryInt(c, "merchant_id"),
 			CountryCode: c.Query("country"), City: c.Query("city")}, true
 	}
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pMemberView)
 	return app.DeliveryScope{BranchID: bid}, ok
 }
 

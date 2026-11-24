@@ -205,7 +205,11 @@ func (a *App) listStaff(ctx context.Context, branchID int64, extra string) ([]St
 	return out, nil
 }
 
-var errOwnerOnly = Err(http.StatusForbidden, "FORBIDDEN", "only an owner can manage an owner")
+var errOwnerOnly = Err(http.StatusForbidden, "OWNER_ONLY", "only an owner can appoint or manage owners and managers")
+
+// senior roles are appointed and managed by an owner only
+// (docs/STAFF_ACCESS_DESIGN.md §6.3): a manager manages order takers and staff.
+func senior(role string) bool { return role == "owner" || role == "manager" }
 
 func staffRole(role string) bool {
 	return role == "owner" || role == "manager" || role == "cashier" || role == "staff"
@@ -225,7 +229,7 @@ func (a *App) CreateStaff(ctx context.Context, branchID int64, in NewUser) (int6
 // CreateStaffBy adds a person on behalf of a signed-in manager, who cannot
 // create an owner; the change is audited.
 func (a *App) CreateStaffBy(ctx context.Context, branchID int64, in NewUser, by *User) (int64, error) {
-	if by != nil && in.Role == "owner" && by.RoleIn(branchID) != "owner" {
+	if by != nil && senior(in.Role) && by.RoleIn(branchID) != "owner" {
 		return 0, errOwnerOnly
 	}
 	var id int64
@@ -295,7 +299,7 @@ func (a *App) UpdateStaff(ctx context.Context, branchID, userID int64, in StaffP
 		if err != nil {
 			return err
 		}
-		if cur.role == "owner" && byRole != "owner" {
+		if senior(cur.role) && byRole != "owner" && userID != by.ID {
 			return errOwnerOnly
 		}
 		changed := map[string]any{"user_id": userID}
@@ -303,7 +307,7 @@ func (a *App) UpdateStaff(ctx context.Context, branchID, userID int64, in StaffP
 			if !staffRole(*in.Role) {
 				return ErrValidation("unknown role")
 			}
-			if *in.Role == "owner" && byRole != "owner" {
+			if senior(*in.Role) && byRole != "owner" {
 				return errOwnerOnly
 			}
 			if userID == by.ID {
@@ -402,7 +406,7 @@ func (a *App) ResetStaffPassword(ctx context.Context, branchID, userID int64, pa
 		if err != nil {
 			return err
 		}
-		if cur.role == "owner" && by.RoleIn(branchID) != "owner" {
+		if senior(cur.role) && by.RoleIn(branchID) != "owner" && userID != by.ID {
 			return errOwnerOnly
 		}
 		if _, err := tx.Exec(ctx, `UPDATE users SET password_hash=$2 WHERE id=$1`, userID, hash); err != nil {
@@ -429,10 +433,10 @@ func (a *App) DeleteStaff(ctx context.Context, branchID, userID int64, by *User)
 		if err != nil {
 			return err
 		}
+		if senior(cur.role) && by.RoleIn(branchID) != "owner" {
+			return errOwnerOnly
+		}
 		if cur.role == "owner" {
-			if by.RoleIn(branchID) != "owner" {
-				return errOwnerOnly
-			}
 			if cur.active {
 				if err := keepAnOwner(ctx, tx, branchID, userID); err != nil {
 					return err

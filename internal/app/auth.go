@@ -38,6 +38,10 @@ type BranchRole struct {
 	// What the person works on is in Posts.
 	Role  string `json:"role"`
 	Posts []Post `json:"posts"`
+	// Perms is what the role may do in this store's back office: everything
+	// for the owner, what the owner allowed for a manager or an order taker
+	// (docs/STAFF_ACCESS_DESIGN.md §6), nothing for staff.
+	Perms []string `json:"perms"`
 }
 
 type User struct {
@@ -109,7 +113,16 @@ func (a *App) loadUser(ctx context.Context, id int64) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
+	ids := make([]int64, len(u.Roles))
+	for i, r := range u.Roles {
+		ids[i] = r.BranchID
+	}
+	conf, err := branchPerms(ctx, a.DB, ids)
+	if err != nil {
+		return nil, err
+	}
 	for i := range u.Roles {
+		u.Roles[i].Perms = permsFor(conf, u.Roles[i].BranchID, u.Roles[i].Role)
 		if ps := posts[postKey{id, u.Roles[i].BranchID}]; ps != nil {
 			u.Roles[i].Posts = ps
 		}

@@ -59,7 +59,7 @@ func (s *Server) myAttendance(c *gin.Context) {
 }
 
 func (s *Server) attendance(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pAttend)
 	if !ok {
 		return
 	}
@@ -76,7 +76,7 @@ func (s *Server) attendance(c *gin.Context) {
 }
 
 func (s *Server) addShift(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pAttend)
 	if !ok {
 		return
 	}
@@ -93,7 +93,7 @@ func (s *Server) addShift(c *gin.Context) {
 }
 
 func (s *Server) editShift(c *gin.Context) {
-	bid, id, ok := staffScope(c)
+	bid, id, ok := staffScope(c, pAttend)
 	if !ok {
 		return
 	}
@@ -112,7 +112,7 @@ func (s *Server) editShift(c *gin.Context) {
 // ---- in-store work summary ----
 
 func (s *Server) kitchenReport(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pReports)
 	if !ok {
 		return
 	}
@@ -135,7 +135,7 @@ func (s *Server) kitchenReport(c *gin.Context) {
 
 // kitchenDetail is one person's work; id 0 is the shared kitchen screen.
 func (s *Server) kitchenDetail(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pReports)
 	if !ok {
 		return
 	}
@@ -165,7 +165,7 @@ func (s *Server) kitchenDetail(c *gin.Context) {
 // ---- rider work summary ----
 
 func (s *Server) riderReport(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pReports)
 	if !ok {
 		return
 	}
@@ -187,7 +187,7 @@ func (s *Server) riderReport(c *gin.Context) {
 }
 
 func (s *Server) riderDetail(c *gin.Context) {
-	bid, id, ok := staffScope(c)
+	bid, id, ok := staffScope(c, pReports)
 	if !ok {
 		return
 	}
@@ -200,7 +200,7 @@ func (s *Server) riderDetail(c *gin.Context) {
 }
 
 func (s *Server) tripDetail(c *gin.Context) {
-	bid, id, ok := staffScope(c)
+	bid, id, ok := staffScope(c, pReports)
 	if !ok {
 		return
 	}

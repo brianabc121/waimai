@@ -38,20 +38,20 @@ func (s *Server) customerSupportImage(c *gin.Context) {
 // ---- store ----
 
 func (s *Server) storeSupport(c *gin.Context) {
-	if bid, ok := branchScope(c, deskRoles); ok {
+	if bid, ok := branchScope(c, pSupport); ok {
 		v, err := s.App.SupportOf(c, app.StoreParty(bid), false)
 		reply(c, v, err)
 	}
 }
 
 func (s *Server) storeSupportRead(c *gin.Context) {
-	if bid, ok := branchScope(c, deskRoles); ok {
+	if bid, ok := branchScope(c, pSupport); ok {
 		reply(c, gin.H{"ok": true}, s.App.ReadSupport(c, app.StoreParty(bid), false))
 	}
 }
 
 func (s *Server) storeSupportImage(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pSupport)
 	if !ok {
 		return
 	}

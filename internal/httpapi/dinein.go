@@ -14,7 +14,7 @@ const (
 // ---- staff: tables and sessions ----
 
 func (s *Server) listTables(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pTable)
 	if !ok {
 		return
 	}
@@ -32,7 +32,7 @@ func (s *Server) listTables(c *gin.Context) {
 }
 
 func (s *Server) saveTable(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pTableManage)
 	if !ok {
 		return
 	}
@@ -81,7 +81,7 @@ func (s *Server) sessionScope(c *gin.Context, roles []string) (int64, bool) {
 }
 
 func (s *Server) openTable(c *gin.Context) {
-	id, ok := s.tableScope(c, deskRoles)
+	id, ok := s.tableScope(c, pTable)
 	if !ok {
 		return
 	}
@@ -100,7 +100,7 @@ func (s *Server) openTable(c *gin.Context) {
 }
 
 func (s *Server) getBill(c *gin.Context) {
-	id, ok := s.sessionScope(c, deskRoles)
+	id, ok := s.sessionScope(c, pTable)
 	if !ok {
 		return
 	}
@@ -113,7 +113,7 @@ func (s *Server) getBill(c *gin.Context) {
 }
 
 func (s *Server) staffBatch(c *gin.Context) {
-	id, ok := s.sessionScope(c, deskRoles)
+	id, ok := s.sessionScope(c, pTable)
 	if !ok {
 		return
 	}
@@ -130,7 +130,7 @@ func (s *Server) staffBatch(c *gin.Context) {
 }
 
 func (s *Server) closeTable(c *gin.Context) {
-	id, ok := s.sessionScope(c, deskRoles)
+	id, ok := s.sessionScope(c, pTable)
 	if !ok {
 		return
 	}
@@ -160,12 +160,12 @@ func (s *Server) billItem(c *gin.Context) {
 	var bill *app.Bill
 	switch c.Param("action") {
 	case "serve":
-		if !allowed(c, bid, kitchenRoles) {
+		if !allowed(c, bid, pKitchen) {
 			return
 		}
 		bill, err = s.App.ServeItem(c, itemID, staffActor(c))
 	case "void":
-		if !allowed(c, bid, deskRoles) {
+		if !allowed(c, bid, pTable) {
 			return
 		}
 		var in struct {
@@ -176,7 +176,7 @@ func (s *Server) billItem(c *gin.Context) {
 		}
 		bill, err = s.App.VoidItem(c, itemID, in.Reason, staffActor(c))
 	default:
-		if !allowed(c, bid, kitchenRoles) {
+		if !allowed(c, bid, pKitchen) {
 			return
 		}
 		err = app.ErrNotFound
@@ -189,7 +189,7 @@ func (s *Server) billItem(c *gin.Context) {
 }
 
 func (s *Server) pairTableDevice(c *gin.Context) {
-	id, ok := s.tableScope(c, deskRoles)
+	id, ok := s.tableScope(c, pTable)
 	if !ok {
 		return
 	}
@@ -208,7 +208,7 @@ func (s *Server) pairTableDevice(c *gin.Context) {
 }
 
 func (s *Server) revokeTableDevice(c *gin.Context) {
-	bid, ok := branchScope(c, deskRoles)
+	bid, ok := branchScope(c, pTable)
 	if !ok {
 		return
 	}

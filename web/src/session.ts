@@ -60,6 +60,18 @@ export function currentRole() {
   return session.user?.roles.find(r => r.branch_id === session.branchId) ?? null
 }
 
+// can tells whether the signed-in person may do something in the current
+// store (docs/STAFF_ACCESS_DESIGN.md §6). The platform's read-only view of a
+// store sees every page; the server still refuses its changes.
+export function can(...perms: string[]): boolean {
+  const r = currentRole()
+  if (!r) return false
+  if (session.user?.is_platform_admin && adminView()) return true
+  if (r.role === 'owner') return true
+  return perms.some(p => p === 'kitchen' ? r.posts.some(x => x.kind !== 'rider') : (r.perms ?? []).includes(p))
+}
+export const isOwner = () => currentRole()?.role === 'owner' || (!!session.user?.is_platform_admin && !!adminView())
+
 export async function login(username: string, password: string) {
   localStorage.removeItem(VIEW_KEY)
   session.user = await post<User>('/auth/login', { username, password })

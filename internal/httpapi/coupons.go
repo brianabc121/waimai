@@ -7,7 +7,7 @@ import (
 )
 
 func (s *Server) repurchaseRule(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pPromo)
 	if !ok {
 		return
 	}
@@ -16,7 +16,7 @@ func (s *Server) repurchaseRule(c *gin.Context) {
 }
 
 func (s *Server) saveRepurchaseRule(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pPromo)
 	if !ok {
 		return
 	}
@@ -35,7 +35,7 @@ func (s *Server) saveRepurchaseRule(c *gin.Context) {
 // ---- coupons a store lets customers claim ----
 
 func (s *Server) listStoreBatches(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pPromo)
 	if !ok {
 		return
 	}
@@ -44,7 +44,7 @@ func (s *Server) listStoreBatches(c *gin.Context) {
 }
 
 func (s *Server) saveStoreBatch(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pPromo)
 	if !ok {
 		return
 	}
@@ -61,7 +61,7 @@ func (s *Server) saveStoreBatch(c *gin.Context) {
 }
 
 func (s *Server) setStoreBatchStatus(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pPromo)
 	if !ok {
 		return
 	}

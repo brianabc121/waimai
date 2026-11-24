@@ -6,7 +6,7 @@ import QRCode from 'qrcode'
 import { ApiError, get, post, put } from '../api'
 import { money, minutesSince, t, toMajor, toMinor } from '../i18n'
 import { useLive } from '../live'
-import { currentRole, session } from '../session'
+import { can, currentRole, session } from '../session'
 import type { BatchLine, Bill, DiningTable, OrderItem, Storefront } from '../types'
 import BillLines from './BillLines.vue'
 import DineMenu from './DineMenu.vue'
@@ -14,7 +14,7 @@ import TotalsTable from './TotalsTable.vue'
 
 const bid = session.branchId!
 const role = currentRole()!
-const manager = ['owner', 'manager'].includes(role.role)
+const manager = can('table.manage')
 const cur = role.currency
 
 const tables = ref<DiningTable[]>([])

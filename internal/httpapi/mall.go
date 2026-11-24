@@ -73,14 +73,14 @@ func (s *Server) mallBannerImage(c *gin.Context) {
 // ---- merchant ----
 
 func (s *Server) mallListing(c *gin.Context) {
-	if bid, ok := branchScope(c, managerRoles); ok {
+	if bid, ok := branchScope(c, pMall); ok {
 		l, err := s.App.MallListing(c, bid)
 		reply(c, l, err)
 	}
 }
 
 func (s *Server) saveMallListing(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pMall)
 	var in app.MallListingInput
 	if !ok || !bind(c, &in) {
 		return

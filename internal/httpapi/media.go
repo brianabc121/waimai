@@ -39,7 +39,7 @@ func (s *Server) mediaPoster(c *gin.Context) {
 }
 
 func (s *Server) listMedia(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pDesign)
 	if !ok {
 		return
 	}
@@ -54,7 +54,7 @@ func (s *Server) listMedia(c *gin.Context) {
 // uploadMedia takes the file as the request body and its title, crop and
 // trim as JSON in the "meta" query parameter.
 func (s *Server) uploadMedia(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pDesign)
 	if !ok {
 		return
 	}
@@ -79,7 +79,7 @@ func (s *Server) uploadMedia(c *gin.Context) {
 }
 
 func (s *Server) mediaScope(c *gin.Context) (bid, id int64, ok bool) {
-	if bid, ok = branchScope(c, managerRoles); !ok {
+	if bid, ok = branchScope(c, pDesign); !ok {
 		return
 	}
 	id, ok = idParam(c, "id")
@@ -134,7 +134,7 @@ func (s *Server) deleteMedia(c *gin.Context) {
 }
 
 func (s *Server) reorderMedia(c *gin.Context) {
-	bid, ok := branchScope(c, managerRoles)
+	bid, ok := branchScope(c, pDesign)
 	if !ok {
 		return
 	}
@@ -180,7 +180,7 @@ func (s *Server) saveImage(c *gin.Context, bid int64) {
 }
 
 func (s *Server) uploadImage(c *gin.Context) {
-	if bid, ok := branchScope(c, managerRoles); ok {
+	if bid, ok := branchScope(c, pImage); ok {
 		s.saveImage(c, bid)
 	}
 }
