@@ -5,3 +5,9 @@ web/dist/
 *.log
 test-results/
 e2e/shots/
+# binaries from "go build ./cmd/<name>" run in the repository root
+/admin
+/api
+/migrate
+/seed
+/worker
