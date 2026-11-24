@@ -1,4 +1,5 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { apiScope } from './api'
 
 // useLive keeps a screen in sync: an SSE stream delivers "refresh" hints and
 // the screen re-reads its snapshot. Hints can be lost, so it also polls slowly,
@@ -32,7 +33,7 @@ export function useLive(url: () => string | null, refresh: () => Promise<void> |
   function connect() {
     const u = url()
     if (!u || stopped || es) return
-    es = new EventSource('/api/v1' + u, { withCredentials: true })
+    es = new EventSource('/api/v1' + u + (apiScope.admin ? (u.includes('?') ? '&' : '?') + 'as=admin' : ''), { withCredentials: true })
     es.addEventListener('ready', () => { online.value = true; void run(); schedule() })
     // the hint is also passed on to whatever else on the page counts things (the unread chats in the navigation)
     es.addEventListener('refresh', () => { void run(); window.dispatchEvent(new Event('live-refresh')) })

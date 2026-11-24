@@ -132,7 +132,7 @@ async function look(page, what, size, lang, file) {
 // A customer with an order, and staff sessions, made once and reused.
 async function staffSession(user) {
   const page = await open('pc', 'en')
-  await page.goto(BASE + '/login')
+  await page.goto(BASE + (/^admin/.test(what) ? '/admin/login' : /^((kitchen|rider|zhang|wang)\d|e2e\d+$)/.test(what) ? '/login?next=/work' : '/login'))
   for (let i = 0; ; i++) {
     await page.fill('input[autocomplete=username]', user)
     await page.fill('input[type=password]', 'demo1234')
@@ -141,7 +141,7 @@ async function staffSession(user) {
     if ((await res).status() !== 429 || i >= 5) break
     await page.waitForTimeout(7000)
   }
-  await page.waitForURL(u => !u.pathname.startsWith('/login'))
+  await page.waitForURL(u => !/\/login$/.test(u.pathname))
   const s = await page.context().storageState()
   await page.context().close()
   return s

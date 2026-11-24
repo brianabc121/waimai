@@ -2473,5 +2473,20 @@
  "rp.d.settings": "Horario, abrir y cerrar, pedidos, estaciones, imágenes de la tienda",
  "rp.p.kitchen.screen": "Pantalla de cocina",
  "rp.d.kitchen.screen": "Abrir la pantalla de cocina",
- "st.e.OWNER_ONLY": "Solo un dueño puede nombrar o gestionar encargados y dueños"
+ "st.e.OWNER_ONLY": "Solo un dueño puede nombrar o gestionar encargados y dueños",
+ "lg.office": "Back office",
+ "lg.work": "Espacio del personal",
+ "lg.hint": "Propietarios, encargados y tomadores de pedidos usan el back office; cocina, empaque y repartidores usan el espacio del personal.",
+ "lg.staff_only": "Tu cuenta es de personal y solo puede usar el espacio del personal",
+ "lg.go_work": "Abrir el espacio del personal",
+ "lg.pick": "Elige cómo entrar",
+ "lg.pick_hint": "Elige una tienda y un rol. Puedes cambiarlo luego en «Cambiar identidad» del menú.",
+ "lg.work_hint": "Cocina, empaque y reparto",
+ "lg.last": "Último usado",
+ "lg.again": "Para abrir el back office desde el espacio del personal, vuelve a escribir tu contraseña",
+ "lg.enter": "Entrar",
+ "lg.bad_password": "Contraseña incorrecta",
+ "lg.switch": "Cambiar identidad",
+ "lg.admin_title": "Administración de la plataforma",
+ "lg.admin_hint": "Solo para administradores de la plataforma"
 }

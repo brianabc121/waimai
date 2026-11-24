@@ -33,7 +33,7 @@ await owner.goto(BASE + '/login')
 await owner.fill('input[autocomplete=username]', 'owner2')
 await owner.fill('input[type=password]', 'demo1234')
 await owner.click('button.primary')
-await owner.waitForURL(u => !u.pathname.startsWith('/login'))
+await owner.waitForURL(u => !/\/login$/.test(u.pathname))
 
 // ---- test files, made in the browser: a square picture, a small GIF, a short video ----
 const files = await owner.evaluate(async () => {

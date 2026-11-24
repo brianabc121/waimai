@@ -40,7 +40,7 @@ func TestAPIMetricsOverHTTP(t *testing.T) {
 	}
 
 	for _, r := range []string{"/admin/overview", "/admin/metrics/api", "/admin/metrics/errors"} {
-		owner.want(403, "FORBIDDEN", "GET", r, nil)
+		owner.want(401, "UNAUTHENTICATED", "GET", r, nil)
 		newClient(t).want(401, "UNAUTHENTICATED", "GET", r, nil)
 	}
 

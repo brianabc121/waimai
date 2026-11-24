@@ -27,11 +27,11 @@ const tid = id => `[data-testid=${id}]`
 const step = s => console.log('✓ ' + s)
 const expect = (ok, what) => { if (!ok) throw new Error(what) }
 async function signIn(page, user) {
-  await page.goto(BASE + '/login')
+  await page.goto(BASE + (/^admin/.test(user) ? '/admin/login' : /^((kitchen|rider|zhang|wang)\d|e2e\d+$)/.test(user) ? '/login?next=/work' : '/login'))
   await page.fill('input[autocomplete=username]', user)
   await page.fill('input[type=password]', 'demo1234')
   await page.click('button.primary')
-  await page.waitForURL(u => !u.pathname.startsWith('/login'))
+  await page.waitForURL(u => !/\/login$/.test(u.pathname))
 }
 
 // ---- the platform turns on the (test) translation service ----

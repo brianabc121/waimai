@@ -93,7 +93,7 @@ Caddy 会自动申请和续期证书，并启用 HTTP/2。HTTP/2 是必要的：
 
 容器里的 Nginx 已配置为信任来自本机和内网代理的 `X-Forwarded-For`，所以限流看到的是顾客的真实地址。如果你用的是别的代理或云负载均衡，要确认它会带上这个请求头。
 
-打开 `https://order.example.com/login`，用平台管理员登录。
+打开 `https://order.example.com/admin/login`（平台管理员有自己单独的登录页，商家和员工的 `/login` 登不进平台后台），用平台管理员登录。
 
 ## 6. 短信
 

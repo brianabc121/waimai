@@ -34,7 +34,7 @@ await owner.goto(BASE + '/login')
 await owner.fill('input[autocomplete=username]', 'owner1')
 await owner.fill('input[type=password]', 'demo1234')
 await owner.click('button.primary')
-await owner.waitForURL(u => !u.pathname.startsWith('/login'))
+await owner.waitForURL(u => !/\/login$/.test(u.pathname))
 const api = async (method, path, data) => {
   const r = await owner.request.fetch(BASE + '/api/v1' + path, { method, data, headers: { 'X-Requested-With': 'e2e' } })
   if (!r.ok()) throw new Error(`${method} ${path}: ${r.status()} ${await r.text()}`)

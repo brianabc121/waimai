@@ -41,8 +41,8 @@ func TestMemberPagesOverHTTP(t *testing.T) {
 	if err := a.EnsurePlatformAdmin(context.Background(), "admin-test", "password1"); err != nil {
 		t.Fatal(err)
 	}
-	admin := login(t, "admin-test")
-	owner1.want(403, "FORBIDDEN", "GET", "/admin/members", nil)
+	admin := adminLogin(t, "admin-test")
+	owner1.want(401, "UNAUTHENTICATED", "GET", "/admin/members", nil)
 	all := admin.want(200, "", "GET", "/admin/members?q=+6391712300&page_size=100", nil)
 	if all["total"].(float64) < 2 {
 		t.Fatalf("all members: %v", all)

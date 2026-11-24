@@ -2473,5 +2473,20 @@
  "rp.d.settings": "Giờ mở cửa, mở đóng cửa, nhận đơn, trạm bếp, ảnh cửa hàng",
  "rp.p.kitchen.screen": "Màn hình bếp",
  "rp.d.kitchen.screen": "Mở màn hình bếp",
- "st.e.OWNER_ONLY": "Chỉ chủ quán mới bổ nhiệm và quản lý quản lý, chủ quán"
+ "st.e.OWNER_ONLY": "Chỉ chủ quán mới bổ nhiệm và quản lý quản lý, chủ quán",
+ "lg.office": "Trang quản lý",
+ "lg.work": "Bàn làm việc nhân viên",
+ "lg.hint": "Chủ cửa hàng, quản lý và nhân viên nhận đơn dùng trang quản lý; bếp, đóng gói và tài xế dùng bàn làm việc.",
+ "lg.staff_only": "Tài khoản của bạn là nhân viên thường, chỉ dùng được bàn làm việc nhân viên",
+ "lg.go_work": "Vào bàn làm việc nhân viên",
+ "lg.pick": "Chọn danh tính",
+ "lg.pick_hint": "Chọn cửa hàng và vai trò để vào. Sau này có thể đổi ở “Đổi danh tính” trong menu.",
+ "lg.work_hint": "Bếp, đóng gói, giao hàng",
+ "lg.last": "Dùng lần trước",
+ "lg.again": "Để vào trang quản lý từ bàn làm việc, hãy nhập lại mật khẩu",
+ "lg.enter": "Vào",
+ "lg.bad_password": "Sai mật khẩu",
+ "lg.switch": "Đổi danh tính",
+ "lg.admin_title": "Quản trị nền tảng",
+ "lg.admin_hint": "Chỉ dành cho quản trị viên nền tảng"
 }

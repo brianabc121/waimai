@@ -33,11 +33,11 @@ const DOT = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 const adminCtx = await browser.newContext({ viewport: { width: 1280, height: 800 }, ...opts })
 const admin = await adminCtx.newPage()
 watch(admin)
-await admin.goto(BASE + '/login')
+await admin.goto(BASE + '/admin/login')
 await admin.fill('input[autocomplete=username]', 'admin')
 await admin.fill('input[type=password]', 'demo1234')
 await admin.click('button.primary')
-await admin.waitForURL(u => !u.pathname.startsWith('/login'))
+await admin.waitForURL(u => !/\/login$/.test(u.pathname))
 const adminTab = async name => { await admin.goto(BASE + '/admin/customers'); await admin.click(tid('ac-tab-' + name)) }
 
 // ---- not logged in ----

@@ -26,11 +26,11 @@ async function open(viewport) {
 }
 async function signIn(viewport, user) {
   const p = await open(viewport)
-  await p.goto(BASE + '/login')
+  await p.goto(BASE + (/^admin/.test(user) ? '/admin/login' : /^((kitchen|rider|zhang|wang)\d|e2e\d+$)/.test(user) ? '/login?next=/work' : '/login'))
   await p.fill('input[autocomplete=username]', user)
   await p.fill('input[type=password]', 'demo1234')
   await p.click('button.primary')
-  await p.waitForURL(u => !u.pathname.startsWith('/login'))
+  await p.waitForURL(u => !/\/login$/.test(u.pathname))
   return p
 }
 const SLUG = 'bgc'

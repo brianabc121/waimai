@@ -91,7 +91,7 @@ func TestCustomerCenterOverHTTP(t *testing.T) {
 	cust.want(422, "VALIDATION", "POST", "/customer/feedback", map[string]string{"kind": "x", "content": "hi"})
 	cust.want(422, "VALIDATION", "POST", "/customer/feedback", map[string]string{"kind": "problem", "content": " "})
 	fb := cust.want(200, "", "POST", "/customer/feedback", map[string]string{"kind": "problem", "content": "地图打不开", "contact": "wx-1"})
-	owner.want(403, "FORBIDDEN", "GET", "/admin/feedback", nil)
+	owner.want(401, "UNAUTHENTICATED", "GET", "/admin/feedback", nil)
 	all := admin.want(200, "", "GET", "/admin/feedback?status=open&page_size=100", nil)
 	found := false
 	for _, x := range list(all, "items") {
@@ -141,7 +141,7 @@ func TestCustomerCenterOverHTTP(t *testing.T) {
 	admin.want(200, "", "POST", wallet, map[string]any{"account": "bonus", "currency": "PHP", "amount": 500, "note": "活动奖励"})
 	admin.want(409, "WALLET_SHORT", "POST", wallet, map[string]any{"account": "balance", "currency": "PHP", "amount": -9301, "note": "x"})
 	admin.want(200, "", "POST", wallet, map[string]any{"account": "balance", "currency": "PHP", "amount": -300, "note": "更正"})
-	owner.want(403, "FORBIDDEN", "POST", wallet, map[string]any{"account": "balance", "currency": "PHP", "amount": 1, "note": "x"})
+	owner.want(401, "UNAUTHENTICATED", "POST", wallet, map[string]any{"account": "balance", "currency": "PHP", "amount": 1, "note": "x"})
 	me = cust.want(200, "", "GET", "/customer/me", nil)
 	w := list(me, "wallets")
 	if len(w) != 1 || w[0].(map[string]any)["balance"].(float64) != 9000 || w[0].(map[string]any)["bonus"].(float64) != 500 {

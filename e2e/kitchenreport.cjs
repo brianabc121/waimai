@@ -22,7 +22,7 @@ async function open(viewport) {
   return page
 }
 async function login(page, user) {
-  await page.goto(BASE + '/login')
+  await page.goto(BASE + (/^admin/.test(user) ? '/admin/login' : /^((kitchen|rider|zhang|wang)\d|e2e\d+$)/.test(user) ? '/login?next=/work' : '/login'))
   for (let i = 0; ; i++) {
     await page.fill('input[autocomplete=username]', user)
     await page.fill('input[type=password]', 'demo1234')
@@ -88,7 +88,7 @@ await fries.waitFor({ state: 'detached' })
 // ---- the rice is marked on the shared kitchen screen ----
 const screen = await open({ width: 1280, height: 800 })
 await login(screen, 'kitchen1')
-await screen.waitForURL(u => !u.pathname.startsWith('/login'))
+await screen.waitForURL(u => !/\/login$/.test(u.pathname))
 const board = (await api(screen, 'GET', '/kitchen/branches/1/board')).body.orders
 const rice = board.find(o => o.public_no === orderNo).items.find(i => i.name === '卤肉饭')
 expect((await api(screen, 'POST', `/kitchen/items/${rice.id}/ready?via=board`)).status, 200, 'ready on the kitchen screen')

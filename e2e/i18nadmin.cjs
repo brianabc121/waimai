@@ -27,11 +27,11 @@ const NEW = 'ค้นหาเลย'
 
 const actx = await browser.newContext({ viewport: { width: 1600, height: 1000 }, locale: 'zh-CN', ignoreHTTPSErrors: insecure, acceptDownloads: true })
 const adm = watch(await actx.newPage())
-await adm.goto(BASE + '/login')
+await adm.goto(BASE + '/admin/login')
 await adm.fill('input[autocomplete=username]', 'admin')
 await adm.fill('input[type=password]', 'demo1234')
 await adm.click('button.primary')
-await adm.waitForURL(u => !u.pathname.startsWith('/login'))
+await adm.waitForURL(u => !/\/login$/.test(u.pathname))
 const H = { headers: { 'X-Requested-With': 'waimai-web' } }
 await adm.request.put(BASE + '/api/v1/admin/i18n/th', { ...H, data: { edits: [{ key: 'ml.search', text: '' }] } })
 

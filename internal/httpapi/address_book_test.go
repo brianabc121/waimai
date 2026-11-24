@@ -12,10 +12,10 @@ func TestAddressBookOverHTTP(t *testing.T) {
 	if err := a.EnsurePlatformAdmin(context.Background(), "admin-test", "password1"); err != nil {
 		t.Fatal(err)
 	}
-	admin := login(t, "admin-test")
+	admin := adminLogin(t, "admin-test")
 	city := fmt.Sprintf("Town-%d", f.branchID)
-	owner.want(403, "FORBIDDEN", "GET", "/admin/addresses", nil)
-	owner.want(403, "FORBIDDEN", "POST", "/admin/addresses", map[string]any{"line": "x"})
+	owner.want(401, "UNAUTHENTICATED", "GET", "/admin/addresses", nil)
+	owner.want(401, "UNAUTHENTICATED", "POST", "/admin/addresses", map[string]any{"line": "x"})
 
 	in := map[string]any{"country_code": "PH", "country": "Philippines", "province": "Cebu", "city": city,
 		"line": "IT Park Tower 2", "lat": 10.33, "lng": 123.90}

@@ -53,7 +53,7 @@ docker compose run --rm seed    # 可选：载入演示数据
 | 员工工作台（店内任务和配送，见 docs/RIDER_APP_DESIGN.md） | `/work` | `zhang1`（炸台、热厨）、`wang1`（打包台加骑手，可切换身份）、`rider1`、`rider2`（只有骑手） |
 | 骑手状态和位置（派单参考） | `/merchant/riders` | `owner1`、`cashier1` |
 | 员工和岗位 | `/merchant/staff` | `owner1` |
-| 平台管理后台（总览、API 监控、Worker 和任务队列、商户、商品、操作记录，见 docs/ADMIN_DESIGN.md） | `/login` | `admin` |
+| 平台管理后台（总览、API 监控、Worker 和任务队列、商户、商品、操作记录，见 docs/ADMIN_DESIGN.md） | `/admin/login` | `admin` |
 | 第二个商户（验证隔离） | `/login` | `owner2`，门店 `/s/bgc` |
 
 开发时设置 `OTP_DEV_ECHO=true`，验证码会直接显示在结账页。生产环境必须关闭，并用 `SMS_PROVIDER` 选择短信服务商（`twilio`，或用 `webhook` 接本地短信网关，见 `.env.example`）。

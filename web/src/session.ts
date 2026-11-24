@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
-import { ApiError, get, post } from './api'
-import type { BranchRole, User } from './types'
+import { ApiError, apiScope, get, post } from './api'
+import type { BranchRole, Entry, User } from './types'
 
 // A platform administrator can open one store's back office read-only. The
 // store is remembered here and shown to the staff screens as if it were a role.
@@ -19,7 +19,7 @@ export function setAdminView(b: { id: number; name: string; slug: string; curren
 }
 
 function applyAdminView() {
-  const v = session.user?.is_platform_admin ? adminView() : null
+  const v = session.user?.entry === 'admin' ? adminView() : null
   if (v && session.user) { session.user.roles = [v]; session.branchId = v.branch_id }
 }
 
@@ -46,9 +46,28 @@ export async function loadSession(): Promise<User | null> {
   return session.user
 }
 
+// The stores where this person has a back-office role.
+export const officeRoles = (u: User | null = session.user) => (u?.roles ?? []).filter(r => r.role !== 'staff')
+
+// In the back office the current store is one where the person has a role there.
 function pickBranch() {
-  const roles = session.user?.roles ?? []
+  const all = session.user?.roles ?? []
+  const roles = session.user?.entry === 'office' && officeRoles().length ? officeRoles() : all
   if (!roles.some(r => r.branch_id === session.branchId)) session.branchId = roles[0]?.branch_id ?? null
+}
+
+// Which sign-in a page is under: the platform's pages and its read-only view
+// of a store use the platform's own (docs/STAFF_ACCESS_DESIGN.md §5.5).
+export function scopeFor(path: string): 'admin' | 'staff' {
+  if (path === '/admin' || path.startsWith('/admin/')) return 'admin'
+  if (path.startsWith('/login')) return 'staff'
+  return adminView() ? 'admin' : 'staff'
+}
+export function useScope(scope: 'admin' | 'staff') {
+  if (apiScope.admin === (scope === 'admin')) return
+  apiScope.admin = scope === 'admin'
+  session.user = null
+  session.loaded = false
 }
 
 export function setBranch(id: number) {
@@ -72,26 +91,52 @@ export function can(...perms: string[]): boolean {
 }
 export const isOwner = () => currentRole()?.role === 'owner' || (!!session.user?.is_platform_admin && !!adminView())
 
-export async function login(username: string, password: string) {
+// The tab last used on the sign-in page of this device.
+export const ENTRY_KEY = 'login_entry'
+
+// login signs in to the store's back office or the staff workbench. Someone
+// without a back-office role who asks for the back office gets the workbench.
+export async function login(username: string, password: string, entry: 'office' | 'work' = 'office') {
   localStorage.removeItem(VIEW_KEY)
-  session.user = await post<User>('/auth/login', { username, password })
+  useScope('staff')
+  session.user = await post<User>('/auth/login', { username, password, entry })
+  localStorage.setItem(ENTRY_KEY, entry)
   remember()
   session.loaded = true
   pickBranch()
 }
 
+// The platform's own sign-in.
+export async function adminLogin(username: string, password: string) {
+  localStorage.removeItem(VIEW_KEY)
+  useScope('admin')
+  session.user = await post<User>('/admin/auth/login', { username, password })
+  session.loaded = true
+}
+
+// switchEntry moves between the back office (asks for the password again
+// when coming from the workbench) and the workbench.
+export async function switchEntry(entry: 'office' | 'work', password = '') {
+  session.user = await post<User>('/auth/entry', { entry, password })
+  remember()
+  pickBranch()
+}
+
 export async function logout() {
-  await post('/auth/logout').catch(() => {})
+  if (apiScope.admin) await post('/admin/auth/logout').catch(() => {})
+  else await post('/auth/logout').catch(() => {})
   localStorage.removeItem(VIEW_KEY)
   localStorage.removeItem(USER_KEY)
   session.user = null
 }
 
-// Where each role lands after signing in.
+// Where a sign-in lands: the workbench, the one store's back office, or the
+// page that asks which store and role when there are several.
 export function homeFor(u: User): string {
-  if (u.is_platform_admin) return '/admin'
-  const role = u.roles.find(r => r.branch_id === session.branchId)?.role ?? u.roles[0]?.role
-  return role === 'staff' ? '/work' : '/merchant/orders'
+  const entry: Entry = u.entry ?? (u.is_platform_admin ? 'admin' : 'office')
+  if (entry === 'admin') return '/admin'
+  if (entry === 'work' || !officeRoles(u).length) return '/work'
+  return officeRoles(u).length > 1 ? '/login/pick' : '/merchant/orders'
 }
 
 // The identities a person can work under in the current branch, from their posts:

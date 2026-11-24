@@ -156,8 +156,11 @@ func audit(ctx context.Context, tx pgx.Tx, branchID, orderID int64, actor Actor,
 	if actor.ID != 0 {
 		actorID = &actor.ID
 	}
-	_, err := tx.Exec(ctx, `INSERT INTO audit_logs (branch_id, order_id, actor_type, actor_id, action, detail)
-		VALUES ($1,NULLIF($2::bigint, 0),$3,$4,$5,$6)`, branchID, orderID, actor.Type, actorID, action, b)
+	// Staff actions keep the role the person had then (docs/STAFF_ACCESS_DESIGN.md §5.3).
+	_, err := tx.Exec(ctx, `INSERT INTO audit_logs (branch_id, order_id, actor_type, actor_id, action, detail, actor_role)
+		VALUES ($1,NULLIF($2::bigint, 0),$3,$4,$5,$6,
+			(SELECT role FROM user_branch_roles WHERE $3 = 'staff' AND user_id = $4 AND branch_id = $1))`,
+		branchID, orderID, actor.Type, actorID, action, b)
 	return err
 }
 

@@ -23,11 +23,11 @@ const step = (s) => console.log('✓ ' + s)
 const shot = (page, name) => page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true })
 const expect = (got, want, what) => { if (got !== want) throw new Error(`${what}: expected ${want}, got ${got}`) }
 async function signIn(page, user, password) {
-  await page.goto(BASE + '/login')
+  await page.goto(BASE + (/^admin/.test(user) ? '/admin/login' : /^((kitchen|rider|zhang|wang)\d|e2e\d+$)/.test(user) ? '/login?next=/work' : '/login'))
   await page.fill('input[autocomplete=username]', user)
   await page.fill('input[type=password]', password)
   await page.click('button.primary')
-  await page.waitForURL(u => !u.pathname.startsWith('/login'))
+  await page.waitForURL(u => !/\/login$/.test(u.pathname))
 }
 // answer the next prompt()/confirm() with the given text
 const answer = (page, text) => page.once('dialog', d => d.accept(text))
@@ -256,7 +256,7 @@ step('a job can be discarded, brought back and retried; retry-all clears the fai
 const other = await open({ width: 1280, height: 900 })
 await signIn(other, 'owner1', 'demo1234')
 await other.goto(BASE + '/admin/merchants')
-await other.waitForSelector('.banner.bad')
+await other.waitForURL(u => u.pathname === '/admin/login')
 expect(await other.locator('tr[data-merchant]').count(), 0, 'merchant rows visible to a merchant account')
 step('a merchant account cannot use the back office')
 

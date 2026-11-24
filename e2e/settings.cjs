@@ -24,7 +24,7 @@ const publicConfig = async () => (await (await ctx.request.get(BASE + '/api/v1/c
 const row = (key) => page.locator(`[data-key=${key}]`)
 const card = (group) => page.locator(`[data-group=${group}]`)
 
-await page.goto(BASE + '/login')
+await page.goto(BASE + '/admin/login')
 await page.fill('input[autocomplete=username]', 'admin')
 await page.fill('input[type=password]', 'demo1234')
 await page.click('button.primary')

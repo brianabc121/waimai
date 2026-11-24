@@ -30,7 +30,7 @@ await owner.goto(BASE + '/login')
 await owner.fill('input[autocomplete=username]', 'owner1')
 await owner.fill('input[type=password]', 'demo1234')
 await owner.click('button.primary')
-await owner.waitForURL(u => !u.pathname.startsWith('/login'))
+await owner.waitForURL(u => !/\/login$/.test(u.pathname))
 await owner.goto(BASE + '/merchant/templates')
 await owner.waitForSelector('[data-test=preview] .menu')
 

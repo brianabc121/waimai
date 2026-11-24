@@ -21,6 +21,7 @@ import (
 
 const (
 	staffCookie    = "sid"
+	adminCookie    = "sid_admin" // the platform's own sign-in (docs/STAFF_ACCESS_DESIGN.md §5.5)
 	customerCookie = "cs"
 )
 
@@ -165,7 +166,7 @@ var (
 func allowed(c *gin.Context, branchID int64, perms []string) bool {
 	u := currentUser(c)
 	role := u.RoleIn(branchID)
-	if role == "" && u.IsPlatformAdmin {
+	if role == "" && u.Entry == app.EntryAdmin {
 		// The platform can look at any store's back office but not act in it:
 		// accepting orders or reconciling cash stays with the merchant.
 		if c.Request.Method == http.MethodGet {
@@ -176,6 +177,22 @@ func allowed(c *gin.Context, branchID int64, perms []string) bool {
 	}
 	if role == "" {
 		fail(c, app.ErrNotFound)
+		return false
+	}
+	// A workbench sign-in reaches only what the workbench uses: the live
+	// updates, the menu and stations, and what a station or the packing
+	// counter does (docs/STAFF_ACCESS_DESIGN.md §5.4).
+	if u.Entry == app.EntryWork {
+		for _, p := range perms {
+			if p == needAny || p == needKitchen && u.InStore(branchID) {
+				return true
+			}
+		}
+		if role == "staff" {
+			fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "your role cannot do this"))
+		} else {
+			fail(c, app.Err(http.StatusForbidden, "WORK_SESSION", "sign in to the back office for this"))
+		}
 		return false
 	}
 	for _, p := range perms {
@@ -263,14 +280,30 @@ func sessionToken(c *gin.Context) string {
 	return token
 }
 
-func (s *Server) requireUser(c *gin.Context) {
-	token := sessionToken(c)
-	if token == "" {
-		fail(c, app.Err(http.StatusUnauthorized, "UNAUTHENTICATED", "please sign in"))
-		return
+// sessionFor picks the sign-in a request is made under. The platform's back
+// office uses only its own; its read-only view of a store says so with a
+// header, or is simply the only sign-in the browser has (pictures and live
+// updates cannot send headers). The stores' pages say "staff".
+func sessionFor(c *gin.Context) (token string, admin bool) {
+	if strings.HasPrefix(c.Request.URL.Path, "/api/v1/admin/") || c.GetHeader("X-Session") == "admin" || c.Query("as") == "admin" {
+		token, _ = c.Cookie(adminCookie)
+		return token, true
 	}
-	u, err := s.App.UserBySession(c, token)
-	if err != nil {
+	if token = sessionToken(c); token != "" || c.GetHeader("X-Session") == "staff" {
+		return token, false
+	}
+	token, _ = c.Cookie(adminCookie)
+	return token, true
+}
+
+func (s *Server) requireUser(c *gin.Context) {
+	token, admin := sessionFor(c)
+	var u *app.User
+	var err error
+	if token != "" {
+		u, err = s.App.UserBySession(c, token)
+	}
+	if token == "" || err != nil || admin != (u.Entry == app.EntryAdmin) {
 		fail(c, app.Err(http.StatusUnauthorized, "UNAUTHENTICATED", "please sign in"))
 		return
 	}
@@ -358,9 +391,12 @@ func (s *Server) Router() *gin.Engine {
 	api.POST("/auth/login", s.limit(s.loginLimit), s.login)
 	api.POST("/auth/token", s.limit(s.loginLimit), s.tokenLogin)
 	api.POST("/auth/logout", s.logout)
+	api.POST("/admin/auth/login", s.limit(s.loginLimit), s.adminLogin)
+	api.POST("/admin/auth/logout", s.adminLogout)
 
 	auth := api.Group("", s.requireUser)
 	auth.GET("/auth/me", func(c *gin.Context) { c.JSON(200, currentUser(c)) })
+	auth.POST("/auth/entry", s.limit(s.loginLimit), s.switchEntry)
 
 	// merchant order desk
 	auth.GET("/merchant/branches/:bid/orders", s.listOrders)

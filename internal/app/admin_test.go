@@ -11,7 +11,7 @@ func adminActor(t *testing.T) app.AdminActor {
 	t.Helper()
 	ctx := context.Background()
 	noErr(t, testApp.EnsurePlatformAdmin(ctx, "admin-apptest", "password1"))
-	_, u, err := testApp.Login(ctx, "admin-apptest", "password1")
+	_, u, err := testApp.LoginTo(ctx, "admin-apptest", "password1", app.EntryAdmin)
 	noErr(t, err)
 	return app.AdminActor{ID: u.ID, IP: "203.0.113.9"}
 }
