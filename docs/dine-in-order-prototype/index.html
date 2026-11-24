@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>代客下单堂食模式 · 原型</title>
+<!-- 方案见 ../DINE_IN_ORDER_DESIGN.md。数据都是示意。用系统真实样式表的 .warm 配色（深红米金），其余样式写在这里。
+     打开 index.html#s1 到 #s6 看各张效果图。 -->
+<link rel="stylesheet" href="../../web/src/styles.css">
+<style>
+  body { margin: 0; background: #ddd; }
+  section { display: none; } section.show { display: block; }
+  .pad { width: 1180px; height: 820px; overflow: hidden; display: flex; flex-direction: column; position: relative; font-size: 14px; }
+  .warm { --ok: #2f7d4a; --ok-soft: #e3f1e6; --warn: #c2650a; --warn-soft: #fde9cf; }
+
+  /* 顶栏 */
+  .top { background: var(--red-bg); color: #fff; display: flex; align-items: center; gap: 14px; padding: 0 18px; height: 58px; flex: none; }
+  .top h1 { font-size: 18px; margin: 0; } .top .back { color: var(--gold); font-weight: 600; }
+  .top .shop { color: #f8dfa6; font-size: 13px; }
+  .seg { display: inline-flex; background: rgba(0,0,0,.25); border-radius: 999px; padding: 3px; margin-inline-start: 8px; }
+  .seg span { padding: 7px 22px; border-radius: 999px; font-weight: 700; color: #f3d9c9; font-size: 15px; }
+  .seg span.on { background: var(--gold); color: var(--red-deep); }
+  .top .sp { flex: 1; }
+  .top .pill { background: rgba(255,255,255,.14); border: 1px solid rgba(244,207,115,.5); border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 14px; }
+  .top .pill b { color: var(--gold); }
+  .top .who { font-size: 13px; color: #f3d9c9; }
+
+  /* 桌台图 */
+  .body { flex: 1; display: flex; min-height: 0; }
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px 6px; }
+  .tab { padding: 9px 18px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); font-weight: 600; color: var(--muted); font-size: 14.5px; }
+  .tab.on { background: var(--red); border-color: var(--red); color: #fff; }
+  .tab small { font-weight: 500; margin-inline-start: 4px; opacity: .8; }
+  .legend { margin-inline-start: auto; display: flex; gap: 12px; font-size: 12.5px; color: var(--muted); }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-inline-end: 4px; }
+  .tgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; padding: 10px 16px 16px; align-content: start; }
+  .tc { height: 118px; border-radius: 14px; background: #fff; border: 2px dashed #d9c8b0; padding: 10px 12px; display: flex; flex-direction: column; position: relative; }
+  .tc .nm { font-size: 22px; font-weight: 800; color: var(--ink); }
+  .tc .cap { font-size: 12.5px; color: var(--muted); }
+  .tc .free { margin-top: auto; color: #a8968a; font-size: 13px; }
+  .tc.busy { background: #fff3d6; border: 2px solid #e8c36c; }
+  .tc.wait { background: #fff0e0; border: 2px solid #f0a560; }
+  .tc.long { background: #fde4df; border: 2px solid #d9665a; }
+  .tc.sel { box-shadow: 0 0 0 3px var(--red); }
+  .tc .row1 { display: flex; align-items: baseline; gap: 8px; }
+  .tc .g { margin-inline-start: auto; font-size: 13px; font-weight: 700; color: var(--ink); }
+  .tc .amt { margin-top: auto; font-size: 17px; font-weight: 800; color: var(--red); }
+  .tc .tm { font-size: 12.5px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .tc .badge { position: absolute; top: -8px; inset-inline-end: -6px; background: var(--warn); color: #fff; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 8px; }
+  .tc .badge.red { background: #c0392b; }
+  .side { width: 330px; flex: none; background: var(--paper); border-inline-start: 1px solid var(--line); display: flex; flex-direction: column; }
+  .side .sh { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+  .side .sh h2 { margin: 0; font-size: 22px; display: flex; align-items: baseline; gap: 8px; }
+  .side .sh h2 small { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .side .sb { padding: 10px 16px; flex: 1; overflow: hidden; }
+  .side .sf { padding: 12px 16px 16px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+  .kv { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
+  .kv span:first-child { color: var(--muted); }
+  .bigbtn { background: var(--red); color: #fff; border-radius: 12px; text-align: center; padding: 15px 0; font-size: 17px; font-weight: 800; }
+  .bigbtn.gold { background: var(--gold); color: var(--red-deep); }
+  .bigbtn.ghost { background: #fff; color: var(--red); border: 1.5px solid var(--red); }
+  .bigbtn.dis { background: #e5d9c8; color: #a8968a; }
+  .btns2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mini { font-size: 13px; padding: 6px 0; border-bottom: 1px dashed var(--line); display: flex; gap: 8px; }
+  .mini b { min-width: 22px; } .mini .st { margin-inline-start: auto; }
+  .st { font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+  .st.cook { background: var(--warn-soft); color: var(--warn); }
+  .st.ready { background: #dcebff; color: #1d4ed8; }
+  .st.served { background: var(--ok-soft); color: var(--ok); }
+  .st.void { background: #eee; color: #888; text-decoration: line-through; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 12px; }
+  .stats div { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: center; font-size: 12px; color: var(--muted); }
+  .stats b { display: block; font-size: 20px; color: var(--ink); }
+
+  /* 遮罩和弹框 */
+  .mask { position: absolute; inset: 0; background: rgba(40,20,10,.5); z-index: 20; }
+  .modal { position: absolute; z-index: 30; background: var(--paper); border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,.35); overflow: hidden; }
+  .modal .mh { padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .modal .mh h3 { margin: 0; font-size: 20px; }
+  .modal .mh .x { margin-inline-start: auto; width: 36px; height: 36px; border-radius: 50%; background: #f3e7d4; display: grid; place-items: center; font-size: 18px; color: var(--muted); }
+  .modal .mb { padding: 16px 20px; }
+  .modal .mf { padding: 14px 20px 18px; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
+  .numgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .numgrid div { height: 64px; border-radius: 12px; background: #fff; border: 1.5px solid #d9c8b0; display: grid; place-items: center; font-size: 24px; font-weight: 700; color: var(--ink); }
+  .numgrid div.on { background: var(--red); border-color: var(--red); color: #fff; }
+  .numgrid div.sm { font-size: 15px; color: var(--muted); }
+  .lbl { font-size: 15px; font-weight: 700; color: var(--red-deep); display: flex; align-items: center; gap: 6px; margin: 4px 0 10px; }
+  .lbl::before { content: ""; width: 3px; height: 15px; background: var(--red); border-radius: 2px; }
+  .lbl small { font-weight: 500; color: var(--muted); font-size: 12.5px; }
+  .lbl .req { color: var(--red); font-size: 11.5px; font-weight: 700; border: 1px solid var(--red); border-radius: 4px; padding: 0 4px; }
+  .chs { display: flex; flex-wrap: wrap; gap: 10px; }
+  .ch { min-height: 46px; min-width: 78px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; border-radius: 10px; background: #fff; border: 1.5px solid #d9c8b0; font-size: 15px; color: var(--ink); }
+  .ch.on { border-color: var(--red); background: var(--gold-soft); color: var(--red-deep); font-weight: 700; }
+  .ch small { color: var(--muted); font-size: 12.5px; }
+  .ch.on small { color: var(--red-deep); }
+  .ch.add { border-style: dashed; color: var(--muted); }
+  .stp { display: inline-flex; align-items: center; gap: 14px; }
+  .stp i { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--red); color: var(--red); display: grid; place-items: center; font-style: normal; font-size: 24px; background: #fff; }
+  .stp i.f { background: var(--red); color: #fff; }
+  .stp b { font-size: 22px; min-width: 24px; text-align: center; }
+  .stp.s i { width: 32px; height: 32px; font-size: 19px; } .stp.s { gap: 10px; } .stp.s b { font-size: 17px; }
+
+  /* 点菜屏 */
+  .tablechip { background: var(--gold); color: var(--red-deep); border-radius: 10px; padding: 6px 14px; font-weight: 800; font-size: 17px; }
+  .tablechip small { font-weight: 600; font-size: 13px; margin-inline-start: 6px; }
+  .cats { width: 108px; flex: none; background: #f3e7d4; overflow: hidden; }
+  .cats div { height: 62px; display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--muted); font-weight: 600; position: relative; }
+  .cats div.on { background: var(--paper); color: var(--ink); box-shadow: inset 4px 0 0 var(--red); }
+  .cats div i { position: absolute; top: 9px; inset-inline-end: 9px; background: var(--red); color: #fff; font-style: normal; font-size: 11px; border-radius: 9px; padding: 0 6px; }
+  .dishes { flex: 1; background: var(--paper); display: flex; flex-direction: column; min-width: 0; }
+  .dbar { display: flex; gap: 8px; padding: 10px 12px 4px; align-items: center; }
+  .dbar .ch { min-height: 40px; font-size: 14px; }
+  .dgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 8px 12px 12px; align-content: start; }
+  .dt { height: 104px; border-radius: 12px; background: #fff; border: 1.5px solid var(--line); padding: 9px 11px; display: flex; flex-direction: column; position: relative; border-top: 5px solid #e8c36c; }
+  .dt.c2 { border-top-color: #d9665a; } .dt.c3 { border-top-color: #6aa17a; } .dt.c4 { border-top-color: #6d8fc7; }
+  .dt .code { font-size: 11.5px; font-weight: 700; background: var(--ink); color: var(--gold-soft); border-radius: 4px; padding: 0 5px; align-self: flex-start; }
+  .dt .nm { font-size: 16px; font-weight: 700; margin-top: 4px; line-height: 1.25; }
+  .dt .ft { margin-top: auto; display: flex; align-items: center; gap: 6px; }
+  .dt .pr { color: var(--red); font-weight: 800; font-size: 15px; }
+  .dt .mk { font-size: 11px; color: var(--muted); border: 1px solid #d9c8b0; border-radius: 4px; padding: 0 4px; }
+  .dt .n { position: absolute; top: -8px; inset-inline-end: -6px; background: var(--red); color: #fff; font-weight: 800; font-size: 14px; min-width: 26px; height: 26px; border-radius: 13px; display: grid; place-items: center; padding: 0 6px; box-shadow: 0 0 0 2px var(--paper); }
+  .dt.on { border-color: var(--red); background: #fffaf0; }
+  .dt.out { opacity: .45; } .dt.out .pr { color: var(--muted); text-decoration: line-through; }
+  .dt .so { margin-inline-start: auto; font-size: 12px; font-weight: 700; color: #888; }
+  .dt .left { margin-inline-start: auto; font-size: 11.5px; color: var(--warn); font-weight: 700; }
+  .cart { width: 360px; flex: none; background: #fff; border-inline-start: 1px solid var(--line); display: flex; flex-direction: column; }
+  .cart .chd { padding: 12px 14px 8px; display: flex; align-items: center; gap: 8px; }
+  .cart .chd h3 { margin: 0; font-size: 17px; }
+  .cart .chd .clr { margin-inline-start: auto; color: var(--muted); font-size: 13px; }
+  .ln { padding: 9px 14px; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: flex-start; }
+  .ln.on { background: #fff6e4; }
+  .ln .lt { flex: 1; min-width: 0; }
+  .ln .lt b { font-size: 15px; }
+  .ln .opt { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .ln .tags { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .ln .tags span { background: var(--gold-soft); color: var(--red-deep); font-size: 12px; font-weight: 600; border-radius: 5px; padding: 1px 7px; }
+  .ln .lp { font-weight: 800; color: var(--ink); white-space: nowrap; margin-top: 2px; text-align: end; }
+  .ln .lp .stp { margin-top: 8px; display: flex; } .ln .lp { display: flex; flex-direction: column; align-items: flex-end; }
+  .whole { padding: 10px 14px; border-top: 1px solid var(--line); background: var(--paper); }
+  .whole .wl { font-size: 13px; font-weight: 700; color: var(--red-deep); margin-bottom: 7px; }
+  .whole .chs { gap: 6px; } .whole .ch { min-height: 36px; min-width: 0; padding: 0 11px; font-size: 13.5px; }
+  .sent { padding: 10px 14px; border-top: 1px solid var(--line); background: #f8efe1; display: flex; align-items: center; font-size: 13.5px; color: var(--muted); }
+  .sent b { color: var(--ink); margin: 0 4px; }
+  .cfoot { margin-top: auto; padding: 12px 14px 14px; border-top: 1px solid var(--line); background: #fff; }
+  .cfoot .tt { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .cfoot .tt b { font-size: 24px; color: var(--red); }
+  .cfoot .row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; }
+
+  /* 账单 + 结账 */
+  .bill { flex: 1; background: var(--paper); overflow: hidden; display: flex; flex-direction: column; }
+  .round { padding: 8px 16px 6px; background: #f3e7d4; font-size: 13px; color: var(--muted); display: flex; gap: 10px; font-weight: 600; }
+  .round b { color: var(--ink); }
+  .bi { display: grid; grid-template-columns: 1fr 70px 90px 74px; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .bi .opt { font-size: 12px; color: var(--muted); }
+  .bi .q { text-align: center; color: var(--muted); }
+  .bi .p { text-align: end; font-weight: 700; }
+  .bi.on { background: #fff3d6; box-shadow: inset 4px 0 0 var(--red); }
+  .bi.void { color: #9a8c80; } .bi.void .p { text-decoration: line-through; }
+  .acts { display: flex; gap: 10px; padding: 10px 16px 12px; background: #fff3d6; border-bottom: 1px solid var(--line); }
+  .acts .ch { min-height: 42px; font-size: 14.5px; background: #fff; }
+  .acts .ch.red { border-color: #d9665a; color: #b83226; }
+  .pay { width: 470px; flex: none; background: #fff; border-inline-start: 1px solid var(--line); display: flex; flex-direction: column; }
+  .pay .ph { padding: 14px 18px 8px; }
+  .due { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 18px 10px; border-bottom: 1px solid var(--line); }
+  .due b { font-size: 30px; color: var(--red); }
+  .recv { margin: 12px 18px 0; display: flex; justify-content: space-between; align-items: center; background: var(--paper); border: 2px solid var(--red); border-radius: 12px; padding: 10px 14px; }
+  .recv b { font-size: 30px; }
+  .quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 10px 18px 0; }
+  .quick div { height: 48px; border-radius: 10px; border: 1.5px solid #d9c8b0; display: grid; place-items: center; font-weight: 700; font-size: 15.5px; background: #fff; }
+  .quick div.on { border-color: var(--red); background: var(--gold-soft); color: var(--red-deep); }
+  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px 18px 0; }
+  .keys div { height: 52px; border-radius: 10px; background: #f8efe1; display: grid; place-items: center; font-size: 22px; font-weight: 700; color: var(--ink); }
+  .chg { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 18px 0; font-size: 15px; }
+  .chg b { font-size: 22px; color: var(--ok); }
+
+  /* 手机 */
+  .phones { width: 1300px; height: 900px; background: #eadfce; display: flex; gap: 34px; padding: 28px 34px; box-sizing: border-box; }
+  .ph-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .ph-wrap .cap2 { font-size: 15px; font-weight: 700; color: #5b3a2a; }
+  .phone { min-height: 0; padding-bottom: 0; margin: 0; max-width: none; width: 390px; height: 800px; flex: none; border-radius: 34px; overflow: hidden; background: var(--bg); position: relative; display: flex; flex-direction: column; box-shadow: 0 0 0 9px #2b1a12, 0 20px 40px rgba(0,0,0,.25); font-size: 14px; }
+  .phone .top { height: auto; padding: 40px 14px 12px; flex-wrap: wrap; gap: 8px; }
+  .phone .top h1 { font-size: 17px; }
+  .phone .seg span { padding: 5px 16px; font-size: 14px; }
+  .phone .tgrid { grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 8px 12px; }
+  .phone .tc { height: 96px; padding: 8px 10px; } .phone .tc .nm { font-size: 19px; } .phone .tc .amt { font-size: 15px; }
+  .phone .bar { padding: 10px 12px 4px; overflow: hidden; } .phone .tab { padding: 7px 13px; font-size: 13.5px; white-space: nowrap; }
+  .plist { flex: 1; background: var(--paper); overflow: hidden; }
+  .pi { display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 1px solid var(--line); }
+  .pi .code { font-size: 11px; font-weight: 700; background: var(--ink); color: var(--gold-soft); border-radius: 4px; padding: 0 5px; }
+  .pi .nm { font-weight: 700; font-size: 15px; }
+  .pi .pr { color: var(--red); font-weight: 800; margin-top: 2px; }
+  .pi .mk { font-size: 11px; color: var(--muted); border: 1px solid #d9c8b0; border-radius: 4px; padding: 0 4px; margin-inline-start: 4px; font-weight: 500; }
+  .pi .r { margin-inline-start: auto; }
+  .pi .sel { background: var(--red); color: #fff; border-radius: 999px; padding: 7px 13px; font-size: 13.5px; font-weight: 700; }
+  .pbar { background: #2b1a12; color: #fff; display: flex; align-items: center; gap: 10px; padding: 10px 12px 26px; }
+  .pbar .n { background: var(--gold); color: var(--red-deep); border-radius: 999px; padding: 2px 9px; font-weight: 800; }
+  .pbar .go { margin-inline-start: auto; background: var(--red); border-radius: 12px; padding: 12px 22px; font-weight: 800; font-size: 16px; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--paper); border-radius: 20px 20px 0 0; z-index: 30; }
+  .sheet .grab { width: 40px; height: 5px; background: #d9c8b0; border-radius: 3px; margin: 8px auto 0; }
+  .phone .mask { z-index: 20; }
+  .phone .ch { min-height: 44px; min-width: 0; font-size: 14.5px; }
+  .note { position: absolute; z-index: 50; background: #2b1a12; color: #fbe7b3; font-size: 13px; line-height: 1.5; border-radius: 10px; padding: 8px 12px; box-shadow: 0 6px 18px rgba(0,0,0,.25); max-width: 300px; }
+  .note b { color: #fff; }
+  .note::before { content: attr(data-n); display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--gold); color: var(--red-deep); font-weight: 800; font-size: 12px; margin-inline-end: 6px; }
+
+  /* 菜品格带图片 */
+  .dt { height: auto; padding: 0; border-top: 1.5px solid var(--line); overflow: visible; }
+  .dt .pic { height: 96px; border-radius: 10px 10px 0 0; background: #f3e7d4 center / cover no-repeat; }
+  .dt .pic.none { display: grid; place-items: center; background: linear-gradient(135deg, #f8e3b2, #f3d3a0); }
+  .dt .pic.none span { font-size: 30px; font-weight: 800; color: rgba(143,37,27,.55); letter-spacing: 2px; }
+  .dt .code { position: absolute; top: 7px; inset-inline-start: 7px; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  .dt .tx { padding: 7px 10px 9px; display: flex; flex-direction: column; gap: 4px; }
+  .dt .nm { margin-top: 0; font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dt .n { z-index: 2; }
+  .dt.on { box-shadow: 0 0 0 2px var(--red); border-color: var(--red); }
+  .dt.out .pic { filter: grayscale(1); }
+  .ln .th { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex: none; }
+  .pi .th { width: 60px; height: 60px; border-radius: 9px; object-fit: cover; flex: none; }
+  .pi .th.none { display: grid; place-items: center; background: #f8e3b2; color: rgba(143,37,27,.6); font-weight: 800; }
+  .mpic { height: 120px; background: center / cover no-repeat; }
+</style>
+</head>
+<body>
+
+<!-- ======================= S1 桌台图 ======================= -->
+<section id="s1">
+<div class="pad warm">
+  <div class="top">
+    <span class="back">‹ 返回订单</span><h1>代客下单</h1>
+    <div class="seg"><span>外卖 / 自取</span><span class="on">堂食</span></div>
+    <span class="sp"></span>
+    <span class="who">接单员 · 阿玲</span><span class="shop">马卡蒂小馆</span>
+  </div>
+  <div class="body">
+    <div class="main">
+      <div class="bar">
+        <span class="tab on">全部<small>18</small></span><span class="tab">大厅<small>10</small></span><span class="tab">包间<small>4</small></span><span class="tab">露台<small>4</small></span>
+        <div class="legend"><span><i style="background:#fff;border:1px dashed #c9b79c"></i>空闲</span><span><i style="background:#f6d991"></i>用餐中</span><span><i style="background:#f6b980"></i>有菜没上</span><span><i style="background:#ec9d93"></i>超 90 分钟</span></div>
+      </div>
+      <div class="tgrid">
+        <div class="tc busy"><div class="row1"><span class="nm">A1</span><span class="g">2/2 人</span></div><span class="amt">₱480</span><span class="tm">25 分 · 2 轮</span></div>
+        <div class="tc"><div class="row1"><span class="nm">A2</span></div><span class="cap">2 人桌</span><span class="free">点一下开台</span></div>
+        <div class="tc wait sel"><span class="badge">3 道没上</span><div class="row1"><span class="nm">A3</span><span class="g">3/4 人</span></div><span class="amt">₱860</span><span class="tm">42 分 · 2 轮</span></div>
+        <div class="tc"><div class="row1"><span class="nm">A4</span></div><span class="cap">4 人桌</span><span class="free">点一下开台</span></div>
+        <div class="tc busy"><div class="row1"><span class="nm">A5</span><span class="g">4/4 人</span></div><span class="amt">₱1,320</span><span class="tm">58 分 · 3 轮</span></div>
+        <div class="tc"><div class="row1"><span class="nm">A6</span></div><span class="cap">4 人桌</span><span class="free">点一下开台</span></div>
+        <div class="tc busy"><div class="row1"><span class="nm">A7</span><span class="g">1/2 人</span></div><span class="amt" style="color:var(--muted);font-size:14px">还没点菜</span><span class="tm">3 分</span></div>
+        <div class="tc long"><span class="badge red">1 道没上</span><div class="row1"><span class="nm">A8</span><span class="g">6/6 人</span></div><span class="amt">₱2,140</span><span class="tm">1 时 36 分 · 4 轮</span></div>
+        <div class="tc"><div class="row1"><span class="nm">A9</span></div><span class="cap">6 人桌</span><span class="free">点一下开台</span></div>
+        <div class="tc"><div class="row1"><span class="nm">A10</span></div><span class="cap">8 人桌</span><span class="free">点一下开台</span></div>
+        <div class="tc busy"><div class="row1"><span class="nm">包1</span><span class="g">10/12 人</span></div><span class="amt">₱4,860</span><span class="tm">1 时 05 分 · 3 轮</span></div>
+        <div class="tc"><div class="row1"><span class="nm">包2</span></div><span class="cap">12 人桌</span><span class="free">点一下开台</span></div>
+        <div class="tc wait"><span class="badge">5 道没上</span><div class="row1"><span class="nm">包3</span><span class="g">8/10 人</span></div><span class="amt">₱1,980</span><span class="tm">18 分 · 1 轮</span></div>
+        <div class="tc"><div class="row1"><span class="nm">包4</span></div><span class="cap">10 人桌</span><span class="free">点一下开台</span></div>
+        <div class="tc"><div class="row1"><span class="nm">露1</span></div><span class="cap">4 人桌</span><span class="free">点一下开台</span></div>
+      </div>
+    </div>
+    <div class="side">
+      <div class="sh"><h2>A3 <small>大厅 · 3/4 人 · 开台 18:02</small></h2></div>
+      <div class="sb">
+        <div class="stats"><div><b>₱860</b>已点</div><div><b>42</b>分钟</div><div><b style="color:var(--warn)">3</b>道没上</div></div>
+        <div class="mini"><b>1</b>小炒黄牛肉 · 大份<span class="st served">已上桌</span></div>
+        <div class="mini"><b>2</b>珍珠奶茶 · 少糖 去冰<span class="st served">已上桌</span></div>
+        <div class="mini"><b>1</b>蒜蓉菜心<span class="st ready">已备好</span></div>
+        <div class="mini"><b>1</b>酸菜鱼 · 微辣<span class="st cook">制作中 12 分</span></div>
+        <div class="mini"><b>1</b>扬州炒饭<span class="st cook">制作中 6 分</span></div>
+      </div>
+      <div class="sf">
+        <div class="bigbtn">＋ 加菜</div>
+        <div class="btns2"><div class="bigbtn ghost">账单 / 退菜</div><div class="bigbtn gold">结账</div></div>
+        <div class="btns2"><div class="bigbtn ghost" style="padding:11px 0;font-size:15px">换桌</div><div class="bigbtn ghost" style="padding:11px 0;font-size:15px">改人数</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ======================= S2 开台：选人数 ======================= -->
+<section id="s2">
+<div class="pad warm">
+  <div class="top">
+    <span class="back">‹ 返回订单</span><h1>代客下单</h1>
+    <div class="seg"><span>外卖 / 自取</span><span class="on">堂食</span></div>
+    <span class="sp"></span><span class="who">接单员 · 阿玲</span><span class="shop">马卡蒂小馆</span>
+  </div>
+  <div class="body">
+    <div class="main">
+      <div class="bar"><span class="tab on">全部<small>18</small></span><span class="tab">大厅<small>10</small></span><span class="tab">包间<small>4</small></span><span class="tab">露台<small>4</small></span></div>
+      <div class="tgrid">
+        <div class="tc busy"><div class="row1"><span class="nm">A1</span><span class="g">2/2 人</span></div><span class="amt">₱480</span><span class="tm">25 分</span></div>
+        <div class="tc"><div class="row1"><span class="nm">A2</span></div><span class="cap">2 人桌</span></div>
+        <div class="tc wait"><div class="row1"><span class="nm">A3</span></div></div>
+        <div class="tc sel"><div class="row1"><span class="nm">A4</span></div><span class="cap">4 人桌</span></div>
+        <div class="tc busy"><div class="row1"><span class="nm">A5</span></div></div>
+        <div class="tc"></div><div class="tc busy"></div><div class="tc long"></div><div class="tc"></div><div class="tc"></div>
+      </div>
+    </div>
+    <div class="side"></div>
+  </div>
+  <div class="mask"></div>
+  <div class="modal" style="left:300px;top:110px;width:580px">
+    <div class="mh"><h3>开台 · A4</h3><span class="muted">大厅 · 4 人桌</span><span class="x">✕</span></div>
+    <div class="mb">
+      <div class="lbl">几位客人 <small>点一下就选好</small></div>
+      <div class="numgrid">
+        <div>1</div><div>2</div><div>3</div><div class="on">4</div>
+        <div>5</div><div>6</div><div>7</div><div>8</div>
+        <div>9</div><div>10</div><div>11</div><div class="sm">12 以上 ＋</div>
+      </div>
+      <div class="lbl" style="margin-top:18px">这桌备注 <small>选填，点选，后厨和小票都看得到</small></div>
+      <div class="chs"><span class="ch">有小孩</span><span class="ch on">有老人</span><span class="ch">赶时间</span><span class="ch">生日</span><span class="ch">VIP</span><span class="ch add">＋ 其他</span></div>
+    </div>
+    <div class="mf"><div class="bigbtn ghost" style="flex:1">只开台</div><div class="bigbtn" style="flex:2">开台并点菜 →</div></div>
+  </div>
+</div>
+</section>
+
+<!-- ======================= S3 点菜 ======================= -->
+<section id="s3">
+<div class="pad warm">
+  <div class="top">
+    <span class="back">‹ 桌台</span>
+    <span class="tablechip">A3<small>3 人 · 42 分</small></span>
+    <span class="pill">第 <b>3</b> 轮加菜</span>
+    <span class="sp"></span><span class="who">接单员 · 阿玲</span><span class="shop">马卡蒂小馆</span>
+  </div>
+  <div class="body">
+    <div class="cats">
+      <div class="on">常点<i>5</i></div><div>面饭<i>1</i></div><div>炸物<i>2</i></div><div>便当</div><div>小菜</div><div>汤</div><div>饮品<i>2</i></div><div>甜品</div>
+    </div>
+    <div class="dishes">
+      <div class="dbar"><span class="ch on">全部</span><span class="ch">招牌</span><span class="ch">辣</span><span class="ch" style="margin-inline-start:auto">🔢 按编号点</span></div>
+      <div class="dgrid">
+        <div class="dt on"><span class="n">1</span><div class="pic" style="background-image:url(../../web/public/demo/beef-noodle-soup.jpg)"></div><span class="code">M01</span><div class="tx"><span class="nm">红烧牛肉面</span><div class="ft"><span class="pr">₱220</span><span class="mk">规格</span><span class="mk">口味</span></div></div></div>
+        <div class="dt on"><span class="n">2</span><div class="pic" style="background-image:url(../../web/public/demo/popcorn-chicken.jpg)"></div><span class="code">F01</span><div class="tx"><span class="nm">盐酥鸡</span><div class="ft"><span class="pr">₱150</span><span class="mk">口味</span></div></div></div>
+        <div class="dt"><div class="pic" style="background-image:url(../../web/public/demo/braised-pork-rice.jpg)"></div><span class="code">R01</span><div class="tx"><span class="nm">卤肉饭</span><div class="ft"><span class="pr">₱120</span></div></div></div>
+        <div class="dt"><div class="pic" style="background-image:url(../../web/public/demo/bento.jpg)"></div><span class="code">B01</span><div class="tx"><span class="nm">招牌便当</span><div class="ft"><span class="pr">₱180</span><span class="mk">规格</span><span class="left">剩 2</span></div></div></div>
+        <div class="dt"><div class="pic" style="background-image:url(../../web/public/demo/chicken-cutlet.jpg)"></div><span class="code">F02</span><div class="tx"><span class="nm">香酥鸡排</span><div class="ft"><span class="pr">₱160</span><span class="mk">口味</span></div></div></div>
+        <div class="dt"><div class="pic" style="background-image:url(../../web/public/demo/fried-combo.jpg)"></div><span class="code">F03</span><div class="tx"><span class="nm">炸物拼盘</span><div class="ft"><span class="pr">₱280</span><span class="mk">规格</span></div></div></div>
+        <div class="dt out"><div class="pic" style="background-image:url(../../web/public/demo/sweet-potato-fries.jpg)"></div><span class="code">F04</span><div class="tx"><span class="nm">地瓜薯条</span><div class="ft"><span class="pr">₱90</span><span class="so">售完</span></div></div></div>
+        <div class="dt on"><span class="n">1</span><div class="pic" style="background-image:url(../../web/public/demo/bubble-milk-tea.jpg)"></div><span class="code">D01</span><div class="tx"><span class="nm">珍珠奶茶</span><div class="ft"><span class="pr">₱120</span><span class="mk">规格</span><span class="mk">口味</span></div></div></div>
+        <div class="dt on"><span class="n">1</span><div class="pic" style="background-image:url(../../web/public/demo/iced-lemon-tea.jpg)"></div><span class="code">D02</span><div class="tx"><span class="nm">冰柠檬茶</span><div class="ft"><span class="pr">₱90</span><span class="mk">口味</span></div></div></div>
+        <div class="dt"><div class="pic" style="background-image:url(../../web/public/demo/bottled-water.jpg)"></div><span class="code">D03</span><div class="tx"><span class="nm">矿泉水</span><div class="ft"><span class="pr">₱30</span></div></div></div>
+        <div class="dt"><div class="pic none"><span>蒜蓉</span></div><span class="code">C06</span><div class="tx"><span class="nm">蒜蓉菜心</span><div class="ft"><span class="pr">₱120</span></div></div></div>
+        <div class="dt"><div class="pic none"><span>酸辣</span></div><span class="code">S01</span><div class="tx"><span class="nm">酸辣汤</span><div class="ft"><span class="pr">₱100</span><span class="mk">口味</span></div></div></div>
+      </div>
+    </div>
+    <div class="cart">
+      <div class="chd"><h3>这一轮</h3><span class="muted">还没送厨</span><span class="clr">清空</span></div>
+      <div class="ln"><img class="th" src="../../web/public/demo/beef-noodle-soup.jpg"><div class="lt"><b>红烧牛肉面</b><div class="opt">大碗 +₱40 · 加蛋 +₱20</div><div class="tags"><span>微辣</span><span>不要香菜</span></div></div><div class="lp">₱280<div class="stp s"><i>−</i><b>1</b><i class="f">＋</i></div></div></div>
+      <div class="ln on"><img class="th" src="../../web/public/demo/popcorn-chicken.jpg"><div class="lt"><b>盐酥鸡</b><div class="tags"><span>少辣</span></div></div><div class="lp">₱300<div class="stp s"><i>−</i><b>2</b><i class="f">＋</i></div></div></div>
+      <div class="ln"><img class="th" src="../../web/public/demo/bubble-milk-tea.jpg"><div class="lt"><b>珍珠奶茶</b><div class="opt">中杯</div><div class="tags"><span>少糖</span><span>去冰</span></div></div><div class="lp">₱120<div class="stp s"><i>−</i><b>1</b><i class="f">＋</i></div></div></div>
+      <div class="ln"><img class="th" src="../../web/public/demo/iced-lemon-tea.jpg"><div class="lt"><b>冰柠檬茶</b><div class="tags"><span>少冰</span></div></div><div class="lp">₱90<div class="stp s"><i>−</i><b>1</b><i class="f">＋</i></div></div></div>
+      <div class="whole"><div class="wl">整轮要求（点选，可多选）</div>
+        <div class="chs"><span class="ch on">先上饮料</span><span class="ch">菜齐再上</span><span class="ch">全部少辣</span><span class="ch">分小碗</span><span class="ch">加急</span></div></div>
+      <div class="sent">已送厨 2 轮 · <b>5 道 ₱860</b><span style="margin-inline-start:auto">查看 ›</span></div>
+      <div class="cfoot">
+        <div class="tt"><span>这一轮 5 份</span><b>₱790</b></div>
+        <div class="row"><div class="bigbtn ghost">取消</div><div class="bigbtn">送厨（5 份）</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="note" data-n="1" style="left:126px;top:722px;max-width:640px">菜品格带图片，<b>点一下 +1</b>；有必选规格或口味模板的会弹出选择框。没上传图片的菜显示菜名前两个字。</div>
+  <div class="note" data-n="2" style="left:812px;top:640px;max-width:330px">点“这一轮”里的一行，可以改数量、口味，或删掉。没有一处要打字。</div>
+</div>
+</section>
+
+<!-- ======================= S4 选规格和口味 ======================= -->
+<section id="s4">
+<div class="pad warm">
+  <div class="top">
+    <span class="back">‹ 桌台</span><span class="tablechip">A3<small>3 人 · 42 分</small></span><span class="pill">第 <b>3</b> 轮加菜</span>
+    <span class="sp"></span><span class="who">接单员 · 阿玲</span><span class="shop">马卡蒂小馆</span>
+  </div>
+  <div class="body">
+    <div class="cats"><div class="on">常点</div><div>面饭</div><div>炸物</div><div>便当</div><div>小菜</div><div>汤</div><div>饮品</div></div>
+    <div class="dishes"><div class="dgrid">
+      <div class="dt c2"></div><div class="dt c2"></div><div class="dt c2"></div><div class="dt c2"></div>
+      <div class="dt c2"></div><div class="dt c2"></div><div class="dt c2"></div><div class="dt c2"></div>
+    </div></div>
+    <div class="cart"></div>
+  </div>
+  <div class="mask"></div>
+  <div class="modal" style="left:200px;top:24px;width:780px">
+    <div class="mpic" style="background-image:url(../../web/public/demo/beef-noodle-soup.jpg)"></div><div class="mh"><span class="code" style="font-size:12px;font-weight:700;background:var(--ink);color:var(--gold-soft);border-radius:4px;padding:1px 6px">M01</span><h3>红烧牛肉面</h3><span style="color:var(--red);font-weight:800;font-size:18px">₱220 起</span><span class="x">✕</span></div>
+    <div class="mb" style="display:grid;gap:12px;padding-top:12px">
+      <div><div class="lbl">份量 <span class="req">必选</span></div>
+        <div class="chs"><span class="ch">小碗 <small>₱220</small></span><span class="ch on">大碗 <small>+₱40</small></span></div></div>
+      <div><div class="lbl">加料 <small>可多选，加价</small></div>
+        <div class="chs"><span class="ch">加牛肉 <small>+₱80</small></span><span class="ch on">加蛋 <small>+₱20</small></span><span class="ch">加面 <small>+₱20</small></span></div></div>
+      <div style="border-top:1px dashed var(--line);padding-top:14px"><div class="lbl">辣度 <small>口味模板 · 单选，不加钱</small></div>
+        <div class="chs"><span class="ch">不辣</span><span class="ch on">微辣</span><span class="ch">中辣</span><span class="ch">特辣</span></div></div>
+      <div><div class="lbl">忌口 <small>可多选</small></div>
+        <div class="chs"><span class="ch">少油</span><span class="ch">少盐</span><span class="ch">不要葱</span><span class="ch">不要姜</span><span class="ch on">不要香菜</span><span class="ch add">＋ 手写一条</span></div></div>
+    </div>
+    <div class="mf">
+      <div class="stp"><i>−</i><b>1</b><i class="f">＋</i></div>
+      <div style="flex:1;color:var(--muted);font-size:13px;padding:0 8px">大碗 · 加蛋 · 微辣 · 不要香菜</div>
+      <div class="bigbtn" style="width:240px">加入这一轮 ₱280</div>
+    </div>
+  </div>
+  <div class="note" data-n="3" style="left:996px;top:330px;max-width:170px">必选的没选，“加入”按钮是灰的，并把那一组标红。</div>
+  <div class="note" data-n="4" style="left:996px;top:500px;max-width:170px">“手写一条”是唯一用键盘的地方，平时用不到。</div>
+</div>
+</section>
+
+<!-- ======================= S5 账单和结账 ======================= -->
+<section id="s5">
+<div class="pad warm">
+  <div class="top">
+    <span class="back">‹ 桌台</span><span class="tablechip">A3<small>3 人 · 1 时 12 分</small></span><span class="pill">账单 · D20261124-031</span>
+    <span class="sp"></span><span class="who">接单员 · 阿玲</span><span class="shop">马卡蒂小馆</span>
+  </div>
+  <div class="body">
+    <div class="bill">
+      <div class="round"><b>第 1 轮</b> 18:02 · 店员 阿玲</div>
+      <div class="bi"><div>小炒黄牛肉<div class="opt">大份 · 微辣 · 不要香菜</div></div><span class="q">×1</span><span><span class="st served">已上桌</span></span><span class="p">₱340</span></div>
+      <div class="bi"><div>珍珠奶茶<div class="opt">中杯 · 少糖 · 去冰</div></div><span class="q">×2</span><span><span class="st served">已上桌</span></span><span class="p">₱240</span></div>
+      <div class="bi on"><div>蒜蓉菜心</div><span class="q">×1</span><span><span class="st ready">已备好</span></span><span class="p">₱120</span></div>
+      <div class="acts"><span class="ch">✓ 上桌</span><span class="ch">再来一份</span><span class="ch">催一下</span><span class="ch red">退菜</span></div>
+      <div class="round"><b>第 2 轮</b> 18:20 · 顾客扫码</div>
+      <div class="bi"><div>酸菜鱼<div class="opt">大份 · 加粉丝 · 微辣</div></div><span class="q">×1</span><span><span class="st served">已上桌</span></span><span class="p">₱560</span></div>
+      <div class="bi void"><div>扬州炒饭<div class="opt">退菜：上太慢 · 阿玲</div></div><span class="q">×1</span><span><span class="st void">已退</span></span><span class="p">₱160</span></div>
+      <div class="round"><b>第 3 轮</b> 18:44 · 店员 阿玲 · 先上饮料</div>
+      <div class="bi"><div>柠檬绿茶<div class="opt">常温</div></div><span class="q">×1</span><span><span class="st served">已上桌</span></span><span class="p">₱90</span></div>
+    </div>
+    <div class="pay">
+      <div class="ph"><div class="lbl" style="margin:0">结账关台</div></div>
+      <div class="kv" style="padding:2px 18px"><span>菜品 6 份</span><span>₱1,350</span></div>
+      <div class="kv" style="padding:2px 18px"><span>服务费 10%</span><span>₱135</span></div>
+      <div class="kv" style="padding:2px 18px 8px"><span>含税 12%</span><span>₱159</span></div>
+      <div class="due"><span>应付</span><b>₱1,485</b></div>
+      <div style="padding:12px 18px 0"><div class="chs" style="gap:8px"><span class="ch on" style="min-width:0;flex:1">现金</span><span class="ch" style="min-width:0;flex:1">刷卡</span><span class="ch" style="min-width:0;flex:1">GCash</span><span class="ch" style="min-width:0;flex:1">转账</span></div></div>
+      <div class="recv"><span class="muted">实收</span><b>₱2,000</b></div>
+      <div class="quick"><div>刚好</div><div>₱1,500</div><div class="on">₱2,000</div><div>₱3,000</div></div>
+      <div class="keys"><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>00</div><div>0</div><div>⌫</div></div>
+      <div class="chg"><span>找零</span><b>₱515</b></div>
+      <div style="padding:12px 18px 16px;margin-top:auto"><div class="bigbtn">收款并关台</div></div>
+    </div>
+  </div>
+  <div class="note" data-n="5" style="left:300px;top:520px;max-width:360px">点账单里的一道菜，下面出操作：上桌、再来一份、催一下、退菜。</div>
+  <div class="note" data-n="6" style="left:300px;top:610px;max-width:360px">还有菜在做时“收款并关台”是灰的，会提示先上桌或退菜（现有规则不变）。</div>
+</div>
+</section>
+
+<!-- ======================= S6 手机 ======================= -->
+<section id="s6">
+<div class="phones warm">
+  <div class="ph-wrap"><div class="phone">
+    <div class="top"><span class="back">‹</span><h1>代客下单</h1><div class="seg"><span>外卖</span><span class="on">堂食</span></div></div>
+    <div class="bar"><span class="tab on">全部</span><span class="tab">大厅</span><span class="tab">包间</span><span class="tab">露台</span></div>
+    <div class="tgrid">
+      <div class="tc busy"><div class="row1"><span class="nm">A1</span><span class="g">2人</span></div><span class="amt">₱480</span><span class="tm">25 分</span></div>
+      <div class="tc"><div class="row1"><span class="nm">A2</span></div><span class="cap">2 人桌</span><span class="free">开台</span></div>
+      <div class="tc wait"><span class="badge">3</span><div class="row1"><span class="nm">A3</span><span class="g">3人</span></div><span class="amt">₱860</span><span class="tm">42 分</span></div>
+      <div class="tc"><div class="row1"><span class="nm">A4</span></div><span class="cap">4 人桌</span><span class="free">开台</span></div>
+      <div class="tc busy"><div class="row1"><span class="nm">A5</span><span class="g">4人</span></div><span class="amt">₱1,320</span><span class="tm">58 分</span></div>
+      <div class="tc"><div class="row1"><span class="nm">A6</span></div><span class="cap">4 人桌</span><span class="free">开台</span></div>
+      <div class="tc busy"><div class="row1"><span class="nm">A7</span><span class="g">1人</span></div><span class="tm" style="margin-top:auto">3 分</span></div>
+      <div class="tc long"><span class="badge red">1</span><div class="row1"><span class="nm">A8</span><span class="g">6人</span></div><span class="amt">₱2,140</span><span class="tm">1:36</span></div>
+      <div class="tc"><div class="row1"><span class="nm">A9</span></div><span class="cap">6 人桌</span><span class="free">开台</span></div>
+      <div class="tc busy"><div class="row1"><span class="nm">包1</span><span class="g">10人</span></div><span class="amt">₱4,860</span><span class="tm">1:05</span></div>
+      <div class="tc"><div class="row1"><span class="nm">包2</span></div><span class="cap">12 人桌</span><span class="free">开台</span></div>
+      <div class="tc wait"><span class="badge">5</span><div class="row1"><span class="nm">包3</span><span class="g">8人</span></div><span class="amt">₱1,980</span><span class="tm">18 分</span></div>
+    </div>
+  </div><span class="cap2">① 桌台：一屏三列，点桌开台或进入</span></div>
+
+  <div class="ph-wrap"><div class="phone">
+    <div class="top"><span class="back">‹</span><span class="tablechip" style="font-size:15px">A3<small>3 人</small></span><span class="pill" style="font-size:13px">第 3 轮加菜</span></div>
+    <div class="body">
+      <div class="cats" style="width:82px"><div class="on" style="height:54px;font-size:14px">常点<i>5</i></div><div style="height:54px;font-size:14px">面饭</div><div style="height:54px;font-size:14px">炸物</div><div style="height:54px;font-size:14px">便当</div><div style="height:54px;font-size:14px">汤</div><div style="height:54px;font-size:14px">饮品<i>2</i></div><div style="height:54px;font-size:14px">甜品</div></div>
+      <div class="plist">
+        <div class="pi"><img class="th" src="../../web/public/demo/beef-noodle-soup.jpg"><div><span class="code">M01</span> <span class="nm">红烧牛肉面</span><div class="pr">₱220 <span class="mk">规格</span><span class="mk">口味</span></div></div><div class="r"><span class="sel">选规格 <b style="background:var(--gold);color:var(--red-deep);border-radius:9px;padding:0 5px">1</b></span></div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/popcorn-chicken.jpg"><div><span class="code">F01</span> <span class="nm">盐酥鸡</span><div class="pr">₱150 <span class="mk">口味</span></div></div><div class="r"><div class="stp s"><i>−</i><b>2</b><i class="f">＋</i></div></div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/braised-pork-rice.jpg"><div><span class="code">R01</span> <span class="nm">卤肉饭</span><div class="pr">₱120 </div></div><div class="r"><div class="stp s"><i class="f">＋</i></div></div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/bento.jpg"><div><span class="code">B01</span> <span class="nm">招牌便当</span><div class="pr">₱180 <span class="mk">规格</span></div></div><div class="r"><span class="sel">选规格</span></div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/chicken-cutlet.jpg"><div><span class="code">F02</span> <span class="nm">香酥鸡排</span><div class="pr">₱160 <span class="mk">口味</span></div></div><div class="r"><div class="stp s"><i class="f">＋</i></div></div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/fried-combo.jpg"><div><span class="code">F03</span> <span class="nm">炸物拼盘</span><div class="pr">₱280 <span class="mk">规格</span></div></div><div class="r"><span class="sel">选规格</span></div></div>
+        <div class="pi" style="opacity:.45"><img class="th" src="../../web/public/demo/sweet-potato-fries.jpg"><div><span class="code">F04</span> <span class="nm">地瓜薯条</span><div class="pr">₱90 </div></div><div class="r muted">售完</div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/bubble-milk-tea.jpg"><div><span class="code">D01</span> <span class="nm">珍珠奶茶</span><div class="pr">₱120 <span class="mk">规格</span><span class="mk">口味</span></div></div><div class="r"><span class="sel">选规格 <b style="background:var(--gold);color:var(--red-deep);border-radius:9px;padding:0 5px">1</b></span></div></div>
+      </div>
+    </div>
+    <div class="pbar"><span>这一轮</span><span class="n">5 份</span><b style="font-size:18px">₱790</b><span class="go">送厨</span></div>
+  </div><span class="cap2">② 点菜：左分类，右边点“＋”</span></div>
+
+  <div class="ph-wrap"><div class="phone">
+    <div class="top"><span class="back">‹</span><span class="tablechip" style="font-size:15px">A3<small>3 人</small></span><span class="pill" style="font-size:13px">账单 ₱1,485</span></div>
+    <div class="plist">
+      <div class="round"><b>第 1 轮</b> 18:02 · 阿玲</div>
+      <div class="pi"><div><span class="nm">小炒黄牛肉</span><div class="muted small">大份 · 微辣</div></div><div class="r"><span class="st served">已上桌</span></div></div>
+      <div class="pi" style="background:#fff3d6"><div><span class="nm">蒜蓉菜心</span></div><div class="r"><span class="st ready">已备好</span></div></div>
+      <div class="round"><b>第 2 轮</b> 18:20 · 扫码</div>
+      <div class="pi"><div><span class="nm">酸菜鱼</span><div class="muted small">大份 · 微辣</div></div><div class="r"><span class="st served">已上桌</span></div></div>
+    </div>
+    <div class="mask"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div style="padding:12px 16px 6px;display:flex;align-items:baseline;gap:8px"><b style="font-size:17px">退菜 · 蒜蓉菜心</b><span class="muted" style="margin-inline-start:auto">₱120</span></div>
+      <div style="padding:4px 16px 0"><div class="lbl">退几份</div><div class="stp s"><i>−</i><b>1</b><i>＋</i></div></div>
+      <div style="padding:14px 16px 0"><div class="lbl">原因 <span class="req">必选</span></div>
+        <div class="chs" style="gap:8px"><span class="ch">点错了</span><span class="ch on">顾客不要了</span><span class="ch">上太慢</span><span class="ch">菜品有问题</span><span class="ch">沽清了</span><span class="ch add">＋ 手写</span></div></div>
+      <div style="padding:14px 16px 0;font-size:13px;color:var(--muted)">已开始做的菜退掉，后厨屏会出“已退”提醒；金额从账单扣掉。</div>
+      <div style="padding:14px 16px 30px;display:grid;grid-template-columns:1fr 2fr;gap:10px"><div class="bigbtn ghost">取消</div><div class="bigbtn">确认退菜</div></div>
+    </div>
+  </div><span class="cap2">③ 账单：点一道菜 → 退菜原因点选</span></div>
+</div>
+</section>
+
+<script>
+  const show = () => { const id = (location.hash || '#s1').slice(1); document.querySelectorAll('section').forEach(s => s.classList.toggle('show', s.id === id)) }
+  addEventListener('hashchange', show); show()
+</script>
+</body>
+</html>
