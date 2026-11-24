@@ -140,6 +140,8 @@ async function showSettlement(id: number) {
         <div class="card"><span>{{ t('bl.c.paid') }}</span><b>{{ money(sum.paid, cur) }}</b></div>
         <div class="card"><span>{{ t('bl.c.due') }}</span><b class="plat">{{ money(sum.platform_discount, cur) }}</b></div>
         <div class="card"><span>{{ t('bl.c.takings') }}</span><b class="ok">{{ money(sum.takings, cur) }}</b></div>
+        <div v-if="sum.refunded" class="card" data-testid="bl-refunded"><span>{{ t('bl.c.refunded') }}</span><b class="neg">-{{ money(sum.refunded, cur) }}</b>
+          <small>{{ t('bl.c.refunded_sub') }}</small></div>
       </div>
       <div class="cols">
         <div class="card stack">

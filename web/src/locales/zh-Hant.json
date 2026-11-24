@@ -3138,5 +3138,10 @@
 "rc.col.by":"誰設的",
 "rc.col.approved":"誰授權",
 "rc.someone":"（未記錄）",
-"rc.check_tag":"對賬：{s}"
+"rc.check_tag":"對賬：{s}",
+"bl.c.refunded":"已退款",
+"bl.c.refunded_sub":"這些訂單之後按菜退給顧客的錢，未從上面扣除",
+"rc.c.refunds":"按菜退款",
+"rc.c.net":"扣除後 {v}",
+"rc.cash_refunded":"現金退款"
 }

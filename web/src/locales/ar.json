@@ -3138,5 +3138,10 @@
  "rc.col.by": "بواسطة",
  "rc.col.approved": "بموافقة",
  "rc.someone": "(غير مسجّل)",
- "rc.check_tag": "التسوية: {s}"
+ "rc.check_tag": "التسوية: {s}",
+ "bl.c.refunded": "المبالغ المستردة",
+ "bl.c.refunded_sub": "ما أُعيد لاحقًا حسب الطبق؛ غير مخصوم أعلاه",
+ "rc.c.refunds": "استرداد حسب الطبق",
+ "rc.c.net": "الصافي {v}",
+ "rc.cash_refunded": "استرداد نقدي"
 }

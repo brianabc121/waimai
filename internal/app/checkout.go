@@ -391,16 +391,16 @@ func (s *adjBase) price(j Adjust) (Totals, error) {
 // the delivery fee: coupons by their kind, the promotion by its kind.
 func orderAdjBase(ctx context.Context, q Querier, b *Branch, orderID int64) (*adjBase, error) {
 	var s adjBase
-	var service string
 	var merchant int64
 	var promoID *int64
-	if err := q.QueryRow(ctx, `SELECT subtotal, delivery_fee, packaging_fee, tax_rate_bp, tax_inclusive, service_type,
-		discount - platform_subsidy, platform_subsidy, promotion_id, promotion_name, promotion_name_en FROM orders WHERE id=$1`, orderID).
-		Scan(&s.subtotal, &s.fee, &s.cfg.PackagingFee, &s.cfg.TaxRateBP, &s.cfg.TaxInclusive, &service, &merchant,
-			&s.platf, &promoID, &s.promoName, &s.promoNameEn); err != nil {
+	var promoKind string
+	if err := q.QueryRow(ctx, `SELECT subtotal, delivery_fee, packaging_fee, tax_rate_bp, tax_inclusive, service_charge_bp,
+		discount - platform_subsidy, platform_subsidy, promotion_id, promotion_kind, promotion_name, promotion_name_en
+		FROM orders WHERE id=$1`, orderID).
+		Scan(&s.subtotal, &s.fee, &s.cfg.PackagingFee, &s.cfg.TaxRateBP, &s.cfg.TaxInclusive, &s.cfg.ServiceChargeBP,
+			&merchant, &s.platf, &promoID, &promoKind, &s.promoName, &s.promoNameEn); err != nil {
 		return nil, err
 	}
-	s.cfg.ServiceChargeBP = b.ServiceChargeBP
 	var couponGoods, couponShip int64
 	if err := q.QueryRow(ctx, `SELECT COALESCE(sum(amount) FILTER (WHERE kind IN ('store_free','store_threshold')), 0),
 		COALESCE(sum(amount) FILTER (WHERE kind = 'store_delivery'), 0) FROM order_discounts WHERE order_id=$1`, orderID).
@@ -411,15 +411,10 @@ func orderAdjBase(ctx context.Context, q Querier, b *Branch, orderID int64) (*ad
 	s.d = Discount{Goods: couponGoods, Delivery: couponShip}
 	if promoID != nil {
 		s.promoID, s.promoAmount = *promoID, promo
-		var kind string
-		if err := q.QueryRow(ctx, `SELECT kind FROM promotions WHERE id=$1`, *promoID).Scan(&kind); err != nil {
-			return nil, err
-		}
-		if kind == "free_delivery" {
-			s.d.Delivery += promo
-		} else {
-			s.d.Goods += promo
-		}
+		// the kind the promotion had when the order took it, not its kind now
+		p := promoOn(promoKind, promo)
+		s.d.Goods += p.Goods
+		s.d.Delivery += p.Delivery
 	}
 	return &s, nil
 }

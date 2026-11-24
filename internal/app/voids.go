@@ -459,7 +459,7 @@ func voidPrice(ctx context.Context, q Querier, b *Branch, m *orderMoney, ordered
 	if kind == "store" {
 		if cur != nil && m.promoAmount > 0 {
 			res.promo = cur
-			if cur.Kind == "free_delivery" {
+			if m.PromotionKind == "free_delivery" {
 				res.promoD = Discount{Delivery: min(m.promoAmount, m.DeliveryFee)}
 			} else {
 				res.promoD = Discount{Goods: min(m.promoAmount, sub)}
@@ -481,15 +481,26 @@ func voidPrice(ctx context.Context, q Querier, b *Branch, m *orderMoney, ordered
 			}
 		}
 	}
-	cfg := b.taxConfig()
-	cfg.PackagingFee, cfg.TaxRateBP, cfg.TaxInclusive = m.PackagingFee, m.TaxRateBP, m.TaxInclusive
-	t := ComputeTotals(sub, m.DeliveryFee, cfg, Discount{Goods: res.promoD.Goods + m.couponGoods,
-		Delivery: res.promoD.Delivery + m.couponShip})
+	cfg := m.fees()
+	// Coupons stay, but only on what the promotion left of the dishes.
+	d := Discount{Goods: res.promoD.Goods + min(m.couponGoods, max(0, sub-res.promoD.Goods)),
+		Delivery: res.promoD.Delivery + m.couponShip}
+	t := ComputeTotals(sub, m.DeliveryFee, cfg, d)
 	if res.promo != nil {
 		t.PromotionID, t.PromotionName, t.PromotionNameEn = res.promo.ID, res.promo.Name, res.promo.NameEn
 		t.PromotionDiscount = min(res.promoD.total(), t.MerchantDiscount)
 	}
 	t.applyPlatform(m.platf)
+	// A percentage off given at checkout is taken off what is left
+	// (docs/PRICING_REVIEW.md, problem 2).
+	if m.adjPercentBP > 0 {
+		base := adjBase{subtotal: sub, fee: m.DeliveryFee, cfg: cfg, d: d, platf: m.platf, promoID: t.PromotionID,
+			promoName: t.PromotionName, promoNameEn: t.PromotionNameEn, promoAmount: t.PromotionDiscount}
+		var err error
+		if t, err = base.price(Adjust{PercentBP: m.adjPercentBP}); err != nil {
+			return nil, err
+		}
+	}
 	res.Totals = t
 	return res, nil
 }
@@ -556,12 +567,13 @@ func (a *App) repriceAfterVoid(ctx context.Context, tx pgx.Tx, b *Branch, o *loc
 			return Totals{}, err
 		}
 	}
-	// Coupons stay, but never take off more than there is left.
-	if t.Subtotal < m.couponGoods {
+	// Coupons stay, but never take off more than the promotion left of the
+	// dishes, so the discount lines add up to the discount (problem 3).
+	if room := max(0, t.Subtotal-min(p.promoD.Goods, t.Subtotal)); room < m.couponGoods {
 		if _, err := tx.Exec(ctx, `WITH c AS (SELECT id, amount, sum(amount) OVER (ORDER BY id) AS run FROM order_discounts
 			WHERE order_id=$1 AND kind IN ('store_threshold','store_free'))
 			UPDATE order_discounts d SET amount = GREATEST(0, LEAST(c.amount, $2 - (c.run - c.amount)))
-			FROM c WHERE d.id = c.id`, o.ID, t.Subtotal); err != nil {
+			FROM c WHERE d.id = c.id`, o.ID, room); err != nil {
 			return Totals{}, err
 		}
 	}
@@ -687,8 +699,11 @@ type RefundInput struct {
 	} `json:"lines"`
 	// Amount is what was given back; nil takes the suggested amount. It may
 	// be less than suggested, never more.
-	Amount     *int64 `json:"amount"`
-	Method     string `json:"method"`
+	Amount *int64 `json:"amount"`
+	Method string `json:"method"`
+	// PayType is how the money went back: cash (out of the drawer),
+	// transfer, online or other. Empty works it out from Method.
+	PayType    string `json:"pay_type"`
 	Reason     string `json:"reason"`
 	ReasonKind string `json:"reason_kind"`
 	// Dry only works the amount out.
@@ -720,6 +735,12 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 	}
 	if len(in.Lines) == 0 {
 		return nil, nil, ErrValidation("pick at least one dish")
+	}
+	if in.PayType == "" {
+		in.PayType = refundPayType(in.Method)
+	}
+	if in.PayType != "cash" && in.PayType != "transfer" && in.PayType != "online" && in.PayType != "other" {
+		return nil, nil, ErrValidation("pay_type is cash, transfer, online or other")
 	}
 	var out *RefundQuote
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
@@ -780,19 +801,35 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 			q.Lines = append(q.Lines, RefundLine{ItemID: l.ItemID, Name: name, Qty: l.Qty, Amount: unit * int64(l.Qty)})
 			q.Dishes += unit * int64(l.Qty)
 		}
-		// Price the order as if these dishes had been voided.
+		// Price the order as if these dishes had been voided, with everything
+		// the order had: its promotion (kept when the store is at fault), its
+		// coupons, the percentage off and the round-off given at checkout
+		// (docs/PRICING_REVIEW.md, problems 1 and 2).
 		var after Totals
+		m, err := readOrderMoney(ctx, tx, o.ID)
+		if err != nil {
+			return err
+		}
 		if o.ServiceType == "dine_in" {
-			var sub int64
-			if err := tx.QueryRow(ctx, `SELECT subtotal FROM orders WHERE id=$1`, o.ID).Scan(&sub); err != nil {
+			var keepID int64
+			if in.ReasonKind == "store" && m.PromotionID != nil {
+				keepID = *m.PromotionID
+			}
+			var merchant int64
+			if err := tx.QueryRow(ctx, `SELECT discount - platform_subsidy FROM orders WHERE id=$1`, o.ID).Scan(&merchant); err != nil {
 				return err
 			}
-			after = ComputeTotals(max(sub-q.Dishes, 0), 0, b.dineInTax(), Discount{})
+			sub := max(m.Subtotal-q.Dishes, 0)
+			if after, err = dineBillTotals(ctx, tx, b, o.ID, sub, keepID, merchant); err != nil {
+				return err
+			}
+			if m.adjPercentBP > 0 {
+				base := adjBase{subtotal: sub, cfg: m.fees(), d: Discount{Goods: after.Discount}}
+				if after, err = base.price(Adjust{PercentBP: m.adjPercentBP}); err != nil {
+					return err
+				}
+			}
 		} else {
-			m, err := readOrderMoney(ctx, tx, o.ID)
-			if err != nil {
-				return err
-			}
 			var ordered time.Time
 			if err := tx.QueryRow(ctx, `SELECT created_at FROM orders WHERE id=$1`, o.ID).Scan(&ordered); err != nil {
 				return err
@@ -804,6 +841,7 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 			}
 			after = p.Totals
 		}
+		after.Total = max(0, after.Total-m.roundOff)
 		q.Left = o.Total - paidBack
 		q.Suggested = max(0, min(o.Total-after.Total, q.Left))
 		out = q
@@ -830,8 +868,8 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		}
 		lines, _ := json.Marshal(q.Lines)
 		if _, err := tx.Exec(ctx, `INSERT INTO order_refunds (order_id, branch_id, lines, amount, method, reason, reason_kind,
-			refunded_by, approved_by, aftersale_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, o.ID, o.BranchID, lines, amount,
-			in.Method, in.Reason, in.ReasonKind, by, approvedBy, asID); err != nil {
+			refunded_by, approved_by, aftersale_id, pay_type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, o.ID, o.BranchID, lines,
+			amount, in.Method, in.Reason, in.ReasonKind, by, approvedBy, asID, in.PayType); err != nil {
 			return err
 		}
 		if asID != nil {
@@ -1064,4 +1102,16 @@ func (a *App) ItemDineIn(ctx context.Context, itemID int64) (bool, error) {
 		return false, ErrNotFound
 	}
 	return dine, err
+}
+
+// cashWords are "cash" as the refund sheet offers it in each language.
+var cashWords = map[string]bool{"现金": true, "現金": true, "cash": true, "efectivo": true, "espèces": true,
+	"наличные": true, "tiền mặt": true, "เงินสด": true, "نقدًا": true, "ငွေသား": true, "សាច់ប្រាក់": true}
+
+// refundPayType works out how a refund went back from its method's name.
+func refundPayType(method string) string {
+	if cashWords[strings.ToLower(strings.TrimSpace(method))] {
+		return "cash"
+	}
+	return "other"
 }

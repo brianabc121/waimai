@@ -3138,5 +3138,10 @@
  "rc.col.by": "Кто дал",
  "rc.col.approved": "Кто одобрил",
  "rc.someone": "(не записано)",
- "rc.check_tag": "Сверка: {s}"
+ "rc.check_tag": "Сверка: {s}",
+ "bl.c.refunded": "Возвращено",
+ "bl.c.refunded_sub": "Возвраты по блюдам позже; выше не вычтены",
+ "rc.c.refunds": "Возвраты по блюдам",
+ "rc.c.net": "итого {v}",
+ "rc.cash_refunded": "Возвраты наличными"
 }

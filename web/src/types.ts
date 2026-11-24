@@ -255,7 +255,7 @@ export interface Settlement {
 }
 export interface BillSummary {
   from: string; to: string; currency: string; orders: number; cancelled: number; food: number; merchant_discount: number
-  platform_discount: number; paid: number; takings: number
+  platform_discount: number; paid: number; takings: number; refunded: number
   kinds: { kind: 'promotion' | CouponKind; funded_by: 'store' | 'platform'; orders: number; amount: number }[]
   repurchase: { issued: number; used: number; sales: number }
   days: { day: string; orders: number; food: number; discount: number; paid: number; takings: number }[]

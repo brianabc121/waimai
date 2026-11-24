@@ -427,20 +427,9 @@ func recomputeBillKeep(ctx context.Context, tx pgx.Tx, b *Branch, orderID, keepI
 		WHERE order_id=$1 AND prep_status <> 'cancelled'`, orderID).Scan(&subtotal); err != nil {
 		return Totals{}, err
 	}
-	t, err := dineTotals(ctx, tx, b, orderID, subtotal)
+	t, err := dineBillTotals(ctx, tx, b, orderID, subtotal, keepID, keepAmount)
 	if err != nil {
 		return Totals{}, err
-	}
-	if keepID != 0 && t.PromotionDiscount < min(keepAmount, subtotal) {
-		ps, err := loadPromotions(ctx, tx, b.ID, "p.id = "+fmt.Sprint(keepID), "")
-		if err != nil {
-			return Totals{}, err
-		}
-		if len(ps) == 1 {
-			keep := min(keepAmount, subtotal)
-			t = ComputeTotals(subtotal, 0, b.dineInTax(), Discount{Goods: keep})
-			t.PromotionID, t.PromotionName, t.PromotionNameEn, t.PromotionDiscount = ps[0].ID, ps[0].Name, ps[0].NameEn, keep
-		}
 	}
 	var promoID *int64
 	if t.PromotionID != 0 {
@@ -454,15 +443,44 @@ func recomputeBillKeep(ctx context.Context, tx pgx.Tx, b *Branch, orderID, keepI
 	return t, err
 }
 
+// dineBillTotals prices a table bill of subtotal without saving it:
+// dineTotals, with promotion keepID kept at keepAmount or more.
+func dineBillTotals(ctx context.Context, q Querier, b *Branch, orderID, subtotal, keepID, keepAmount int64) (Totals, error) {
+	t, err := dineTotals(ctx, q, b, orderID, subtotal)
+	if err != nil {
+		return Totals{}, err
+	}
+	if keepID != 0 && t.PromotionDiscount < min(keepAmount, subtotal) {
+		ps, err := loadPromotions(ctx, q, b.ID, "p.id = "+fmt.Sprint(keepID), "")
+		if err != nil {
+			return Totals{}, err
+		}
+		if len(ps) == 1 {
+			cfg, err := orderFees(ctx, q, orderID)
+			if err != nil {
+				return Totals{}, err
+			}
+			keep := min(keepAmount, subtotal)
+			t = ComputeTotals(subtotal, 0, cfg, Discount{Goods: keep})
+			t.PromotionID, t.PromotionName, t.PromotionNameEn, t.PromotionDiscount = ps[0].ID, ps[0].Name, ps[0].NameEn, keep
+		}
+	}
+	return t, nil
+}
+
 // dineTotals prices a table bill: the best dine-in promotion for the dishes
-// (docs/CHECKOUT_DISCOUNT_DESIGN.md §4.2), then service charge and tax. A
-// promotion's dates and daily hours are checked at the time the table was
-// opened, so a lunch offer still applies when the lunch guests pay at 14:20;
-// its status and quota are checked now.
+// (docs/CHECKOUT_DISCOUNT_DESIGN.md §4.2), then service charge and tax at the
+// rates the table was opened with. A promotion's dates and daily hours are
+// checked at the time the table was opened, so a lunch offer still applies
+// when the lunch guests pay at 14:20; its status and quota are checked now.
 func dineTotals(ctx context.Context, q Querier, b *Branch, orderID, subtotal int64) (Totals, error) {
 	var opened time.Time
 	if err := q.QueryRow(ctx, `SELECT COALESCE((SELECT s.opened_at FROM dining_sessions s WHERE s.id = o.session_id), o.created_at)
 		FROM orders o WHERE o.id=$1`, orderID).Scan(&opened); err != nil {
+		return Totals{}, err
+	}
+	cfg, err := orderFees(ctx, q, orderID)
+	if err != nil {
 		return Totals{}, err
 	}
 	ps, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope='dine_in'", "")
@@ -470,7 +488,7 @@ func dineTotals(ctx context.Context, q Querier, b *Branch, orderID, subtotal int
 		return Totals{}, err
 	}
 	best, d := bestPromotion(ps, opened, b.location(), "dine_in", subtotal, 0)
-	t := ComputeTotals(subtotal, 0, b.dineInTax(), d)
+	t := ComputeTotals(subtotal, 0, cfg, d)
 	if best != nil {
 		t.PromotionID, t.PromotionName, t.PromotionNameEn, t.PromotionDiscount = best.ID, best.Name, best.NameEn, d.total()
 	}

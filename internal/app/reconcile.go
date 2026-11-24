@@ -45,8 +45,19 @@ type ReconCash struct {
 	RiderCollected int64 `json:"rider_collected"` // riders took in cash at the door
 	RiderReturned  int64 `json:"rider_returned"`  // of which already handed in and checked
 	RiderPending   int64 `json:"rider_pending"`   // still with the riders or not checked
-	// Expected is what the drawer should hold: cash at the store plus what riders handed in.
+	// Refunded is cash given back for dishes in the period.
+	Refunded int64 `json:"refunded"`
+	// Expected is what the drawer should hold: cash at the store plus what
+	// riders handed in, less cash refunds.
 	Expected int64 `json:"expected"`
+}
+
+// ReconRefunds is money given back by dish in the period, whenever the
+// order was paid (docs/PRICING_REVIEW.md, problem 7).
+type ReconRefunds struct {
+	Count int   `json:"count"`
+	Total int64 `json:"total"`
+	Cash  int64 `json:"cash"`
 }
 
 // CashCount is the cash counted in the drawer on one day.
@@ -78,6 +89,9 @@ type Reconcile struct {
 	Rows      []ReconRow     `json:"rows"`
 	Cash      ReconCash      `json:"cash"`
 	Discounts ReconDiscounts `json:"discounts"`
+	Refunds   ReconRefunds   `json:"refunds"`
+	// Net is Total less the refunds.
+	Net int64 `json:"net"`
 	// Problems counts online payments marked wrong, in any period.
 	Problems int `json:"problems"`
 	// CashCount is the day's count when the period is one day.
@@ -145,7 +159,16 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, from, to strin
 		&out.Cash.RiderPending, &out.Discounts.Promotion, &out.Discounts.Staff, &out.Discounts.RoundOff); err != nil {
 		return nil, err
 	}
-	out.Cash.Expected = out.Cash.Counter + out.Cash.RiderReturned
+	if err := a.DB.QueryRow(ctx, `SELECT count(*), COALESCE(sum(r.amount), 0),
+			COALESCE(sum(r.amount) FILTER (WHERE r.pay_type = 'cash'), 0)
+		FROM order_refunds r JOIN branches b ON b.id = r.branch_id
+		WHERE r.branch_id = $1 AND (r.created_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date`,
+		branchID, from, to).Scan(&out.Refunds.Count, &out.Refunds.Total, &out.Refunds.Cash); err != nil {
+		return nil, err
+	}
+	out.Cash.Refunded = out.Refunds.Cash
+	out.Net = out.Total - out.Refunds.Total
+	out.Cash.Expected = out.Cash.Counter + out.Cash.RiderReturned - out.Cash.Refunded
 	// coupons the store paid for
 	if err := a.DB.QueryRow(ctx, `SELECT COALESCE(sum(d.amount), 0) FROM order_discounts d
 		JOIN orders o ON o.id = d.order_id JOIN branches b ON b.id = o.branch_id
