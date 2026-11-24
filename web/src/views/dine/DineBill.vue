@@ -13,6 +13,9 @@ import PayPicker from '../checkout/PayPicker.vue'
 import ApproveDialog from '../ApproveDialog.vue'
 import type { DeskLine } from './DineOrder.vue'
 import { presetList, sinceText } from './strings'
+import VoidSheet from '../VoidSheet.vue'
+import { session } from '../../session'
+import { voidNote, voidsOf } from '../../voids'
 
 const props = defineProps<{ bill: Bill; presets: DinePresets | null; currency: string; country: string; phone: boolean; payFirst: boolean; items?: Map<number, Item> }>()
 const emit = defineEmits<{ back: []; update: [bill: Bill]; again: [line: DeskLine]; closed: []; add: [] }>()
@@ -56,22 +59,11 @@ function again(it: OrderItem) {
   emit('again', { item_id: it.item_id, option_ids: ids, note_tags: (it.note_tags ?? []).map(x => x.id), note: it.note })
 }
 
-// ---- void ----
-const voiding = reactive<{ item: OrderItem | null; qty: number; reason: string; writing: boolean; text: string; busy: boolean }>(
-  { item: null, qty: 1, reason: '', writing: false, text: '', busy: false })
-const reasons = computed(() => presetList(props.presets, 'void_reasons'))
-function startVoid(it: OrderItem) { Object.assign(voiding, { item: it, qty: 1, reason: '', writing: false, text: '', busy: false }) }
-async function confirmVoid() {
-  const it = voiding.item!
-  const reason = voiding.writing ? voiding.text.trim() : voiding.reason
-  if (!reason) return
-  voiding.busy = true
-  try {
-    emit('update', await post<Bill>(`/merchant/bill-items/${it.id}/void`, { reason, qty: voiding.qty }))
-    voiding.item = null; sel.value = null
-  } catch (e) { error.value = (e as Error).message }
-  voiding.busy = false
-}
+// ---- void (docs/VOID_ITEM_DESIGN.md §8.2): the shared sheet, with this store's reasons ----
+const voiding = ref<OrderItem | null>(null)
+const reasons = computed(() => props.presets?.void_reasons?.length ? presetList(props.presets, 'void_reasons') : undefined)
+function startVoid(it: OrderItem) { voiding.value = it }
+function voided(b: Bill) { voiding.value = null; sel.value = null; emit('update', b) }
 
 // ---- payment ----
 const paying = ref(props.payFirst || !props.phone)
@@ -186,7 +178,8 @@ const done = ref(false)
           <template v-for="it in r.items" :key="it.id">
             <button class="bi" :class="{ on: sel === it.id, void: it.prep_status === 'cancelled' }" :disabled="it.prep_status === 'cancelled' || bill.status !== 'open'"
               data-testid="dd-bill-item" @click="sel = sel === it.id ? null : it.id">
-              <span class="nm">{{ it.name }}<small v-if="it.prep_status === 'cancelled' && it.void_reason">{{ t('dd.voided', { r: it.void_reason }) }}</small>
+              <span class="nm">{{ it.name }}<small v-if="it.prep_status === 'cancelled' && voidsOf(bill.order, it).length" data-testid="dd-void-note">{{ voidsOf(bill.order, it).map(v => voidNote(v)).join(' / ') }}</small>
+                <small v-else-if="it.prep_status === 'cancelled' && it.void_reason">{{ t('dd.voided', { r: it.void_reason }) }}</small>
                 <small v-else-if="detail(it)">{{ detail(it) }}</small></span>
               <span class="q">×{{ it.qty }}</span>
               <span><span class="dd-st" :class="st(it)[0]">{{ st(it)[1] }}</span><span v-if="it.rush_at && !it.served_at && it.prep_status !== 'cancelled'" class="dd-st rush">{{ t('dd.st.rush') }}</span></span>
@@ -230,33 +223,8 @@ const done = ref(false)
       </section>
     </div>
 
-    <!-- void: how many and why -->
-    <div v-if="voiding.item" class="dd-mask" :class="{ bottom: phone }" @click.self="voiding.item = null">
-      <div class="dd-modal" data-testid="dd-void-sheet">
-        <div class="mh"><h3>{{ t('dd.void_title', { name: voiding.item.name }) }}</h3><span class="muted">{{ m(voiding.item.unit_price * voiding.qty) }}</span>
-          <button class="x" @click="voiding.item = null">✕</button></div>
-        <div class="mb">
-          <template v-if="voiding.item.qty > 1">
-            <div class="dd-lbl">{{ t('dd.void_qty') }}</div>
-            <span class="dd-stp"><button @click="voiding.qty = Math.max(1, voiding.qty - 1)">−</button><b>{{ voiding.qty }}</b>
-              <button @click="voiding.qty = Math.min(voiding.item!.qty, voiding.qty + 1)">＋</button></span>
-          </template>
-          <div class="dd-lbl" style="margin-top:14px">{{ t('dd.reason') }} <span class="req">{{ t('dd.required') }}</span></div>
-          <div class="dd-chs">
-            <button v-for="x in reasons" :key="x" class="dd-ch" :class="{ on: !voiding.writing && voiding.reason === x }" data-testid="dd-reason" @click="voiding.reason = x; voiding.writing = false">{{ x }}</button>
-            <button v-if="!voiding.writing" class="dd-ch add" @click="voiding.writing = true">{{ t('dd.write') }}</button>
-            <span v-else class="dd-write"><input v-model="voiding.text" maxlength="100" :placeholder="t('dd.reason')" /></span>
-          </div>
-          <div class="muted small" style="margin-top:12px">{{ t('dd.void_note') }}</div>
-        </div>
-        <div class="mf"><button class="dd-big ghost" @click="voiding.item = null">{{ t('dd.cancel') }}</button>
-          <button class="dd-big" style="flex:2" :disabled="voiding.busy || !(voiding.writing ? voiding.text.trim() : voiding.reason)" data-testid="dd-void-ok" @click="confirmVoid">{{ t('dd.void_ok') }}</button></div>
-      </div>
-    </div>
-
-    <AdjustSheet v-if="adjOpen" :currency="currency" :reasons="payOpts?.reasons" :initial="adjust" :bottom="phone" :preview="previewAdj"
-      @close="adjOpen = false" @apply="setAdjust" />
-    <ApproveDialog v-if="approving" :branch-id="o.branch_id" perm="checkout.discount" :what="t('ck.approve_what')" @approved="approved" @close="approving = false" />
+    <!-- void: how many, why, and what the bill comes to -->
+    <VoidSheet v-if="voiding" :item="voiding" :branch-id="session.branchId!" :currency="currency" bill :reasons="reasons" :bottom="phone" @done="voided" @close="voiding = null" />
 
     <!-- closed -->
     <div v-if="done" class="dd-mask">

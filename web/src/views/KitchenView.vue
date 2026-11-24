@@ -9,6 +9,28 @@ import { session } from '../session'
 import type { Order, OrderItem, Station } from '../types'
 import { timerClass } from '../progress'
 import { addonNo, addons } from '../addon'
+import '../voids'
+
+// Voids (docs/VOID_ITEM_DESIGN.md §8.3): a dish already started stays on top
+// in red until a cook taps "got it"; one not started shows struck for a minute.
+const unacked = computed(() => orders.value.flatMap(o => (o.voids ?? []).filter(v => v.needs_ack && !v.ack_at).map(v => ({ o, v }))))
+const hasUnacked = (o: Order) => (o.voids ?? []).some(v => v.needs_ack && !v.ack_at)
+const recentVoids = (o: Order) => { void now.value; return (o.voids ?? []).filter(v => !v.needs_ack && Date.now() - new Date(v.at).getTime() < 60000) }
+const ack = (id: number) => run(() => post(`/kitchen/voids/${id}/ack`))
+let knownVoids = new Set<number>()
+let firstLoad = true
+function voidBeep() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    ;[660, 440].forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain()
+      o.frequency.value = f; o.connect(g); g.connect(ctx.destination)
+      g.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.3)
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.3 + 0.4)
+      o.start(ctx.currentTime + i * 0.3); o.stop(ctx.currentTime + i * 0.3 + 0.45)
+    })
+  } catch { /* audio not available */ }
+}
 
 const bid = session.branchId!
 const orders = ref<Order[]>([])
@@ -38,6 +60,11 @@ const { online, lastSync, refreshNow } = useLive(() => `/merchant/branches/${bid
   orders.value = b.orders; stations.value = s.stations
   if (b.target_minutes) target.value = b.target_minutes
   if (typeof station.value === 'number' && !s.stations.some(x => x.id === station.value)) setStation('all')
+  const ids = new Set(unacked.value.map(x => x.v.id))
+  if (!firstLoad && [...ids].some(id => !knownVoids.has(id))) voidBeep()
+  knownVoids = ids; firstLoad = false
+  // a minute after a void not started, its struck line goes
+  if (orders.value.some(o => recentVoids(o).length)) setTimeout(() => (now.value = Date.now()), 61000)
 })
 
 // A table's bill stays open for the whole meal: dishes already at the table drop off the screen.
@@ -103,6 +130,14 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
     <div v-if="!online" class="banner warn" style="margin-bottom:12px">{{ t('offline') }}</div>
     <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
 
+    <div v-if="unacked.length" class="stack" style="margin-bottom:14px" data-testid="k-voids">
+      <div v-for="x in unacked" :key="x.v.id" class="kvoidalert" data-testid="k-void-alert">
+        <span class="grow"><b>{{ t('vd.k.alert', { n: x.v.qty, name: x.v.name, r: x.v.reason }) }}</b>
+          <span class="small"> · {{ dine(x.o) ? t('table') + ' ' + x.o.table_name : x.o.public_no }} · {{ whenText(x.v.at, x.o.timezone).split(' ').pop() }}</span></span>
+        <button class="btn" data-testid="k-void-ack" @click="ack(x.v.id)">{{ t('vd.k.ack') }}</button>
+      </div>
+    </div>
+
     <div class="cols" v-if="cancelled.length" style="margin-bottom:14px">
       <div v-for="o in cancelled" :key="o.id" class="card" style="border-color:var(--bad);background:var(--bad-soft)">
         <h2>{{ o.public_no }}</h2>
@@ -122,7 +157,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
       <div v-if="unassigned > 0" class="banner warn" style="margin-bottom:12px">{{ t('unassigned_warn', { n: unassigned }) }}</div>
       <div v-if="shown.length === 0" class="card muted">{{ t('kitchen_empty') }}</div>
       <div class="cols">
-        <div v-for="o in shown" :key="o.id" class="card stack" :class="{ kfresh: freshAdd(o) }">
+        <div v-for="o in shown" :key="o.id" class="card stack" :class="{ kfresh: freshAdd(o), kvoid: hasUnacked(o) }">
           <div class="row between">
             <h2><template v-if="dine(o)">{{ t('table') }} {{ o.table_name }}<span v-for="g in o.table_tags ?? []" :key="g" class="tag warn" style="margin-inline-start:4px">{{ g }}</span></template><template v-else>{{ o.public_no }}</template>
               <span class="tag brand" style="margin-inline-start:4px">{{ t(o.service_type) }}</span>
@@ -153,6 +188,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
               <button v-else class="btn small" @click="itemAction(it, 'undo')">{{ t('undo') }}</button>
             </template>
           </div>
+          <div v-for="v in recentVoids(o)" :key="'v' + v.id" class="kline" data-testid="k-voided"><span class="grow kname strike">{{ v.qty }} × {{ v.name }}</span><span class="tag bad">{{ t('vd.k.voided') }}</span></div>
         </div>
       </div>
     </template>
@@ -226,6 +262,10 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
 </template>
 
 <style scoped>
+.kvoidalert { display: flex; align-items: center; gap: 10px; background: #fde8e6; color: #9b1c12; border: 2px solid #d92d20; border-radius: 10px; padding: 10px 12px; font-size: 16px; }
+.kvoidalert .btn { background: #d92d20; color: #fff; border-color: #d92d20; min-height: 44px; }
+.kvoid { border: 2px solid #d92d20 !important; }
+
 .kfresh { border: 2px solid #f59e0b; }
 .kaddtag { background: #fff1e0; color: #b45309; border-color: #f5c48a; }
 .kadd { color: #b45309; font-weight: 600; }

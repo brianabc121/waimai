@@ -1,0 +1,126 @@
+<script setup lang="ts">
+// Refund by dish once the customer has the order (docs/VOID_ITEM_DESIGN.md
+// §7): pick dishes, the amount follows the void rules, the money is given
+// back outside the system and recorded here.
+import { computed, reactive, ref, watch } from 'vue'
+import { post } from '../api'
+import { money, t, toMinor } from '../i18n'
+import { can } from '../session'
+import type { Order, RefundQuote } from '../types'
+import { customerReasons, kindOf, splitList, voidErr } from '../voids'
+import ApproveDialog from './ApproveDialog.vue'
+
+const props = defineProps<{ order: Order; branchId: number }>()
+const emit = defineEmits<{ (e: 'done', o: Order, amount: number): void; (e: 'close'): void }>()
+const m = (v: number) => money(v, props.order.currency)
+
+// what each line can still be refunded
+const refunded = computed(() => {
+  const n = new Map<number, number>()
+  for (const r of props.order.refunds ?? []) for (const l of r.lines) n.set(l.item_id, (n.get(l.item_id) ?? 0) + l.qty)
+  return n
+})
+const lines = computed(() => props.order.items.filter(i => i.prep_status !== 'cancelled')
+  .map(i => ({ it: i, left: i.qty - (refunded.value.get(i.id) ?? 0) })).filter(l => l.left > 0))
+const qty = reactive<Record<number, number>>({})
+const picked = computed(() => lines.value.filter(l => (qty[l.it.id] ?? 0) > 0).map(l => ({ item_id: l.it.id, qty: qty[l.it.id] })))
+
+const s = reactive({ reason: '', writing: false, text: '', kind: 'store' as 'store' | 'customer', method: '', amount: '', busy: false })
+const methods = splitList('vd.r.methods')
+s.method = methods[0] ?? ''
+const reasons = [...customerReasons(), ...splitList('vd.reasons.store')]
+const reason = computed(() => s.writing ? s.text.trim() : s.reason)
+const quote = ref<RefundQuote | null>(null)
+const error = ref('')
+const approving = ref(false)
+
+let seq = 0
+watch([picked, () => s.kind], async () => {
+  const n = ++seq
+  if (!picked.value.length) { quote.value = null; return }
+  try {
+    const r = await post<{ quote: RefundQuote }>(`/merchant/orders/${props.order.id}/refunds`, { lines: picked.value, reason_kind: s.kind, dry: true })
+    if (n === seq) { quote.value = r.quote; s.amount = ''; error.value = '' }
+  } catch (e) { if (n === seq) { quote.value = null; error.value = voidErr(e) } }
+}, { deep: true })
+
+const amount = computed(() => s.amount ? toMinor(s.amount) : quote.value?.suggested ?? 0)
+const tooMuch = computed(() => !!quote.value && amount.value > quote.value.suggested)
+function tap(r: string) { s.reason = r; s.writing = false; s.kind = kindOf(r) }
+
+async function go(headers?: Record<string, string>) {
+  if (!quote.value || !reason.value || tooMuch.value || amount.value <= 0) return
+  if (!headers && !can('order.aftersale')) { approving.value = true; return }
+  s.busy = true; error.value = ''
+  try {
+    const r = await post<{ order: Order }>(`/merchant/orders/${props.order.id}/refunds`,
+      { lines: picked.value, amount: amount.value, method: s.method, reason: reason.value, reason_kind: s.kind }, headers)
+    emit('done', r.order, amount.value)
+  } catch (e) { error.value = voidErr(e) }
+  s.busy = false
+}
+</script>
+
+<template>
+  <div class="vmask" @click.self="emit('close')">
+    <div class="vsheet" data-testid="refund-sheet">
+      <div class="vh"><h3>{{ t('vd.r.title', { no: order.public_no }) }}</h3><button class="x" @click="emit('close')">✕</button></div>
+      <div class="vb">
+        <div class="small muted">{{ t('vd.r.hint') }}</div>
+        <div class="lbl">{{ t('vd.r.pick') }}</div>
+        <div v-for="l in lines" :key="l.it.id" class="rl" data-testid="refund-line">
+          <span class="grow">{{ l.it.name }} <span class="muted small">×{{ l.left }} · {{ m(l.it.unit_price) }}</span></span>
+          <span class="stp"><button :disabled="!qty[l.it.id]" @click="qty[l.it.id] = (qty[l.it.id] ?? 0) - 1">−</button><b>{{ qty[l.it.id] ?? 0 }}</b>
+            <button :disabled="(qty[l.it.id] ?? 0) >= l.left" data-testid="refund-more" @click="qty[l.it.id] = (qty[l.it.id] ?? 0) + 1">＋</button></span>
+        </div>
+        <div class="lbl">{{ t('vd.reason') }} <span class="req">{{ t('vd.required') }}</span></div>
+        <div class="chs">
+          <button v-for="x in reasons" :key="x" class="ch" :class="{ on: !s.writing && s.reason === x }" data-testid="refund-reason" @click="tap(x)">{{ x }}</button>
+          <button v-if="!s.writing" class="ch add" @click="s.writing = true">{{ t('vd.write') }}</button>
+          <input v-else v-model="s.text" class="write" maxlength="100" :placeholder="t('vd.reason')" />
+        </div>
+        <div class="kinds"><button v-for="k in (['store', 'customer'] as const)" :key="k" class="kd" :class="{ on: s.kind === k }" @click="s.kind = k">{{ t('vd.kind.' + k) }}</button>
+          <span class="small muted">{{ t('vd.kind_hint.' + s.kind) }}</span></div>
+        <div class="lbl">{{ t('vd.r.method') }}</div>
+        <div class="chs"><button v-for="x in methods" :key="x" class="ch" :class="{ on: s.method === x }" @click="s.method = x">{{ x }}</button></div>
+        <template v-if="quote">
+          <label class="field" style="margin:0"><span>{{ t('vd.r.amount') }} · {{ t('vd.r.suggested', { s: m(quote.suggested) }) }}</span>
+            <input v-model="s.amount" inputmode="decimal" :placeholder="(quote.suggested / 100).toFixed(2)" data-testid="refund-amount" /></label>
+        </template>
+        <div v-if="error" class="banner bad small">{{ error }}</div>
+      </div>
+      <div class="vf">
+        <button class="btn" @click="emit('close')">{{ t('vd.cancel') }}</button>
+        <button class="btn primary grow" :disabled="s.busy || !quote || !reason || tooMuch || amount <= 0" data-testid="refund-ok" @click="go()">
+          {{ !can('order.aftersale') ? '🔒 ' : '' }}{{ t('vd.r.ok', { s: m(amount) }) }}</button>
+      </div>
+    </div>
+    <ApproveDialog v-if="approving" :branch-id="branchId" perm="order.aftersale" :what="t('vd.r.btn')" @approved="tok => { approving = false; go({ 'X-Approval': tok }) }" @close="approving = false" />
+  </div>
+</template>
+
+<style scoped>
+.vmask { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 30; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.vsheet { background: var(--card, #fff); border-radius: 14px; width: min(480px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden; }
+.vh { display: flex; align-items: center; gap: 8px; padding: 14px 16px 8px; }
+.vh h3 { margin: 0; font-size: 17px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.x { background: none; border: 0; font-size: 18px; cursor: pointer; color: var(--muted); }
+.vb { padding: 0 16px 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.lbl { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.req { color: var(--bad, #c0392b); font-size: 12px; }
+.rl { display: flex; align-items: center; gap: 10px; }
+.grow { flex: 1; min-width: 0; }
+.stp { display: inline-flex; align-items: center; gap: 10px; }
+.stp button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font-size: 18px; cursor: pointer; }
+.stp b { min-width: 18px; text-align: center; }
+.chs { display: flex; flex-wrap: wrap; gap: 8px; }
+.ch { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 7px 12px; cursor: pointer; font-size: 14px; }
+.ch.on { border-color: var(--brand); background: var(--brand-soft); box-shadow: 0 0 0 1px var(--brand); }
+.ch.add { border-style: dashed; color: var(--muted); }
+.write { flex: 1 1 160px; min-width: 0; }
+.kinds { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.kd { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; }
+.kd.on { border-color: var(--brand); color: var(--brand); font-weight: 600; }
+.vf { display: flex; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+.vf .btn { min-height: 44px; }
+</style>
