@@ -29,7 +29,8 @@
   .cols { display: grid; grid-template-columns: 1fr 380px; gap: 16px; min-height: 0; flex: 1; }
   .box { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 18px; }
   .box h3 { margin: 0 0 8px; font-size: 16px; }
-  .seghead { display: flex; align-items: center; gap: 8px; margin: 12px 0 2px; padding: 6px 10px; border-radius: 8px; background: #f4f5f6; font-size: 13px; color: #4b5563; font-weight: 600; }
+  .seghead { display: flex; align-items: center; gap: 6px; margin: 12px 0 2px; padding: 7px 10px; border-radius: 6px; background: #f3e7d4; font-size: 13px; color: #7b6657; font-weight: 600; }
+  .seghead b { color: #3b1f14; }
   .seghead.add { background: #fff1e2; color: #a2510a; }
   .seghead.pend { background: #fff7e0; color: #8a5a00; border: 1px dashed #e8b64c; }
   .seghead .r { margin-inline-start: auto; font-weight: 500; }
@@ -79,6 +80,8 @@
   .dd div { padding: 8px 12px; font-size: 14px; display: flex; gap: 10px; } .dd div.on { background: #fbe7b3; } .dd small { margin-inline-start: auto; color: var(--muted); }
   .wbtn { background: var(--red); color: #fff; border-radius: 12px; text-align: center; padding: 15px 0; font-size: 18px; font-weight: 800; }
   .wbtn.ghost { background: #fff; color: var(--red); border: 1.5px solid var(--red); padding: 10px 0; font-size: 15px; }
+  .chipw { border: 1.5px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 600; color: var(--ink); }
+  .chipw.on { background: #fbe7b3; border-color: #d9a640; color: #7a4a0a; } .chipw.dash { border-style: dashed; color: var(--muted); }
   .lockbar { background: #fff4e0; border: 1px solid #efcf8f; color: #7a4a0a; border-radius: 10px; padding: 9px 12px; font-size: 13px; }
 
   /* 弹窗 */
@@ -122,6 +125,18 @@
   .stp { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 8px; }
 
   /* 后厨 / 骑手 */
+  .ktabs { display: inline-flex; background: #eceef0; border-radius: 999px; padding: 4px; } .ktabs span { padding: 7px 16px; border-radius: 999px; font-weight: 700; font-size: 15px; } .ktabs span.on { background: #fff; color: #c2410c; }
+  .kbtn { border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 13px; } .kbtn.on { background: #c2410c; color: #fff; border-color: #c2410c; }
+  .kcols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; }
+  .kcard { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .kcard.hot { border: 2px solid #f08a24; box-shadow: 0 0 0 3px rgba(240,138,36,.18); }
+  .kh2 { display: flex; align-items: center; gap: 6px; font-size: 18px; }
+  .tg { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 8px; background: #eceef0; color: #4b5563; }
+  .tg.brand { background: #ffe4d6; color: #c2410c; } .tg.org { background: #f08a24; color: #fff; } .tg.warn { background: #fde9cf; color: #b26a00; } .tg.bad { background: #fde2df; color: #b42318; margin-inline-end: 4px; }
+  .kl { display: flex; align-items: center; gap: 6px; padding: 7px 0; border-top: 1px solid #eef0f2; }
+  .kl.done .kn { color: #9ca3af; } .kl.new { background: #fff7ed; margin: 0 -8px; padding: 7px 8px; border-radius: 8px; border-top-color: transparent; }
+  .kl .g { flex: 1; min-width: 0; } .kn { font-size: 16px; font-weight: 700; } .sm { font-size: 12.5px; } .mut { color: #6b7280; font-weight: 400; } .kr { color: #b26a00; font-weight: 700; }
+  .kb { border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 600; background: #fff; } .kb.ok { background: #1f8a4c; color: #fff; border-color: #1f8a4c; }
   .kds { background: #111418; color: #e8eaed; flex: 1; padding: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-content: start; }
   .kc { background: #1d2228; border-radius: 12px; overflow: hidden; border: 2px solid #2c333b; }
   .kc.hot { border-color: #f08a24; box-shadow: 0 0 0 3px rgba(240,138,36,.25); }
@@ -148,14 +163,14 @@
     <div class="cols">
       <div class="box" style="overflow:hidden">
         <h3>菜品 <span style="font-weight:500;color:#6b7280;font-size:13px">原单 + 加单 1 次</span></h3>
-        <div class="seghead">原单 · 12:41 · 顾客下单<span class="r">3 份 · ₱360</span></div>
+        <div class="seghead"><b>原单</b> 12:41 · 顾客下单<span class="r">3 份 · ₱360</span></div>
         <div class="ln"><span class="q">×1</span>海南鸡饭（大）<span class="p">₱199</span></div>
         <div class="ln"><span class="q">×1</span>干炒牛河 <small>少油</small><span class="p">₱126</span></div>
         <div class="ln"><span class="q">×1</span>冻柠茶 <small>少冰</small><span class="p">₱35</span></div>
-        <div class="seghead add">加单 1 · 12:55 · 店员 小林（客户微信）<span class="r">2 份 · ₱205</span></div>
+        <div class="seghead add"><b>加单 1</b> 12:55 · 店员 小林 · 加急<span class="r">2 份 · ₱205</span></div>
         <div class="ln"><span class="q">×1</span>珍珠奶茶 <small>少糖 · 去冰</small><span class="st" style="background:#fde9cf;color:#c2650a">制作中</span><span class="p">₱85</span></div>
         <div class="ln"><span class="q">×1</span>盐酥鸡<span class="st" style="background:#fde9cf;color:#c2650a">制作中</span><span class="p">₱120</span></div>
-        <div class="seghead pend">顾客加菜 · 13:02 · 等你确认（还剩 4:12）<span class="r">1 份 · +₱45</span></div>
+        <div class="seghead pend"><b>加单 2</b> 13:02 · 顾客加菜 · 等你确认（还剩 4:12）<span class="r">1 份 · +₱45</span></div>
         <div class="ln" style="background:#fffbef"><span class="q">×1</span>卤蛋<span class="p">₱45</span></div>
         <div style="display:flex;gap:10px;padding:8px 10px 4px"><span class="btn green" style="padding:7px 16px">确认加菜</span><span class="btn" style="padding:7px 16px">拒绝…</span><span class="hint" style="margin:auto 0">确认后金额变成 ₱599</span></div>
         <div style="margin-top:10px">
@@ -181,13 +196,13 @@
         </div>
         <div class="box" style="font-size:13px;color:#4b5563;line-height:1.7">
           <h3>操作记录</h3>
-          12:41 顾客下单 · 12:42 小林 接单<br>12:52 打包完成 2 袋 · 12:53 派给 王师傅<br><b style="color:#a2510a">12:55 小林 加单 2 份 +₱175，退回“等菜”</b><br><b style="color:#8a5a00">13:02 顾客加菜 1 份，等确认</b>
+          12:41 顾客下单 · 12:42 小林 接单<br>12:52 打包完成 2 袋 · 12:53 派给 王师傅<br><b style="color:#a2510a">12:55 小林 加单 2 份 +₱175（加急），退回“等菜”</b><br><b style="color:#8a5a00">13:02 顾客加菜 1 份，等确认</b>
         </div>
       </div>
     </div>
   </div>
   <div class="anno" data-n="1" style="left:1040px;top:670px">截止前一直有“＋加单”，下面一行写清楚能加到什么时候、加了会怎样</div>
-  <div class="anno" data-n="2" style="left:330px;top:720px">菜品按“原单 / 加单 N”分段，写时间和谁加的；和堂食的“第 N 轮”同一个组件</div>
+  <div class="anno" data-n="2" style="left:330px;top:720px">分段抬头和堂食账单一样：第几批、时间、谁加的、整轮要求</div>
   <div class="anno" data-n="3" style="left:620px;top:720px">顾客自己加的要确认，5 分钟不处理自动失效</div>
   <div class="anno" data-n="4" style="left:330px;top:800px">满减按总额重算只升不降；配送费不另收；骑手收新总额</div>
 </div>
@@ -209,7 +224,7 @@
         <div class="trow lock"><span>A1</span><span>海南鸡饭（大）</span><span>1</span><span>₱199</span><span>₱199</span><span></span></div>
         <div class="trow lock"><span>B3</span><span>干炒牛河</span><span>1</span><span>₱126</span><span>₱126</span><span>少油</span></div>
         <div class="trow lock"><span>D2</span><span>冻柠茶</span><span>1</span><span>₱35</span><span>₱35</span><span>少冰</span></div>
-        <div class="rhead new">＋ 这次加单<span class="r">2 份 · ₱205</span></div>
+        <div class="rhead new">＋ 加单 1（这次）<span class="r">2 份 · ₱205</span></div>
         <div class="trow"><span><b>C3</b></span><span>珍珠奶茶<span class="tag">口味：少糖 · 去冰</span></span><span class="qbox"><i>−</i>1<i>＋</i></span><span>₱85</span><span><b>₱85</b></span><span>少糖 去冰 ▾</span></div>
         <div class="trow"><span><b>B7</b></span><span>盐酥鸡</span><span class="qbox"><i>−</i>1<i>＋</i></span><span>₱120</span><span><b>₱120</b></span><span style="color:#a8968a">选口味 ▾</span></div>
         <div style="padding:30px;text-align:center;color:#a8968a">在右边“选择商品”里输编号或菜名，回车加入。原单的菜不能改。</div>
@@ -229,7 +244,8 @@
         <div class="frow"><span>付款</span><div class="ro">货到付款 · 骑手收 ₱554</div></div>
         <div class="frow" style="margin-top:6px"><span>选择商品</span><div class="inp on">盐</div></div>
         <div class="dd"><div class="on"><b>B7</b>盐酥鸡<small>₱120</small></div><div><b>B8</b>椒盐排骨<small>₱160</small></div><div><b>S2</b>盐焗鸡翅<small>剩 2</small></div></div>
-        <div class="frow"><span>加单备注</span><div class="inp">顾客和后厨都看得到（选填）</div></div>
+        <div class="frow" style="align-items:start"><span>整轮要求</span><div style="display:flex;flex-wrap:wrap;gap:6px"><span class="chipw on">加急</span><span class="chipw">分开装</span><span class="chipw">全部少辣</span><span class="chipw">分小碗</span><span class="chipw dash">＋ 其他</span></div></div>
+        <div class="hint" style="margin:-4px 0 0 86px">和堂食“整轮要求”同一份预设，后厨看得到</div>
         <div class="frow"><span>店内备注</span><div class="inp">只有店员看得到（选填）</div></div>
         <div style="margin-top:auto;display:grid;gap:10px">
           <div class="wbtn">确认加单 · +₱175</div>
@@ -241,7 +257,7 @@
   <div class="anno" data-n="1" style="left:330px;top:470px">原单灰底上锁，只能看；有过加单的也列在这里</div>
   <div class="anno" data-n="2" style="left:620px;top:470px">新加的菜和代客下单一样：输编号回车，规格、口味模板照旧</div>
   <div class="anno" data-n="3" style="left:330px;top:560px">底栏改成“前后对比”：原来多少、加后多少、多收多少</div>
-  <div class="anno" data-n="4" style="left:1010px;top:680px">顾客、地址、配送费只读</div>
+  <div class="anno" data-n="4" style="left:620px;top:560px">顾客、地址、配送费只读</div>
 </div>
 </section>
 
@@ -267,7 +283,7 @@ B7 盐酥鸡 ×1 ₱120
     <div style="text-align:center;font-weight:700">马卡蒂小馆 · 后厨</div>
     <div class="big">加单 1</div>
     <div>原单 <b>#A1086</b> · 外卖 · Grace</div>
-    <div>12:55 · 店员 小林</div>
+    <div>12:55 · 店员 小林 · <b>加急</b></div>
     <hr>
     <div><b>1 × 珍珠奶茶</b></div><div>　· 少糖 · 去冰</div>
     <div><b>1 × 盐酥鸡</b></div>
@@ -405,34 +421,32 @@ B7 盐酥鸡 ×1 ₱120
 <!-- ======================= S6 后厨、打包、骑手 + 和堂食统一 ======================= -->
 <section id="s6">
 <div class="pc ok" style="flex-direction:column">
-  <div style="height:52px;background:#1c1f24;color:#fff;display:flex;align-items:center;gap:14px;padding:0 18px;flex:none"><b style="font-size:18px">后厨屏 · 热厨</b><span style="color:#9aa4ae">马卡蒂小馆</span><span style="margin-inline-start:auto;background:#5a3307;color:#ffcf8a;border-radius:999px;padding:4px 12px;font-weight:700">2 单有加单</span></div>
-  <div class="kds">
-    <div class="kc hot">
-      <div class="kh">#A1086 <small>外卖 · Grace</small><span class="tm">14 分</span></div>
-      <div class="ks">原单 · 12:41</div>
-      <div class="ki done">1 海南鸡饭（大）<span class="b">已好</span></div>
-      <div class="ki done">1 干炒牛河 <small>少油</small><span class="b">已好</span></div>
-      <div class="ks add">＋ 加单 1 · 12:55 · 和原单一起出</div>
-      <div class="ki">1 珍珠奶茶 <small>少糖 · 去冰</small></div>
-      <div class="ki">1 盐酥鸡</div>
+  <div style="display:flex;flex:1;min-height:0">
+  <div class="nav" style="flex:none"><div class="brand">马卡蒂小馆</div><div class="role"><b style="background:#eceef0;color:#4b5563">员工</b>后厨 阿明</div><a class="on">后厨</a><a>菜单</a><a>我的工作台</a></div>
+  <div class="content" style="gap:10px">
+    <div style="display:flex;align-items:center;gap:10px"><div class="ktabs"><span class="on">制作 · 3</span><span>打包 · 1</span><span>上菜 · 0</span></div><span style="margin-inline-start:auto;color:#6b7280;font-size:13px">同步于 13:02:20</span></div>
+    <div style="display:flex;gap:6px"><span class="kbtn">全部</span><span class="kbtn on">热厨 / Hot kitchen · 3</span><span class="kbtn">饮品台 / Drinks · 1</span><span class="kbtn">未分台 · 0</span></div>
+    <div class="kcols">
+      <div class="kcard hot">
+        <div class="kh2"><b>#A1086</b><span class="tg brand">外卖</span><span class="tg org">加单</span><span class="tg" style="margin-inline-start:auto">14 分</span></div>
+        <div class="kl done"><div class="g"><div class="kn">1 × 海南鸡饭（大）</div></div><span class="kb">撤销</span></div>
+        <div class="kl done"><div class="g"><div class="kn">1 × 干炒牛河</div><div class="sm">少油</div></div><span class="kb">撤销</span></div>
+        <div class="kl new"><div class="g"><div class="kn">1 × 珍珠奶茶<span class="sm mut"> · 加单 1</span></div><div class="sm kr">※ 加急</div><div class="sm">少糖 · 去冰</div></div><span class="kb">开始</span><span class="kb ok">做好</span></div>
+        <div class="kl new"><div class="g"><div class="kn">1 × 盐酥鸡<span class="sm mut"> · 加单 1</span></div><div class="sm kr">※ 加急</div></div><span class="kb">开始</span><span class="kb ok">做好</span></div>
+      </div>
+      <div class="kcard">
+        <div class="kh2"><b>桌 A3</b><span class="tg warn">有小孩</span><span class="tg brand">堂食</span><span class="sm mut" style="margin-inline-start:auto">D1124-007</span></div>
+        <div class="kl done"><div class="g"><div class="kn">1 × 小炒黄牛肉<span class="sm mut"> · 第 1 轮</span></div><div class="sm">大份</div></div><span class="kb">撤销</span></div>
+        <div class="kl"><div class="g"><div class="kn"><span class="tg bad">催菜</span>1 × 酸菜鱼<span class="sm mut"> · 第 2 轮</span></div><div class="sm kr">※ 先上饮料</div><div class="sm">微辣</div></div><span class="kb ok">做好</span></div>
+        <div class="kl"><div class="g"><div class="kn">1 × 扬州炒饭<span class="sm mut"> · 第 3 轮</span></div></div><span class="kb">开始</span><span class="kb ok">做好</span></div>
+      </div>
+      <div class="kcard">
+        <div class="kh2"><b>#A1091</b><span class="tg brand">自取</span><span class="tg" style="margin-inline-start:auto">6 分</span></div>
+        <div class="kl"><div class="g"><div class="kn">2 × 扬州炒饭</div></div><span class="kb">开始</span><span class="kb ok">做好</span></div>
+        <div class="kl"><div class="g"><div class="kn">1 × 椒盐排骨</div></div><span class="kb">开始</span><span class="kb ok">做好</span></div>
+      </div>
     </div>
-    <div class="kc hot">
-      <div class="kh">A3 桌 <small>堂食 · 3 人</small><span class="tm">42 分</span></div>
-      <div class="ks">第 1 轮 · 18:02 · 店员 阿玲</div>
-      <div class="ki done">1 小炒黄牛肉 <small>大份</small><span class="b">已上</span></div>
-      <div class="ks">第 2 轮 · 18:20 · 顾客扫码</div>
-      <div class="ki done">1 蒜蓉菜心<span class="b">已好</span></div>
-      <div class="ks add">＋ 第 3 轮 · 18:44 · 店员 阿玲 · 先上饮料</div>
-      <div class="ki">1 酸菜鱼 <small>微辣</small></div>
-    </div>
-    <div class="kc">
-      <div class="kh">#A1091 <small>自取 · 陈小姐</small><span class="tm">6 分</span></div>
-      <div class="ks">原单 · 12:58</div>
-      <div class="ki">2 扬州炒饭</div>
-      <div class="ki">1 椒盐排骨</div>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 16px 16px;background:#111418">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:auto">
     <div class="box">
       <h3>打包台 · #A1086 <span class="chip org">加单后重新打包</span></h3>
       <div class="callout org">已打包 2 袋。加单 1 有 <b>2 份</b>要加装：珍珠奶茶、盐酥鸡（还在做）。</div>
@@ -442,13 +456,14 @@ B7 盐酥鸡 ×1 ₱120
     <div class="box">
       <h3>同一套“轮次”显示</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
-        <div><div class="seghead" style="margin-top:0">原单 · 12:41 · 顾客</div><div class="seghead add">加单 1 · 12:55 · 店员 小林</div><div class="seghead pend">顾客加菜 · 等确认</div><div class="hint">外卖、自取：截止到骑手取餐 / 顾客取走</div></div>
-        <div><div class="seghead" style="margin-top:0">第 1 轮 · 18:02 · 店员</div><div class="seghead">第 2 轮 · 18:20 · 扫码</div><div class="seghead add">第 3 轮 · 18:44 · 店员</div><div class="hint">堂食：截止到结账关台（PR #103）</div></div>
+        <div><div class="seghead" style="margin-top:0"><b>原单</b> 12:41 · 顾客下单</div><div class="seghead add"><b>加单 1</b> 12:55 · 店员 小林 · 加急</div><div class="seghead pend"><b>加单 2</b> 13:02 · 顾客加菜 · 等确认</div><div class="hint">外卖、自取：截止到骑手取餐 / 顾客取走</div></div>
+        <div><div class="seghead" style="margin-top:0"><b>第 1 轮</b> 18:02 · 店员 阿玲 · 先上饮料</div><div class="seghead"><b>第 2 轮</b> 18:20 · 顾客扫码</div><div class="seghead add"><b>第 3 轮</b> 18:44 · 店员 阿玲</div><div class="hint">堂食：截止到结账关台（PR #105 已上线）</div></div></div>
       </div>
     </div>
   </div>
-  <div class="anno" data-n="1" style="left:60px;top:470px">加单在原订单卡里另起一段，橙色“＋加单”，几分钟内闪烁</div>
-  <div class="anno" data-n="2" style="left:520px;top:470px">堂食的新一轮和外卖加单在后厨长一样</div>
+  </div></div>
+  <div class="anno" data-n="1" style="left:250px;top:420px">和堂食现在的写法一样：菜后写“· 加单 1”，下面“※ 整轮要求”；卡片多一个“加单”标签，3 分钟内描橙边</div>
+  <div class="anno" data-n="2" style="left:780px;top:420px">堂食（PR #105 已上线的样子）：“· 第 N 轮”、整轮要求、催菜</div>
 </div>
 </section>
 
