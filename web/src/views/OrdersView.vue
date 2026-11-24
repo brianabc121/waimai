@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import KitchenNote from './KitchenNote.vue'
 import { computed, ref } from 'vue'
-import { ApiError, get, post } from '../api'
+import { ApiError, api, get, post } from '../api'
 import { both, has, minutesSince, money, reasonText, t, whenText } from '../i18n'
 import { useLive } from '../live'
 import { can, session } from '../session'
-import type { Order, RiderInfo } from '../types'
+import type { Adjust, Order, PayChoice, PayOptions, RiderInfo, Totals } from '../types'
+import AdjustSheet from './checkout/AdjustSheet.vue'
+import PayPicker from './checkout/PayPicker.vue'
+import { payText, pctText } from '../checkout'
 import { contactApps, contactName, contactPhone } from '../addresses'
 import './work/strings'
 import './translateStrings'
@@ -31,6 +34,55 @@ const textsPending = ref(0)
 void get<{ pending: number }>(`/merchant/branches/${session.branchId}/store-texts`).then(v => { textsPending.value = v.pending }, () => {})
 
 const bid = session.branchId!
+
+// The discount at checkout and how a paid order was paid (docs/CHECKOUT_DISCOUNT_DESIGN.md §5.4, §6.2).
+const payOpts = ref<PayOptions | null>(null)
+void get<PayOptions>(`/merchant/branches/${bid}/pay-options`).then(o => (payOpts.value = o)).catch(() => null)
+const adjFor = ref<Order | null>(null)
+const adjToken = ref('')
+const canAdjust = (o: Order) => o.service_type !== 'dine_in' && o.payment_status !== 'paid' && !!o.addon?.open && can('order.handle')
+function adjustOrder(o: Order) {
+  if (can('checkout.discount')) { adjToken.value = ''; adjFor.value = o; return }
+  askApproval('checkout.discount', t('ck.approve_what'), h => { adjToken.value = h['X-Approval']; adjFor.value = o })
+}
+const adjPreview = (a: Adjust) => post<Totals>(`/merchant/orders/${adjFor.value!.id}/adjust-preview`, a)
+const adjInitial = (o: Order): Adjust | null => o.totals.adj_percent_bp || o.totals.adj_mode
+  ? { percent_bp: o.totals.adj_percent_bp ?? 0, mode: o.totals.adj_mode ?? '', amount: o.totals.adj_mode === 'round' ? o.totals.round_off ?? 0 : o.totals.adj_mode === 'set_total' ? o.totals.total : 0, reason: o.adj_reason ?? '' }
+  : null
+async function saveAdjust(a: Adjust | null) {
+  const o = adjFor.value!
+  adjFor.value = null; error.value = ''
+  try {
+    await api('PUT', `/merchant/orders/${o.id}/adjust`, { expected_version: o.version, adjust: a ?? { percent_bp: 0, mode: '', amount: 0, reason: '' } },
+      adjToken.value ? { 'X-Approval': adjToken.value } : {})
+  } catch (e) {
+    error.value = e instanceof ApiError && e.code === 'VERSION_CONFLICT' ? t('conflict')
+      : e instanceof ApiError && e.code === 'APPROVAL_INVALID' ? t('ck.approval_used') : (e as Error).message
+  }
+  adjToken.value = ''
+  await refreshNow()
+}
+const adjText = (o: Order) => {
+  const x = o.totals, parts: string[] = []
+  if (x.adj_percent_bp) parts.push(pctText(x.adj_percent_bp))
+  if (x.adj_mode === 'round') parts.push(t('ck.round_off'))
+  if (x.adj_mode === 'set_total') parts.push(o.totals.total === 0 ? t('ck.free') : t('ck.adj_set'))
+  if (o.adj_reason) parts.push(o.adj_reason)
+  if (o.adj_by) parts.push(o.adj_approved_by ? t('ck.by_ok', { name: o.adj_by, boss: o.adj_approved_by }) : t('ck.by', { name: o.adj_by }))
+  return parts.join(' · ')
+}
+const payFor = ref<Order | null>(null)
+const payPick = ref<PayChoice>({ type: 'cash', channel_id: 0 })
+function recordPay(o: Order) {
+  payPick.value = { type: (o.pay_type || 'cash') as PayChoice['type'], channel_id: o.pay_channel_id ?? 0 }
+  payFor.value = o
+}
+async function savePay() {
+  const o = payFor.value!
+  payFor.value = null; error.value = ''
+  try { await api('PUT', `/merchant/orders/${o.id}/payment`, payPick.value) } catch (e) { error.value = (e as Error).message }
+  await refreshNow()
+}
 const scope = ref<'active' | 'history'>('active')
 const orders = ref<Order[]>([])
 const riders = ref<RiderInfo[]>([])
@@ -315,6 +367,14 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
               {{ batchTitle(b.seq) }} · {{ t('ao.src.customer') }} · {{ t('ao.st.' + b.status) }}<template v-if="b.reject_reason">（{{ b.reject_reason }}）</template></div>
           </div>
           <TotalsTable :totals="selected.totals" :currency="selected.currency" :delivery="selected.service_type === 'delivery'" :discounts="selected.discounts" />
+          <div v-if="selected.totals.adj_percent_bp || selected.totals.adj_mode" class="row between adjrow" data-testid="adj-row">
+            <span class="muted">{{ t('ck.adj') }}</span><span>{{ adjText(selected) }}</span></div>
+          <div v-if="selected.payment_status === 'paid' && selected.pay_type" class="row between" data-testid="pay-row">
+            <span class="muted">{{ t('ck.pay_type') }}</span><span>{{ payText(selected) }}</span></div>
+          <div v-if="canAdjust(selected) || (selected.payment_status === 'paid' && selected.service_type !== 'dine_in' && can('order.handle'))" class="row wrap" style="gap:8px">
+            <button v-if="canAdjust(selected)" class="btn small" data-testid="adj-edit" @click="adjustOrder(selected)">{{ t('ck.edit_adj') }}</button>
+            <button v-if="selected.payment_status === 'paid' && selected.service_type !== 'dine_in' && can('order.handle')" class="btn small" data-testid="pay-record" @click="recordPay(selected)">{{ t('ck.record_pay') }}</button>
+          </div>
 
           <div v-if="selected.delivery" class="row between">
             <span class="muted">{{ t('rider') }}</span>
@@ -361,11 +421,24 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
       </div>
       <div v-else-if="orders.length" class="detail card muted nopick">{{ t('pick_order') }}</div>
     </div>
+    <AdjustSheet v-if="adjFor" :currency="adjFor.currency" :reasons="payOpts?.reasons" :initial="adjInitial(adjFor)" :preview="adjPreview"
+      @close="adjFor = null" @apply="saveAdjust" />
+    <div v-if="payFor" class="drawer-mask" style="position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:40" @click="payFor = null"></div>
+    <div v-if="payFor" class="card stack paybox" data-testid="pay-dialog">
+      <h2 style="margin:0;font-size:17px">{{ t('ck.record_pay') }} · {{ payFor.public_no }}</h2>
+      <PayPicker v-model="payPick" :options="payOpts" />
+      <div class="row" style="justify-content:flex-end;gap:8px">
+        <button class="btn" @click="payFor = null">{{ t('ck.cancel') }}</button>
+        <button class="btn primary" :disabled="payPick.type === 'online' && !payPick.channel_id" data-testid="pay-save" @click="savePay">{{ t('ck.save') }}</button>
+      </div>
+    </div>
     <ApproveDialog v-if="approving" :branch-id="bid" :perm="approving.perm" :what="approving.what" @approved="approved" @close="approving = null" />
   </div>
 </template>
 
 <style scoped>
+.paybox { position: fixed; left: 50%; top: 16vh; transform: translateX(-50%); width: min(440px, calc(100vw - 32px)); z-index: 41; }
+.adjrow span:last-child { color: #8a5a12; text-align: end; }
 .cp-tag { cursor: pointer; border: 1px solid currentColor; }
 .desk { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 14px; align-items: start; }
 .list { display: flex; flex-direction: column; gap: 10px; }

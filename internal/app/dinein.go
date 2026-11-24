@@ -722,8 +722,18 @@ type CloseInput struct {
 	ExpectedManifest int    `json:"expected_manifest_version"`
 	AmountReceived   int64  `json:"amount_received"`
 	Note             string `json:"note"`
-	// PayMethod is how the guests paid (cash, card, a wallet), as the desk shows it.
+	// PayMethod is how the guests paid (cash, card, a wallet), as the desk
+	// shows it. Replaced by PayType and PayChannelID; kept for older desks.
 	PayMethod string `json:"pay_method"`
+	// PayType is cash, card or online; PayChannelID the online method.
+	PayType      string `json:"pay_type"`
+	PayChannelID int64  `json:"pay_channel_id"`
+	// Adjust is the discount at checkout, nil for none
+	// (docs/CHECKOUT_DISCOUNT_DESIGN.md §5); the caller checked who may give it.
+	Adjust *Adjust `json:"adjust"`
+	// ExpectedTotal is the amount to pay the cashier saw; another amount
+	// means the bill changed meanwhile.
+	ExpectedTotal *int64 `json:"expected_total"`
 }
 
 // CloseTable records the payment and ends the session. Afterwards the QR
@@ -759,7 +769,38 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 			return ErrD(http.StatusConflict, "ITEMS_IN_PROGRESS",
 				"some dishes are still being prepared; finish or void them before closing", map[string]any{"count": cooking})
 		}
-		if in.AmountReceived < o.Total {
+		total := o.Total
+		var adjusted *Totals
+		if !in.Adjust.empty() {
+			b, err := scanBranch(tx.QueryRow(ctx, `SELECT `+branchCols+` FROM branches WHERE id=$1`, s.BranchID))
+			if err != nil {
+				return err
+			}
+			base, err := orderAdjBase(ctx, tx, b, o.ID)
+			if err != nil {
+				return err
+			}
+			t, err := base.price(*in.Adjust)
+			if err != nil {
+				return err
+			}
+			adjusted, total = &t, t.Total
+		}
+		if in.ExpectedTotal != nil && *in.ExpectedTotal != total {
+			return ErrVersion
+		}
+		var channel *int64
+		if in.PayType != "" {
+			ch, name, err := resolvePay(ctx, tx, s.BranchID, PayInput{Type: in.PayType, ChannelID: in.PayChannelID})
+			if err != nil {
+				return err
+			}
+			channel, in.PayMethod = ch, name
+			if in.PayType != "cash" {
+				in.AmountReceived = total // a card or an online payment is for the exact amount
+			}
+		}
+		if in.AmountReceived < total {
 			return ErrValidation("the amount received is less than the bill")
 		}
 		// The dine-in promotion takes its quota only now: an open table holds none.
@@ -781,9 +822,20 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 			WHERE order_id=$1 AND prep_status='ready' AND served_at IS NULL`, o.ID); err != nil {
 			return err
 		}
+		if adjusted != nil {
+			if err := writeAdjusted(ctx, tx, o.ID, *adjusted, in.Adjust.Reason, actor); err != nil {
+				return err
+			}
+			if err := audit(ctx, tx, s.BranchID, o.ID, actor, "order.adjusted", map[string]any{"adjust": in.Adjust,
+				"total_before": o.Total, "total_after": total, "staff_discount": adjusted.StaffDiscount,
+				"round_off": adjusted.RoundOff}); err != nil {
+				return err
+			}
+		}
 		if _, err := tx.Exec(ctx, `UPDATE orders SET fulfillment_status='dined', payment_status='paid',
-			amount_received=$2, payment_note=$3, pay_method=$4, completed_at=now(), version=version+1, updated_at=now() WHERE id=$1`,
-			o.ID, in.AmountReceived, in.Note, in.PayMethod); err != nil {
+			amount_received=$2, payment_note=$3, pay_method=$4, pay_type=$5, pay_channel_id=$6, completed_at=now(),
+			version=version+1, updated_at=now() WHERE id=$1`,
+			o.ID, in.AmountReceived, in.Note, in.PayMethod, in.PayType, channel); err != nil {
 			return err
 		}
 		var closer *int64
@@ -795,7 +847,8 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 			return err
 		}
 		if err := audit(ctx, tx, s.BranchID, o.ID, actor, "table.closed",
-			map[string]any{"table": s.TableName, "total": o.Total, "received": in.AmountReceived, "pay_method": in.PayMethod}); err != nil {
+			map[string]any{"table": s.TableName, "total": total, "received": in.AmountReceived, "pay_type": in.PayType,
+				"pay_method": in.PayMethod}); err != nil {
 			return err
 		}
 		return notify(ctx, tx, Event{BranchID: s.BranchID, OrderID: o.ID})

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { discountLabel, kindBadge } from '../coupons'
 import { money, pick, t } from '../i18n'
+import '../checkout'
 import type { OrderDiscount, Totals } from '../types'
 // discounts, when given, are shown one per line: the promotion and each coupon.
 defineProps<{ totals: Totals; currency: string; delivery: boolean; discounts?: OrderDiscount[] }>()
@@ -19,6 +20,8 @@ defineProps<{ totals: Totals; currency: string; delivery: boolean; discounts?: O
           <td><i class="badge" :class="d.kind">{{ kindBadge(d.kind) }}</i>{{ discountLabel(d) }}</td><td>−{{ money(d.amount, currency) }}</td></tr>
       </template>
       <tr v-else-if="totals.discount" class="disc"><td>{{ pick(totals.promotion_name, totals.promotion_name_en) || t('discount') }}</td><td>−{{ money(totals.discount, currency) }}</td></tr>
+      <tr v-if="totals.staff_discount" class="disc" data-testid="staff-discount-line"><td>{{ t('ck.staff_disc') }}</td><td>−{{ money(totals.staff_discount, currency) }}</td></tr>
+      <tr v-if="totals.round_off" class="disc" data-testid="round-off-line"><td>{{ t(totals.adj_mode === 'round' ? 'ck.round_off' : 'ck.staff_disc') }}</td><td>−{{ money(totals.round_off, currency) }}</td></tr>
       <tr class="sum"><td>{{ t('total') }}</td><td>{{ money(totals.total, currency) }}</td></tr>
       <tr v-if="totals.tax_amount && totals.tax_inclusive"><td class="muted small">{{ t('tax_included') }} {{ totals.tax_rate_bp / 100 }}%</td>
         <td class="muted small">{{ money(totals.tax_amount, currency) }}</td></tr>

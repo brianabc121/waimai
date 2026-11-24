@@ -184,6 +184,7 @@ func customerView(o *app.Order) *app.Order {
 	// which delivery area an address fell in is the store's business
 	o.ZoneName, o.ZoneDistanceM = "", nil
 	o.StaffNote, o.PlacedBy = "", ""
+	o.AdjReason, o.AdjBy, o.AdjApprovedBy = "", "", ""
 	// who in the store added a batch, and its kitchen tags, stay in the store
 	for i := range o.Batches {
 		o.Batches[i].By, o.Batches[i].RoundTags = "", []string{}
@@ -1075,6 +1076,8 @@ func (s *Server) riderAction(c *gin.Context) {
 	var in struct {
 		CollectedAmount int64  `json:"collected_amount"`
 		Reason          string `json:"reason"`
+		// Pay is how the customer paid at the door, nil for cash.
+		Pay *app.PayInput `json:"pay"`
 	}
 	if c.Request.ContentLength != 0 && !bind(c, &in) {
 		return
@@ -1088,7 +1091,7 @@ func (s *Server) riderAction(c *gin.Context) {
 	case "arrive":
 		o, err = s.App.RiderArrive(c, taskID, riderID)
 	case "deliver":
-		o, err = s.App.RiderDeliver(c, taskID, riderID, in.CollectedAmount)
+		o, err = s.App.RiderDeliverPaid(c, taskID, riderID, in.CollectedAmount, in.Pay)
 	case "fail":
 		o, err = s.App.RiderFail(c, taskID, riderID, in.Reason)
 	default:

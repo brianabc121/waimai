@@ -31,6 +31,15 @@ type Totals struct {
 	// which the platform pays back to the store. Discount is their sum.
 	MerchantDiscount int64 `json:"merchant_discount"`
 	PlatformSubsidy  int64 `json:"platform_subsidy"`
+	// The discount staff gave at checkout (docs/CHECKOUT_DISCOUNT_DESIGN.md §5):
+	// AdjPercentBP is the share of the dishes still charged (9000 = 10% off)
+	// and StaffDiscount what it took off the dishes; AdjMode is "round" (a
+	// round-off) or "set_total" (the amount to pay was typed in), and RoundOff
+	// what that took off the total. Neither is part of Discount.
+	AdjPercentBP  int    `json:"adj_percent_bp"`
+	StaffDiscount int64  `json:"staff_discount"`
+	AdjMode       string `json:"adj_mode"`
+	RoundOff      int64  `json:"round_off"`
 	// Total is what the customer pays.
 	Total int64 `json:"total"`
 }

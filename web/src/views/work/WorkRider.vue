@@ -9,7 +9,8 @@ import { both, money, t, toMajor, toMinor, whenText } from '../../i18n'
 import { addons, totalBefore } from '../../addon'
 import { useLive } from '../../live'
 import { currentRole, reloadUser, session } from '../../session'
-import type { Order } from '../../types'
+import type { Order, PayChannel, PayOptions } from '../../types'
+import { channelName } from '../../checkout'
 import { contactApps, contactName, contactPhone } from '../../addresses'
 import { shrink } from '../../photo'
 import { duty, flush, loadDuty, openAppSettings, setDuty, track } from './duty'
@@ -104,8 +105,20 @@ const quick = computed(() => {
 })
 const got = computed(() => toMinor(cash.value))
 const diff = computed(() => cur.value ? got.value - cur.value.totals.total : 0)
+// a customer may pay the rider online at the door (docs/CHECKOUT_DISCOUNT_DESIGN.md §6.2)
+const door = reactive<{ online: boolean; channel: number; list: PayChannel[] | null }>({ online: false, channel: 0, list: null })
+watch(() => cur.value?.id, () => { door.online = false; door.channel = 0 })
+async function payOnline() {
+  door.online = true
+  if (!door.list && cur.value) {
+    try { door.list = (await get<PayOptions>(`/merchant/branches/${cur.value.branch_id}/pay-options`)).channels } catch { door.list = [] }
+    if (door.list.length === 1) door.channel = door.list[0].id
+  }
+}
 async function deliver(o: Order) {
-  if (await act(o, 'deliver', { collected_amount: due(o) ? got.value : 0 })) void back()
+  const online = due(o) && door.online
+  if (online && !door.channel) return
+  if (await act(o, 'deliver', online ? { collected_amount: 0, pay: { type: 'online', channel_id: door.channel } } : { collected_amount: due(o) ? got.value : 0 })) void back()
 }
 
 // ---- photo at the door (optional) ----
@@ -210,6 +223,15 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
           <template v-else>
             <div v-if="due(cur)" class="card stack cash">
               <div class="row between"><span class="k">{{ t('wk.due') }}</span><b class="amt" style="font-size:28px">{{ money(cur.totals.total, cur.currency) }}</b></div>
+              <div class="seg" data-testid="door-pay">
+                <button :class="{ on: !door.online }" data-testid="door-cash" @click="door.online = false">{{ t('ck.rider_cash') }}</button>
+                <button :class="{ on: door.online }" data-testid="door-online" @click="payOnline">{{ t('ck.rider_online') }}</button>
+              </div>
+              <div v-if="door.online" class="quick">
+                <button v-for="c in door.list ?? []" :key="c.id" :class="{ on: door.channel === c.id }" data-testid="door-channel" @click="door.channel = c.id">{{ channelName(c) }}</button>
+                <span v-if="door.list && !door.list.length" class="small muted">{{ t('ck.no_channels') }}</span>
+              </div>
+              <template v-else>
               <label class="field" style="margin:0"><span>{{ t('wk.received') }}</span>
                 <input v-model="cash.value" type="number" inputmode="decimal" min="0" step="0.01" name="collected" /></label>
               <div class="quick">
@@ -218,6 +240,7 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
               </div>
               <div v-if="diff > 0" class="muted small" data-testid="change">{{ t('wk.change', { got: money(got, cur.currency), change: money(diff, cur.currency) }) }}</div>
               <div v-else-if="diff < 0" class="small" style="color:var(--warn)">{{ t('wk.short', { amt: money(-diff, cur.currency) }) }}</div>
+              </template>
             </div>
             <div v-else class="banner ok">{{ t('wk.prepaid') }} · {{ t('wk.no_cash') }}</div>
             <div class="card stack" data-testid="proof">
@@ -229,8 +252,8 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
               <div class="small muted">{{ t('wk.photo_hint') }}</div>
               <div v-if="photo.error" class="banner bad small">{{ photo.error }}</div>
             </div>
-            <button class="btn primary block big" :disabled="busy" data-act="deliver" @click="deliver(cur)">
-              {{ due(cur) ? t('wk.confirm_deliver_cash', { amt: money(cur.totals.total, cur.currency) }) : t('wk.confirm_deliver') }}</button>
+            <button class="btn primary block big" :disabled="busy || (due(cur) && door.online && !door.channel)" data-act="deliver" @click="deliver(cur)">
+              {{ due(cur) && door.online ? t('wk.confirm_deliver') : due(cur) ? t('wk.confirm_deliver_cash', { amt: money(cur.totals.total, cur.currency) }) : t('wk.confirm_deliver') }}</button>
           </template>
           <button class="btn link block" style="color:var(--bad)" data-act="problem" @click="prob.open = true">{{ t('wk.cannot_deliver') }}</button>
         </template>

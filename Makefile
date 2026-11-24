@@ -38,6 +38,7 @@ e2e:
 	node e2e/attendance.cjs
 	node e2e/kitchenreport.cjs
 	node e2e/progress.cjs
+	node e2e/checkout.cjs
 	node e2e/riderreport.cjs
 	node e2e/staffexport.cjs
 	node e2e/settings.cjs

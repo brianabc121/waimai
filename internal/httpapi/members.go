@@ -94,6 +94,9 @@ func (s *Server) staffOrder(c *gin.Context) {
 	if !ok || !bind(c, &in) {
 		return
 	}
+	if in.HasAdjust() && !s.discountOK(c, bid) {
+		return
+	}
 	out, err := s.App.PlaceStaffOrder(c, bid, staffActor(c), c.GetHeader("Idempotency-Key"), in)
 	reply(c, out, err)
 }

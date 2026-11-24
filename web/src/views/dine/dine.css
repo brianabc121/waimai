@@ -242,6 +242,12 @@
 .dd-pay .due { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 18px 10px; border-bottom: 1px solid var(--line); }
 .dd-pay .due b { font-size: 28px; color: var(--red); }
 .dd-pay .methods { padding: 12px 18px 0; gap: 8px; }
+.dd-pay .kv.adj { width: calc(100% - 20px); margin: 4px 10px; padding: 8px; border: 1px dashed #d9c3a5; border-radius: 8px; background: #fff; font: inherit; cursor: pointer; text-align: start; }
+.dd-pay .kv.adj span:last-child { color: var(--muted); }
+.dd-pay .kv.adj.set { border-style: solid; border-color: #e8c97a; background: #fdf3d6; }
+.dd-pay .kv.adj.set span:last-child { color: #8a5a12; font-weight: 700; }
+.dd-pay > .muted.small { padding: 0 18px; }
+.dd-pay .due .was { font-size: 15px; color: var(--muted); font-weight: 400; margin-inline-end: 8px; }
 .dd-pay .methods .dd-ch { flex: 1; min-width: 70px; min-height: 44px; }
 .dd-pay .recv { margin: 12px 18px 0; display: flex; justify-content: space-between; align-items: center; background: var(--paper); border: 2px solid var(--red); border-radius: 12px; padding: 8px 14px; }
 .dd-pay .recv b { font-size: 28px; }

@@ -8,6 +8,7 @@ import { can, session } from '../session'
 import { CONTACT_FIELDS } from '../addresses'
 import type { Branch, Station, Zone } from '../types'
 import StoreTextsCard from './StoreTextsCard.vue'
+import PaySettingsCard from './checkout/PaySettingsCard.vue'
 
 const bid = session.branchId!
 const branch = ref<Branch | null>(null)
@@ -142,6 +143,8 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
       <label class="field"><span>{{ t('set.intro') }}</span><textarea name="intro" v-model="s.intro" rows="3" maxlength="500"></textarea></label>
       <button class="btn primary">{{ t('save') }}</button>
     </form>
+
+    <PaySettingsCard v-if="can('settings')" :branch-id="bid" />
 
     <StoreTextsCard v-if="can('menu.translate')" ref="texts" :base="`/merchant/branches/${bid}`" @en-name="v => s.name_en = v" />
 
