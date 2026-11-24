@@ -10,7 +10,9 @@ import { ApiError, get, newKey, post, put } from '../api'
 import { has, mn, money, pick, promoLabel, t, whenText } from '../i18n'
 import { can, currentRole, session } from '../session'
 import { dialOf, e164, localDigits, splitPhone } from '../dial'
-import type { AddressHint, Item, OptionGroup, Order, Quote, Storefront, StoreMember } from '../types'
+import type { AddonQuote, AddressHint, DinePresets, Item, OptionGroup, Order, Quote, Storefront, StoreMember } from '../types'
+import { addonErr, addonNo, batchSource, batchTitle, itemsByBatch } from '../addon'
+import { presetList } from './dine/strings'
 import type { Picked } from './PlacePicker.vue'
 import { googleMapsLink, mapsKey, suggestPlaces, type Place } from '../maps'
 import './manualStrings'
@@ -29,7 +31,10 @@ const route = useRoute()
 // tables always get the desk.
 type Mode = 'delivery' | 'dine'
 const canDine = can('table.use'), canDelivery = can('order.manual')
+// ?append=<order id> adds dishes to that order (docs/ADD_ON_ORDER_DESIGN.md §6.2).
+const appendId = Number(route.query.append) || 0
 function firstMode(): Mode {
+  if (appendId && canDelivery) return 'delivery'
   if (!canDelivery) return 'dine'
   if (!canDine) return 'delivery'
   if (route.query.mode === 'dine' || route.query.table) return 'dine'
@@ -57,6 +62,34 @@ onMounted(async () => {
   if (!slug) return
   try { store.value = await get<Storefront>(`/stores/${slug}`) } catch (e) { loadError.value = (e as Error).message }
   if (store.value && !store.value.branch.delivery_enabled && store.value.branch.pickup_enabled) service.value = 'pickup'
+})
+
+// ---------- adding to an order ----------
+// The order's own dishes are shown locked above the ones being added; the
+// customer, the address and the fees stay as they are on the order.
+const target = ref<Order | null>(null)
+const targetErr = ref('')
+const roundPresets = ref<string[]>(presetList(null, 'round_tags'))
+const roundTags = ref<string[]>([])
+const aq = ref<AddonQuote | null>(null)
+async function loadTarget() {
+  try { target.value = await get<Order>(`/merchant/orders/${appendId}`) } catch { targetErr.value = t('ao.m.missing') }
+}
+if (appendId) {
+  void loadTarget()
+  if (can('table.use')) void get<{ presets: DinePresets }>(`/merchant/branches/${session.branchId}/dine-desk`)
+    .then(r => { roundPresets.value = presetList(r.presets, 'round_tags') }).catch(() => {})
+}
+function toggleRound(tag: string) {
+  roundTags.value = roundTags.value.includes(tag) ? roundTags.value.filter(x => x !== tag) : [...roundTags.value, tag]
+}
+const targetState = computed(() => {
+  const o = target.value
+  if (!o) return ''
+  const parts = [t('a.' + o.acceptance_status)]
+  if (o.acceptance_status === 'accepted') parts.push(t('p.' + o.packing_status))
+  if (o.delivery) parts.push(`${t('rider')} ${o.delivery.rider_name}`)
+  return parts.join(' · ')
 })
 
 // ---------- the dishes ----------
@@ -405,12 +438,13 @@ const orderBody = () => ({
   note: orderNote.value, staff_note: staffNote.value, accept: accept.value,
 })
 let quoteTimer = 0, quoteSeq = 0
-watch(() => JSON.stringify([orderBody().items, service.value, zoneId.value, f.lat, f.lng, feeOverride.value, when.value, phoneE164.value]), () => {
+watch(() => JSON.stringify([orderBody().items, service.value, zoneId.value, f.lat, f.lng, feeOverride.value, when.value, phoneE164.value, roundTags.value]), () => {
   clearTimeout(quoteTimer)
   quoteTimer = window.setTimeout(requote, 300)
 })
 async function requote() {
   const seq = ++quoteSeq
+  if (appendId) return requoteAddon(seq)
   if (!lines.value.length) { quote.value = null; quoteError.value = ''; return }
   try {
     const q = await post<Quote>(`${base}/staff-quotes`, orderBody())
@@ -422,8 +456,19 @@ async function requote() {
     quoteError.value = e instanceof ApiError && e.code === 'OUT_OF_ZONE' && f.lat == null && !listMode.value ? '' : errText(e)
   }
 }
+async function requoteAddon(seq: number) {
+  if (!lines.value.length) { aq.value = null; quoteError.value = ''; return }
+  try {
+    const q = await post<AddonQuote>(`/merchant/orders/${appendId}/append/quote`, { items: orderBody().items, round_tags: roundTags.value })
+    if (seq === quoteSeq) { aq.value = q; quoteError.value = '' }
+  } catch (e) {
+    if (seq !== quoteSeq) return
+    aq.value = null; quoteError.value = addonErr(e)
+  }
+}
 const totals = computed(() => quote.value?.totals ?? null)
 const total = computed(() => totals.value?.total ?? (lines.value.length ? subtotal.value + (store.value?.branch.packaging_fee ?? 0) : 0))
+const extra = computed(() => aq.value?.extra ?? subtotal.value)
 const promo = computed(() => {
   // the offer this order gets, else the one it could get
   const tt = totals.value
@@ -501,6 +546,7 @@ const done = ref<{ order: Order; token: string; text: string } | null>(null)
 async function place() {
   error.value = ''
   if (!lines.value.length) { error.value = t('vo.need_items'); return }
+  if (appendId) return placeAddon()
   placing.value = true
   try {
     const r = await post<{ order: Order; member: StoreMember; access_token: string }>(`${base}/staff-orders`, orderBody(), { 'Idempotency-Key': newKey() })
@@ -510,6 +556,39 @@ async function place() {
     void loadRecent()
   } catch (e) { error.value = errText(e) } finally { placing.value = false }
 }
+const doneSeq = ref(0)
+async function placeAddon() {
+  placing.value = true
+  try {
+    const r = await post<{ order: Order; seq: number; access_token: string }>(`/merchant/orders/${appendId}/append`,
+      { items: orderBody().items, round_tags: roundTags.value, expected_total: aq.value?.after.total ?? null }, { 'Idempotency-Key': newKey() })
+    const text = addonMessage(r.order, r.seq, r.access_token)
+    doneSeq.value = r.seq
+    done.value = { order: r.order, token: r.access_token, text }
+    target.value = r.order
+    // the dishes are on the order now, shown with it above
+    lines.value = []; aq.value = null; roundTags.value = []
+    await copy(text)
+  } catch (e) {
+    error.value = addonErr(e)
+    if (e instanceof ApiError && e.code === 'QUOTE_CHANGED') void requote()
+    if (e instanceof ApiError && e.code === 'ADDON_CLOSED') void loadTarget()
+  } finally { placing.value = false }
+}
+// The message for the customer after an add-on: what was added and the new total.
+function addonMessage(o: Order, seq: number, token: string): string {
+  const b = o.batches?.find(x => x.seq === seq)
+  const out = [o.customer_name ? t('ao.msg.head', { name: o.customer_name, no: o.public_no }) : t('ao.msg.head0', { no: o.public_no })]
+  for (const i of o.items.filter(i => i.batch_seq === seq)) {
+    const code = items.value.find(x => x.id === i.item_id)?.code ?? ''
+    const extra = [...i.options.map(x => x.name), ...(i.note_tags ?? []).map(x => x.name), i.note].filter(Boolean).join(' ')
+    out.push(`${code ? code + ' ' : ''}${i.name} ×${i.qty}${extra ? `（${extra}）` : ''} ${m(i.line_total)}`)
+  }
+  if (aq.value?.promo_up && o.totals.promotion_name) out.push(t('ao.m.promo_up', { s: pick(o.totals.promotion_name, o.totals.promotion_name_en) }))
+  out.push(t(o.service_type === 'pickup' ? 'ao.msg.total_p' : 'ao.msg.total_d', { s: m(o.totals.total), o: m(b?.total_before ?? o.totals.total) }))
+  if (token) out.push(t('ao.msg.link', { s: `${location.origin}/o/${token}` }))
+  return out.join('\n')
+}
 function next() {
   done.value = null
   lines.value = []; clearMember()
@@ -517,7 +596,7 @@ function next() {
   quote.value = null; quoteError.value = ''; error.value = ''
   void nextTick(() => document.querySelector<HTMLInputElement>('[data-testid="mo-member"]')?.focus())
 }
-function onKey(e: KeyboardEvent) { if (mode.value === 'delivery' && done.value && e.key === 'Enter') { e.preventDefault(); next() } }
+function onKey(e: KeyboardEvent) { if (mode.value === 'delivery' && done.value && e.key === 'Enter') { e.preventDefault(); if (appendId) router.push('/merchant/orders'); else next() } }
 onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
@@ -538,14 +617,17 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
   <div v-else class="mo warm" data-testid="manual-order">
     <div class="mo-top">
       <button class="back" @click="router.push('/merchant/orders')"><span class="rtl-flip">‹</span> {{ t('vo.back') }}</button>
-      <h1>{{ t('vo.title') }}</h1>
-      <div v-if="canDine" class="mo-modes" role="tablist">
+      <h1 v-if="appendId" data-testid="ao-title">{{ t('ao.m.title', { no: target?.public_no ?? '' }) }}</h1>
+      <h1 v-else>{{ t('vo.title') }}</h1>
+      <span v-if="appendId && target" class="tstate">{{ targetState }}</span>
+      <div v-if="canDine && !appendId" class="mo-modes" role="tablist">
         <button role="tab" class="on" aria-selected="true" data-testid="mode-delivery">{{ t('dd.mode_delivery') }}</button>
         <button role="tab" data-testid="mode-dine" @click="setMode('dine')">{{ t('dd.mode_dine') }}</button>
       </div>
       <span class="store">{{ store?.branch.name }}</span>
     </div>
-    <div v-if="loadError" class="banner bad" style="margin:12px">{{ loadError }}</div>
+    <div v-if="loadError || targetErr" class="banner bad" style="margin:12px">{{ loadError || targetErr }}</div>
+    <div v-if="target?.addon && !target.addon.open" class="banner bad" style="margin:12px" data-testid="ao-closed">{{ t('ao.closed') }}</div>
     <div class="mo-body">
       <!-- the dishes -->
       <div v-if="noteLine" class="note-mask" @click="noteKey = 0"></div>
@@ -561,6 +643,20 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
         <div class="thead"><span>{{ t('vo.col.no') }}</span><span>{{ t('vo.col.item') }}</span><span class="c">{{ t('vo.col.qty') }}</span>
           <span class="r">{{ t('vo.col.price') }}</span><span class="r">{{ t('vo.col.sum') }}</span><span>{{ t('vo.col.note') }}</span><span></span></div>
         <div class="rows" data-testid="mo-lines">
+          <template v-if="target">
+            <template v-for="g in itemsByBatch(target)" :key="'b' + g.seq">
+              <div class="bh" data-testid="ao-batch">🔒 {{ batchTitle(g.seq) }}<template v-if="g.batch"> · {{ whenText(g.batch.at, target.timezone).split(' ').pop() }} · {{ batchSource(target, g.batch) }}</template>
+                <template v-if="g.batch?.round_tags?.length"> · {{ g.batch.round_tags.join(' · ') }}</template></div>
+              <div v-for="it in g.items" :key="it.id" class="tr lock" data-testid="ao-orig">
+                <span class="no"></span>
+                <span class="name"><span v-if="items.find(x => x.id === it.item_id)?.code" class="code">{{ items.find(x => x.id === it.item_id)?.code }}</span><b>{{ pick(it.name, it.name_en) }}</b>
+                  <span v-if="it.options.length" class="spec">{{ it.options.map(o => pick(o.name, o.name_en)).join('、') }}</span></span>
+                <span class="c">{{ it.qty }}</span><span class="r">{{ m(it.unit_price) }}</span><span class="r b">{{ m(it.line_total) }}</span>
+                <span class="muted small">{{ [...(it.note_tags ?? []).map(x => x.name), it.note].filter(Boolean).join(' · ') }}</span><span></span>
+              </div>
+            </template>
+            <div class="bh add" data-testid="ao-this">＋ {{ t('ao.m.this') }} · {{ batchTitle((target.batches?.length ?? 1) + 1) }}</div>
+          </template>
           <div v-if="!lines.length" class="empty muted">{{ t('vo.empty') }}</div>
           <template v-for="(l, i) in lines" :key="l.key">
             <div class="tr" :class="{ sel: l.key === selKey }" data-testid="mo-line" @click="selKey = l.key">
@@ -596,7 +692,16 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
           </template>
         </div>
         <div class="foot">
-          <div class="tot">
+          <div v-if="appendId" class="tot ao-tot" data-testid="ao-bar">
+            <span><span class="k">{{ t('vo.count') }}</span><b class="n">{{ count }}</b></span>
+            <span><span class="k">{{ t('ao.m.before') }}</span>{{ target ? m(target.totals.total) : '—' }}</span>
+            <span>→</span>
+            <span><span class="k">{{ t('ao.m.after') }}</span><b data-testid="ao-after">{{ aq ? m(aq.after.total) : '—' }}</b></span>
+            <span><span class="k">{{ t('ao.m.extra') }}</span><b class="n" data-testid="ao-extra">{{ aq ? '+' + m(aq.extra) : '—' }}</b></span>
+            <span v-if="aq?.promo_up" class="tag gold" data-testid="ao-promo-up">{{ t('ao.m.promo_up', { s: pick(aq.after.promotion_name, aq.after.promotion_name_en) }) }}</span>
+            <span class="grow"></span>
+          </div>
+          <div v-else class="tot">
             <span><span class="k">{{ t('vo.count') }}</span><b class="n">{{ count }}</b></span>
             <span><span class="k">{{ t('vo.packaging') }}</span>{{ totals ? m(totals.packaging_fee) : '—' }}</span>
             <span><span class="k">{{ t('vo.delivery_fee') }}</span>{{ feeText }}</span>
@@ -605,7 +710,12 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
             <span class="grow"></span>
             <button class="btn copy" :disabled="!lines.length" @click="copyDraft">{{ t('vo.copy_order') }}</button>
           </div>
-          <div class="cust">
+          <div v-if="target" class="cust">
+            <span>{{ t('vo.f.name') }}</span><span>{{ target.customer_name || '—' }}</span>
+            <span>{{ t('vo.f.phone') }}</span><span>{{ target.contact_phone || target.customer_phone || '—' }}</span>
+            <span>{{ t('vo.f.address') }}</span><span>{{ target.service_type === 'pickup' ? t('vo.pickup') + ' · ' + target.pickup_code : [target.address_line, target.address_unit].filter(Boolean).join(' · ') }}</span>
+          </div>
+          <div v-else class="cust">
             <span>{{ t('vo.f.member') }}</span><span>{{ f.no ? pad(f.no) : '—' }}<template v-if="f.status === 'temp'">（{{ t('vo.temp') }}）</template></span>
             <span>{{ t('vo.f.name') }}</span><span>{{ f.name || '—' }}</span>
             <span>{{ t('vo.f.source') }}</span><span>{{ f.source ? srcText(f.source) : '—' }}</span>
@@ -619,6 +729,19 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
       <!-- the member, the address, the dish search -->
       <section class="panel">
         <div class="pscroll">
+          <template v-if="appendId">
+            <div class="memberbox" data-testid="ao-ro">
+              <div class="row between"><b>{{ target?.public_no }} · {{ target ? t(target.service_type) : '' }}</b>
+                <span v-if="target?.member_no" class="muted">#{{ pad(target.member_no) }}</span></div>
+              <div>{{ target?.customer_name }} · {{ target?.contact_phone || target?.customer_phone }}</div>
+              <div v-if="target?.service_type === 'delivery'">{{ [target.address_line, target.address_unit].filter(Boolean).join('，') }}</div>
+              <div v-if="target?.service_type === 'delivery'" class="small">{{ t('vo.delivery_fee') }}: {{ t('ao.m.fee_same', { s: target.totals.delivery_fee ? m(target.totals.delivery_fee) : t('vo.free') }) }}</div>
+              <div class="muted small">{{ t('ao.m.ro') }}</div>
+            </div>
+            <div class="sec top"><span class="k">{{ t('ao.m.round_tags') }}</span>
+              <div class="srcs"><button v-for="r in roundPresets" :key="r" :class="{ on: roundTags.includes(r) }" data-testid="ao-round" @click="toggleRound(r)">{{ r }}</button></div></div>
+          </template>
+          <template v-else>
           <div class="sec rel idrow">
             <span class="k">{{ t('vo.member_id') }}</span>
             <input v-model="memberQ" class="inp idin" data-testid="mo-member" :placeholder="t('vo.member_ph')" @keydown="memberKey"
@@ -737,6 +860,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
           </div>
           <div class="sec"><span class="k">{{ t('vo.order_note') }}</span><input v-model="orderNote" class="inp" maxlength="300" :placeholder="t('vo.order_note_ph')" /></div>
           <div class="sec"><span class="k">{{ t('vo.staff_note') }}</span><input v-model="staffNote" class="inp" maxlength="300" data-testid="mo-staff-note" :placeholder="t('vo.staff_note_ph')" /></div>
+          </template>
           <div class="sec pick rel"><span class="k brandc">{{ t('vo.pick') }}</span>
             <input ref="pickInput" v-model="pickQ" class="inp" data-testid="mo-pick" autocomplete="off" @keydown="pickKey" @focus="pickFocus" @blur="later(() => (pickOpen = false))" />
             <div v-if="pickOpen && pickQ.trim()" class="drop" style="left:80px;right:0;top:44px" data-testid="mo-pick-drop">
@@ -751,8 +875,10 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
         </div>
         <div class="confirmbar">
           <div v-if="error" class="banner bad" data-testid="mo-error">{{ error }}</div>
-          <label class="row small"><input v-model="accept" type="checkbox" /> {{ t('vo.accept') }}</label>
-          <button class="btn primary confirm" data-testid="mo-place" :disabled="placing" @click="place">
+          <label v-if="!appendId" class="row small"><input v-model="accept" type="checkbox" /> {{ t('vo.accept') }}</label>
+          <button v-if="appendId" class="btn primary confirm" data-testid="ao-place" :disabled="placing || !target?.addon?.open" @click="place">
+            {{ placing ? t('vo.placing') : t('ao.m.confirm', { s: m(extra) }) }}</button>
+          <button v-else class="btn primary confirm" data-testid="mo-place" :disabled="placing" @click="place">
             {{ placing ? t('vo.placing') : t('vo.confirm', { s: m(total) }) }}</button>
         </div>
       </section>
@@ -794,7 +920,19 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
       keepable @done="picked" @close="picking = false" />
 
     <div v-if="toast" class="toast">✓ {{ toast }}</div>
-    <div v-if="done" class="sheet-mask center">
+    <div v-if="done && appendId" class="sheet-mask center">
+      <div class="modal" data-testid="ao-done">
+        <h2>{{ t('ao.m.done', { no: done.order.public_no }) }}</h2>
+        <div class="muted">{{ t('ao.m.done_hint') }}</div>
+        <pre class="copytext" data-testid="ao-done-text">{{ done.text }}</pre>
+        <div class="row wrap" style="justify-content:flex-end;margin-top:14px">
+          <a class="btn" :href="`/ticket/${done.order.id}?batch=${doneSeq}`" target="_blank" data-testid="ao-print">{{ t('ao.print_batch') }} · {{ t('ao.n', { n: addonNo(doneSeq) }) }}</a>
+          <button class="btn" @click="copy(done.text); flash(t('vo.copied'))">{{ t('vo.copy_again') }}</button>
+          <button class="btn primary" data-testid="ao-back" @click="router.push('/merchant/orders')">{{ t('ao.m.back') }}</button>
+        </div>
+      </div>
+    </div>
+    <div v-else-if="done" class="sheet-mask center">
       <div class="modal" data-testid="mo-done">
         <h2>{{ t('vo.done_title', { no: done.order.public_no }) }}</h2>
         <div class="muted">{{ done.order.acceptance_status === 'accepted' ? t('vo.done_accepted') : t('vo.done_pending') }}</div>
@@ -827,6 +965,13 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 .c { text-align: center; } .r { text-align: right; } .b { font-weight: 700; } .red { color: #b42318; } .okc { color: #18794e; }
 .small { font-size: 12.5px; } .grow { flex: 1; min-width: 0; } .wrap { flex-wrap: wrap; }
 .rel { position: relative; }
+.tstate { color: var(--gold-soft); font-size: 13px; }
+.bh { padding: 6px 12px; font-size: 12.5px; color: #7a5b3a; background: #efe4d0; border-bottom: 1px solid var(--edge); }
+.bh.add { background: #fff3dc; color: #b45309; font-weight: 700; }
+.tr.lock { background: #f4efe6; color: #6b5d4d; }
+.tr.lock .name b { font-weight: 600; }
+.ao-tot .tag.gold { background: var(--gold); color: #5a1010; border: 0; }
+.sec.top { align-items: flex-start; }
 
 .order { display: flex; flex-direction: column; min-height: 0; background: var(--paper); border-right: 1px solid var(--line); }
 .thead, .tr { display: grid; grid-template-columns: 30px minmax(140px, 1fr) 92px 70px 78px minmax(90px, 160px) 62px; gap: 10px; align-items: center; padding: 0 14px; }

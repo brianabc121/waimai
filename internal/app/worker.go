@@ -25,6 +25,7 @@ var workerTasks = []struct {
 	Interval time.Duration
 }{
 	{"expire_pending", workerTick},
+	{"expire_addons", workerTick},
 	{"release_scheduled", workerTick},
 	{"jobs", workerTick},
 	{"rider_trips", tripInterval},
@@ -103,6 +104,7 @@ func (w *Worker) Tick(ctx context.Context) {
 		}
 		return n, err
 	})
+	w.runTask(ctx, "expire_addons", a.ExpireAddons)
 	w.runTask(ctx, "release_scheduled", a.ReleaseScheduled)
 	w.runTask(ctx, "jobs", a.runJobs)
 	if time.Since(w.lastTrips) > tripInterval {

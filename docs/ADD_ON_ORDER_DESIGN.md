@@ -1,6 +1,6 @@
 # 加单（外卖、自取、堂食）设计方案 v0.2
 
-> 状态：2026-11-24 v0.2，brian 确认按这一版全部落实（第 11 节全部按推荐）。堂食模式（PR #105）已合并，本方案按它的实际实现整理过。
+> 状态：2026-11-24 v0.2，brian 确认按这一版全部落实（第 11 节全部按推荐），已实现（迁移 00058、`internal/app/addon.go`、`e2e/addon.cjs`）。实现和方案的小差别：商家确认/拒绝顾客加菜的接口按订单和批次号走（`POST /merchant/orders/{id}/batches/{seq}/accept|reject`），被拒、撤回、失效的加菜不算进每单 3 次。堂食模式（PR #105）已合并，本方案按它的实际实现整理过。
 > 效果图：[docs/add-on-order-screens/](add-on-order-screens/)，原型 [docs/add-on-order-prototype/index.html](add-on-order-prototype/index.html)（地址后加 `#s1` 到 `#s6` 切换）。
 >
 > | 效果图 | 内容 |
@@ -256,7 +256,7 @@ brian 的原话：堂食在结账前、外卖在交接给骑手前，都可以�
 - 截止判断：外卖 `fulfillment_status IN ('none','awaiting_handoff')`，自取 `('none','awaiting_pickup')`，且 `acceptance_status IN ('pending','accepted')`。
 - 接口：
   - 店员：`POST /merchant/orders/{id}/append/quote`（试算）、`POST /merchant/orders/{id}/append`（带幂等键）。
-  - 确认顾客加菜：`POST /merchant/order-batches/{id}/accept`、`/reject`（带原因）。
+  - 确认顾客加菜：`POST /merchant/orders/{id}/batches/{seq}/accept`、`/reject`（带原因）。
   - 顾客：`POST /api/orders/{token}/append/quote`、`POST /api/orders/{token}/append`、`DELETE /api/orders/{token}/append/{batchId}`（确认前撤回）。
   - 订单详情（店员和顾客）返回按批次分组的菜，和每批的状态、前后金额。
 - 定时任务：每分钟把过期没确认的顾客加菜改成 `expired`，释放库存，通知顾客（和现在的接单超时同一个 Worker）。

@@ -7,6 +7,7 @@ import { both, minutesSince, t, whenText } from '../i18n'
 import { useLive } from '../live'
 import { session } from '../session'
 import type { Order, OrderItem, Station } from '../types'
+import { addonNo, addons } from '../addon'
 
 const bid = session.branchId!
 const orders = ref<Order[]>([])
@@ -38,6 +39,9 @@ const { online, lastSync, refreshNow } = useLive(() => `/merchant/branches/${bid
 // A table's bill stays open for the whole meal: dishes already at the table drop off the screen.
 const live = (o: Order) => o.items.filter(i => i.prep_status !== 'cancelled' && !i.served_at)
 const dine = (o: Order) => o.service_type === 'dine_in'
+// An order with dishes added in the last 3 minutes has an orange edge (docs/ADD_ON_ORDER_DESIGN.md §7.1).
+const addedTo = (o: Order) => !dine(o) && addons(o).length > 0
+const freshAdd = (o: Order) => { void now.value; const list = addons(o), b = list[list.length - 1]; return !dine(o) && !!b && Date.now() - new Date(b.at).getTime() < 180000 }
 // Orders split into baskets show which basket each dish goes in.
 const baskets = (o: Order) => o.items.some(i => i.basket > 1)
 const cancelled = computed(() => orders.value.filter(o => o.acceptance_status === 'cancelled'))
@@ -114,10 +118,11 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
       <div v-if="unassigned > 0" class="banner warn" style="margin-bottom:12px">{{ t('unassigned_warn', { n: unassigned }) }}</div>
       <div v-if="shown.length === 0" class="card muted">{{ t('kitchen_empty') }}</div>
       <div class="cols">
-        <div v-for="o in shown" :key="o.id" class="card stack">
+        <div v-for="o in shown" :key="o.id" class="card stack" :class="{ kfresh: freshAdd(o) }">
           <div class="row between">
             <h2><template v-if="dine(o)">{{ t('table') }} {{ o.table_name }}<span v-for="g in o.table_tags ?? []" :key="g" class="tag warn" style="margin-inline-start:4px">{{ g }}</span></template><template v-else>{{ o.public_no }}</template>
               <span class="tag brand" style="margin-inline-start:4px">{{ t(o.service_type) }}</span>
+              <span v-if="addedTo(o)" class="tag kaddtag" style="margin-inline-start:4px" data-testid="k-addon">{{ t('ao.tag') }}</span>
               <span class="tag info" v-if="o.scheduled_for" style="margin-inline-start:4px">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span></h2>
             <span v-if="!dine(o)" class="tag" :class="waited(o) >= 20 ? 'bad' : waited(o) >= 10 ? 'warn' : ''">{{ waited(o) }} {{ t('min') }}</span>
             <span v-else class="small muted">{{ o.public_no }}</span>
@@ -125,7 +130,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
           <div v-if="o.note" class="banner warn small">{{ t('order_note') }}: {{ o.note }}</div>
           <div v-for="it in lines(o)" :key="it.id" class="kline" :class="it.prep_status">
             <div class="grow">
-              <div class="kname"><span v-if="baskets(o)" class="tag info" style="margin-inline-end:4px;vertical-align:middle">{{ t('basket_short', { n: it.basket }) }}</span><span v-if="it.rush_at && it.prep_status !== 'ready'" class="tag bad krush" data-testid="k-rush">{{ t('dd.k.rush') }}</span>{{ it.qty }} × {{ both(it.name, it.name_en) }}<span v-if="dine(o)" class="small muted" style="font-weight:400"> · {{ t('batch_n', { n: it.batch_seq }) }}</span></div>
+              <div class="kname"><span v-if="baskets(o)" class="tag info" style="margin-inline-end:4px;vertical-align:middle">{{ t('basket_short', { n: it.basket }) }}</span><span v-if="it.rush_at && it.prep_status !== 'ready'" class="tag bad krush" data-testid="k-rush">{{ t('dd.k.rush') }}</span>{{ it.qty }} × {{ both(it.name, it.name_en) }}<span v-if="dine(o)" class="small muted" style="font-weight:400"> · {{ t('batch_n', { n: it.batch_seq }) }}</span><span v-else-if="it.batch_seq > 1" class="small kadd" data-testid="k-addon-line"> · {{ t('ao.k', { n: addonNo(it.batch_seq) }) }}</span></div>
               <div v-if="it.round_tags?.length" class="small kround" data-testid="k-round">※ {{ it.round_tags.join(' · ') }}</div>
               <div class="small" v-if="stations.length && it.needs_prep">
                 <span class="tag" :class="it.station_id === null ? 'warn' : 'info'">{{ it.station_name || t('unassigned') }}</span>
@@ -178,6 +183,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
           </div>
           <div v-if="o.note" class="banner warn small">{{ t('order_note') }}: {{ o.note }}</div>
 
+          <div v-if="addedTo(o) && o.bags && o.packing_status !== 'packed'" class="banner warn small" data-testid="k-repack">{{ t('ao.p.repack') }} · {{ t('bags') }} {{ o.bags }}</div>
           <template v-if="o.packing_status === 'waiting_items'">
             <div v-for="it in live(o)" :key="it.id" class="row between" :class="{ muted: it.prep_status === 'ready' }">
               <span>{{ it.qty }} × {{ both(it.name, it.name_en) }}</span>
@@ -216,6 +222,9 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
 </template>
 
 <style scoped>
+.kfresh { border: 2px solid #f59e0b; }
+.kaddtag { background: #fff1e0; color: #b45309; border-color: #f5c48a; }
+.kadd { color: #b45309; font-weight: 600; }
 .kline { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: #f6f6f4; border-inline-start: 5px solid var(--line); }
 .kline.preparing { border-inline-start-color: var(--warn); background: var(--warn-soft); }
 .kline.ready { border-inline-start-color: var(--ok); background: var(--ok-soft); }

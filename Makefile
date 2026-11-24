@@ -43,6 +43,7 @@ e2e:
 	node e2e/responsive.cjs
 	node e2e/storefront.cjs
 	node e2e/manualorder.cjs
+	node e2e/addon.cjs
 	node e2e/members.cjs
 	node e2e/addressbook.cjs
 	node e2e/deliverystats.cjs
