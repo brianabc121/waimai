@@ -49,7 +49,7 @@ function shift(days: number) {
     <div v-if="error" class="banner bad">{{ error }}</div>
     <template v-if="log">
       <div class="kpis" data-testid="voids-kpis">
-        <div class="card kpi"><span>{{ t('vd.log.count') }}</span><b>{{ log.voids }}</b><small>{{ log.void_qty }}</small></div>
+        <div class="card kpi"><span>{{ t('vd.log.count') }}</span><b>{{ log.voids }}</b></div>
         <div class="card kpi"><span>{{ t('vd.log.amount') }}</span><b>{{ m(log.void_amount) }}</b></div>
         <div class="card kpi warn"><span>{{ t('vd.log.wasted') }}</span><b>{{ m(log.wasted_amount) }}</b></div>
         <div class="card kpi"><span>{{ t('vd.log.refund') }}</span><b>{{ m(log.refund_amount) }}</b><small>{{ t('vd.log.refund_n', { n: log.refund_orders }) }}</small></div>

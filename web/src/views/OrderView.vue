@@ -478,10 +478,11 @@ async function copyNo() {
 .od-items { display: grid; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .od-basket { font-size: 12px; font-weight: 600; color: var(--muted); padding-top: 2px; }
 .od-item { display: flex; gap: 12px; align-items: center; }
-.od-item img, .od-item.voided .od-iname, .od-item.voided .qty, .od-item.voided .price { text-decoration: line-through; color: var(--muted); }
+.od-item.voided .od-iname, .od-item.voided .qty, .od-item.voided .price { text-decoration: line-through; color: var(--muted); }
+.od-item.voided img { opacity: .5; }
 .od-item .voidtag { font-size: 12px; color: #b42318; margin-top: 2px; }
 .od-was { text-align: end; font-size: 12px; color: var(--muted); text-decoration: line-through; }
-.od-item .ph { width: 64px; height: 52px; border-radius: 8px; object-fit: cover; flex: none; }
+.od-item img, .od-item .ph { width: 64px; height: 52px; border-radius: 8px; object-fit: cover; flex: none; }
 .od-item .ph { background: #c2401c; color: #fff3da; font-weight: 600; font-size: 18px; display: grid; place-items: center; }
 .od-item .grow { flex: 1; min-width: 0; }
 .od-iname { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; line-height: 1.4; }

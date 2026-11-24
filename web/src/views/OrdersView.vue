@@ -491,7 +491,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
 .adjrow span:last-child { color: #8a5a12; text-align: end; }
 .voidline > .grow > b, .voidline > .grow { text-decoration: line-through; color: var(--muted); }
 .voidline .voidnote, .voidline :deep(*) { text-decoration: none; }
-.voidnote { color: #b42318; text-decoration: none; display: inline-block; }
+.voidnote { color: #b42318; text-decoration: none; display: inline-block; width: 100%; }
 .voidnote a { margin-inline-start: 6px; }
 .voidbtn { color: #b42318; border-color: #f1b4ae; }
 .refunds { border-top: 1px dashed var(--line); padding-top: 8px; }
