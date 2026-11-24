@@ -226,7 +226,10 @@ type ReorderLine struct {
 	Qty       int     `json:"qty"`
 	OptionIDs []int64 `json:"option_ids"`
 	Note      string  `json:"note"`
-	Basket    int     `json:"basket"`
+	// NoteTagIDs are the flavour notes still offered; the ones that are not
+	// any more are written into Note.
+	NoteTagIDs []int64 `json:"note_tag_ids"`
+	Basket     int     `json:"basket"`
 }
 
 type Reorder struct {
@@ -282,6 +285,11 @@ func (a *App) Reorder(ctx context.Context, token string) (*Reorder, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	rows.Close()
+	live, err := liveNoteTags(ctx, a.DB, ids)
+	if err != nil {
+		return nil, err
+	}
 lines:
 	for _, it := range o.Items {
 		if it.VoidReason != "" {
@@ -294,6 +302,7 @@ lines:
 			continue
 		}
 		l := ReorderLine{ItemID: it.ItemID, Qty: it.Qty, OptionIDs: []int64{}, Note: it.Note, Basket: max(it.Basket, 1)}
+		l.NoteTagIDs, l.Note = carryNotes(it, live[it.ItemID])
 		for _, op := range it.Options {
 			id, ok := opts[key{op.Group, op.Name}]
 			if !ok {

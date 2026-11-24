@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -47,10 +48,14 @@ type ImportRow struct {
 	DetailsSet  bool               `json:"details_set"`
 	Specs       []OptionGroupInput `json:"specs"`
 	SpecsSet    bool               `json:"specs_set"`
-	Action      string             `json:"action"` // create or update; empty when the row has errors
-	OldPrice    *int64             `json:"old_price,omitempty"`
-	NewCategory bool               `json:"new_category,omitempty"` // the category does not exist yet and will be made
-	Errors      []string           `json:"errors"`
+	// NoteTemplates are the names in the 口味模板 cell; NoteTemplatesSet says
+	// the cell had a value ("无" takes the dish's templates off).
+	NoteTemplates    []string `json:"note_templates"`
+	NoteTemplatesSet bool     `json:"note_templates_set"`
+	Action           string   `json:"action"` // create or update; empty when the row has errors
+	OldPrice         *int64   `json:"old_price,omitempty"`
+	NewCategory      bool     `json:"new_category,omitempty"` // the category does not exist yet and will be made
+	Errors           []string `json:"errors"`
 }
 
 // MenuImport is an uploaded spreadsheet and its parse result.
@@ -88,6 +93,7 @@ var importColumns = map[string][]string{
 	"needs_prep":  {"需要制作", "needsprep"},
 	"station":     {"工作台", "station"},
 	"stock":       {"限量库存", "库存", "stock"},
+	"notes":       {"口味模板", "口味备注", "notetemplates", "flavournotes"},
 }
 
 // normHeader drops spaces, "*" and anything in brackets, and lowercases.
@@ -334,7 +340,7 @@ func parseMenuSheet(content []byte) ([]ImportRow, error) {
 		}
 		r := ImportRow{Line: line, Category: get("category"), Name: get("name"), NameEn: get("name_en"),
 			Description: get("description"), Station: get("station"), Errors: []string{},
-			Photos: []string{}, Specs: []OptionGroupInput{}}
+			Photos: []string{}, Specs: []OptionGroupInput{}, NoteTemplates: []string{}}
 		bad := func(code string) { r.Errors = append(r.Errors, code) }
 		if r.Category == "" {
 			bad("category_required")
@@ -426,6 +432,19 @@ func parseMenuSheet(content []byte) ([]ImportRow, error) {
 				}
 			}
 		}
+		if s := get("notes"); s != "" {
+			r.NoteTemplatesSet = true
+			if !isClear(s) {
+				for _, n := range splitAny(s, ",，、;；\n/") {
+					if n = strings.TrimSpace(n); n != "" && !slices.Contains(r.NoteTemplates, n) {
+						r.NoteTemplates = append(r.NoteTemplates, n)
+					}
+				}
+				if len(r.NoteTemplates) > maxItemNoteTemplates {
+					bad(fmt.Sprintf("note_templates_too_many:%d", maxItemNoteTemplates))
+				}
+			}
+		}
 		if r.Category != "" && r.Name != "" {
 			key := r.Category + "\x00" + r.Name
 			if first, dup := seen[key]; dup {
@@ -455,10 +474,12 @@ type importContext struct {
 	items    map[string]int64  // category id + name -> item id
 	prices   map[int64]int64   // item id -> price
 	stations map[string]*int64 // active station name -> id
+	notes    map[string]int64  // flavour note template name -> id
 }
 
 func loadImportContext(ctx context.Context, q Querier, branchID int64) (*importContext, error) {
-	ic := &importContext{cats: map[string]int64{}, items: map[string]int64{}, prices: map[int64]int64{}, stations: map[string]*int64{}}
+	ic := &importContext{cats: map[string]int64{}, items: map[string]int64{}, prices: map[int64]int64{}, stations: map[string]*int64{},
+		notes: map[string]int64{}}
 	rows, err := q.Query(ctx, `SELECT id, name FROM menu_categories WHERE branch_id=$1 AND NOT archived ORDER BY id DESC`, branchID)
 	if err != nil {
 		return nil, err
@@ -502,6 +523,23 @@ func loadImportContext(ctx context.Context, q Querier, branchID int64) (*importC
 		ic.stations[name] = &id
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows, err = q.Query(ctx, `SELECT id, name FROM note_templates WHERE branch_id=$1`, branchID)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ic.notes[name] = id
+	}
+	rows.Close()
 	return ic, rows.Err()
 }
 
@@ -511,6 +549,11 @@ func (ic *importContext) resolve(r *ImportRow) int64 {
 	if r.Station != "" {
 		if _, ok := ic.stations[r.Station]; !ok {
 			r.Errors = append(r.Errors, "station_unknown")
+		}
+	}
+	for _, n := range r.NoteTemplates {
+		if _, ok := ic.notes[n]; !ok {
+			r.Errors = append(r.Errors, "note_template_unknown:"+n)
 		}
 	}
 	r.Action, r.OldPrice, r.NewCategory = "", nil, false
@@ -529,6 +572,15 @@ func (ic *importContext) resolve(r *ImportRow) int64 {
 		return id
 	}
 	return 0
+}
+
+// noteIDs are the template ids of a row's 口味模板 cell, in its order.
+func (ic *importContext) noteIDs(r *ImportRow) []int64 {
+	ids := []int64{}
+	for _, n := range r.NoteTemplates {
+		ids = append(ids, ic.notes[n])
+	}
+	return ids
 }
 
 // parseMenuImport is the background job: parse the stored file and save the
@@ -627,7 +679,7 @@ func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Act
 			r := &rows[i]
 			kept := r.Errors[:0]
 			for _, e := range r.Errors {
-				if e != "station_unknown" {
+				if e != "station_unknown" && !strings.HasPrefix(e, "note_template_unknown:") {
 					kept = append(kept, e)
 				}
 			}
@@ -676,6 +728,11 @@ func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Act
 						return err
 					}
 				}
+				if len(r.NoteTemplates) > 0 {
+					if err := setItemNoteTemplates(ctx, tx, branchID, itemID, ic.noteIDs(r)); err != nil {
+						return err
+					}
+				}
 				ic.items[fmt.Sprintf("%d\x00%s", catID, r.Name)] = itemID
 				created++
 				continue
@@ -702,6 +759,11 @@ func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Act
 			}
 			if r.SpecsSet {
 				if err := writeGroups(ctx, tx, itemID, r.Specs); err != nil {
+					return err
+				}
+			}
+			if r.NoteTemplatesSet {
+				if err := setItemNoteTemplates(ctx, tx, branchID, itemID, ic.noteIDs(r)); err != nil {
 					return err
 				}
 			}

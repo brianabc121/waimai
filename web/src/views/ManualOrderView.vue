@@ -14,6 +14,8 @@ import type { AddressHint, Item, OptionGroup, Order, Quote, Storefront, StoreMem
 import type { Picked } from './PlacePicker.vue'
 import { googleMapsLink, mapsKey, suggestPlaces, type Place } from '../maps'
 import './manualStrings'
+import NotePicker from './NotePicker.vue'
+import { cartTags, hasNotes, toggleTag } from '../notes'
 
 const PlacePicker = defineAsyncComponent(() => import('./PlacePicker.vue'))
 const router = useRouter()
@@ -37,7 +39,7 @@ onMounted(async () => {
 // ---------- the dishes ----------
 // Options of a group that takes one (大碗/小碗) are the dish's spec, shown
 // after its name; the others are add-ons, each with a count, in the yellow block.
-interface Line { key: number; item: Item; qty: number; picks: Record<number, number>; note: string }
+interface Line { key: number; item: Item; qty: number; picks: Record<number, number>; note: string; tags: number[] }
 let nextKey = 1
 const lines = ref<Line[]>([])
 const selKey = ref(0)
@@ -52,15 +54,46 @@ const count = computed(() => lines.value.reduce((s, l) => s + l.qty, 0))
 const subtotal = computed(() => lines.value.reduce((s, l) => s + unit(l) * l.qty, 0))
 
 function addLine(item: Item, picks: Record<number, number> = {}) {
-  const l: Line = { key: nextKey++, item, qty: 1, picks, note: '' }
+  const l: Line = { key: nextKey++, item, qty: 1, picks, note: '', tags: [] }
   lines.value.push(l)
   selKey.value = l.key
 }
 function copyLine(l: Line) {
-  const c: Line = { ...l, key: nextKey++, picks: { ...l.picks } }
+  const c: Line = { ...l, key: nextKey++, picks: { ...l.picks }, tags: [...l.tags] }
   lines.value.splice(lines.value.indexOf(l) + 1, 0, c)
   selKey.value = c.key
 }
+// The note cell (docs/NOTE_TEMPLATE_DESIGN.md 6.2): on a dish with flavour
+// notes it opens a panel of its tags under the cell (from the bottom on a
+// phone). What is typed filters the tags; Enter picks the first match, or
+// keeps the words as the note when nothing matches. Tab or Esc closes it.
+const noteKey = ref(0)
+const notePos = ref<Record<string, string>>({})
+const noteLine = computed(() => lines.value.find(x => x.key === noteKey.value && hasNotes(x.item)) ?? null)
+const noteTagsOf = (l: Line) => cartTags(l.item, l.tags)
+function openNote(l: Line, e: Event) {
+  selKey.value = l.key
+  if (!hasNotes(l.item)) return
+  const r = ((e.target as HTMLElement).closest('.note-cell') as HTMLElement).getBoundingClientRect()
+  const w = Math.max(r.width, 300), left = Math.min(r.left, window.innerWidth - w - 8)
+  notePos.value = { top: `${r.bottom + 4}px`, left: `${Math.max(8, left)}px`, width: `${w}px` }
+  noteKey.value = l.key
+  // a phone: the panel covers the row, so it has its own box to type in
+  if (window.matchMedia('(max-width: 1000px)').matches) void nextTick(() => notePopIn.value?.focus())
+}
+const notePopIn = ref<HTMLInputElement>()
+function noteMatch(l: Line) {
+  const q = l.note.trim().toLowerCase()
+  if (!q) return null
+  for (const g of l.item.notes ?? []) for (const x of g.tags) if (mn(x).toLowerCase().includes(q) || x.name.toLowerCase().includes(q)) return { g, x }
+  return null
+}
+function noteEnter(l: Line) {
+  const hit = noteMatch(l)
+  if (hit) { if (!l.tags.includes(hit.x.id)) l.tags = toggleTag(l.tags, hit.g, hit.x.id); l.note = '' }
+  else noteKey.value = 0
+}
+function dropTag(l: Line, id: number) { l.tags = l.tags.filter(x => x !== id) }
 function removeLine(l: Line) { lines.value = lines.value.filter(x => x !== l) }
 function setQty(l: Line, d: number) { l.qty = Math.max(1, Math.min(999, l.qty + d)) }
 function setAddon(l: Line, g: OptionGroup, id: number, d: number) {
@@ -343,7 +376,7 @@ const quoteError = ref('')
 const error = ref('')
 const orderBody = () => ({
   member: memberBody(), service_type: service.value, zone_id: listMode.value ? zoneId.value : null,
-  items: lines.value.map(l => ({ item_id: l.item.id, qty: l.qty, note: l.note,
+  items: lines.value.map(l => ({ item_id: l.item.id, qty: l.qty, note: l.note, note_tag_ids: l.tags,
     option_ids: Object.entries(l.picks).flatMap(([id, n]) => Array(n).fill(Number(id))) })),
   scheduled_for: when.value || null, delivery_fee: service.value === 'delivery' ? feeOverride.value : null,
   note: orderNote.value, staff_note: staffNote.value, accept: accept.value,
@@ -405,9 +438,9 @@ function message(o?: Order, token?: string): string {
   const out: string[] = []
   if (o) out.push(t('vo.msg.head', { store: name, no: o.public_no }))
   const rows = o ? o.items.map(i => ({ code: items.value.find(x => x.id === i.item_id)?.code ?? '', name: i.name, qty: i.qty, sum: i.line_total,
-    opts: i.options.map(x => x.name), note: i.note }))
+    opts: [...i.options.map(x => x.name), ...(i.note_tags ?? []).map(x => x.name)], note: i.note }))
     : lines.value.map(l => ({ code: l.item.code ?? '', name: l.item.name, qty: l.qty, sum: unit(l) * l.qty,
-      opts: optionsOf(l).filter(x => x.n).map(x => x.n > 1 ? `${x.o.name} ×${x.n}` : x.o.name), note: l.note }))
+      opts: [...optionsOf(l).filter(x => x.n).map(x => x.n > 1 ? `${x.o.name} ×${x.n}` : x.o.name), ...noteTagsOf(l)], note: l.note }))
   for (const r of rows) {
     const extra = [...r.opts, r.note].filter(Boolean).join('，')
     out.push(`${r.code ? r.code + ' ' : ''}${r.name}${extra ? `（${extra}）` : ''} ×${r.qty}　${m(r.sum)}`)
@@ -487,6 +520,15 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
     <div v-if="loadError" class="banner bad" style="margin:12px">{{ loadError }}</div>
     <div class="mo-body">
       <!-- the dishes -->
+      <div v-if="noteLine" class="note-mask" @click="noteKey = 0"></div>
+      <div v-if="noteLine" class="note-pop" :style="notePos" data-testid="mo-note-pop" @mousedown.prevent>
+        <div class="np-head"><b>{{ mn(noteLine.item) }}</b><span class="muted small">{{ t('nt.free') }}</span>
+          <button type="button" class="np-done" @click="noteKey = 0">{{ t('nt.done') }}</button></div>
+        <input ref="notePopIn" v-model="noteLine.note" class="note-in np-in" maxlength="100" :placeholder="t('vo.note_ph')" data-testid="mo-note-pop-in"
+          @keydown.enter.prevent="noteEnter(noteLine)" @keydown.esc="noteKey = 0" />
+        <NotePicker v-model="noteLine.tags" :groups="noteLine.item.notes ?? []" :filter="noteLine.note.trim()" />
+        <div v-if="noteLine.note.trim() && !noteMatch(noteLine)" class="muted small np-foot">{{ t('nt.enter_note', { s: noteLine.note.trim() }) }}</div>
+      </div>
       <section class="order">
         <div class="thead"><span>{{ t('vo.col.no') }}</span><span>{{ t('vo.col.item') }}</span><span class="c">{{ t('vo.col.qty') }}</span>
           <span class="r">{{ t('vo.col.price') }}</span><span class="r">{{ t('vo.col.sum') }}</span><span>{{ t('vo.col.note') }}</span><span></span></div>
@@ -499,7 +541,11 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
                 <span v-if="specText(l)" class="spec">{{ specText(l) }}</span></span>
               <span class="c"><span class="qty"><button :aria-label="'−'" @click.stop="setQty(l, -1)">−</button><b data-testid="mo-qty">{{ l.qty }}</b><button class="f" data-testid="mo-plus" @click.stop="setQty(l, 1)">+</button></span></span>
               <span class="r">{{ m(unit(l)) }}</span><span class="r b">{{ m(unit(l) * l.qty) }}</span>
-              <input v-model="l.note" class="note-in" :placeholder="t('vo.note_ph')" maxlength="100" @click.stop />
+              <div class="note-cell" :class="{ open: noteKey === l.key && hasNotes(l.item), tpl: hasNotes(l.item) }" data-testid="mo-note" @click.stop="openNote(l, $event)">
+                <span v-for="(n, ti) in noteTagsOf(l)" :key="ti" class="nchip">{{ n }}<button type="button" aria-label="✕" @click.stop="dropTag(l, l.tags[ti])">✕</button></span>
+                <input v-model="l.note" class="note-in" :placeholder="l.tags.length ? '' : hasNotes(l.item) ? t('nt.choose') + ' / ' + t('vo.note_ph') : t('vo.note_ph')" maxlength="100"
+                  data-testid="mo-note-in" @focus="openNote(l, $event)" @keydown.enter.prevent="noteEnter(l)" @keydown.esc="noteKey = 0" @keydown.tab="noteKey = 0" />
+              </div>
               <span class="ops"><button :title="t('vo.copy_line')" @click.stop="copyLine(l)">⧉</button><button class="del" :title="t('vo.remove')" data-testid="mo-remove" @click.stop="removeLine(l)">✕</button></span>
             </div>
             <div v-if="hasAddons(l) && (addonsOf(l).length || l.key === selKey)" class="tr sub">
@@ -768,6 +814,22 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 .qty.sm button { width: 20px; height: 20px; font-size: 12px; }
 .qty.sm button:not(.f) { background: #fff; }
 .note-in { border: 1px solid var(--edge); background: #fff; border-radius: 6px; padding: 4px 8px; font-size: 12.5px; min-height: 28px; width: 100%; min-width: 0; }
+.note-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.note-cell .note-in { flex: 1 1 60px; }
+.note-cell.tpl:has(.nchip) { border: 1px solid var(--edge); background: #fff; border-radius: 6px; padding: 3px; }
+.note-cell.tpl:has(.nchip) .note-in { border: 0; padding: 1px 4px; min-height: 22px; }
+.note-cell.open { outline: 2px solid var(--brand); outline-offset: 1px; border-radius: 6px; }
+.nchip { display: inline-flex; align-items: center; gap: 2px; background: var(--gold-soft); color: var(--brand-dark); border-radius: 5px; padding: 1px 2px 1px 7px;
+  font-size: 12px; font-weight: 600; max-width: 100%; overflow-wrap: anywhere; }
+.nchip button { border: 0; background: none; color: inherit; font-size: 10px; padding: 0 4px; cursor: pointer; opacity: .7; }
+.note-mask { position: fixed; inset: 0; z-index: 40; }
+.note-pop { position: fixed; z-index: 41; background: var(--paper, #fff); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(59, 31, 20, .18);
+  padding: 12px; max-height: min(60vh, 420px); overflow-y: auto; }
+.np-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.np-head b { font-size: 14px; }
+.np-done { margin-inline-start: auto; border: 1px solid var(--brand); color: var(--brand); background: #fff; border-radius: 6px; padding: 3px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.np-foot { margin-top: 10px; }
+.np-in { display: none; }
 .ops { display: flex; gap: 6px; justify-content: flex-end; }
 .ops button { width: 26px; height: 26px; border-radius: 6px; border: 0; background: var(--row); color: var(--muted); font-weight: 700; padding: 0; }
 .ops button.del { color: #b42318; }
@@ -881,7 +943,12 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
   .thead { display: none; }
   .tr { grid-template-columns: 24px minmax(0, 1fr) auto auto; row-gap: 6px; padding: 10px 12px; }
   .tr > .r:not(.b) { display: none; }
-  .tr .note-in { grid-column: 2 / 4; min-height: 34px; }
+  .tr .note-cell { grid-column: 2 / 4; }
+  .tr .note-in { min-height: 34px; }
+  .note-pop { top: auto !important; left: 0 !important; width: auto !important; right: 0; bottom: 0; border-radius: 14px 14px 0 0; max-height: 60vh;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .note-mask { background: rgba(0, 0, 0, .3); }
+  .np-in { display: block; min-height: 40px; font-size: 15px; margin-bottom: 12px; }
   .addons { grid-column: 1 / -1; }
   .qty { gap: 10px; }
   .qty button { width: 32px; height: 32px; border-radius: 8px; font-size: 16px; }

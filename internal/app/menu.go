@@ -110,6 +110,8 @@ type ItemInput struct {
 	Sort            int                `json:"sort"`
 	StationID       *int64             `json:"station_id"`
 	Groups          []OptionGroupInput `json:"groups"`
+	// NoteTemplateIDs are the flavour note templates to show; nil keeps them.
+	NoteTemplateIDs *[]int64 `json:"note_template_ids"`
 }
 
 // The dish page holds the main picture and up to this many more.
@@ -220,6 +222,11 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 		}
 		if _, err := tx.Exec(ctx, `DELETE FROM option_groups WHERE item_id=$1`, id); err != nil {
 			return err
+		}
+		if in.NoteTemplateIDs != nil {
+			if err := setItemNoteTemplates(ctx, tx, branchID, id, *in.NoteTemplateIDs); err != nil {
+				return err
+			}
 		}
 		for gi, g := range in.Groups {
 			var gid int64

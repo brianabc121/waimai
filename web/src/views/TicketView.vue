@@ -33,7 +33,8 @@ const sorted = computed(() => [...(o.value?.items ?? [])].sort((a, b) => a.baske
       <p v-if="multi && (i === 0 || sorted[i - 1].basket !== it.basket)" class="bk"><b>—— {{ t('basket_n', { n: it.basket }) }} ——</b></p>
       <div><b>{{ it.qty }} × {{ both(it.name, it.name_en) }}</b><span>{{ money(it.line_total, o.currency) }}</span></div>
       <small v-if="it.options.length">{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</small>
-      <small v-if="it.note">{{ t('note') }}: {{ it.note }}</small>
+      <small v-if="it.note_tags?.length" class="nt" data-testid="ticket-notes">※ {{ it.note_tags.map(x => x.name).join(' ') }}</small>
+      <small v-if="it.note" class="nt">{{ t('note') }}: {{ it.note }}</small>
     </div>
     <hr />
     <TotalsTable :totals="o.totals" :currency="o.currency" :delivery="o.service_type === 'delivery'" :discounts="o.discounts" />
@@ -47,5 +48,6 @@ const sorted = computed(() => [...(o.value?.items ?? [])].sort((a, b) => a.baske
 .ticket .bk { text-align: center; margin: 6px 0 2px; }
 .line { margin: 6px 0; } .line > div { display: flex; justify-content: space-between; gap: 8px; }
 .line small { display: block; }
+.line small.nt { font-weight: 700; padding-inline-start: 10px; }
 hr { border: 0; border-top: 1px dashed #000; margin: 8px 0; }
 </style>

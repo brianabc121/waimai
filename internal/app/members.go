@@ -429,6 +429,8 @@ type StaffLine struct {
 	Qty       int     `json:"qty"`
 	OptionIDs []int64 `json:"option_ids"`
 	Note      string  `json:"note"`
+	// NoteTagIDs are the chosen flavour notes.
+	NoteTagIDs []int64 `json:"note_tag_ids"`
 }
 
 type StaffOrderInput struct {
@@ -452,7 +454,7 @@ func (in *StaffOrderInput) quoteInput() QuoteInput {
 		Lat: in.Member.Lat, Lng: in.Member.Lng, feeOverride: in.DeliveryFee}
 	for _, l := range in.Items {
 		qi.Items = append(qi.Items, QuoteLineInput{ItemID: l.ItemID, Qty: l.Qty, OptionIDs: l.OptionIDs,
-			Note: strings.TrimSpace(l.Note), repeat: true})
+			Note: strings.TrimSpace(l.Note), NoteTagIDs: l.NoteTagIDs, repeat: true})
 	}
 	return qi
 }
@@ -618,9 +620,9 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 		for _, l := range cur.Lines {
 			opts, _ := json.Marshal(l.Options)
 			if _, err := tx.Exec(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name,
-				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,'')`, orderID, b.ID, batchID, l.ItemID, l.Name,
-				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep); err != nil {
+				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer, note_tags)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,'',$13)`, orderID, b.ID, batchID, l.ItemID, l.Name,
+				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, noteTagsJSON(l.NoteTags)); err != nil {
 				return wrap("insert order item", err)
 			}
 		}

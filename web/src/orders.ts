@@ -77,7 +77,7 @@ export function cardStatus(c: { display_status: string; can_review: boolean; aft
 // what was there) and opens the store, where prices and stock are today's.
 export async function orderAgain(router: Router, token: string): Promise<string> {
   const r = await get<Reorder>(`/customer/orders/${token}/reorder`)
-  if (r.lines.length) replaceCart(r.slug, r.service_type, r.lines)
+  if (r.lines.length) replaceCart(r.slug, r.service_type, r.lines.map(l => ({ ...l, note_tags: l.note_tag_ids ?? [] })))
   const note = !r.lines.length ? t('ol.gone_all')
     : r.missing.length ? t('ol.gone_some', { names: r.missing.map(m => pick(m.name, m.name_en)).join('、') }) : ''
   await router.push(`/s/${r.slug}`)

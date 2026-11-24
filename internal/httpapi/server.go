@@ -543,6 +543,7 @@ func (s *Server) Router() *gin.Engine {
 	s.couponAdminRoutes(admin)
 	s.billRoutes(auth, admin)
 	s.translationRoutes(auth, admin)
+	s.noteTemplateRoutes(auth, admin)
 	s.permRoutes(auth)
 	s.uiTextRoutes(api, admin)
 	s.chatAdminRoutes(auth, admin)

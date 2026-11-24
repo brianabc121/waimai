@@ -35,7 +35,15 @@ export interface Item {
   name_tr?: string; description_tr?: string; details_tr?: string
   // a short code staff type to find the dish, such as B1
   code?: string
+  // Flavour note templates (docs/NOTE_TEMPLATE_DESIGN.md): the ones the dish
+  // shows, and their groups with the tags on offer.
+  note_template_ids?: number[]; notes?: NoteGroup[]
 }
+export interface NoteTag { id: number; name: string; name_en: string; active: boolean; name_tr?: string }
+export interface NoteGroup { id: number; name: string; name_en: string; multi: boolean; tags: NoteTag[]; name_tr?: string }
+export interface NoteTemplate { id: number; name: string; icon: string; sort: number; groups: NoteGroup[]; item_ids: number[] }
+// A chosen tag as the order line keeps it.
+export interface LineNoteTag { id: number; group: string; name: string; group_tr?: string; name_tr?: string }
 export interface Category { id: number; name: string; name_en: string; sort: number; required?: boolean; items: Item[]; name_tr?: string }
 export interface Promotion {
   id: number; name: string; name_en: string; kind: 'amount_off' | 'percent_off' | 'free_delivery'
@@ -72,6 +80,7 @@ export interface LineOption { group: string; group_en: string; name: string; nam
 export interface OrderItem {
   id: number; item_id: number; name: string; name_en: string; name_tr?: string; unit_price: number; qty: number; line_total: number
   options: LineOption[]; note: string; needs_prep: boolean; prep_status: string
+  note_tags?: LineNoteTag[]
   station_id: number | null; station_name: string
   batch_seq: number; batch_source: string; served_at: string | null; void_reason?: string
   basket: number
@@ -87,7 +96,7 @@ export interface OrderCard {
   can_review: boolean; reviewed: boolean; aftersale: '' | 'open' | 'resolved' | 'declined'
 }
 export interface Reorder { slug: string; service_type: 'delivery' | 'pickup'
-  lines: { item_id: number; qty: number; option_ids: number[]; note: string; basket: number }[]; missing: { name: string; name_en: string }[] }
+  lines: { item_id: number; qty: number; option_ids: number[]; note: string; note_tag_ids?: number[]; basket: number }[]; missing: { name: string; name_en: string }[] }
 export interface DeliveryTask {
   id: number; rider_id: number; rider_name: string; rider_phone: string; assignment_version: number
   status: string; fail_reason: string; assigned_at: string; seen_at: string | null; proof_at: string | null
@@ -126,16 +135,17 @@ export interface TableSummary { id: number; order_id: number; public_no: string;
 export interface DiningTable { id: number; name: string; qr_token: string; active: boolean; sort: number; session: TableSummary | null; devices: TableDevice[] }
 export interface Bill { session_id: number; table_id: number; table_name: string; status: 'open' | 'closed'; guests: number; opened_at: string; closed_at: string | null; order: Order }
 export interface TableAccess { slug: string; store_name: string; table_name: string; mode: 'qr' | 'ipad' }
-export interface BatchLine { item_id: number; qty: number; option_ids: number[]; note: string }
+export interface BatchLine { item_id: number; qty: number; option_ids: number[]; note: string; note_tag_ids?: number[] }
 export interface Quote { id: string; currency: string; service_type: string; zone_name: string; zone_distance_m: number | null; scheduled_for: string | null; totals: Totals; expires_at: string
   coupons: AppliedCoupon[]; coupon_choices: CouponChoice[]
-  lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string; basket?: number }[] }
+  lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string; note_tags?: LineNoteTag[]; basket?: number }[] }
 export interface ImportSpecGroup { name: string; min_select: number; max_select: number; options: { name: string; price_delta: number }[] }
 export interface ImportRow {
   line: number; category: string; name: string; name_en: string; description: string; price: number; station: string
   published: boolean | null; dine_in: boolean | null; delivery: boolean | null; pickup: boolean | null
   image_url: string; image_set: boolean; photos: string[]; photos_set: boolean; details: string; details_set: boolean
   specs: ImportSpecGroup[]; specs_set: boolean; new_category?: boolean
+  note_templates?: string[]; note_templates_set?: boolean
   action: string; old_price?: number; errors: string[]
 }
 export interface MenuImport {

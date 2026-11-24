@@ -5,6 +5,7 @@ import { computed, ref } from 'vue'
 import { cart, linePrice, MAX_BASKETS, moveLine, type CartLine } from '../cart'
 import { money, pick, t, mn } from '../i18n'
 import type { Item, Storefront } from '../types'
+import { cartTags } from '../notes'
 
 const props = defineProps<{ store: Storefront; items: Map<number, Item>; currency: string; orderable: (it: Item) => boolean }>()
 const emit = defineEmits<{ empty: [] }>()
@@ -67,7 +68,7 @@ function moveTo(l: CartLine, b: number) { moving.value = ''; moveLine(l, b) }
         <div class="grow">
           <div class="nm">{{ name(l) }}</div>
           <div class="muted small" v-if="optionNames(l)">{{ optionNames(l) }}</div>
-          <div class="muted small" v-if="l.note">{{ t('note') }}: {{ l.note }}</div>
+          <div class="note-line" v-if="l.note || l.note_tags?.length" data-testid="cart-notes">{{ [...cartTags(items.get(l.item_id), l.note_tags), l.note].filter(Boolean).join(' · ') }}</div>
           <div v-if="bad(l)" class="small" style="color:var(--bad)">{{ t('unavailable') }}</div>
           <div v-else class="pr">{{ money(linePrice(l, items)!, currency) }}</div>
         </div>

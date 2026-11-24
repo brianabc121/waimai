@@ -3,7 +3,9 @@ import LangButton from './LangButton.vue'
 import { computed, defineAsyncComponent, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError, get, post } from '../api'
-import { addLine, linePrice, useCart } from '../cart'
+import { addLine, linePrice, pruneNoteTags, useCart } from '../cart'
+import { hasNotes } from '../notes'
+import NotePicker from './NotePicker.vue'
 import { locale, menuOriginal, money, pick, promoLabel, setLocale, t, mn, mt, sn } from '../i18n'
 import { mallSpot } from '../mall'
 import { defaultTemplate } from '../theme'
@@ -44,6 +46,7 @@ async function load() {
   try {
     const s = await get<Storefront>(`/stores/${props.slug}?lang=${locale.value}`)
     store.value = s
+    pruneNoteTags(items.value)
     document.title = sn(s.branch)
     // "Home" in the bottom navigation comes back to the store last looked at.
     rememberStore({ slug: props.slug, name: sn(s.branch), currency: s.branch.currency })
@@ -165,17 +168,17 @@ const dish = ref<Item | null>(null)
 // Choosing options goes on in the options sheet, over the dish page's place.
 function addFromDish() {
   const it = dish.value!
-  if (it.groups.length) dish.value = null
+  if (it.groups.length || hasNotes(it)) dish.value = null
   open(it)
 }
 
 // ---- item sheet ----
-const sheet = reactive<{ item: Item | null; chosen: Set<number>; qty: number; note: string }>({ item: null, chosen: new Set(), qty: 1, note: '' })
+const sheet = reactive<{ item: Item | null; chosen: Set<number>; qty: number; note: string; tags: number[] }>({ item: null, chosen: new Set(), qty: 1, note: '', tags: [] })
 
 function open(it: Item) {
   if (!orderable(it)) return
-  if (it.groups.length === 0) { addLine(it, [], 1, ''); return }
-  sheet.item = it; sheet.chosen = new Set(); sheet.qty = 1; sheet.note = ''
+  if (it.groups.length === 0 && !hasNotes(it)) { addLine(it, [], 1, ''); return }
+  sheet.item = it; sheet.chosen = new Set(); sheet.qty = 1; sheet.note = ''; sheet.tags = []
 }
 
 function toggle(groupIdx: number, optionId: number) {
@@ -197,7 +200,7 @@ const sheetPrice = computed(() => {
 
 function confirmSheet() {
   if (!sheet.item || sheetMissing.value) return
-  addLine(sheet.item, [...sheet.chosen], sheet.qty, sheet.note)
+  addLine(sheet.item, [...sheet.chosen], sheet.qty, sheet.note, sheet.tags)
   sheet.item = null
 }
 
@@ -484,7 +487,13 @@ async function sendReport() {
                 <span class="price muted" v-if="o.price_delta">+{{ money(o.price_delta, cur) }}</span>
               </label>
             </div>
-            <label class="field"><span>{{ t('note') }}</span><input v-model="sheet.note" maxlength="200" :placeholder="t('note_ph')" /></label>
+            <section v-if="sheet.item.notes?.length" class="notes-sec" data-testid="sheet-notes">
+              <h3>{{ t('nt.title') }}</h3>
+              <div class="muted small" style="margin:-4px 0 10px">{{ t('nt.free') }}</div>
+              <NotePicker v-model="sheet.tags" :groups="sheet.item.notes" />
+            </section>
+            <label class="field"><span>{{ t('note') }}</span><input v-model="sheet.note" maxlength="200" data-testid="sheet-note"
+              :placeholder="sheet.item.notes?.length ? t('nt.other_ph') : t('note_ph')" /></label>
           </div>
           <div class="sheet-foot row between">
             <span class="stepper"><button @click="sheet.qty = Math.max(1, sheet.qty - 1)">−</button><span>{{ sheet.qty }}</span><button class="fill" @click="sheet.qty = Math.min(99, sheet.qty + 1)">+</button></span>
@@ -666,6 +675,8 @@ async function sendReport() {
 
 .opt { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .opt.off { opacity: .5; }
+.notes-sec { border-top: 1px solid var(--line); padding-top: 10px; }
+.notes-sec h3 { margin: 0 0 6px; }
 
 /* the cart bar: a white card with the basket, the sums and the checkout button */
 .shop .bottombar.cartbar { background: none; border: 0; pointer-events: none; z-index: 30; }

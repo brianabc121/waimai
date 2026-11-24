@@ -460,9 +460,10 @@ func (a *App) AddBatch(ctx context.Context, sessionID int64, source, idemKey str
 				status = "ready"
 			}
 			if _, err := tx.Exec(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name, name_en,
-				unit_price, qty, line_total, options, note, needs_prep, prep_status, name_customer)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, s.OrderID, b.ID, batchID, l.ItemID, l.Name,
-				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, status, l.NameTr); err != nil {
+				unit_price, qty, line_total, options, note, needs_prep, prep_status, name_customer, note_tags)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`, s.OrderID, b.ID, batchID, l.ItemID, l.Name,
+				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, status, l.NameTr,
+				noteTagsJSON(l.NoteTags)); err != nil {
 				return wrap("insert batch item", err)
 			}
 		}

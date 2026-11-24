@@ -19,7 +19,7 @@ extend({
   'mtr.lang_on': ['开', 'On'], 'mtr.lang_off': ['关', 'Off'],
   'mtr.lang_on_hint': ['这种语言已关闭，顾客看英文。点击打开', 'Off: customers get English. Turn on'],
   'mtr.lang_off_hint': ['点击关闭这种语言，顾客改看英文', 'Turn off: customers get English instead'],
-  'mtr.k_item': ['菜名', 'Dish names'], 'mtr.k_category': ['分类', 'Categories'], 'mtr.k_option': ['规格', 'Options'],
+  'mtr.k_item': ['菜名', 'Dish names'], 'mtr.k_category': ['分类', 'Categories'], 'mtr.k_option': ['规格', 'Options'], 'mtr.k_note': ['口味模板', 'Flavour notes'],
   'mtr.k_description': ['描述', 'Descriptions'], 'mtr.k_details': ['详情', 'Details'], 'mtr.k_promotion': ['优惠活动', 'Offers'],
   'mtr.original': ['原文', 'Original'],
   'mtr.st_machine': ['机器翻译', 'Machine'], 'mtr.st_converted': ['简繁转换', 'Converted'], 'mtr.st_human': ['商家已改', 'Yours'],

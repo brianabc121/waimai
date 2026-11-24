@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { cartTags, noteLine } from '../notes'
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { listAddresses, sorted, usable, whoLine, type Address } from '../addresses'
@@ -165,13 +166,13 @@ interface Shown { item_id: number; name: string; options: string; note: string; 
 // yet), as the menu has them.
 const lines = computed<Shown[]>(() => {
   if (quote.value) return quote.value.lines.map(l => ({ item_id: l.item_id, name: mn(l), options: l.options.map(o => mn(o)).join(' · '),
-    note: l.note, qty: l.qty, total: l.line_total, basket: l.basket || 1 }))
+    note: noteLine(l, true), qty: l.qty, total: l.line_total, basket: l.basket || 1 }))
   const sent = quoteItems()
   return cart.lines.map((l, i) => {
     const it = items.value.get(l.item_id), unit = linePrice(l, items.value)
     const names = new Map((it?.groups ?? []).flatMap(g => g.options).map(o => [o.id, mn(o)]))
     return { item_id: l.item_id, name: it ? mn(it) : '', options: l.option_ids.map(id => names.get(id) ?? '').filter(Boolean).join(' · '),
-      note: l.note, qty: l.qty, total: unit == null ? null : unit * l.qty, basket: sent[i].basket }
+      note: [...cartTags(it, l.note_tags), l.note].filter(Boolean).join(' · '), qty: l.qty, total: unit == null ? null : unit * l.qty, basket: sent[i].basket }
   }).filter(l => l.name)
 })
 const baskets = computed(() => {
@@ -323,7 +324,7 @@ async function submit() {
             <div class="grow">
               <div class="n clamp2">{{ l.name }}</div>
               <div class="sub" v-if="l.options">{{ l.options }}</div>
-              <div class="sub" v-if="l.note">{{ t('note') }}: {{ l.note }}</div>
+              <div class="note-line" v-if="l.note" data-testid="co-notes">{{ l.note }}</div>
             </div>
             <span class="qty">×{{ l.qty }}</span>
             <b class="price" v-if="l.total != null">{{ money(l.total, cur) }}</b>

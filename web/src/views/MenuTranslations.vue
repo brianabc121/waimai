@@ -8,10 +8,11 @@ import { get, post, put } from '../api'
 import { t } from '../i18n'
 import { fmtDateTime } from './admin/util'
 import { LANGS, type Locale } from '../langs'
-import type { Category, Item } from '../types'
+import type { Category, Item, NoteTemplate } from '../types'
 import './translateStrings'
 
-const props = defineProps<{ base: string; cats: Category[]; item?: Item | null; readonly?: boolean }>()
+const props = defineProps<{ base: string; cats: Category[]; item?: Item | null; tpl?: NoteTemplate | null; readonly?: boolean }>()
+const single = computed(() => !!(props.item || props.tpl))
 const emit = defineEmits<{ (e: 'close'): void }>()
 
 interface Field { entity: string; entity_id: number; field: string; text: string }
@@ -36,6 +37,9 @@ async function load() {
   try { take(await get<View>(`${props.base}/translations`)) } catch (e) { error.value = (e as Error).message }
 }
 onMounted(load)
+// the flavour note templates, to say which template a group or tag is in
+const tpls = ref<NoteTemplate[]>([])
+onMounted(async () => { try { tpls.value = (await get<{ templates: NoteTemplate[] }>(`${props.base}/note-templates`)).templates } catch { /* names only */ } })
 onUnmounted(() => clearTimeout(timer))
 
 async function send(fn: () => Promise<View>) {
@@ -46,8 +50,8 @@ async function send(fn: () => Promise<View>) {
 }
 
 // ---- which rows ----
-type Kind = 'item' | 'category' | 'option' | 'description' | 'details' | 'promotion'
-const kinds: Kind[] = ['item', 'category', 'option', 'description', 'details', 'promotion']
+type Kind = 'item' | 'category' | 'option' | 'note' | 'description' | 'details' | 'promotion'
+const kinds: Kind[] = ['item', 'category', 'option', 'note', 'description', 'details', 'promotion']
 const kind = ref<Kind>('item')
 const ofKind = (f: Field, k: Kind) => {
   switch (k) {
@@ -55,15 +59,22 @@ const ofKind = (f: Field, k: Kind) => {
     case 'description': return f.entity === 'item' && f.field === 'description'
     case 'details': return f.entity === 'item' && f.field === 'details'
     case 'option': return f.entity === 'group' || f.entity === 'option'
+    case 'note': return f.entity === 'note_group' || f.entity === 'note_tag'
     default: return f.entity === k
   }
 }
 // one dish: its own texts, its option groups and options
 const mine = computed(() => {
+  if (props.tpl) {
+    const keys = new Set<string>()
+    for (const g of props.tpl.groups) { keys.add(`note_group/${g.id}`); for (const x of g.tags) keys.add(`note_tag/${x.id}`) }
+    return keys
+  }
   const it = props.item
   if (!it) return null
   const keys = new Set([`item/${it.id}`])
   for (const g of it.groups) { keys.add(`group/${g.id}`); for (const o of g.options) keys.add(`option/${o.id}`) }
+  for (const g of it.notes ?? []) { keys.add(`note_group/${g.id}`); for (const x of g.tags) keys.add(`note_tag/${x.id}`) }
   return keys
 })
 const rows = computed(() => (view.value?.fields ?? []).filter(f =>
@@ -75,6 +86,10 @@ const dishOf = computed(() => {
   for (const c of props.cats) for (const it of c.items) for (const g of it.groups) {
     m.set(`group/${g.id}`, it.name)
     for (const o of g.options) m.set(`option/${o.id}`, `${it.name} · ${g.name}`)
+  }
+  for (const tp of tpls.value) for (const g of tp.groups) {
+    m.set(`note_group/${g.id}`, tp.name)
+    for (const x of g.tags) m.set(`note_tag/${x.id}`, g.name ? `${tp.name} · ${g.name}` : tp.name)
   }
   return m
 })
@@ -151,7 +166,7 @@ const badge = (c: Tr | undefined) => c ? t('mtr.st_' + c.status) : t('mtr.st_mis
   <div class="dim" @click.self="emit('close')">
     <div class="tr-box tr-sheet" data-testid="tr-dialog">
       <div class="row between">
-        <h2>{{ item ? t('mtr.title_item', { name: item.name }) : t('mtr.title') }}</h2>
+        <h2>{{ item ? t('mtr.title_item', { name: item.name }) : tpl ? t('mtr.title_item', { name: tpl.name }) : t('mtr.title') }}</h2>
         <button class="btn small" data-testid="tr-close" @click="emit('close')">✕</button>
       </div>
       <div v-if="error" class="banner bad">{{ error }}</div>
@@ -163,7 +178,7 @@ const badge = (c: Tr | undefined) => c ? t('mtr.st_' + c.status) : t('mtr.st_mis
         </div>
         <div v-if="view.pending" class="banner info" data-testid="tr-pending">{{ t('mtr.pending') }}</div>
 
-        <div v-if="!item" class="tr-head">
+        <div v-if="!single" class="tr-head">
           <label class="row" style="gap:6px">{{ t('mtr.menu_lang') }}
             <select :value="view.menu_lang" :disabled="readonly || busy" data-testid="tr-menu-lang" @change="setMenuLang(($event.target as HTMLSelectElement).value)">
               <option v-for="l in LANGS" :key="l.code" :value="l.code">{{ l.name }}</option>
@@ -171,9 +186,9 @@ const badge = (c: Tr | undefined) => c ? t('mtr.st_' + c.status) : t('mtr.st_mis
           <span class="small muted">{{ t('mtr.stats', stats) }}</span>
           <button v-if="!readonly && view.provider" class="btn small" :disabled="busy" data-testid="tr-retranslate" @click="retranslate">{{ t('mtr.retranslate') }}</button>
         </div>
-        <div v-if="!item" class="small muted">{{ t('mtr.menu_lang_hint') }}</div>
+        <div v-if="!single" class="small muted">{{ t('mtr.menu_lang_hint') }}</div>
 
-        <div v-if="!item" class="tr-kinds">
+        <div v-if="!single" class="tr-kinds">
           <button v-for="k in kinds" :key="k" class="chip" :class="{ on: kind === k }" :data-testid="'tr-kind-' + k" @click="kind = k">
             {{ t('mtr.k_' + k) }} <span class="muted">{{ count(k) }}</span></button>
         </div>
@@ -193,7 +208,7 @@ const badge = (c: Tr | undefined) => c ? t('mtr.st_' + c.status) : t('mtr.st_mis
               <tr v-for="f in rows" :key="`${f.entity}/${f.entity_id}/${f.field}`" :data-testid="`tr-row-${f.entity}-${f.entity_id}-${f.field}`">
                 <td class="orig"><div>{{ f.text }}</div>
                   <div v-if="dishOf.get(`${f.entity}/${f.entity_id}`)" class="small muted">{{ dishOf.get(`${f.entity}/${f.entity_id}`) }}</div>
-                  <div v-if="item" class="small muted">{{ t('mtr.k_' + (f.entity === 'item' ? (f.field === 'name' ? 'item' : f.field) : f.entity === 'group' || f.entity === 'option' ? 'option' : f.entity)) }}</div></td>
+                  <div v-if="item" class="small muted">{{ t('mtr.k_' + (f.entity === 'item' ? (f.field === 'name' ? 'item' : f.field) : f.entity === 'group' || f.entity === 'option' ? 'option' : f.entity.startsWith('note_') ? 'note' : f.entity)) }}</div></td>
                 <td v-for="l in cols" :key="l.code" class="tr-cell" :class="[cell(f, l.code)?.status ?? 'missing', { off: off(l.code) }]"
                   :data-testid="`tr-cell-${f.entity}-${f.entity_id}-${f.field}-${l.code}`" :dir="l.code === 'ar' ? 'rtl' : undefined" @click="edit(f, l.code)">
                   <div class="tx">{{ cell(f, l.code)?.text ?? '—' }}</div>

@@ -2,27 +2,30 @@
 // The item editor, shared by the merchant's menu page and the platform back
 // office. `base` is the API prefix of the branch, for example
 // /merchant/branches/3 or /admin/branches/3.
-import { reactive, ref } from 'vue'
-import { ApiError, post, put } from '../api'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { ApiError, get, post, put } from '../api'
 import { both, t, toMajor, toMinor } from '../i18n'
-import type { Item, Station } from '../types'
+import type { Item, NoteTemplate, Station } from '../types'
+import '../notes'
 import ImageUpload from './ImageUpload.vue'
 import PhotoList from './PhotoList.vue'
 import './manualStrings'
 
 const props = defineProps<{ item: Item | null; categoryId?: number; cats: { id: number; name: string }[]; stations: Station[]; cur: string; base: string }>()
-const emit = defineEmits<{ saved: []; close: [] }>()
+const emit = defineEmits<{ saved: []; close: []; 'manage-notes': [] }>()
 
 interface OptForm { name: string; name_en: string; extra: number; sold_out: boolean }
 interface GroupForm { name: string; name_en: string; min_select: number; max_select: number; options: OptForm[] }
 interface Form { id: number; category_id: number; code: string; name: string; name_en: string; description: string; image_url: string
   photos: string[]; details: string
   price: number; published: boolean; sold_out: boolean; limited: boolean; stock: number; needs_prep: boolean
-  delivery_available: boolean; pickup_available: boolean; dine_in_available: boolean; sort: number; station_id: number | null; groups: GroupForm[] }
+  delivery_available: boolean; pickup_available: boolean; dine_in_available: boolean; sort: number; station_id: number | null; groups: GroupForm[]
+  note_template_ids: number[] }
 
 function blank(): Form {
   return { id: 0, category_id: 0, code: '', name: '', name_en: '', description: '', image_url: '', photos: [], details: '', price: 0, published: false, sold_out: false,
-    limited: false, stock: 0, needs_prep: true, delivery_available: true, pickup_available: true, dine_in_available: true, sort: 0, station_id: null, groups: [] }
+    limited: false, stock: 0, needs_prep: true, delivery_available: true, pickup_available: true, dine_in_available: true, sort: 0, station_id: null, groups: [],
+    note_template_ids: [] }
 }
 
 const it = props.item
@@ -33,9 +36,26 @@ const f = reactive<Form>(it ? {
   needs_prep: it.needs_prep, delivery_available: it.delivery_available, pickup_available: it.pickup_available, dine_in_available: it.dine_in_available ?? true, sort: it.sort, station_id: it.station_id,
   groups: it.groups.map(g => ({ name: g.name, name_en: g.name_en, min_select: g.min_select, max_select: g.max_select,
     options: g.options.map(o => ({ name: o.name, name_en: o.name_en, extra: toMajor(o.price_delta), sold_out: o.sold_out })) })),
+  note_template_ids: [...(it.note_template_ids ?? [])],
 } : { ...blank(), category_id: props.categoryId || props.cats[0]?.id || 0 })
 const error = ref('')
 const busy = ref(false)
+
+// The store's flavour note templates (docs/NOTE_TEMPLATE_DESIGN.md §5.2): up to three per dish.
+const MAX_NOTES = 3
+const templates = ref<NoteTemplate[]>([])
+const showAllNotes = ref(false)
+onMounted(async () => {
+  templates.value = (await get<{ templates: NoteTemplate[] }>(`${props.base}/note-templates`).catch(() => ({ templates: [] }))).templates
+})
+const shownTemplates = computed(() => showAllNotes.value || templates.value.length <= 4 ? templates.value
+  : templates.value.filter((x, i) => i < 3 || f.note_template_ids.includes(x.id)))
+function toggleNote(id: number) {
+  const i = f.note_template_ids.indexOf(id)
+  if (i >= 0) f.note_template_ids.splice(i, 1)
+  else if (f.note_template_ids.length < MAX_NOTES) f.note_template_ids.push(id)
+}
+const tplSummary = (x: NoteTemplate) => x.groups.map(g => (g.name ? g.name + '：' : '') + g.tags.filter(t => t.active).map(t => t.name).join('、')).join(' · ')
 
 async function save() {
   const body = {
@@ -44,6 +64,7 @@ async function save() {
     needs_prep: f.needs_prep, delivery_available: f.delivery_available, pickup_available: f.pickup_available, dine_in_available: f.dine_in_available, sort: f.sort, station_id: f.needs_prep ? f.station_id : null,
     groups: f.groups.map(g => ({ name: g.name, name_en: g.name_en, min_select: Number(g.min_select), max_select: Number(g.max_select),
       options: g.options.map(o => ({ name: o.name, name_en: o.name_en, price_delta: toMinor(o.extra), sold_out: o.sold_out })) })),
+    note_template_ids: f.note_template_ids,
   }
   error.value = ''; busy.value = true
   try {
@@ -95,6 +116,23 @@ async function save() {
             <option v-for="x in stations.filter(x => x.active || x.id === f.station_id)" :key="x.id" :value="x.id">{{ both(x.name, x.name_en) }}</option>
           </select></label>
 
+        <section class="notes" data-testid="item-notes">
+          <h3>{{ t('nt.tab_templates') }}</h3>
+          <div class="muted small" style="margin-bottom:8px">{{ t('nt.form_hint') }}</div>
+          <div v-if="!templates.length" class="muted small">{{ t('nt.none_yet') }} <a href="#" @click.prevent="emit('manage-notes')">{{ t('nt.manage') }}</a></div>
+          <div class="tplpick">
+            <label v-for="x in shownTemplates" :key="x.id" :class="{ on: f.note_template_ids.includes(x.id), off: !f.note_template_ids.includes(x.id) && f.note_template_ids.length >= MAX_NOTES }">
+              <input type="checkbox" :checked="f.note_template_ids.includes(x.id)" :disabled="!f.note_template_ids.includes(x.id) && f.note_template_ids.length >= MAX_NOTES"
+                :data-testid="'item-note-' + x.name" @change="toggleNote(x.id)" />
+              <div><b>{{ x.icon }} {{ x.name }}</b><small>{{ tplSummary(x) }}</small></div>
+            </label>
+          </div>
+          <div v-if="templates.length" class="row between small" style="margin-top:6px">
+            <a href="#" @click.prevent="emit('manage-notes')">{{ t('nt.manage') }}</a>
+            <a v-if="shownTemplates.length < templates.length" href="#" @click.prevent="showAllNotes = true">+{{ templates.length - shownTemplates.length }}</a>
+          </div>
+        </section>
+
         <h3 style="margin:14px 0 8px">{{ t('option_groups') }}</h3>
         <div v-for="(g, gi) in f.groups" :key="gi" class="card stack" style="margin-bottom:10px;background:#fafafa">
           <div class="grid2">
@@ -127,4 +165,11 @@ async function save() {
 <style scoped>
 .chans { display: flex; flex-wrap: wrap; gap: 4px 20px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: center; }
+.notes { margin-top: 14px; }
+.notes h3 { margin: 0 0 4px; }
+.tplpick { display: grid; gap: 8px; }
+.tplpick label { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; cursor: pointer; }
+.tplpick label.on { border-color: var(--brand); background: var(--brand-soft); }
+.tplpick label.off { opacity: .55; cursor: default; }
+.tplpick small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; overflow-wrap: anywhere; }
 </style>
