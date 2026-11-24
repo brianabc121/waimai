@@ -202,6 +202,22 @@
   .note { position: absolute; z-index: 50; background: #2b1a12; color: #fbe7b3; font-size: 13px; line-height: 1.5; border-radius: 10px; padding: 8px 12px; box-shadow: 0 6px 18px rgba(0,0,0,.25); max-width: 300px; }
   .note b { color: #fff; }
   .note::before { content: attr(data-n); display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--gold); color: var(--red-deep); font-weight: 800; font-size: 12px; margin-inline-end: 6px; }
+
+  /* 菜品格带图片 */
+  .dt { height: auto; padding: 0; border-top: 1.5px solid var(--line); overflow: visible; }
+  .dt .pic { height: 96px; border-radius: 10px 10px 0 0; background: #f3e7d4 center / cover no-repeat; }
+  .dt .pic.none { display: grid; place-items: center; background: linear-gradient(135deg, #f8e3b2, #f3d3a0); }
+  .dt .pic.none span { font-size: 30px; font-weight: 800; color: rgba(143,37,27,.55); letter-spacing: 2px; }
+  .dt .code { position: absolute; top: 7px; inset-inline-start: 7px; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  .dt .tx { padding: 7px 10px 9px; display: flex; flex-direction: column; gap: 4px; }
+  .dt .nm { margin-top: 0; font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dt .n { z-index: 2; }
+  .dt.on { box-shadow: 0 0 0 2px var(--red); border-color: var(--red); }
+  .dt.out .pic { filter: grayscale(1); }
+  .ln .th { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex: none; }
+  .pi .th { width: 60px; height: 60px; border-radius: 9px; object-fit: cover; flex: none; }
+  .pi .th.none { display: grid; place-items: center; background: #f8e3b2; color: rgba(143,37,27,.6); font-weight: 800; }
+  .mpic { height: 120px; background: center / cover no-repeat; }
 </style>
 </head>
 <body>
@@ -310,46 +326,42 @@
   </div>
   <div class="body">
     <div class="cats">
-      <div>常点</div><div class="on">热菜<i>3</i></div><div>凉菜</div><div>汤</div><div>面饭</div><div>饮品<i>2</i></div><div>甜品</div><div>酒水</div>
+      <div class="on">常点<i>5</i></div><div>面饭<i>1</i></div><div>炸物<i>2</i></div><div>便当</div><div>小菜</div><div>汤</div><div>饮品<i>2</i></div><div>甜品</div>
     </div>
     <div class="dishes">
       <div class="dbar"><span class="ch on">全部</span><span class="ch">招牌</span><span class="ch">辣</span><span class="ch" style="margin-inline-start:auto">🔢 按编号点</span></div>
       <div class="dgrid">
-        <div class="dt c2 on"><span class="n">1</span><span class="code">C12</span><span class="nm">小炒黄牛肉</span><div class="ft"><span class="pr">₱260</span><span class="mk">规格</span><span class="mk">口味</span></div></div>
-        <div class="dt c2 on"><span class="n">2</span><span class="code">C01</span><span class="nm">鱼香肉丝</span><div class="ft"><span class="pr">₱180</span><span class="mk">口味</span></div></div>
-        <div class="dt c2"><span class="code">C02</span><span class="nm">宫保鸡丁</span><div class="ft"><span class="pr">₱190</span><span class="mk">口味</span></div></div>
-        <div class="dt c2"><span class="code">C03</span><span class="nm">麻婆豆腐</span><div class="ft"><span class="pr">₱150</span><span class="mk">口味</span></div></div>
-        <div class="dt c2"><span class="code">C05</span><span class="nm">酸菜鱼</span><div class="ft"><span class="pr">₱420</span><span class="mk">规格</span><span class="left">剩 2</span></div></div>
-        <div class="dt c2"><span class="code">C06</span><span class="nm">蒜蓉菜心</span><div class="ft"><span class="pr">₱120</span></div></div>
-        <div class="dt c2 out"><span class="code">C07</span><span class="nm">干锅花菜</span><div class="ft"><span class="pr">₱160</span><span class="so">售完</span></div></div>
-        <div class="dt c2"><span class="code">C08</span><span class="nm">红烧肉</span><div class="ft"><span class="pr">₱280</span></div></div>
-        <div class="dt c2"><span class="code">C09</span><span class="nm">糖醋里脊</span><div class="ft"><span class="pr">₱220</span></div></div>
-        <div class="dt c2"><span class="code">C10</span><span class="nm">水煮牛肉</span><div class="ft"><span class="pr">₱320</span><span class="mk">口味</span></div></div>
-        <div class="dt c2"><span class="code">C11</span><span class="nm">香辣虾</span><div class="ft"><span class="pr">₱380</span><span class="mk">规格</span></div></div>
-        <div class="dt c2"><span class="code">C13</span><span class="nm">西红柿炒蛋</span><div class="ft"><span class="pr">₱130</span></div></div>
-        <div class="dt c2"><span class="code">C14</span><span class="nm">地三鲜</span><div class="ft"><span class="pr">₱140</span></div></div>
-        <div class="dt c2"><span class="code">C15</span><span class="nm">回锅肉</span><div class="ft"><span class="pr">₱210</span><span class="mk">口味</span></div></div>
-        <div class="dt c2"><span class="code">C16</span><span class="nm">清炒时蔬</span><div class="ft"><span class="pr">₱110</span></div></div>
-        <div class="dt c2"><span class="code">C17</span><span class="nm">椒盐排骨</span><div class="ft"><span class="pr">₱260</span></div></div>
+        <div class="dt on"><span class="n">1</span><div class="pic" style="background-image:url(../../web/public/demo/beef-noodle-soup.jpg)"></div><span class="code">M01</span><div class="tx"><span class="nm">红烧牛肉面</span><div class="ft"><span class="pr">₱220</span><span class="mk">规格</span><span class="mk">口味</span></div></div></div>
+        <div class="dt on"><span class="n">2</span><div class="pic" style="background-image:url(../../web/public/demo/popcorn-chicken.jpg)"></div><span class="code">F01</span><div class="tx"><span class="nm">盐酥鸡</span><div class="ft"><span class="pr">₱150</span><span class="mk">口味</span></div></div></div>
+        <div class="dt"><div class="pic" style="background-image:url(../../web/public/demo/braised-pork-rice.jpg)"></div><span class="code">R01</span><div class="tx"><span class="nm">卤肉饭</span><div class="ft"><span class="pr">₱120</span></div></div></div>
+        <div class="dt"><div class="pic" style="background-image:url(../../web/public/demo/bento.jpg)"></div><span class="code">B01</span><div class="tx"><span class="nm">招牌便当</span><div class="ft"><span class="pr">₱180</span><span class="mk">规格</span><span class="left">剩 2</span></div></div></div>
+        <div class="dt"><div class="pic" style="background-image:url(../../web/public/demo/chicken-cutlet.jpg)"></div><span class="code">F02</span><div class="tx"><span class="nm">香酥鸡排</span><div class="ft"><span class="pr">₱160</span><span class="mk">口味</span></div></div></div>
+        <div class="dt"><div class="pic" style="background-image:url(../../web/public/demo/fried-combo.jpg)"></div><span class="code">F03</span><div class="tx"><span class="nm">炸物拼盘</span><div class="ft"><span class="pr">₱280</span><span class="mk">规格</span></div></div></div>
+        <div class="dt out"><div class="pic" style="background-image:url(../../web/public/demo/sweet-potato-fries.jpg)"></div><span class="code">F04</span><div class="tx"><span class="nm">地瓜薯条</span><div class="ft"><span class="pr">₱90</span><span class="so">售完</span></div></div></div>
+        <div class="dt on"><span class="n">1</span><div class="pic" style="background-image:url(../../web/public/demo/bubble-milk-tea.jpg)"></div><span class="code">D01</span><div class="tx"><span class="nm">珍珠奶茶</span><div class="ft"><span class="pr">₱120</span><span class="mk">规格</span><span class="mk">口味</span></div></div></div>
+        <div class="dt on"><span class="n">1</span><div class="pic" style="background-image:url(../../web/public/demo/iced-lemon-tea.jpg)"></div><span class="code">D02</span><div class="tx"><span class="nm">冰柠檬茶</span><div class="ft"><span class="pr">₱90</span><span class="mk">口味</span></div></div></div>
+        <div class="dt"><div class="pic" style="background-image:url(../../web/public/demo/bottled-water.jpg)"></div><span class="code">D03</span><div class="tx"><span class="nm">矿泉水</span><div class="ft"><span class="pr">₱30</span></div></div></div>
+        <div class="dt"><div class="pic none"><span>蒜蓉</span></div><span class="code">C06</span><div class="tx"><span class="nm">蒜蓉菜心</span><div class="ft"><span class="pr">₱120</span></div></div></div>
+        <div class="dt"><div class="pic none"><span>酸辣</span></div><span class="code">S01</span><div class="tx"><span class="nm">酸辣汤</span><div class="ft"><span class="pr">₱100</span><span class="mk">口味</span></div></div></div>
       </div>
     </div>
     <div class="cart">
       <div class="chd"><h3>这一轮</h3><span class="muted">还没送厨</span><span class="clr">清空</span></div>
-      <div class="ln"><div class="lt"><b>小炒黄牛肉</b><div class="opt">大份 +₱80</div><div class="tags"><span>微辣</span><span>不要香菜</span></div></div><div class="lp">₱340<div class="stp s"><i>−</i><b>1</b><i class="f">＋</i></div></div></div>
-      <div class="ln on"><div class="lt"><b>鱼香肉丝</b><div class="tags"><span>少油</span></div></div><div class="lp">₱360<div class="stp s"><i>−</i><b>2</b><i class="f">＋</i></div></div></div>
-      <div class="ln"><div class="lt"><b>珍珠奶茶</b><div class="opt">中杯</div><div class="tags"><span>少糖</span><span>去冰</span></div></div><div class="lp">₱120<div class="stp s"><i>−</i><b>1</b><i class="f">＋</i></div></div></div>
-      <div class="ln"><div class="lt"><b>柠檬绿茶</b><div class="tags"><span>常温</span></div></div><div class="lp">₱90<div class="stp s"><i>−</i><b>1</b><i class="f">＋</i></div></div></div>
+      <div class="ln"><img class="th" src="../../web/public/demo/beef-noodle-soup.jpg"><div class="lt"><b>红烧牛肉面</b><div class="opt">大碗 +₱40 · 加蛋 +₱20</div><div class="tags"><span>微辣</span><span>不要香菜</span></div></div><div class="lp">₱280<div class="stp s"><i>−</i><b>1</b><i class="f">＋</i></div></div></div>
+      <div class="ln on"><img class="th" src="../../web/public/demo/popcorn-chicken.jpg"><div class="lt"><b>盐酥鸡</b><div class="tags"><span>少辣</span></div></div><div class="lp">₱300<div class="stp s"><i>−</i><b>2</b><i class="f">＋</i></div></div></div>
+      <div class="ln"><img class="th" src="../../web/public/demo/bubble-milk-tea.jpg"><div class="lt"><b>珍珠奶茶</b><div class="opt">中杯</div><div class="tags"><span>少糖</span><span>去冰</span></div></div><div class="lp">₱120<div class="stp s"><i>−</i><b>1</b><i class="f">＋</i></div></div></div>
+      <div class="ln"><img class="th" src="../../web/public/demo/iced-lemon-tea.jpg"><div class="lt"><b>冰柠檬茶</b><div class="tags"><span>少冰</span></div></div><div class="lp">₱90<div class="stp s"><i>−</i><b>1</b><i class="f">＋</i></div></div></div>
       <div class="whole"><div class="wl">整轮要求（点选，可多选）</div>
         <div class="chs"><span class="ch on">先上饮料</span><span class="ch">菜齐再上</span><span class="ch">全部少辣</span><span class="ch">分小碗</span><span class="ch">加急</span></div></div>
       <div class="sent">已送厨 2 轮 · <b>5 道 ₱860</b><span style="margin-inline-start:auto">查看 ›</span></div>
       <div class="cfoot">
-        <div class="tt"><span>这一轮 5 份</span><b>₱910</b></div>
+        <div class="tt"><span>这一轮 5 份</span><b>₱790</b></div>
         <div class="row"><div class="bigbtn ghost">取消</div><div class="bigbtn">送厨（5 份）</div></div>
       </div>
     </div>
   </div>
-  <div class="note" data-n="1" style="left:140px;top:610px;max-width:420px">菜品格<b>点一下 +1</b>；有必选规格或口味模板的会弹出选择框。角上红数字是这一轮已点几份。</div>
-  <div class="note" data-n="2" style="left:812px;top:610px;max-width:330px">点“这一轮”里的一行，可以改数量、口味，或删掉。没有一处要打字。</div>
+  <div class="note" data-n="1" style="left:126px;top:722px;max-width:640px">菜品格带图片，<b>点一下 +1</b>；有必选规格或口味模板的会弹出选择框。没上传图片的菜显示菜名前两个字。</div>
+  <div class="note" data-n="2" style="left:812px;top:640px;max-width:330px">点“这一轮”里的一行，可以改数量、口味，或删掉。没有一处要打字。</div>
 </div>
 </section>
 
@@ -361,7 +373,7 @@
     <span class="sp"></span><span class="who">接单员 · 阿玲</span><span class="shop">马卡蒂小馆</span>
   </div>
   <div class="body">
-    <div class="cats"><div>常点</div><div class="on">热菜</div><div>凉菜</div><div>汤</div><div>面饭</div><div>饮品</div><div>甜品</div></div>
+    <div class="cats"><div class="on">常点</div><div>面饭</div><div>炸物</div><div>便当</div><div>小菜</div><div>汤</div><div>饮品</div></div>
     <div class="dishes"><div class="dgrid">
       <div class="dt c2"></div><div class="dt c2"></div><div class="dt c2"></div><div class="dt c2"></div>
       <div class="dt c2"></div><div class="dt c2"></div><div class="dt c2"></div><div class="dt c2"></div>
@@ -369,13 +381,13 @@
     <div class="cart"></div>
   </div>
   <div class="mask"></div>
-  <div class="modal" style="left:200px;top:70px;width:780px">
-    <div class="mh"><span class="code" style="font-size:12px;font-weight:700;background:var(--ink);color:var(--gold-soft);border-radius:4px;padding:1px 6px">C05</span><h3>酸菜鱼</h3><span style="color:var(--red);font-weight:800;font-size:18px">₱420 起</span><span class="x">✕</span></div>
-    <div class="mb" style="display:grid;gap:16px">
+  <div class="modal" style="left:200px;top:24px;width:780px">
+    <div class="mpic" style="background-image:url(../../web/public/demo/beef-noodle-soup.jpg)"></div><div class="mh"><span class="code" style="font-size:12px;font-weight:700;background:var(--ink);color:var(--gold-soft);border-radius:4px;padding:1px 6px">M01</span><h3>红烧牛肉面</h3><span style="color:var(--red);font-weight:800;font-size:18px">₱220 起</span><span class="x">✕</span></div>
+    <div class="mb" style="display:grid;gap:12px;padding-top:12px">
       <div><div class="lbl">份量 <span class="req">必选</span></div>
-        <div class="chs"><span class="ch">小份 <small>₱420</small></span><span class="ch on">大份 <small>+₱120</small></span></div></div>
-      <div><div class="lbl">鱼片 <small>可多选，加价</small></div>
-        <div class="chs"><span class="ch">加鱼片 <small>+₱80</small></span><span class="ch">加豆芽 <small>+₱20</small></span><span class="ch on">加粉丝 <small>+₱20</small></span></div></div>
+        <div class="chs"><span class="ch">小碗 <small>₱220</small></span><span class="ch on">大碗 <small>+₱40</small></span></div></div>
+      <div><div class="lbl">加料 <small>可多选，加价</small></div>
+        <div class="chs"><span class="ch">加牛肉 <small>+₱80</small></span><span class="ch on">加蛋 <small>+₱20</small></span><span class="ch">加面 <small>+₱20</small></span></div></div>
       <div style="border-top:1px dashed var(--line);padding-top:14px"><div class="lbl">辣度 <small>口味模板 · 单选，不加钱</small></div>
         <div class="chs"><span class="ch">不辣</span><span class="ch on">微辣</span><span class="ch">中辣</span><span class="ch">特辣</span></div></div>
       <div><div class="lbl">忌口 <small>可多选</small></div>
@@ -383,8 +395,8 @@
     </div>
     <div class="mf">
       <div class="stp"><i>−</i><b>1</b><i class="f">＋</i></div>
-      <div style="flex:1;color:var(--muted);font-size:13px;padding:0 8px">大份 · 加粉丝 · 微辣 · 不要香菜</div>
-      <div class="bigbtn" style="width:240px">加入这一轮 ₱560</div>
+      <div style="flex:1;color:var(--muted);font-size:13px;padding:0 8px">大碗 · 加蛋 · 微辣 · 不要香菜</div>
+      <div class="bigbtn" style="width:240px">加入这一轮 ₱280</div>
     </div>
   </div>
   <div class="note" data-n="3" style="left:996px;top:330px;max-width:170px">必选的没选，“加入”按钮是灰的，并把那一组标红。</div>
@@ -456,20 +468,19 @@
   <div class="ph-wrap"><div class="phone">
     <div class="top"><span class="back">‹</span><span class="tablechip" style="font-size:15px">A3<small>3 人</small></span><span class="pill" style="font-size:13px">第 3 轮加菜</span></div>
     <div class="body">
-      <div class="cats" style="width:82px"><div style="height:54px;font-size:14px">常点</div><div class="on" style="height:54px;font-size:14px">热菜<i>3</i></div><div style="height:54px;font-size:14px">凉菜</div><div style="height:54px;font-size:14px">汤</div><div style="height:54px;font-size:14px">面饭</div><div style="height:54px;font-size:14px">饮品<i>2</i></div><div style="height:54px;font-size:14px">甜品</div></div>
+      <div class="cats" style="width:82px"><div class="on" style="height:54px;font-size:14px">常点<i>5</i></div><div style="height:54px;font-size:14px">面饭</div><div style="height:54px;font-size:14px">炸物</div><div style="height:54px;font-size:14px">便当</div><div style="height:54px;font-size:14px">汤</div><div style="height:54px;font-size:14px">饮品<i>2</i></div><div style="height:54px;font-size:14px">甜品</div></div>
       <div class="plist">
-        <div class="pi"><div><span class="code">C12</span> <span class="nm">小炒黄牛肉</span><div class="pr">₱260 <span class="mk">规格</span></div></div><div class="r"><span class="sel">选规格 <b style="background:var(--gold);color:var(--red-deep);border-radius:9px;padding:0 5px">1</b></span></div></div>
-        <div class="pi"><div><span class="code">C01</span> <span class="nm">鱼香肉丝</span><div class="pr">₱180 <span class="mk">口味</span></div></div><div class="r"><div class="stp s"><i>−</i><b>2</b><i class="f">＋</i></div></div></div>
-        <div class="pi"><div><span class="code">C02</span> <span class="nm">宫保鸡丁</span><div class="pr">₱190 <span class="mk">口味</span></div></div><div class="r"><div class="stp s"><i class="f">＋</i></div></div></div>
-        <div class="pi"><div><span class="code">C03</span> <span class="nm">麻婆豆腐</span><div class="pr">₱150</div></div><div class="r"><div class="stp s"><i class="f">＋</i></div></div></div>
-        <div class="pi"><div><span class="code">C05</span> <span class="nm">酸菜鱼</span><div class="pr">₱420 <span class="mk">规格</span></div></div><div class="r"><span class="sel">选规格</span></div></div>
-        <div class="pi"><div><span class="code">C06</span> <span class="nm">蒜蓉菜心</span><div class="pr">₱120</div></div><div class="r"><div class="stp s"><i class="f">＋</i></div></div></div>
-        <div class="pi" style="opacity:.45"><div><span class="code">C07</span> <span class="nm">干锅花菜</span><div class="pr">₱160</div></div><div class="r muted">售完</div></div>
-        <div class="pi"><div><span class="code">C08</span> <span class="nm">红烧肉</span><div class="pr">₱280</div></div><div class="r"><div class="stp s"><i class="f">＋</i></div></div></div>
-        <div class="pi"><div><span class="code">C09</span> <span class="nm">糖醋里脊</span><div class="pr">₱220</div></div><div class="r"><div class="stp s"><i class="f">＋</i></div></div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/beef-noodle-soup.jpg"><div><span class="code">M01</span> <span class="nm">红烧牛肉面</span><div class="pr">₱220 <span class="mk">规格</span><span class="mk">口味</span></div></div><div class="r"><span class="sel">选规格 <b style="background:var(--gold);color:var(--red-deep);border-radius:9px;padding:0 5px">1</b></span></div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/popcorn-chicken.jpg"><div><span class="code">F01</span> <span class="nm">盐酥鸡</span><div class="pr">₱150 <span class="mk">口味</span></div></div><div class="r"><div class="stp s"><i>−</i><b>2</b><i class="f">＋</i></div></div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/braised-pork-rice.jpg"><div><span class="code">R01</span> <span class="nm">卤肉饭</span><div class="pr">₱120 </div></div><div class="r"><div class="stp s"><i class="f">＋</i></div></div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/bento.jpg"><div><span class="code">B01</span> <span class="nm">招牌便当</span><div class="pr">₱180 <span class="mk">规格</span></div></div><div class="r"><span class="sel">选规格</span></div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/chicken-cutlet.jpg"><div><span class="code">F02</span> <span class="nm">香酥鸡排</span><div class="pr">₱160 <span class="mk">口味</span></div></div><div class="r"><div class="stp s"><i class="f">＋</i></div></div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/fried-combo.jpg"><div><span class="code">F03</span> <span class="nm">炸物拼盘</span><div class="pr">₱280 <span class="mk">规格</span></div></div><div class="r"><span class="sel">选规格</span></div></div>
+        <div class="pi" style="opacity:.45"><img class="th" src="../../web/public/demo/sweet-potato-fries.jpg"><div><span class="code">F04</span> <span class="nm">地瓜薯条</span><div class="pr">₱90 </div></div><div class="r muted">售完</div></div>
+        <div class="pi"><img class="th" src="../../web/public/demo/bubble-milk-tea.jpg"><div><span class="code">D01</span> <span class="nm">珍珠奶茶</span><div class="pr">₱120 <span class="mk">规格</span><span class="mk">口味</span></div></div><div class="r"><span class="sel">选规格 <b style="background:var(--gold);color:var(--red-deep);border-radius:9px;padding:0 5px">1</b></span></div></div>
       </div>
     </div>
-    <div class="pbar"><span>这一轮</span><span class="n">5 份</span><b style="font-size:18px">₱910</b><span class="go">送厨</span></div>
+    <div class="pbar"><span>这一轮</span><span class="n">5 份</span><b style="font-size:18px">₱790</b><span class="go">送厨</span></div>
   </div><span class="cap2">② 点菜：左分类，右边点“＋”</span></div>
 
   <div class="ph-wrap"><div class="phone">
