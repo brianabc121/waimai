@@ -370,7 +370,8 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
           <div v-if="selected.totals.adj_percent_bp || selected.totals.adj_mode" class="row between adjrow" data-testid="adj-row">
             <span class="muted">{{ t('ck.adj') }}</span><span>{{ adjText(selected) }}</span></div>
           <div v-if="selected.payment_status === 'paid' && selected.pay_type" class="row between" data-testid="pay-row">
-            <span class="muted">{{ t('ck.pay_type') }}</span><span>{{ payText(selected) }}</span></div>
+            <span class="muted">{{ t('ck.pay_type') }}</span><span>{{ payText(selected) }}
+              <span v-if="selected.pay_check" class="tag" :class="selected.pay_check === 'ok' ? 'ok' : 'bad'" data-testid="pay-check">{{ t('rc.check_tag', { s: t('rc.st.' + selected.pay_check) }) }}<template v-if="selected.pay_check_note"> · {{ selected.pay_check_note }}</template></span></span></div>
           <div v-if="canAdjust(selected) || (selected.payment_status === 'paid' && selected.service_type !== 'dine_in' && can('order.handle'))" class="row wrap" style="gap:8px">
             <button v-if="canAdjust(selected)" class="btn small" data-testid="adj-edit" @click="adjustOrder(selected)">{{ t('ck.edit_adj') }}</button>
             <button v-if="selected.payment_status === 'paid' && selected.service_type !== 'dine_in' && can('order.handle')" class="btn small" data-testid="pay-record" @click="recordPay(selected)">{{ t('ck.record_pay') }}</button>

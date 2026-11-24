@@ -19,6 +19,7 @@ const pages: [string, string[]][] = [
   ['/merchant/promos', ['promo']],
   ['/merchant/cash', ['cash']],
   ['/merchant/bills', ['bills']],
+  ['/merchant/reconcile', ['reconcile']],
   ['/merchant/delivery-map', ['delivery.map']],
   ['/merchant/staff/roles', ['owner']],
   ['/merchant/staff/attendance', ['staff.attendance']],

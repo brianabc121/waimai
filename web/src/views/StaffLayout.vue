@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '../checkout'
 import LangButton from './LangButton.vue'
 import '../bills'
 import './members/memberStrings'
@@ -105,6 +106,7 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
         <router-link v-if="show('/merchant/promos')" to="/merchant/promos">{{ t('promos') }}</router-link>
         <router-link v-if="show('/merchant/cash')" to="/merchant/cash">{{ t('cash') }}</router-link>
         <router-link v-if="show('/merchant/bills')" to="/merchant/bills" data-testid="nav-bills">{{ t('bl.nav') }}</router-link>
+        <router-link v-if="show('/merchant/reconcile')" to="/merchant/reconcile" data-testid="nav-reconcile">{{ t('rc.nav') }}</router-link>
         <router-link v-if="show('/merchant/riders')" to="/merchant/riders">{{ t('riders') }}</router-link>
         <router-link v-if="show('/merchant/delivery-map')" to="/merchant/delivery-map">{{ t('delivery_map') }}</router-link>
         <router-link v-if="show('/merchant/staff')" to="/merchant/staff" data-testid="nav-staff">{{ t('staff') }}</router-link>
