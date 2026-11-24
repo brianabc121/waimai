@@ -34,6 +34,12 @@ type OrderItem struct {
 	BatchSource string     `json:"batch_source"`
 	ServedAt    *time.Time `json:"served_at"`
 	VoidReason  string     `json:"void_reason,omitempty"`
+	// The round's time, notes (drinks first) and the staff member who sent it,
+	// and when someone asked the kitchen to hurry this dish.
+	BatchAt   time.Time  `json:"batch_at"`
+	RoundTags []string   `json:"round_tags"`
+	BatchBy   string     `json:"batch_by,omitempty"`
+	RushAt    *time.Time `json:"rush_at"`
 	// Basket is the customer's basket this line was put in (1 to 4).
 	Basket int `json:"basket"`
 	// ImageURL is the dish's current picture; only the customer's order page gets it.
@@ -129,6 +135,9 @@ type Order struct {
 	TableName      string          `json:"table_name"`
 	AmountReceived *int64          `json:"amount_received"`
 	PaymentNote    string          `json:"payment_note"`
+	PayMethod      string          `json:"pay_method"`
+	// TableTags are the sitting's notes (children, birthday) for the kitchen.
+	TableTags []string        `json:"table_tags"`
 	CreatedAt      time.Time       `json:"created_at"`
 	AcceptedAt     *time.Time      `json:"accepted_at"`
 	PackedAt       *time.Time      `json:"packed_at"`
@@ -199,7 +208,8 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	o.payment_note, o.dest_lat, o.dest_lng, o.zone_distance_m, o.contact_phone, o.contact_title, o.contact_wechat,
 	o.contact_telegram, o.contact_line, o.contact_whatsapp, EXISTS (SELECT 1 FROM customer_address_photos p WHERE p.address_id = o.address_id),
 	o.merchant_discount, o.platform_subsidy, (SELECT m.member_no FROM store_members m WHERE m.id = o.member_id),
-	o.order_source, COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.placed_by), ''), o.staff_note`
+	o.order_source, COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.placed_by), ''), o.staff_note,
+	o.pay_method, COALESCE((SELECT s.tags FROM dining_sessions s WHERE s.id = o.session_id), '{}')`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}, Discounts: []OrderDiscount{}}
@@ -214,7 +224,7 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.Timezone, &o.SessionID, &o.TableName, &o.AmountReceived, &o.PaymentNote, &o.DestLat, &o.DestLng,
 		&o.ZoneDistanceM, &o.ContactPhone, &o.ContactTitle, &o.ContactWechat, &o.ContactTelegram, &o.ContactLine,
 		&o.ContactWhatsapp, &o.AddressPhoto, &t.MerchantDiscount, &t.PlatformSubsidy, &o.MemberNo, &o.OrderSource,
-		&o.PlacedBy, &o.StaffNote)
+		&o.PlacedBy, &o.StaffNote, &o.PayMethod, &o.TableTags)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +266,9 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 
 	rows, err = q.Query(ctx, `SELECT i.id, i.order_id, i.item_id, i.name, i.name_en, i.unit_price, i.qty, i.line_total,
 		i.options, i.note, i.needs_prep, i.prep_status, i.station_id, i.station_name, b.seq, b.source, i.served_at,
-		i.void_reason, i.basket_no, i.name_customer, i.note_tags FROM order_items i JOIN order_batches b ON b.id = i.batch_id
+		i.void_reason, i.basket_no, i.name_customer, i.note_tags, b.created_at, b.round_tags,
+		COALESCE((SELECT u.display_name FROM users u WHERE u.id = b.placed_by), ''), i.rush_at
+		FROM order_items i JOIN order_batches b ON b.id = i.batch_id
 		WHERE i.order_id = ANY($1) ORDER BY i.id`, ids)
 	if err != nil {
 		return nil, err
@@ -267,7 +279,8 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 		var opts, tags []byte
 		if err := rows.Scan(&it.ID, &orderID, &it.ItemID, &it.Name, &it.NameEn, &it.UnitPrice, &it.Qty,
 			&it.LineTotal, &opts, &it.Note, &it.NeedsPrep, &it.PrepStatus, &it.StationID, &it.StationName,
-			&it.BatchSeq, &it.BatchSource, &it.ServedAt, &it.VoidReason, &it.Basket, &it.NameTr, &tags); err != nil {
+			&it.BatchSeq, &it.BatchSource, &it.ServedAt, &it.VoidReason, &it.Basket, &it.NameTr, &tags,
+			&it.BatchAt, &it.RoundTags, &it.BatchBy, &it.RushAt); err != nil {
 			rows.Close()
 			return nil, err
 		}

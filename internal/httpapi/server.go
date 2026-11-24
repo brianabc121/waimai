@@ -447,6 +447,10 @@ func (s *Server) Router() *gin.Engine {
 	auth.GET("/merchant/table-sessions/:id", s.getBill)
 	auth.POST("/merchant/table-sessions/:id/batches", s.staffBatch)
 	auth.POST("/merchant/table-sessions/:id/close", s.closeTable)
+	auth.PATCH("/merchant/table-sessions/:id", s.patchSession)
+	auth.POST("/merchant/table-sessions/:id/move", s.moveTable)
+	auth.GET("/merchant/branches/:bid/dine-desk", s.dineDesk)
+	auth.PUT("/merchant/branches/:bid/dine-desk", s.saveDinePresets)
 	auth.POST("/merchant/bill-items/:id/:action", s.billItem)
 
 	// merchant configuration
