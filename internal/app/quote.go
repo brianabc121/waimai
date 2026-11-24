@@ -18,6 +18,8 @@ type QuoteLineInput struct {
 	Qty       int     `json:"qty"`
 	OptionIDs []int64 `json:"option_ids"`
 	Note      string  `json:"note"`
+	// NoteTagIDs are the chosen flavour notes (note_templates.go).
+	NoteTagIDs []int64 `json:"note_tag_ids,omitempty"`
 	// Basket is 1 to 4; 0 means the first.
 	Basket int `json:"basket,omitempty"`
 	// repeat lets an option be named more than once, for as many of it
@@ -63,17 +65,18 @@ type LineOption struct {
 }
 
 type QuoteLine struct {
-	ItemID    int64        `json:"item_id"`
-	Name      string       `json:"name"`
-	NameEn    string       `json:"name_en"`
-	NameTr    string       `json:"name_tr,omitempty"`
-	UnitPrice int64        `json:"unit_price"`
-	Qty       int          `json:"qty"`
-	LineTotal int64        `json:"line_total"`
-	Options   []LineOption `json:"options"`
-	Note      string       `json:"note"`
-	NeedsPrep bool         `json:"needs_prep"`
-	Basket    int          `json:"basket"`
+	ItemID    int64         `json:"item_id"`
+	Name      string        `json:"name"`
+	NameEn    string        `json:"name_en"`
+	NameTr    string        `json:"name_tr,omitempty"`
+	UnitPrice int64         `json:"unit_price"`
+	Qty       int           `json:"qty"`
+	LineTotal int64         `json:"line_total"`
+	Options   []LineOption  `json:"options"`
+	Note      string        `json:"note"`
+	NoteTags  []LineNoteTag `json:"note_tags"`
+	NeedsPrep bool          `json:"needs_prep"`
+	Basket    int           `json:"basket"`
 	// CategoryID is only used while pricing, to check required categories.
 	CategoryID int64 `json:"-"`
 }
@@ -411,6 +414,9 @@ func priceLines(ctx context.Context, q Querier, branchID int64, service string, 
 		if optionGone {
 			unavailable = append(unavailable, line.ItemID)
 			continue
+		}
+		if ql.NoteTags, err = pickNotes(it, line.NoteTagIDs); err != nil {
+			return nil, 0, err
 		}
 		ql.UnitPrice = unit
 		ql.LineTotal = unit * int64(line.Qty)

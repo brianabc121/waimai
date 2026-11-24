@@ -25,6 +25,7 @@ run: build
 e2e:
 	node e2e/flow.cjs
 	node e2e/dinein.cjs
+	node e2e/notetemplates.cjs
 	node e2e/templates.cjs
 	node e2e/admin.cjs
 	node e2e/mapzones.cjs

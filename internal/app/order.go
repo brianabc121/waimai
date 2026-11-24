@@ -17,16 +17,18 @@ type OrderItem struct {
 	Name   string `json:"name"`
 	NameEn string `json:"name_en"`
 	// NameTr is the name in the language the customer ordered in, when it differs.
-	NameTr      string       `json:"name_tr,omitempty"`
-	UnitPrice   int64        `json:"unit_price"`
-	Qty         int          `json:"qty"`
-	LineTotal   int64        `json:"line_total"`
-	Options     []LineOption `json:"options"`
-	Note        string       `json:"note"`
-	NeedsPrep   bool         `json:"needs_prep"`
-	PrepStatus  string       `json:"prep_status"`
-	StationID   *int64       `json:"station_id"`
-	StationName string       `json:"station_name"`
+	NameTr    string       `json:"name_tr,omitempty"`
+	UnitPrice int64        `json:"unit_price"`
+	Qty       int          `json:"qty"`
+	LineTotal int64        `json:"line_total"`
+	Options   []LineOption `json:"options"`
+	Note      string       `json:"note"`
+	// NoteTags are the flavour notes chosen, as they were then.
+	NoteTags    []LineNoteTag `json:"note_tags"`
+	NeedsPrep   bool          `json:"needs_prep"`
+	PrepStatus  string        `json:"prep_status"`
+	StationID   *int64        `json:"station_id"`
+	StationName string        `json:"station_name"`
 	// Dine-in: which batch the line came in, who sent it, and when it reached the table.
 	BatchSeq    int        `json:"batch_seq"`
 	BatchSource string     `json:"batch_source"`
@@ -254,7 +256,7 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 
 	rows, err = q.Query(ctx, `SELECT i.id, i.order_id, i.item_id, i.name, i.name_en, i.unit_price, i.qty, i.line_total,
 		i.options, i.note, i.needs_prep, i.prep_status, i.station_id, i.station_name, b.seq, b.source, i.served_at,
-		i.void_reason, i.basket_no, i.name_customer FROM order_items i JOIN order_batches b ON b.id = i.batch_id
+		i.void_reason, i.basket_no, i.name_customer, i.note_tags FROM order_items i JOIN order_batches b ON b.id = i.batch_id
 		WHERE i.order_id = ANY($1) ORDER BY i.id`, ids)
 	if err != nil {
 		return nil, err
@@ -262,15 +264,16 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 	for rows.Next() {
 		var it OrderItem
 		var orderID int64
-		var opts []byte
+		var opts, tags []byte
 		if err := rows.Scan(&it.ID, &orderID, &it.ItemID, &it.Name, &it.NameEn, &it.UnitPrice, &it.Qty,
 			&it.LineTotal, &opts, &it.Note, &it.NeedsPrep, &it.PrepStatus, &it.StationID, &it.StationName,
-			&it.BatchSeq, &it.BatchSource, &it.ServedAt, &it.VoidReason, &it.Basket, &it.NameTr); err != nil {
+			&it.BatchSeq, &it.BatchSource, &it.ServedAt, &it.VoidReason, &it.Basket, &it.NameTr, &tags); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		it.Options = []LineOption{}
+		it.Options, it.NoteTags = []LineOption{}, []LineNoteTag{}
 		_ = json.Unmarshal(opts, &it.Options)
+		_ = json.Unmarshal(tags, &it.NoteTags)
 		byID[orderID].Items = append(byID[orderID].Items, it)
 	}
 	rows.Close()
@@ -559,9 +562,10 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		for _, l := range cur.Lines {
 			opts, _ := json.Marshal(l.Options)
 			if _, err := tx.Exec(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name,
-				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, orderID, b.ID, batchID, l.ItemID, l.Name,
-				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, max(1, l.Basket), l.NameTr); err != nil {
+				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer, note_tags)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`, orderID, b.ID, batchID, l.ItemID, l.Name,
+				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, max(1, l.Basket), l.NameTr,
+				noteTagsJSON(l.NoteTags)); err != nil {
 				return wrap("insert order item", err)
 			}
 		}

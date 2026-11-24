@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import KitchenNote from './KitchenNote.vue'
 import { computed, reactive, ref } from 'vue'
 import { ApiError, get, post } from '../api'
 import { both, minutesSince, t, whenText } from '../i18n'
@@ -132,7 +133,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
                 </select>
               </div>
               <div class="small" v-if="it.options.length">{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</div>
-              <div class="small bold" v-if="it.note" style="color:var(--warn)">{{ t('note') }}: {{ it.note }}</div>
+              <KitchenNote :it="it" />
             </div>
             <span v-if="!it.needs_prep" class="tag">{{ t('no_prep') }}</span>
             <template v-else>
@@ -155,7 +156,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
             <div class="grow">
               <div class="kname">{{ it.qty }} × {{ both(it.name, it.name_en) }}</div>
               <div class="small" v-if="it.options.length">{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</div>
-              <div class="small bold" v-if="it.note" style="color:var(--warn)">{{ t('note') }}: {{ it.note }}</div>
+              <KitchenNote :it="it" />
             </div>
             <button class="btn small ok" @click="serve(it)">{{ t('serve') }}</button>
           </div>
@@ -188,7 +189,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
               <input type="checkbox" :checked="check(o).ticked.has(it.id)" @change="tick(o, it)" />
               <span><b>{{ it.qty }} × {{ both(it.name, it.name_en) }}</b>
                 <span class="small muted" v-if="it.options.length"><br />{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</span>
-                <span class="small bold" v-if="it.note" style="color:var(--warn)"><br />{{ t('note') }}: {{ it.note }}</span></span>
+                <template v-if="it.note || it.note_tags?.length"><br /><KitchenNote :it="it" inline /></template></span>
             </label>
             <div class="row between"><span>{{ t('bags') }}</span>
               <span class="stepper"><button @click="check(o).bags = Math.max(1, check(o).bags - 1)">−</button><b>{{ check(o).bags }}</b><button class="fill" @click="check(o).bags++">+</button></span></div>

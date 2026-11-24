@@ -8,6 +8,9 @@ import ItemForm from './ItemForm.vue'
 import MenuImportDialog from './MenuImportDialog.vue'
 import MenuTranslations from './MenuTranslations.vue'
 import './translateStrings'
+import '../notes'
+import NoteTemplates from './NoteTemplates.vue'
+import { useRoute, useRouter } from 'vue-router'
 
 const bid = session.branchId!
 const cur = currentRole()?.currency ?? 'PHP'
@@ -15,6 +18,14 @@ const manager = computed(() => can('menu.edit'))
 const translator = computed(() => can('menu.translate'))
 const soldOut = computed(() => can('menu.soldout', 'menu.edit', 'kitchen'))
 const cats = ref<Category[]>([])
+// the two tabs: the dishes, and the flavour note templates (docs/NOTE_TEMPLATE_DESIGN.md)
+const route = useRoute(), router = useRouter()
+const tab = computed(() => route.query.tab === 'notes' ? 'notes' : 'items')
+const setTab = (x: 'items' | 'notes') => router.replace({ query: { ...route.query, tab: x === 'notes' ? 'notes' : undefined } })
+const tplName = (id: number) => tpls.value.find(x => x.id === id)?.name ?? ''
+const tpls = ref<{ id: number; name: string }[]>([])
+async function loadTpls() { tpls.value = (await get<{ templates: { id: number; name: string }[] }>(`/merchant/branches/${bid}/note-templates`).catch(() => ({ templates: [] }))).templates }
+onMounted(loadTpls)
 const stations = ref<Station[]>([])
 const error = ref('')
 
@@ -84,10 +95,17 @@ async function saved() { form.open = false; await load() }
         </template>
       </div>
     </div>
+    <div class="subtabs" data-testid="menu-tabs">
+      <button :class="{ on: tab === 'items' }" data-testid="tab-items" @click="setTab('items')">{{ t('nt.tab_items') }}</button>
+      <button :class="{ on: tab === 'notes' }" data-testid="tab-notes" @click="setTab('notes')">{{ t('nt.tab_templates') }}</button>
+    </div>
     <div v-if="error" class="banner bad">{{ error }}</div>
     <div v-if="trFailed && translator" class="banner bad row between" data-testid="tr-failed-banner">{{ t('mtr.failed', { at: '' }) }}
       <button class="btn small" @click="showLangs(null)">{{ t('mtr.open') }}</button></div>
 
+    <NoteTemplates v-if="tab === 'notes'" :base="`/merchant/branches/${bid}`" :cats="cats" :can-edit="manager" @changed="load(); loadTpls()" />
+
+    <template v-else>
     <div v-for="c in cats" :key="c.id" class="card" style="padding:0;overflow:auto">
       <div class="row between wrap" style="padding:10px 12px"><h2>{{ both(c.name, c.name_en) }}
           <span v-if="c.required" class="tag brand" :title="t('cat_required_hint')" data-testid="cat-required">{{ t('cat_required') }}</span></h2>
@@ -97,7 +115,9 @@ async function saved() { form.open = false; await load() }
       <table class="data">
         <tbody>
           <tr v-for="it in c.items" :key="it.id">
-            <td><span v-if="it.code" class="tag brand" style="margin-inline-end:6px" data-testid="item-code-tag">{{ it.code }}</span><b>{{ it.name }}</b><div class="muted small">{{ it.name_en }}</div></td>
+            <td><span v-if="it.code" class="tag brand" style="margin-inline-end:6px" data-testid="item-code-tag">{{ it.code }}</span><b>{{ it.name }}</b>
+              <span v-if="it.note_template_ids?.length" class="tag warn" style="margin-inline-start:6px" data-testid="item-notes-tag">{{ t('nt.on', { names: it.note_template_ids.map(tplName).join('、') }) }}</span>
+              <div class="muted small">{{ it.name_en }}</div></td>
             <td class="price">{{ money(it.price, cur) }}</td>
             <td>
               <span class="tag" :class="it.published ? 'ok' : ''">{{ it.published ? t('published') : t('draft') }}</span>
@@ -127,13 +147,14 @@ async function saved() { form.open = false; await load() }
         </tbody>
       </table>
     </div>
+    </template>
 
     <MenuImportDialog v-if="importing" :base="`/merchant/branches/${bid}`" :cur="cur" @imported="load" @close="importing = false" />
 
     <MenuTranslations v-if="langs.open" :base="`/merchant/branches/${bid}`" :cats="cats" :item="langs.item" @close="closeLangs" />
 
     <ItemForm v-if="form.open" :item="form.item" :category-id="form.categoryId" :cats="cats" :stations="stations" :cur="cur"
-      :base="`/merchant/branches/${bid}`" @saved="saved" @close="form.open = false" />
+      :base="`/merchant/branches/${bid}`" @saved="saved" @close="form.open = false" @manage-notes="form.open = false; setTab('notes')" />
   </div>
 </template>
 

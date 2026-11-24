@@ -247,6 +247,10 @@ type Item struct {
 	Sort              int           `json:"sort"`
 	StationID         *int64        `json:"station_id"`
 	Groups            []OptionGroup `json:"groups"`
+	// NoteTemplateIDs are the flavour note templates the dish shows; Notes
+	// are their groups with the tags on offer (note_templates.go).
+	NoteTemplateIDs []int64     `json:"note_template_ids"`
+	Notes           []NoteGroup `json:"notes"`
 	// Sold is how many were ordered so far; only the storefront fills it in.
 	Sold int `json:"sold"`
 	// The name, description and details in the customer's language, when
@@ -324,7 +328,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 	items := []*Item{}
 	byID := map[int64]*Item{}
 	for rows.Next() {
-		it := &Item{Groups: []OptionGroup{}}
+		it := &Item{Groups: []OptionGroup{}, NoteTemplateIDs: []int64{}, Notes: []NoteGroup{}}
 		if err := rows.Scan(&it.ID, &it.CategoryID, &it.Name, &it.NameEn, &it.Description, &it.ImageURL,
 			&it.Price, &it.Published, &it.SoldOut, &it.StockQty, &it.NeedsPrep, &it.DeliveryAvailable,
 			&it.PickupAvailable, &it.Sort, &it.StationID, &it.Photos, &it.Details, &it.DineInAvailable, &it.Code); err != nil {
@@ -385,7 +389,14 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 			ref.item.Groups[ref.idx].Options = append(ref.item.Groups[ref.idx].Options, o)
 		}
 	}
-	return items, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if err := attachNotes(ctx, q, branchID, items); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 func loadMenu(ctx context.Context, q Querier, branchID int64, publishedOnly bool) ([]Category, error) {

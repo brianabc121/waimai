@@ -7,6 +7,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { money, pick, t, mn } from '../i18n'
 import type { Category, Item } from '../types'
+import '../notes'
 
 const props = defineProps<{ categories: Category[]; currency: string; layout: string
   canOrder: (it: Item) => boolean; qtyOf: (it: Item) => number
@@ -82,8 +83,8 @@ defineExpose({ scrollTo })
                 <div class="row between buy">
                   <span class="price bold">{{ money(it.price, currency) }}</span>
                   <span v-if="!canOrder(it)" class="tag">{{ t('sold_out') }}</span>
-                  <button v-else-if="it.groups.length" class="btn small primary" @click.stop="$emit('add', it)">
-                    {{ t('choose') }}<span v-if="qtyOf(it)"> · {{ qtyOf(it) }}</span></button>
+                  <button v-else-if="it.groups.length || it.notes?.length" class="btn small primary" data-testid="choose" @click.stop="$emit('add', it)">
+                    {{ it.groups.length ? t('choose') : t('nt.choose') }}<span v-if="qtyOf(it)"> · {{ qtyOf(it) }}</span></button>
                   <span v-else class="stepper">
                     <template v-if="qtyOf(it)">
                       <button @click.stop="$emit('dec', it)" aria-label="-">−</button>

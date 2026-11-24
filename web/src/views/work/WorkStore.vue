@@ -2,6 +2,7 @@
 // In-store identity: the dishes waiting at the person's own stations, and the
 // orders to pack when they hold the packing post. It reads the same kitchen
 // board as the big kitchen screen, so both always agree.
+import KitchenNote from '../KitchenNote.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { ApiError, get, post } from '../../api'
 import { both, minutesSince, pick, t, whenText } from '../../i18n'
@@ -116,7 +117,7 @@ const handoff = (o: Order) => run(() => post(`/merchant/orders/${o.id}/handoff`)
         <div><span class="q">{{ x.it.qty }} × {{ both(x.it.name, x.it.name_en) }}</span>
           <span v-if="x.it.prep_status === 'preparing'" class="tag info" style="margin-inline-start:6px">{{ t('i.preparing') }}</span>
           <div v-if="x.it.options.length" class="small">{{ x.it.options.map(o => both(o.name, o.name_en)).join(' · ') }}</div>
-          <div v-if="x.it.note" class="small bold" style="color:var(--warn)">{{ t('note') }}：{{ x.it.note }}</div>
+          <KitchenNote :it="x.it" />
           <div class="src">{{ x.it.station_name }} · {{ source(x.o) }} · <span :class="{ late: x.waited >= 8 }">{{ t('wk.waited', { n: x.waited }) }}</span></div></div>
         <button v-if="x.it.prep_status === 'pending'" class="btn" data-act="start" @click="itemAction(x.it, 'start')">{{ t('wk.start') }}</button>
         <button v-else class="btn ok" data-act="ready" @click="itemAction(x.it, 'ready')">{{ t('wk.done') }}</button>
@@ -157,7 +158,7 @@ const handoff = (o: Order) => run(() => post(`/merchant/orders/${o.id}/handoff`)
             <input type="checkbox" :checked="pk.ticked.has(it.id)" @change="tick(it)" />
             <span><span v-if="packOrder.items.some(x => x.basket > 1)" class="tag info" style="margin-inline-end:4px">{{ t('basket_short', { n: it.basket }) }}</span><b>{{ it.qty }} × {{ both(it.name, it.name_en) }}</b>
               <span v-if="it.options.length" class="small muted"><br />{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</span>
-              <span v-if="it.note" class="small bold" style="color:var(--warn)"><br />{{ t('note') }}: {{ it.note }}</span></span>
+              <template v-if="it.note || it.note_tags?.length"><br /><KitchenNote :it="it" inline /></template></span>
           </label>
           <div class="row between"><span>{{ t('bags') }}</span>
             <span class="stepper"><button @click="pk.bags = Math.max(1, pk.bags - 1)">−</button><b>{{ pk.bags }}</b><button class="fill" @click="pk.bags++">+</button></span></div>

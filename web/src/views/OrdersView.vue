@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import KitchenNote from './KitchenNote.vue'
 import { computed, ref } from 'vue'
 import { ApiError, get, post } from '../api'
 import { both, has, minutesSince, money, reasonText, t, whenText } from '../i18n'
@@ -250,7 +251,7 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <div v-for="it in selected.items" :key="it.id" class="row top between">
               <div class="grow"><span v-if="baskets(selected)" class="tag info" style="margin-inline-end:4px">{{ t('basket_short', { n: it.basket }) }}</span><b>{{ it.qty }} ×</b> {{ both(it.name, it.name_en) }}
                 <div class="muted small" v-if="it.options.length">{{ it.options.map(o => both(o.name, o.name_en)).join(' · ') }}</div>
-                <div class="small" v-if="it.note" style="color:var(--warn)">{{ t('note') }}: {{ it.note }}</div></div>
+                <KitchenNote :it="it" /></div>
               <span class="tag" v-if="selected.acceptance_status === 'accepted'" :class="it.prep_status === 'ready' ? 'ok' : ''">{{ t('i.' + it.prep_status) }}</span>
               <span class="price">{{ money(it.line_total, selected.currency) }}</span>
             </div>

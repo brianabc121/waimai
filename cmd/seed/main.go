@@ -174,10 +174,11 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 		must(err)
 		return id
 	}
-	item := func(in app.ItemInput) {
+	item := func(in app.ItemInput) int64 {
 		in.Published, in.DeliveryAvailable, in.PickupAvailable = true, true, true
-		_, err := a.SaveItem(ctx, bid, 0, in)
+		id, err := a.SaveItem(ctx, bid, 0, in)
 		must(err)
+		return id
 	}
 	spice := app.OptionGroupInput{Name: "辣度", NameEn: "Spice level", MinSelect: 1, MaxSelect: 1,
 		Options: []app.OptionInput{
@@ -206,7 +207,7 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 
 	mains := cat("主食", "Mains", 1)
 	item(app.ItemInput{CategoryID: mains, Code: "B1", Name: "卤肉饭", NameEn: "Braised Pork Rice", Price: 15900, NeedsPrep: true, StationID: wok})
-	item(app.ItemInput{CategoryID: mains, Code: "B2", Name: "牛肉面", NameEn: "Beef Noodle Soup", Price: 24900, NeedsPrep: true, StationID: wok,
+	beefNoodle := item(app.ItemInput{CategoryID: mains, Code: "B2", Name: "牛肉面", NameEn: "Beef Noodle Soup", Price: 24900, NeedsPrep: true, StationID: wok,
 		Groups: []app.OptionGroupInput{spice}})
 	item(app.ItemInput{CategoryID: mains, Code: "B3", Name: "今日限量便当", NameEn: "Daily Bento (limited)", Price: 21900,
 		NeedsPrep: true, StationID: wok, StockQty: intp(5), Description: "每日限量 5 份"})
@@ -223,8 +224,15 @@ func seedStore(ctx context.Context, a *app.App, slug, name, nameEn, owner string
 
 	drinks := cat("饮品", "Drinks", 3)
 	item(app.ItemInput{CategoryID: drinks, Code: "D1", Name: "冰柠檬茶", NameEn: "Iced Lemon Tea", Price: 6900, NeedsPrep: true, StationID: bar})
-	item(app.ItemInput{CategoryID: drinks, Code: "D2", Name: "珍珠奶茶", NameEn: "Bubble Milk Tea", Price: 11900, NeedsPrep: true, StationID: bar})
+	milkTea := item(app.ItemInput{CategoryID: drinks, Code: "D2", Name: "珍珠奶茶", NameEn: "Bubble Milk Tea", Price: 11900, NeedsPrep: true, StationID: bar})
 	item(app.ItemInput{CategoryID: drinks, Code: "D3", Name: "瓶装水", NameEn: "Bottled Water", Price: 3000, NeedsPrep: false})
+
+	// Flavour note templates (docs/NOTE_TEMPLATE_DESIGN.md): milk tea, stir-fry and general.
+	tpls, err := a.AddStarterNoteTemplates(ctx, bid, []string{"milk_tea", "stir_fry", "general"})
+	must(err)
+	must(a.SetNoteTemplateItems(ctx, bid, tpls[0], []int64{milkTea}))
+	must(a.SetNoteTemplateItems(ctx, bid, tpls[1], []int64{beefNoodle}))
+	must(a.SetNoteTemplateItems(ctx, bid, tpls[2], []int64{beefNoodle, milkTea}))
 
 	i64 := func(v int64) *int64 { return &v }
 	for _, p := range []app.PromotionInput{

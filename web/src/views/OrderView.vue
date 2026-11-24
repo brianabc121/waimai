@@ -2,6 +2,7 @@
 // One order as its customer sees it: where it is, what can be done about it
 // (cancel, ask for a refund, call, order again, review), what was paid, and
 // where it goes. Anyone holding the link sees it; the list needs a login.
+import { noteLine } from '../notes'
 import LangButton from './LangButton.vue'
 import { computed, defineAsyncComponent, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -280,7 +281,7 @@ async function copyNo() {
                 <div class="grow">
                   <div class="od-iname">{{ mn(it) }}</div>
                   <div class="sub" v-if="it.options.length">{{ it.options.map(o => mn(o)).join(' · ') }}</div>
-                  <div class="sub" v-if="it.note">{{ t('note') }}: {{ it.note }}</div>
+                  <div class="note-line" v-if="it.note || it.note_tags?.length" data-testid="od-notes">{{ noteLine(it, true) }}</div>
                 </div>
                 <span class="qty">×{{ it.qty }}</span>
                 <span class="price">{{ money(it.line_total, order.currency) }}</span>

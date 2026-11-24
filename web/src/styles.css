@@ -420,3 +420,10 @@ html[data-lang="my"] body, html[data-lang="km"] body { line-height: 1.8; }
 .shell-role .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* an action the role may not take: still shown, so people know whom to ask */
 .btn.need, .btn.need:disabled { color: #6b7280; background: #f6f6f4; border-style: dashed; opacity: 1; }
+
+/* a line's flavour notes and own note under its name (docs/NOTE_TEMPLATE_DESIGN.md) */
+.note-line { display: inline-block; max-width: 100%; margin-top: 3px; padding: 1px 7px; border-radius: 6px; font-size: 12px; line-height: 1.5;
+  background: var(--gold-soft, #fff4d6); color: var(--brand-dark, #b45309); overflow-wrap: anywhere; }
+/* the same on staff screens: the cook must not miss it */
+.note-kitchen { color: var(--warn); font-weight: 700; font-size: 13px; overflow-wrap: anywhere; }
+.note-kitchen .t { display: inline-block; background: var(--warn-soft); border-radius: 4px; padding: 0 5px; margin: 1px 3px 1px 0; }

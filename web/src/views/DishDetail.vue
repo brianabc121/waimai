@@ -7,6 +7,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { money, t, mn, mt } from '../i18n'
 import type { Item } from '../types'
 import './storeStrings'
+import '../notes'
 
 const props = defineProps<{ item: Item; currency: string; canOrder: boolean; qty: number }>()
 const emit = defineEmits<{ add: []; dec: []; close: [] }>()
@@ -80,6 +81,13 @@ onBeforeUnmount(() => {
               <div class="ochips"><span v-for="o in g.options" :key="o.id" :class="{ off: o.sold_out }">{{ mn(o) }}<small v-if="o.price_delta">+{{ money(o.price_delta, currency) }}</small></span></div>
             </div>
           </section>
+          <section v-if="item.notes?.length" class="block" data-testid="dish-notes">
+            <h3>{{ t('nt.title') }}</h3>
+            <div v-for="g in item.notes" :key="g.id" class="opts">
+              <div class="gname">{{ g.name ? mn(g) : '' }} <small class="muted">{{ g.multi ? t('nt.multi') : t('nt.single') }}</small></div>
+              <div class="ochips"><span v-for="x in g.tags" :key="x.id">{{ mn(x) }}</span></div>
+            </div>
+          </section>
           <section class="block">
             <h3>{{ t('dd.details') }}</h3>
             <p class="details" :class="{ muted: !item.details }" data-testid="dish-details">{{ mt(item.details, item.details_tr) || t('dd.none') }}</p>
@@ -88,8 +96,8 @@ onBeforeUnmount(() => {
         <div class="foot">
           <div class="fprice"><span class="price">{{ money(item.price, currency) }}</span></div>
           <span v-if="!canOrder" class="tag">{{ t('sold_out') }}</span>
-          <button v-else-if="item.groups.length" class="btn primary" data-testid="dish-choose" @click="emit('add')">
-            {{ t('choose') }}<span v-if="qty"> · {{ qty }}</span></button>
+          <button v-else-if="item.groups.length || item.notes?.length" class="btn primary" data-testid="dish-choose" @click="emit('add')">
+            {{ item.groups.length ? t('choose') : t('nt.choose') }}<span v-if="qty"> · {{ qty }}</span></button>
           <span v-else-if="qty" class="stepper">
             <button @click="emit('dec')" aria-label="-">−</button><span>{{ qty }}</span>
             <button class="fill" data-testid="dish-add" @click="emit('add')" aria-label="+">+</button></span>

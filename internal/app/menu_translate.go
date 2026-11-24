@@ -87,6 +87,10 @@ func menuFields(ctx context.Context, q Querier, branchID int64) ([]transField, e
 			WHERE i.branch_id=$1 AND NOT i.archived ORDER BY g.sort, g.id`, []string{"group.name"}},
 		{`SELECT o.id, o.name_en, o.name FROM options o JOIN option_groups g ON g.id = o.group_id JOIN menu_items i ON i.id = g.item_id
 			WHERE i.branch_id=$1 AND NOT i.archived ORDER BY o.sort, o.id`, []string{"option.name"}},
+		{`SELECT g.id, g.name_en, g.name FROM note_groups g JOIN note_templates t ON t.id = g.template_id
+			WHERE t.branch_id=$1 ORDER BY t.sort, t.id, g.sort, g.id`, []string{"note_group.name"}},
+		{`SELECT x.id, x.name_en, x.name FROM note_tags x JOIN note_groups g ON g.id = x.group_id JOIN note_templates t ON t.id = g.template_id
+			WHERE t.branch_id=$1 ORDER BY t.sort, t.id, g.sort, g.id, x.sort, x.id`, []string{"note_tag.name"}},
 		{`SELECT id, name_en, name FROM promotions WHERE branch_id=$1 AND status <> 'ended' ORDER BY id`, []string{"promotion.name"}},
 		// the store's own name and texts, in three languages only (docs/I18N_DESIGN.md §7)
 		{`SELECT id, name_en, name, notice, intro FROM branches WHERE id=$1`, []string{"branch.name", "branch.notice", "branch.intro"}},
@@ -342,6 +346,14 @@ func (m *menuLocale) item(it *Item) {
 			o.NameTr = m.text("option", o.ID, "name", o.Name, o.NameEn)
 		}
 	}
+	for i := range it.Notes {
+		g := &it.Notes[i]
+		g.NameTr = m.text("note_group", g.ID, "name", g.Name, g.NameEn)
+		for j := range g.Tags {
+			x := &g.Tags[j]
+			x.NameTr = m.text("note_tag", x.ID, "name", x.Name, x.NameEn)
+		}
+	}
 }
 
 // LocalizeStorefront fills in the menu in the customer's language.
@@ -402,6 +414,16 @@ func localizeLines(ctx context.Context, q Querier, b *Branch, lang string, lines
 		for j := range l.Options {
 			o := &l.Options[j]
 			o.GroupTr, o.NameTr = groups[o.Group], opts[o.Group+"\x00"+o.Name]
+		}
+		tags := map[int64][2]string{}
+		for _, g := range it.Notes {
+			for _, x := range g.Tags {
+				tags[x.ID] = [2]string{g.NameTr, x.NameTr}
+			}
+		}
+		for j := range l.NoteTags {
+			x := &l.NoteTags[j]
+			x.GroupTr, x.NameTr = tags[x.ID][0], tags[x.ID][1]
 		}
 	}
 	return nil
@@ -469,7 +491,7 @@ type TranslationEdit struct {
 }
 
 var nameEnTables = map[string]string{"category": "menu_categories", "item": "menu_items", "group": "option_groups",
-	"option": "options", "promotion": "promotions", "branch": "branches"}
+	"option": "options", "promotion": "promotions", "branch": "branches", "note_group": "note_groups", "note_tag": "note_tags"}
 
 // SaveTranslation stores the merchant's own translation of one field.
 func (a *App) SaveTranslation(ctx context.Context, branchID int64, in TranslationEdit, actor Actor) error {

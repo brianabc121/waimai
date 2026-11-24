@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // Menu, cart and "send to kitchen" for one table. Shared by the scanned phone,
 // the table tablet and the staff desk; the parent decides where the batch goes.
+import { cartTags, hasNotes } from '../notes'
+import NotePicker from './NotePicker.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { newKey } from '../api'
 import { linePrice, type CartLine } from '../cart'
@@ -34,19 +36,19 @@ const bad = (l: CartLine) => { const it = items.value.get(l.item_id); return !it
 const hasBad = computed(() => state.lines.some(bad))
 const review = ref(false)
 
-const sheet = reactive<{ item: Item | null; chosen: Set<number>; qty: number; note: string }>({ item: null, chosen: new Set(), qty: 1, note: '' })
+const sheet = reactive<{ item: Item | null; chosen: Set<number>; qty: number; note: string; tags: number[] }>({ item: null, chosen: new Set(), qty: 1, note: '', tags: [] })
 
-function add(it: Item, optionIds: number[], qty: number, note: string) {
+function add(it: Item, optionIds: number[], qty: number, note: string, tags: number[] = []) {
   const ids = [...optionIds].sort((a, b) => a - b)
-  const key = `${it.id}:${ids.join(',')}:${note.trim()}`
+  const key = `${it.id}:${ids.join(',')}:${[...tags].sort((a, b) => a - b).join(',')}:${note.trim()}`
   const ex = state.lines.find(l => l.key === key)
   if (ex) ex.qty = Math.min(99, ex.qty + qty)
-  else state.lines.push({ key, item_id: it.id, qty, option_ids: ids, note: note.trim(), basket: 1 })
+  else state.lines.push({ key, item_id: it.id, qty, option_ids: ids, note: note.trim(), basket: 1, note_tags: [...tags] })
 }
 function open(it: Item) {
   if (it.sold_out) return
-  if (it.groups.length === 0) { add(it, [], 1, ''); return }
-  sheet.item = it; sheet.chosen = new Set(); sheet.qty = 1; sheet.note = ''
+  if (it.groups.length === 0 && !hasNotes(it)) { add(it, [], 1, ''); return }
+  sheet.item = it; sheet.chosen = new Set(); sheet.qty = 1; sheet.note = ''; sheet.tags = []
 }
 function toggle(gi: number, id: number) {
   const g = sheet.item!.groups[gi]
@@ -64,7 +66,7 @@ const sheetPrice = computed(() => {
 })
 function confirmSheet() {
   if (!sheet.item || sheetMissing.value) return
-  add(sheet.item, [...sheet.chosen], sheet.qty, sheet.note)
+  add(sheet.item, [...sheet.chosen], sheet.qty, sheet.note, sheet.tags)
   sheet.item = null
 }
 function groupHint(g: { min_select: number; max_select: number }) {
@@ -88,7 +90,7 @@ const qtyOf = (it: Item) => state.lines.filter(l => l.item_id === it.id).reduce(
 
 function send() {
   if (props.busy || hasBad.value || count.value === 0) return
-  emit('submit', state.lines.map(l => ({ item_id: l.item_id, qty: l.qty, option_ids: l.option_ids, note: l.note })), total.value, state.key)
+  emit('submit', state.lines.map(l => ({ item_id: l.item_id, qty: l.qty, option_ids: l.option_ids, note: l.note, note_tag_ids: l.note_tags ?? [] })), total.value, state.key)
 }
 // Called by the parent once the server has confirmed the batch.
 function clear() { state.lines = []; review.value = false }
@@ -121,7 +123,12 @@ defineExpose({ clear, count })
               <span class="price muted" v-if="o.price_delta">+{{ money(o.price_delta, currency) }}</span>
             </label>
           </div>
-          <label class="field"><span>{{ t('note') }}</span><input v-model="sheet.note" maxlength="200" :placeholder="t('note_ph')" /></label>
+          <div v-if="sheet.item.notes?.length">
+            <h3>{{ t('nt.title') }}</h3>
+            <div class="muted small" style="margin:-4px 0 10px">{{ t('nt.free') }}</div>
+            <NotePicker v-model="sheet.tags" :groups="sheet.item.notes" />
+          </div>
+          <label class="field"><span>{{ t('note') }}</span><input v-model="sheet.note" maxlength="200" :placeholder="sheet.item.notes?.length ? t('nt.other_ph') : t('note_ph')" /></label>
         </div>
         <div class="sheet-foot row between">
           <span class="stepper"><button @click="sheet.qty = Math.max(1, sheet.qty - 1)">−</button><span>{{ sheet.qty }}</span><button class="fill" @click="sheet.qty = Math.min(99, sheet.qty + 1)">+</button></span>
@@ -140,7 +147,7 @@ defineExpose({ clear, count })
             <div class="grow">
               <div class="bold">{{ items.get(l.item_id) ? mn(items.get(l.item_id)!) : '—' }}</div>
               <div class="muted small" v-if="optionNames(l)">{{ optionNames(l) }}</div>
-              <div class="muted small" v-if="l.note">{{ t('note') }}: {{ l.note }}</div>
+              <div class="note-line" v-if="l.note || l.note_tags?.length">{{ [...cartTags(items.get(l.item_id), l.note_tags), l.note].filter(Boolean).join(' · ') }}</div>
               <div v-if="bad(l)" class="small" style="color:var(--bad)">{{ t('unavailable') }}</div>
               <div v-else class="price small">{{ money(linePrice(l, items)! * l.qty, currency) }}</div>
             </div>

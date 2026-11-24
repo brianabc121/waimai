@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // One table's bill, grouped by ordering round. Staff also get serve and void.
+import KitchenNote from './KitchenNote.vue'
 import { computed } from 'vue'
 import { both, money, pick, t, mn } from '../i18n'
 import type { Order, OrderItem } from '../types'
@@ -35,7 +36,7 @@ const name = (it: OrderItem) => props.staff ? both(it.name, it.name_en) : mn(it)
         <div class="grow">
           <div>{{ it.qty }} × {{ name(it) }}</div>
           <div class="small muted" v-if="it.options.length">{{ it.options.map(x => props.staff ? pick(x.name, x.name_en) : mn(x)).join(' · ') }}</div>
-          <div class="small muted" v-if="it.note">{{ t('note') }}: {{ it.note }}</div>
+          <KitchenNote :it="it" />
           <div class="small muted" v-if="it.void_reason">{{ t('reason') }}: {{ it.void_reason }}</div>
         </div>
         <span class="tag" :class="state(it)[1]">{{ state(it)[0] }}</span>
