@@ -280,6 +280,14 @@ type Rule interface {
 - 对账页：新增“按菜退款”卡片和扣除后的净额，现金退款从钱箱应有中扣除；账单页显示已退款。退款弹窗按所选方式传 `pay_type`。
 - 测试 `internal/app/pricing_fix_test.go`：附录 A 的 5 个场景改成断言正确金额，另测退款进对账。
 
+### 第 1 步（已完成）：一个计价引擎
+
+- 新包 `internal/pricing`：纯函数 `Price(Input) Result`，按固定 8 个阶段算（单品优惠 → 整单优惠 → 结账打折 → 费用 → 税 → 平台出资 → 抹零/改实收），每项菜品优惠用最大余数法分摊到每道菜，服务费和税也分摊到行，分摊之和永远等于总数。随机 2 万组输入和旧算法逐分比对一致（`pricing_test.go`）。
+- `internal/app/money.go`：所有入口统一三步：`loadMoney`（只读订单自己的快照：费率、在售的行、活动及其当时类型、券、结账打折）→ `choosePromo`（按明确的策略决定活动：加单只升不降、店铺原因保留、顾客原因重算、堂食按开台时间取最优）→ `priceMoney`（交给引擎）→ `saveMoney`（写订单金额和优惠明细，明细之和恒等于总优惠）。
+- 删除了原来各自重算的 `adjustTotals`、`adjBase`、`orderAdjBase`、`reapplyAdjust`、`priceWithAddonOnly`、`voidPrice`、`recomputeBillKeep`、`dineBillTotals`、`dineTotals`、`Totals.applyPlatform`；报价、代客下单、加单、退菜、结账打折、堂食账单、退款试算都走同一条路。
+- 顺带修好：代客下单的订单原来没有写活动明细行和店铺优惠合计（`merchant_discount` 为 0），店铺原因退菜时活动会被整个去掉，账单页也少算店铺优惠。
+- 新测试：代客下单的活动明细；对测试库里所有订单检查“明细之和 = 总优惠”“各项相加 = 应付”“店铺 + 平台 = 总优惠”。
+
 ## 附录 A：复现测试
 
 需要本地 PostgreSQL（`TEST_DATABASE_URL`）。放进 `internal/app/` 后运行

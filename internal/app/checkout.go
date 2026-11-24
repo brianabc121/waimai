@@ -333,93 +333,27 @@ func (j *Adjust) validate() error {
 	return nil
 }
 
-// adjustTotals prices an order with a discount at checkout on top of what it
-// already had (§5.2): promotion and coupons first (d, and the platform's
-// coupon platf), then the percentage off what the dishes still cost, which
-// also lowers service charge and tax, then the round-off or the typed amount,
-// which only lowers what is paid.
-func adjustTotals(subtotal, fee int64, cfg TaxConfig, d Discount, platf int64, j Adjust) (Totals, error) {
-	d.Goods = min(d.Goods, subtotal)
-	staff := int64(0)
-	if j.PercentBP > 0 {
-		left := subtotal - d.Goods
-		staff = left - mulDivRound(left, int64(j.PercentBP), 10000)
+// withAdjust prices the order with discount j at checkout on top of what it
+// already has (§5.2): its promotion and coupons as they are, then the
+// percentage off what the dishes still cost, which also lowers service
+// charge and tax, then the round-off or the typed amount, which only lowers
+// what is paid.
+func (m *orderMoney) withAdjust(j Adjust) (*priced, error) {
+	var promo *Promotion
+	var off Discount
+	if m.Promo != nil && m.PromoAmount > 0 {
+		promo, off = m.Promo, promoOn(m.Promo.Kind, m.PromoAmount)
 	}
-	t := ComputeTotals(subtotal, fee, cfg, Discount{Goods: d.Goods + staff, Delivery: d.Delivery})
-	t.Discount -= staff
-	t.MerchantDiscount -= staff
-	t.StaffDiscount, t.AdjPercentBP = staff, j.PercentBP
-	t.applyPlatform(platf)
-	switch j.Mode {
-	case "round":
-		if j.Amount > t.Total {
-			return t, ErrValidation("the round-off is more than the amount to pay")
-		}
-		t.RoundOff = j.Amount
-	case "set_total":
-		if j.Amount > t.Total {
-			return t, ErrValidation("the amount to pay cannot be more than the bill")
-		}
-		t.RoundOff = t.Total - j.Amount
+	in := m.input(nil, promo, off)
+	in.StaffBP = j.PercentBP
+	if j.Mode != "" {
+		in.Round = &j
 	}
-	t.AdjMode = j.Mode
-	t.Total -= t.RoundOff
-	return t, nil
+	return priceMoney(in)
 }
 
-// adjBase is what an order's discount at checkout is computed from.
-type adjBase struct {
-	subtotal, fee int64
-	cfg           TaxConfig
-	d             Discount
-	platf         int64
-	promoID       int64
-	promoName     string
-	promoNameEn   string
-	promoAmount   int64
-}
-
-func (s *adjBase) price(j Adjust) (Totals, error) {
-	t, err := adjustTotals(s.subtotal, s.fee, s.cfg, s.d, s.platf, j)
-	t.PromotionID, t.PromotionName, t.PromotionNameEn, t.PromotionDiscount = s.promoID, s.promoName, s.promoNameEn, s.promoAmount
-	return t, err
-}
-
-// orderAdjBase reads an order's amounts before any discount at checkout
-// (discount never includes it; some older orders have no merchant_discount,
-// so the store's part is discount less the platform's). The store-paid discount is split into what came off the dishes and what came off
-// the delivery fee: coupons by their kind, the promotion by its kind.
-func orderAdjBase(ctx context.Context, q Querier, b *Branch, orderID int64) (*adjBase, error) {
-	var s adjBase
-	var merchant int64
-	var promoID *int64
-	var promoKind string
-	if err := q.QueryRow(ctx, `SELECT subtotal, delivery_fee, packaging_fee, tax_rate_bp, tax_inclusive, service_charge_bp,
-		discount - platform_subsidy, platform_subsidy, promotion_id, promotion_kind, promotion_name, promotion_name_en
-		FROM orders WHERE id=$1`, orderID).
-		Scan(&s.subtotal, &s.fee, &s.cfg.PackagingFee, &s.cfg.TaxRateBP, &s.cfg.TaxInclusive, &s.cfg.ServiceChargeBP,
-			&merchant, &s.platf, &promoID, &promoKind, &s.promoName, &s.promoNameEn); err != nil {
-		return nil, err
-	}
-	var couponGoods, couponShip int64
-	if err := q.QueryRow(ctx, `SELECT COALESCE(sum(amount) FILTER (WHERE kind IN ('store_free','store_threshold')), 0),
-		COALESCE(sum(amount) FILTER (WHERE kind = 'store_delivery'), 0) FROM order_discounts WHERE order_id=$1`, orderID).
-		Scan(&couponGoods, &couponShip); err != nil {
-		return nil, err
-	}
-	promo := max(0, merchant-couponGoods-couponShip)
-	s.d = Discount{Goods: couponGoods, Delivery: couponShip}
-	if promoID != nil {
-		s.promoID, s.promoAmount = *promoID, promo
-		// the kind the promotion had when the order took it, not its kind now
-		p := promoOn(promoKind, promo)
-		s.d.Goods += p.Goods
-		s.d.Delivery += p.Delivery
-	}
-	return &s, nil
-}
-
-// writeAdjusted stores an order's amounts with its discount at checkout.
+// writeAdjusted records who gave an order's discount at checkout, why and
+// when (the amounts are saved by saveMoney).
 func writeAdjusted(ctx context.Context, tx pgx.Tx, orderID int64, t Totals, reason string, actor Actor) error {
 	var by, approved *int64
 	var at *time.Time
@@ -435,49 +369,9 @@ func writeAdjusted(ctx context.Context, tx pgx.Tx, orderID int64, t Totals, reas
 	} else {
 		reason = ""
 	}
-	_, err := tx.Exec(ctx, `UPDATE orders SET service_charge=$2, tax_amount=$3, discount=$4, merchant_discount=$5,
-		platform_subsidy=$6, total=$7, adj_percent_bp=$8, staff_discount=$9, adj_mode=$10, round_off=$11, adj_reason=$12,
-		adj_by=$13, adj_approved_by=$14, adj_at=$15, version=version+1, updated_at=now() WHERE id=$1`,
-		orderID, t.ServiceCharge, t.TaxAmount, t.Discount, t.MerchantDiscount, t.PlatformSubsidy, t.Total, t.AdjPercentBP,
-		t.StaffDiscount, t.AdjMode, t.RoundOff, reason, by, approved, at)
+	_, err := tx.Exec(ctx, `UPDATE orders SET adj_reason=$2, adj_by=$3, adj_approved_by=$4, adj_at=$5 WHERE id=$1`,
+		orderID, reason, by, approved, at)
 	return err
-}
-
-// reapplyAdjust keeps an order's discount at checkout right after its dishes
-// changed (an add-on, a void): the percentage is taken off the new amount,
-// and a round-off or typed amount no longer fits, so it is dropped (§5.4).
-// It reports whether a round-off was dropped.
-func reapplyAdjust(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64) (bool, error) {
-	var bp int
-	var mode, reason string
-	if err := tx.QueryRow(ctx, `SELECT adj_percent_bp, adj_mode, adj_reason FROM orders WHERE id=$1`, orderID).
-		Scan(&bp, &mode, &reason); err != nil {
-		return false, err
-	}
-	if bp == 0 && mode == "" {
-		return false, nil
-	}
-	base, err := orderAdjBase(ctx, tx, b, orderID)
-	if err != nil {
-		return false, err
-	}
-	t, err := base.price(Adjust{PercentBP: bp})
-	if err != nil {
-		return false, err
-	}
-	if t.AdjPercentBP == 0 {
-		reason = ""
-	}
-	// who set it and when stay as they were
-	if _, err := tx.Exec(ctx, `UPDATE orders SET service_charge=$2, tax_amount=$3, discount=$4, merchant_discount=$5,
-		platform_subsidy=$6, total=$7, staff_discount=$8, adj_mode='', round_off=0, adj_reason=$9,
-		adj_at = CASE WHEN $10 THEN adj_at END, adj_by = CASE WHEN $10 THEN adj_by END,
-		adj_approved_by = CASE WHEN $10 THEN adj_approved_by END WHERE id=$1`,
-		orderID, t.ServiceCharge, t.TaxAmount, t.Discount, t.MerchantDiscount, t.PlatformSubsidy, t.Total,
-		t.StaffDiscount, reason, bp > 0); err != nil {
-		return false, err
-	}
-	return mode != "", nil
 }
 
 // adjustable says whether staff may still change an order's discount at
@@ -498,20 +392,15 @@ func (a *App) PreviewOrderAdjust(ctx context.Context, orderID int64, j Adjust) (
 	if err := j.validate(); err != nil {
 		return nil, err
 	}
-	bid, err := a.OrderBranch(ctx, orderID)
+	m, err := loadMoney(ctx, a.DB, orderID)
 	if err != nil {
 		return nil, err
 	}
-	b, err := a.BranchByID(ctx, bid)
+	p, err := m.withAdjust(j)
 	if err != nil {
 		return nil, err
 	}
-	base, err := orderAdjBase(ctx, a.DB, b, orderID)
-	if err != nil {
-		return nil, err
-	}
-	t, err := base.price(j)
-	return &t, err
+	return &p.Totals, nil
 }
 
 // SetOrderAdjust gives, changes or takes away a delivery or pickup order's
@@ -535,12 +424,16 @@ func (a *App) SetOrderAdjust(ctx context.Context, orderID int64, expectedVersion
 		if err != nil {
 			return err
 		}
-		base, err := orderAdjBase(ctx, tx, b, o.ID)
+		m, err := loadMoney(ctx, tx, o.ID)
 		if err != nil {
 			return err
 		}
-		t, err := base.price(j)
+		p, err := m.withAdjust(j)
 		if err != nil {
+			return err
+		}
+		t := p.Totals
+		if err := saveMoney(ctx, tx, b, o.ID, p, false); err != nil {
 			return err
 		}
 		if err := writeAdjusted(ctx, tx, o.ID, t, j.Reason, actor); err != nil {

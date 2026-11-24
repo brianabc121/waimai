@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/brianabc121/waimai/internal/pricing"
 )
 
 // Orders the store places for a customer who sent their order over WeChat,
@@ -467,25 +469,23 @@ func staffAdjust(ctx context.Context, q Querier, b *Branch, quote *Quote, j *Adj
 		return nil
 	}
 	t := quote.Totals
-	base := adjBase{subtotal: t.Subtotal, fee: t.DeliveryFee, cfg: b.taxConfig(), promoID: t.PromotionID,
-		promoName: t.PromotionName, promoNameEn: t.PromotionNameEn, promoAmount: t.PromotionDiscount}
-	base.cfg.PackagingFee = t.PackagingFee
-	if t.PromotionID != 0 {
-		var kind string
-		if err := q.QueryRow(ctx, `SELECT kind FROM promotions WHERE id=$1`, t.PromotionID).Scan(&kind); err != nil {
-			return err
-		}
-		if kind == "free_delivery" {
-			base.d.Delivery = t.MerchantDiscount
-		} else {
-			base.d.Goods = t.MerchantDiscount
-		}
+	cfg := b.taxConfig()
+	cfg.PackagingFee = t.PackagingFee
+	in := moneyIn{Fees: cfg, Delivery: t.DeliveryFee, StaffBP: j.PercentBP}
+	for i, l := range quote.Lines {
+		in.Lines = append(in.Lines, pricing.Line{Key: strconv.Itoa(i), Amount: l.LineTotal})
 	}
-	nt, err := base.price(*j)
+	if quote.promo != nil {
+		in.Promo, in.PromoOff = quote.promo, promoOn(quote.promo.Kind, t.PromotionDiscount)
+	}
+	if j.Mode != "" {
+		in.Round = j
+	}
+	p, err := priceMoney(in)
 	if err != nil {
 		return err
 	}
-	quote.Totals = nt
+	quote.Totals = p.Totals
 	return nil
 }
 
@@ -684,6 +684,10 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 			if err := claimPromotion(ctx, tx, b.ID, t.PromotionID, orderID, phone, t.PromotionDiscount); err != nil {
 				return err
 			}
+		}
+		// the amounts with the discount at checkout, the promotion's row
+		if err := saveMoney(ctx, tx, b, orderID, quotePriced(cur), false); err != nil {
+			return err
 		}
 		if !in.Adjust.empty() {
 			if err := writeAdjusted(ctx, tx, orderID, t, in.Adjust.Reason, actor); err != nil {

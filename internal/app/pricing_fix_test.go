@@ -152,3 +152,63 @@ func TestPricingFixPromoKindDrift(t *testing.T) {
 		t.Fatalf("before=%d after=%d", before, pv.Total)
 	}
 }
+
+// An order taken by staff keeps its promotion's row, so a void by the
+// store's fault keeps the promotion (before, it had no row and was dropped).
+func TestPricingFixStaffOrderPromotion(t *testing.T) {
+	s := newStore(t, false)
+	ctx, a := context.Background(), testApp
+	s.promo(t, app.PromotionInput{Kind: "amount_off", Threshold: 30000, Value: 5000, AppliesDelivery: true, AppliesPickup: true})
+	out, err := a.PlaceStaffOrder(ctx, s.branchID, s.staff, uniq("k"), app.StaffOrderInput{
+		Member:      app.MemberInput{Phone: "+639450004444", Source: "phone"},
+		ServiceType: "pickup",
+		Items:       []app.StaffLine{{ItemID: s.chicken, Qty: 2, OptionIDs: []int64{s.spiceMild}}, {ItemID: s.water, Qty: 1}},
+	})
+	noErr(t, err)
+	o := out.Order
+	if len(o.Discounts) != 1 || o.Discounts[0].Kind != "promotion" || o.Discounts[0].Amount != 5000 ||
+		o.Totals.MerchantDiscount != 5000 {
+		t.Fatalf("staff order discounts: %+v %+v", o.Discounts, o.Totals)
+	}
+	o, err = a.Accept(ctx, o.ID, 0, s.staff)
+	noErr(t, err)
+	r, err := a.VoidLine(ctx, itemByName(o, "water").ID, app.VoidInput{Reason: "沽清", ReasonKind: "store"}, s.staff, true)
+	noErr(t, err)
+	if r.Order.Totals.PromotionDiscount != 5000 && r.Order.Totals.Discount != 5000 {
+		t.Fatalf("after a store void: %+v", r.Order.Totals)
+	}
+}
+
+// Every order the tests made: its discount rows add up to its discount and
+// what it pays adds up from its parts.
+func TestPricingInvariantsOverAllOrders(t *testing.T) {
+	need(t)
+	rows, err := testApp.DB.Query(context.Background(), `SELECT o.id, o.discount,
+		COALESCE((SELECT sum(amount) FROM order_discounts d WHERE d.order_id = o.id), 0),
+		EXISTS (SELECT 1 FROM order_discounts d WHERE d.order_id = o.id),
+		o.subtotal + o.packaging_fee + o.delivery_fee + o.service_charge - o.discount - o.staff_discount - o.round_off
+			+ CASE WHEN o.tax_inclusive THEN 0 ELSE o.tax_amount END, o.total,
+		o.merchant_discount + o.platform_subsidy
+		FROM orders o WHERE o.acceptance_status NOT IN ('rejected','cancelled','expired')
+			AND o.updated_at > now() - interval '10 minutes'`)
+	noErr(t, err)
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		var id, discount, lines, parts, total, split int64
+		var has bool
+		noErr(t, rows.Scan(&id, &discount, &lines, &has, &parts, &total, &split))
+		n++
+		if has && lines != discount {
+			t.Errorf("order %d: discount %d, rows %d", id, discount, lines)
+		}
+		if parts != total && total != 0 {
+			t.Errorf("order %d: parts %d, total %d", id, parts, total)
+		}
+		if split != discount {
+			t.Errorf("order %d: merchant+platform %d, discount %d", id, split, discount)
+		}
+	}
+	noErr(t, rows.Err())
+	t.Logf("%d orders checked", n)
+}

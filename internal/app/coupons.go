@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/brianabc121/waimai/internal/pricing"
 )
 
 // Coupons (docs/COUPON_DESIGN.md). A customer holds coupons; at checkout one
@@ -284,33 +286,52 @@ func pickCoupons(wallet []CustomerCoupon, want []int64, auto bool, service strin
 	return res, nil
 }
 
-// applyCoupons prices the cart's coupons into the quote: the store's coupons
-// add to the promotion before tax, the platform coupon comes off at the end.
-func applyCoupons(quote *Quote, wallet []CustomerCoupon, cfg TaxConfig, promoID int64, promoName, promoNameEn string,
-	subtotal, fee int64, promo Discount) error {
+// applyCoupons prices the cart with its promotion and coupons: the store's
+// coupons after the promotion and before tax, the platform coupon off what is
+// left to pay at the end (money.go).
+func applyCoupons(quote *Quote, wallet []CustomerCoupon, cfg TaxConfig, promo *Promotion, fee int64, promoD Discount) error {
 	in := quote.Input
-	pick, err := pickCoupons(wallet, derefIDs(in.CouponIDs), in.CouponIDs == nil, in.ServiceType, subtotal, fee, promo)
+	var sub int64
+	lines := []pricing.Line{}
+	for i, l := range quote.Lines {
+		sub += l.LineTotal
+		lines = append(lines, pricing.Line{Key: strconv.Itoa(i), Amount: l.LineTotal})
+	}
+	pick, err := pickCoupons(wallet, derefIDs(in.CouponIDs), in.CouponIDs == nil, in.ServiceType, sub, fee, promoD)
 	if err != nil {
 		return err
 	}
-	d := Discount{Goods: promo.Goods + pick.merchant.Goods, Delivery: promo.Delivery + pick.merchant.Delivery}
-	quote.Totals = ComputeTotals(subtotal, fee, cfg, d)
-	quote.Totals.PromotionID, quote.Totals.PromotionName, quote.Totals.PromotionNameEn = promoID, promoName, promoNameEn
-	quote.Totals.PromotionDiscount = min(promo.total(), quote.Totals.MerchantDiscount)
-	if p := pick.platform; p != nil {
-		p.Saves = quote.Totals.applyPlatform(p.Value)
-		if p.Saves > 0 {
-			pick.applied = append(pick.applied, AppliedCoupon{ID: p.ID, Kind: p.Kind, Name: p.Name, NameEn: p.NameEn,
-				Amount: p.Saves, FundedBy: "platform"})
-		} else {
-			p.Selected = false
-		}
-	}
-	quote.Coupons, quote.CouponChoices = pick.applied, pick.choices
-	ids := []int64{}
+	used := []orderCoupon{}
 	for _, c := range pick.applied {
-		ids = append(ids, c.ID)
+		id := c.ID
+		used = append(used, orderCoupon{CouponID: &id, Kind: c.Kind, FundedBy: c.FundedBy, Name: c.Name, NameEn: c.NameEn,
+			Amount: c.Amount})
 	}
+	if p := pick.platform; p != nil {
+		id := p.ID
+		used = append(used, orderCoupon{CouponID: &id, Kind: p.Kind, FundedBy: "platform", Name: p.Name, NameEn: p.NameEn,
+			Amount: p.Value})
+	}
+	pr, err := priceMoney(moneyIn{Lines: lines, Fees: cfg, Delivery: fee, Promo: promo, PromoOff: promoD, Coupons: used})
+	if err != nil {
+		return err
+	}
+	quote.Totals, quote.promo = pr.Totals, pr.Promo
+	quote.Coupons = []AppliedCoupon{}
+	ids := []int64{}
+	for _, c := range pr.Coupons {
+		if c.FundedBy == "platform" {
+			pick.platform.Saves = c.Amount
+			if c.Amount == 0 {
+				pick.platform.Selected = false
+				continue
+			}
+		}
+		quote.Coupons = append(quote.Coupons, AppliedCoupon{ID: *c.CouponID, Kind: c.Kind, Name: c.Name, NameEn: c.NameEn,
+			Amount: c.Amount, FundedBy: c.FundedBy})
+		ids = append(ids, *c.CouponID)
+	}
+	quote.CouponChoices = pick.choices
 	quote.Input.CouponIDs = &ids // placing the order uses exactly these
 	return nil
 }
@@ -326,14 +347,6 @@ func derefIDs(p *[]int64) []int64 {
 // discount on it. A coupon used meanwhile (another phone, another order)
 // fails the order with QUOTE_CHANGED.
 func claimCoupons(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, phone string, q *Quote) error {
-	t := q.Totals
-	if t.PromotionID != 0 && t.PromotionDiscount > 0 {
-		if _, err := tx.Exec(ctx, `INSERT INTO order_discounts (order_id, branch_id, kind, funded_by, name, name_en,
-			amount, promotion_id) VALUES ($1,$2,'promotion','store',$3,$4,$5,$6)`, orderID, b.ID, t.PromotionName,
-			t.PromotionNameEn, t.PromotionDiscount, t.PromotionID); err != nil {
-			return err
-		}
-	}
 	for _, c := range q.Coupons {
 		tag, err := tx.Exec(ctx, `UPDATE customer_coupons SET status='used', order_id=$2, used_at=now()
 			WHERE id=$1 AND status='unused' AND expires_at > now()
@@ -344,15 +357,33 @@ func claimCoupons(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, phon
 		if tag.RowsAffected() == 0 {
 			return Err(http.StatusConflict, "QUOTE_CHANGED", "a coupon is no longer available, please confirm the new amount")
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO order_discounts (order_id, branch_id, kind, funded_by, name, name_en,
-			amount, coupon_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, orderID, b.ID, c.Kind, c.FundedBy, c.Name, c.NameEn,
-			c.Amount, c.ID); err != nil {
-			return err
-		}
+	}
+	return recordDiscounts(ctx, tx, b.ID, orderID, q)
+}
+
+// recordDiscounts writes a new order's discount rows (its promotion and
+// coupons) and who pays for them.
+func recordDiscounts(ctx context.Context, tx pgx.Tx, branchID, orderID int64, q *Quote) error {
+	if err := saveDiscountRows(ctx, tx, branchID, orderID, quotePriced(q)); err != nil {
+		return err
 	}
 	_, err := tx.Exec(ctx, `UPDATE orders SET merchant_discount=$2, platform_subsidy=$3 WHERE id=$1`,
-		orderID, t.MerchantDiscount, t.PlatformSubsidy)
+		orderID, q.Totals.MerchantDiscount, q.Totals.PlatformSubsidy)
 	return err
+}
+
+// quotePriced is a quote's amounts as saveMoney takes them.
+func quotePriced(q *Quote) *priced {
+	p := &priced{Totals: q.Totals, Promo: q.promo}
+	if p.Promo == nil && q.Totals.PromotionID != 0 {
+		p.Promo = &Promotion{ID: q.Totals.PromotionID}
+	}
+	for _, c := range q.Coupons {
+		id := c.ID
+		p.Coupons = append(p.Coupons, orderCoupon{CouponID: &id, Kind: c.Kind, FundedBy: c.FundedBy, Name: c.Name,
+			NameEn: c.NameEn, Amount: c.Amount})
+	}
+	return p
 }
 
 // releaseCoupons gives a rejected or cancelled order's coupons back. They keep

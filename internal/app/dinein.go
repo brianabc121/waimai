@@ -413,86 +413,32 @@ func lockSession(ctx context.Context, tx pgx.Tx, id int64) (*lockedSession, erro
 	return &s, err
 }
 
-// recomputeBill sets the order's amounts from its live lines.
+// recomputeBill sets a table bill's amounts from its live lines.
 func recomputeBill(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64) (Totals, error) {
-	return recomputeBillKeep(ctx, tx, b, orderID, 0, 0)
+	return repriceTable(ctx, tx, b, orderID, false)
 }
 
-// recomputeBillKeep is recomputeBill that keeps promotion keepID taking off
-// at least keepAmount (a dish voided through the store's fault does not
-// lower the guests' promotion, docs/VOID_ITEM_DESIGN.md §6).
-func recomputeBillKeep(ctx context.Context, tx pgx.Tx, b *Branch, orderID, keepID, keepAmount int64) (Totals, error) {
-	var subtotal int64
-	if err := tx.QueryRow(ctx, `SELECT COALESCE(sum(line_total), 0) FROM order_items
-		WHERE order_id=$1 AND prep_status <> 'cancelled'`, orderID).Scan(&subtotal); err != nil {
-		return Totals{}, err
-	}
-	t, err := dineBillTotals(ctx, tx, b, orderID, subtotal, keepID, keepAmount)
-	if err != nil {
-		return Totals{}, err
-	}
-	var promoID *int64
-	if t.PromotionID != 0 {
-		promoID = &t.PromotionID
-	}
-	_, err = tx.Exec(ctx, `UPDATE orders SET subtotal=$2, service_charge=$3, tax_amount=$4, tax_inclusive=$5,
-		tax_rate_bp=$6, total=$7, discount=$8, merchant_discount=$8, promotion_id=$9, promotion_name=$10,
-		promotion_name_en=$11, version=version+1, manifest_version=manifest_version+1, updated_at=now() WHERE id=$1`,
-		orderID, t.Subtotal, t.ServiceCharge, t.TaxAmount, t.TaxInclusive, t.TaxRateBP, t.Total, t.Discount,
-		promoID, t.PromotionName, t.PromotionNameEn)
-	return t, err
+// dinePolicy is how a table bill decides its promotion: the best dine-in
+// promotion for the dishes (docs/CHECKOUT_DISCOUNT_DESIGN.md §4.2), its dates
+// and daily hours checked at the time the table was opened, so a lunch offer
+// still applies when the lunch guests pay at 14:20; its status and quota are
+// checked now. A dish voided through the store's fault never lowers the
+// guests' promotion (docs/VOID_ITEM_DESIGN.md §6).
+func dinePolicy(m *orderMoney, storeFault bool) promoPolicy {
+	return promoPolicy{at: m.Opened, pick: true, current: storeFault, floor: storeFault}
 }
 
-// dineBillTotals prices a table bill of subtotal without saving it:
-// dineTotals, with promotion keepID kept at keepAmount or more.
-func dineBillTotals(ctx context.Context, q Querier, b *Branch, orderID, subtotal, keepID, keepAmount int64) (Totals, error) {
-	t, err := dineTotals(ctx, q, b, orderID, subtotal)
+// repriceTable prices a table bill again and saves it.
+func repriceTable(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, storeFault bool) (Totals, error) {
+	m, err := loadMoney(ctx, tx, orderID)
 	if err != nil {
 		return Totals{}, err
 	}
-	if keepID != 0 && t.PromotionDiscount < min(keepAmount, subtotal) {
-		ps, err := loadPromotions(ctx, q, b.ID, "p.id = "+fmt.Sprint(keepID), "")
-		if err != nil {
-			return Totals{}, err
-		}
-		if len(ps) == 1 {
-			cfg, err := orderFees(ctx, q, orderID)
-			if err != nil {
-				return Totals{}, err
-			}
-			keep := min(keepAmount, subtotal)
-			t = ComputeTotals(subtotal, 0, cfg, Discount{Goods: keep})
-			t.PromotionID, t.PromotionName, t.PromotionNameEn, t.PromotionDiscount = ps[0].ID, ps[0].Name, ps[0].NameEn, keep
-		}
-	}
-	return t, nil
-}
-
-// dineTotals prices a table bill: the best dine-in promotion for the dishes
-// (docs/CHECKOUT_DISCOUNT_DESIGN.md §4.2), then service charge and tax at the
-// rates the table was opened with. A promotion's dates and daily hours are
-// checked at the time the table was opened, so a lunch offer still applies
-// when the lunch guests pay at 14:20; its status and quota are checked now.
-func dineTotals(ctx context.Context, q Querier, b *Branch, orderID, subtotal int64) (Totals, error) {
-	var opened time.Time
-	if err := q.QueryRow(ctx, `SELECT COALESCE((SELECT s.opened_at FROM dining_sessions s WHERE s.id = o.session_id), o.created_at)
-		FROM orders o WHERE o.id=$1`, orderID).Scan(&opened); err != nil {
-		return Totals{}, err
-	}
-	cfg, err := orderFees(ctx, q, orderID)
+	p, _, err := m.reprice(ctx, tx, b, nil, dinePolicy(m, storeFault))
 	if err != nil {
 		return Totals{}, err
 	}
-	ps, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope='dine_in'", "")
-	if err != nil {
-		return Totals{}, err
-	}
-	best, d := bestPromotion(ps, opened, b.location(), "dine_in", subtotal, 0)
-	t := ComputeTotals(subtotal, 0, cfg, d)
-	if best != nil {
-		t.PromotionID, t.PromotionName, t.PromotionNameEn, t.PromotionDiscount = best.ID, best.Name, best.NameEn, d.total()
-	}
-	return t, nil
+	return p.Totals, saveMoney(ctx, tx, b, orderID, p, true)
 }
 
 type BatchInput struct {
@@ -730,21 +676,20 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 				"some dishes are still being prepared; finish or void them before closing", map[string]any{"count": cooking})
 		}
 		total := o.Total
-		var adjusted *Totals
+		var adjusted *priced
+		var b *Branch
 		if !in.Adjust.empty() {
-			b, err := scanBranch(tx.QueryRow(ctx, `SELECT `+branchCols+` FROM branches WHERE id=$1`, s.BranchID))
+			if b, err = readBranch(ctx, tx, s.BranchID); err != nil {
+				return err
+			}
+			m, err := loadMoney(ctx, tx, o.ID)
 			if err != nil {
 				return err
 			}
-			base, err := orderAdjBase(ctx, tx, b, o.ID)
-			if err != nil {
+			if adjusted, err = m.withAdjust(*in.Adjust); err != nil {
 				return err
 			}
-			t, err := base.price(*in.Adjust)
-			if err != nil {
-				return err
-			}
-			adjusted, total = &t, t.Total
+			total = adjusted.Totals.Total
 		}
 		if in.ExpectedTotal != nil && *in.ExpectedTotal != total {
 			return ErrVersion
@@ -783,12 +728,15 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 			return err
 		}
 		if adjusted != nil {
-			if err := writeAdjusted(ctx, tx, o.ID, *adjusted, in.Adjust.Reason, actor); err != nil {
+			if err := saveMoney(ctx, tx, b, o.ID, adjusted, false); err != nil {
+				return err
+			}
+			if err := writeAdjusted(ctx, tx, o.ID, adjusted.Totals, in.Adjust.Reason, actor); err != nil {
 				return err
 			}
 			if err := audit(ctx, tx, s.BranchID, o.ID, actor, "order.adjusted", map[string]any{"adjust": in.Adjust,
-				"total_before": o.Total, "total_after": total, "staff_discount": adjusted.StaffDiscount,
-				"round_off": adjusted.RoundOff}); err != nil {
+				"total_before": o.Total, "total_after": total, "staff_discount": adjusted.Totals.StaffDiscount,
+				"round_off": adjusted.Totals.RoundOff}); err != nil {
 				return err
 			}
 		}
