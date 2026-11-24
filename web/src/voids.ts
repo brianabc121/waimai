@@ -65,7 +65,7 @@ extend({
   'vd.r.amount': ['退款金额', 'Amount'],
   'vd.r.suggested': ['建议 {s}（最多）', 'Suggested {s} (at most)'],
   'vd.r.method': ['退款方式', 'How it is given back'],
-  'vd.r.methods': ['现金|转账|GCash|其他', 'Cash|Transfer|GCash|Other'],
+  'vd.r.methods': ['现金|转账|电子钱包|其他', 'Cash|Transfer|E-wallet|Other'],
   'vd.r.ok': ['记录退款 {s}', 'Record refund {s}'],
   'vd.r.done': ['已记录退款 {s}', 'Refund of {s} recorded'],
   'vd.r.row': ['已退款 {s} · {m} · {r} · {at}', 'Refunded {s} · {m} · {r} · {at}'],

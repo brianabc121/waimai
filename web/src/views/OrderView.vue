@@ -18,6 +18,7 @@ import './storeStrings'
 import TotalsTable from './TotalsTable.vue'
 import CustomerFrame from './me/CustomerFrame.vue'
 import { couponTitle, lastDay } from '../coupons'
+import '../voids'
 import { chatEnabled } from '../chat'
 import { addonErr, batchTitle, pendingAddon } from '../addon'
 
@@ -158,6 +159,9 @@ const stateIcon = computed(() => {
   if (s === 'out_for_delivery' || s === 'rider_arrived') return ICONS.ride
   return ICONS.clock
 })
+// what the store took off and gave back (docs/VOID_ITEM_DESIGN.md §8.6)
+const lastVoid = computed(() => (order.value?.voids ?? []).slice(-1)[0] ?? null)
+const firstTotal = computed(() => order.value?.voids?.[0]?.total_before ?? null)
 const itemCount = computed(() => order.value?.items.reduce((n, i) => n + i.qty, 0) ?? 0)
 
 // ---- adding dishes (docs/ADD_ON_ORDER_DESIGN.md §8) ----
@@ -258,6 +262,9 @@ async function copyNo() {
           </section>
           <div v-else-if="droppedAdd" class="banner warn" data-testid="addon-dropped">{{ batchTitle(droppedAdd.seq) }} · {{ t('ao.st.' + droppedAdd.status) }}<template v-if="droppedAdd.reject_reason">（{{ droppedAdd.reject_reason }}）</template></div>
 
+          <div v-if="lastVoid" class="banner warn" data-testid="void-banner">{{ t('vd.c.banner', { n: lastVoid.qty, dish: lastVoid.name, r: lastVoid.reason, s: money(lastVoid.total_before - lastVoid.total_after, order.currency) }) }}</div>
+          <div v-if="order.refunded" class="banner info" data-testid="refund-banner">{{ t('vd.c.refund', { s: money(order.refunded, order.currency) }) }}</div>
+
           <router-link v-if="order.gift" to="/me/coupons" class="od-gift" data-testid="order-gift">
             <span class="ic">🎁</span>
             <span class="grow"><b>{{ t('cp.gift', { what: couponTitle(order.gift, order.gift.currency) }) }}</b>
@@ -309,19 +316,21 @@ async function copyNo() {
             <template v-for="(it, i) in sorted" :key="it.id">
               <div v-if="multi && (i === 0 || sorted[i - 1].basket !== it.basket)" class="od-basket" data-testid="basket-head">{{ t('basket_n', { n: it.basket }) }}</div>
               <div v-else-if="!multi && grouped && (i === 0 || sorted[i - 1].batch_seq !== it.batch_seq)" class="od-basket" data-testid="addon-head">{{ batchTitle(it.batch_seq) }}</div>
-              <div class="od-item">
+              <div class="od-item" :class="{ voided: it.prep_status === 'cancelled' }">
                 <img v-if="it.image_url" :src="it.image_url" alt="" loading="lazy" /><span v-else class="ph">{{ mn(it).slice(0, 1) }}</span>
                 <div class="grow">
                   <div class="od-iname">{{ mn(it) }}</div>
                   <div class="sub" v-if="it.options.length">{{ it.options.map(o => mn(o)).join(' · ') }}</div>
                   <div class="note-line" v-if="it.note || it.note_tags?.length" data-testid="od-notes">{{ noteLine(it, true) }}</div>
+                  <div v-if="it.prep_status === 'cancelled'" class="voidtag" data-testid="od-voided">{{ t('vd.c.struck') }}<template v-if="it.void_reason"> · {{ it.void_reason }}</template></div>
                 </div>
                 <span class="qty">×{{ it.qty }}</span>
                 <span class="price">{{ money(it.line_total, order.currency) }}</span>
               </div>
             </template>
           </div>
-          <div class="od-sums"><TotalsTable :totals="order.totals" :currency="order.currency" :delivery="order.service_type === 'delivery'" :discounts="order.discounts" /></div>
+          <div class="od-sums"><TotalsTable :totals="order.totals" :currency="order.currency" :delivery="order.service_type === 'delivery'" :discounts="order.discounts" />
+            <div v-if="firstTotal != null && firstTotal !== order.totals.total" class="od-was" data-testid="od-was">{{ t('vd.c.was', { s: money(firstTotal, order.currency) }) }}</div></div>
         </section>
 
         <section class="od-card od-infocard" data-testid="order-info">
@@ -469,7 +478,10 @@ async function copyNo() {
 .od-items { display: grid; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .od-basket { font-size: 12px; font-weight: 600; color: var(--muted); padding-top: 2px; }
 .od-item { display: flex; gap: 12px; align-items: center; }
-.od-item img, .od-item .ph { width: 64px; height: 52px; border-radius: 8px; object-fit: cover; flex: none; }
+.od-item img, .od-item.voided .od-iname, .od-item.voided .qty, .od-item.voided .price { text-decoration: line-through; color: var(--muted); }
+.od-item .voidtag { font-size: 12px; color: #b42318; margin-top: 2px; }
+.od-was { text-align: end; font-size: 12px; color: var(--muted); text-decoration: line-through; }
+.od-item .ph { width: 64px; height: 52px; border-radius: 8px; object-fit: cover; flex: none; }
 .od-item .ph { background: #c2401c; color: #fff3da; font-weight: 600; font-size: 18px; display: grid; place-items: center; }
 .od-item .grow { flex: 1; min-width: 0; }
 .od-iname { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; line-height: 1.4; }

@@ -10,6 +10,7 @@ import { locale, setLocale, t } from '../i18n'
 import { can, currentRole, logout, reloadUser, session, setAdminView } from '../session'
 import './loginStrings'
 import '../progress'
+import '../voids'
 import '../approve'
 import ApprovePinDialog from './ApprovePinDialog.vue'
 import { pagePerms } from '../perms'
@@ -94,6 +95,7 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
       <div class="shell-links">
         <router-link v-if="show('/merchant/orders')" to="/merchant/orders">{{ t('orders') }}</router-link>
         <router-link v-if="show('/merchant/progress')" to="/merchant/progress" class="navsub" data-testid="nav-progress">{{ t('kp.nav') }}</router-link>
+        <router-link v-if="show('/merchant/voids')" to="/merchant/voids" class="navsub" data-testid="nav-voids">{{ t('vd.log.title') }}</router-link>
         <router-link v-if="show('/merchant/members')" to="/merchant/members" data-testid="nav-members">{{ t('sm.title') }}</router-link>
         <router-link v-if="show('/merchant/addresses')" to="/merchant/addresses" data-testid="nav-addresses">{{ t('da.title') }}</router-link>
         <router-link v-if="show('/merchant/tables')" to="/merchant/tables">{{ t('tables') }}</router-link>

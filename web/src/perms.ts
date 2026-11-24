@@ -7,6 +7,7 @@ import { extend } from './i18n'
 const pages: [string, string[]][] = [
   ['/merchant/orders/new', ['order.manual', 'table.use']],
   ['/merchant/progress', ['order.progress']],
+  ['/merchant/voids', ['order.void']],
   ['/merchant/orders', ['order.view']],
   ['/merchant/members', ['member.view']],
   ['/merchant/addresses', ['member.view']],
@@ -92,6 +93,8 @@ extend({
   'rp.d.order.cancel': ['取消已经接了的单', 'Cancel orders already accepted'],
   'rp.p.order.aftersale': ['售后和退款', 'After-sales and refunds'],
   'rp.d.order.aftersale': ['处理顾客的售后申请', "Handle customers' after-sales requests"],
+  'rp.p.order.void': ['退已做的菜', 'Void dishes already made'],
+  'rp.d.order.void': ['退厨房已经开始做或做好的菜（算损耗），看退菜记录；没有这项可以请经理输授权码', 'Void dishes the kitchen started or made (counted as waste), see the void log; without it a manager can approve with a code'],
   'rp.p.table.use': ['桌台收银', 'Run tables'],
   'rp.d.table.use': ['开台、加菜、退菜、收款关台，绑定点餐平板', 'Open tables, add and void dishes, take payment, pair tablets'],
   'rp.p.table.manage': ['桌台设置', 'Set up tables'],
