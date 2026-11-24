@@ -3169,5 +3169,13 @@
 "pr.dish_percent":"指定菜品{zhe}折",
 "pr.dish_second":"第二份{zhe}折",
 "pr.dish_half":"第二份半價",
-"pr.dish_free":"買一送一"
+"pr.dish_free":"買一送一",
+"vo.by_pic":"🖼 看圖點菜",
+"vo.pic_title":"看圖點菜",
+"vo.pic_hint":"點一下加一份，有規格的先選規格；口味備註回到訂單裡填",
+"vo.pic_added":"已加的菜",
+"vo.pic_empty":"點左邊的菜加進來",
+"vo.pic_sum":"共 {n} 份",
+"vo.pic_done":"完成",
+"vo.pic_none":"這個分類沒有可以點的菜"
 }

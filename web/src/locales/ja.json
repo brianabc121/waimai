@@ -3169,5 +3169,13 @@
  "pr.dish_percent": "対象料理 {pct}%オフ",
  "pr.dish_second": "2点目 {pct}%オフ",
  "pr.dish_half": "2点目半額",
- "pr.dish_free": "1つ買うと1つ無料"
+ "pr.dish_free": "1つ買うと1つ無料",
+ "vo.by_pic": "🖼 写真で選ぶ",
+ "vo.pic_title": "写真で選ぶ",
+ "vo.pic_hint": "タップで1つ追加。オプションのある料理は先に選択。メモは注文の行で入力",
+ "vo.pic_added": "追加した料理",
+ "vo.pic_empty": "左の料理をタップして追加",
+ "vo.pic_sum": "計 {n} 点",
+ "vo.pic_done": "完了",
+ "vo.pic_none": "この分類に注文できる料理はありません"
 }

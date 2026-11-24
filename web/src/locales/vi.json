@@ -3169,5 +3169,13 @@
  "pr.dish_percent": "Món chọn giảm {pct}%",
  "pr.dish_second": "Món thứ hai giảm {pct}%",
  "pr.dish_half": "Món thứ hai nửa giá",
- "pr.dish_free": "Mua 1 tặng 1"
+ "pr.dish_free": "Mua 1 tặng 1",
+ "vo.by_pic": "🖼 Chọn theo ảnh",
+ "vo.pic_title": "Chọn theo ảnh",
+ "vo.pic_hint": "Chạm để thêm một phần; món có tùy chọn sẽ hỏi trước. Ghi chú nhập ở dòng đơn",
+ "vo.pic_added": "Đã thêm",
+ "vo.pic_empty": "Chạm món bên trái để thêm",
+ "vo.pic_sum": "{n} phần",
+ "vo.pic_done": "Xong",
+ "vo.pic_none": "Mục này không có món đặt được"
 }

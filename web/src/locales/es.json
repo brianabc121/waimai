@@ -3169,5 +3169,13 @@
  "pr.dish_percent": "Platos elegidos {pct} % de descuento",
  "pr.dish_second": "Segunda unidad {pct} % de descuento",
  "pr.dish_half": "Segunda unidad a mitad de precio",
- "pr.dish_free": "Compra uno y llévate otro gratis"
+ "pr.dish_free": "Compra uno y llévate otro gratis",
+ "vo.by_pic": "🖼 Elegir por foto",
+ "vo.pic_title": "Elegir por foto",
+ "vo.pic_hint": "Toca para añadir uno; los platos con opciones preguntan antes. Las notas van en las líneas del pedido",
+ "vo.pic_added": "Añadidos",
+ "vo.pic_empty": "Toca un plato para añadirlo",
+ "vo.pic_sum": "{n} artículos",
+ "vo.pic_done": "Listo",
+ "vo.pic_none": "No hay platos disponibles aquí"
 }
