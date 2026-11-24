@@ -111,6 +111,62 @@
   "my": "အော်ဒါ ပယ်ဖျက်လိုက်ပါပြီ",
   "km": "ការកម្ម៉ង់ត្រូវបានលុបចោល"
  },
+ "sys.order.appended": {
+  "zh": "商家为你的订单加了菜",
+  "en": "The store added dishes to your order",
+  "zh-Hant": "商家為你的訂單加了菜",
+  "th": "ร้านเพิ่มอาหารในออเดอร์ของคุณแล้ว",
+  "vi": "Cửa hàng đã thêm món vào đơn của bạn",
+  "fr": "Le restaurant a ajouté des plats à votre commande",
+  "ar": "أضاف المتجر أطباقًا إلى طلبك",
+  "es": "La tienda añadió platos a tu pedido",
+  "ru": "Заведение добавило блюда в ваш заказ",
+  "ja": "お店が注文に料理を追加しました",
+  "my": "ဆိုင်က သင့်အော်ဒါထဲ ဟင်းပွဲ ထပ်ထည့်ပေးပါပြီ",
+  "km": "ហាងបានបន្ថែមម្ហូបទៅក្នុងការកម្ម៉ង់របស់អ្នក"
+ },
+ "sys.order.addon_accepted": {
+  "zh": "商家已确认你加的菜",
+  "en": "The store accepted the dishes you added",
+  "zh-Hant": "商家已確認你加的菜",
+  "th": "ร้านยืนยันอาหารที่คุณสั่งเพิ่มแล้ว",
+  "vi": "Cửa hàng đã nhận các món bạn thêm",
+  "fr": "Le restaurant a accepté les plats ajoutés",
+  "ar": "قبل المتجر الأطباق التي أضفتها",
+  "es": "La tienda aceptó los platos que añadiste",
+  "ru": "Заведение приняло добавленные блюда",
+  "ja": "お店が追加注文を受け付けました",
+  "my": "သင်ထပ်မှာထားသော ဟင်းပွဲများကို ဆိုင်က လက်ခံပါပြီ",
+  "km": "ហាងបានទទួលម្ហូបដែលអ្នកបន្ថែម"
+ },
+ "sys.order.addon_rejected": {
+  "zh": "商家没有接受你加的菜，原订单不变",
+  "en": "The store declined the dishes you added; your order is unchanged",
+  "zh-Hant": "商家沒有接受你加的菜，原訂單不變",
+  "th": "ร้านไม่รับอาหารที่สั่งเพิ่ม ออเดอร์เดิมไม่เปลี่ยน",
+  "vi": "Cửa hàng không nhận món thêm; đơn cũ giữ nguyên",
+  "fr": "Le restaurant a refusé les plats ajoutés ; votre commande reste inchangée",
+  "ar": "رفض المتجر الأطباق المضافة؛ طلبك كما هو",
+  "es": "La tienda rechazó los platos añadidos; tu pedido no cambia",
+  "ru": "Заведение не приняло добавленные блюда; заказ не изменился",
+  "ja": "お店は追加注文を受け付けませんでした。元の注文はそのままです",
+  "my": "ထပ်မှာထားသော ဟင်းပွဲများကို ဆိုင်က မလက်ခံပါ၊ မူလအော်ဒါ မပြောင်းလဲပါ",
+  "km": "ហាងមិនទទួលម្ហូបដែលបន្ថែមទេ ការកម្ម៉ង់ដើមនៅដដែល"
+ },
+ "sys.order.addon_expired": {
+  "zh": "商家没有及时确认，加的菜已失效",
+  "en": "The store did not confirm in time, so the added dishes were dropped",
+  "zh-Hant": "商家沒有及時確認，加的菜已失效",
+  "th": "ร้านไม่ได้ยืนยันทันเวลา รายการที่สั่งเพิ่มถูกยกเลิก",
+  "vi": "Cửa hàng không xác nhận kịp, món thêm đã bị hủy",
+  "fr": "Le restaurant n’a pas confirmé à temps ; les plats ajoutés sont annulés",
+  "ar": "لم يؤكد المتجر في الوقت المناسب، فأُلغيت الأطباق المضافة",
+  "es": "La tienda no confirmó a tiempo; los platos añadidos se anularon",
+  "ru": "Заведение не подтвердило вовремя, добавленные блюда отменены",
+  "ja": "お店の確認が間に合わず、追加注文は取り消されました",
+  "my": "ဆိုင်က အချိန်မီ အတည်မပြုသဖြင့် ထပ်မှာထားသည်များ ပျက်သွားပါပြီ",
+  "km": "ហាងមិនបានបញ្ជាក់ទាន់ពេល ម្ហូបដែលបន្ថែមត្រូវបានលុបចោល"
+ },
  "sys.push.rider.assigned": {
   "zh": "新配送单",
   "en": "New delivery",
@@ -166,6 +222,20 @@
   "ja": "受け取りできます",
   "my": "ထုတ်ယူရန် အသင့်ဖြစ်ပါပြီ",
   "km": "រួចរាល់សម្រាប់មកយក"
+ },
+ "sys.push.rider.appended": {
+  "zh": "订单加了菜，等店里重新打包",
+  "en": "Dishes were added; wait for the store to repack",
+  "zh-Hant": "訂單加了菜，等店裡重新打包",
+  "th": "มีการเพิ่มอาหาร รอร้านแพ็กใหม่",
+  "vi": "Đơn có thêm món, chờ cửa hàng đóng gói lại",
+  "fr": "Des plats ont été ajoutés ; attendez le nouvel emballage",
+  "ar": "أُضيفت أطباق؛ انتظر إعادة التغليف",
+  "es": "Se añadieron platos; espera a que la tienda vuelva a empacar",
+  "ru": "В заказ добавили блюда, дождитесь новой упаковки",
+  "ja": "料理が追加されました。再梱包をお待ちください",
+  "my": "ဟင်းပွဲ ထပ်ထည့်ထားသည်၊ ဆိုင်က ပြန်ထုပ်သည်အထိ စောင့်ပါ",
+  "km": "មានម្ហូបបន្ថែម សូមរង់ចាំហាងវេចខ្ចប់ឡើងវិញ"
  },
  "sys.push.chat.store_title": {
   "zh": "有新的顾客消息",

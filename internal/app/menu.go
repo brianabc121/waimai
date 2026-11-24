@@ -554,6 +554,8 @@ type SettingsInput struct {
 	KitchenSlowMinutes int `json:"kitchen_slow_minutes"`
 	DetourPercent      int `json:"detour_percent"`
 	DetourMeters       int `json:"detour_meters"`
+	// AddonConfirmMinutes: 0 keeps what is set.
+	AddonConfirmMinutes int `json:"addon_confirm_minutes"`
 	// The store page's notice, introduction and baskets; nil keeps what is set.
 	Notice         *string `json:"notice"`
 	Intro          *string `json:"intro"`
@@ -595,6 +597,9 @@ func (a *App) SaveSettings(ctx context.Context, branchID int64, in SettingsInput
 	if in.DetourMeters != 0 && (in.DetourMeters < 100 || in.DetourMeters > 20000) {
 		return nil, ErrValidation("the detour distance must be 0.1 to 20 km")
 	}
+	if in.AddonConfirmMinutes != 0 && (in.AddonConfirmMinutes < 1 || in.AddonConfirmMinutes > 60) {
+		return nil, ErrValidation("the add-on confirmation time must be 1 to 60 minutes")
+	}
 	for _, t := range []*string{in.Notice, in.Intro} {
 		if t != nil {
 			*t = strings.TrimSpace(*t)
@@ -627,11 +632,12 @@ func (a *App) SaveSettings(ctx context.Context, branchID int64, in SettingsInput
 		scheduling_enabled=$18, prep_minutes=$19, kitchen_slow_minutes=coalesce(nullif($20, 0), kitchen_slow_minutes),
 		detour_percent=coalesce(nullif($21, 0), detour_percent), detour_meters=coalesce(nullif($22, 0), detour_meters),
 		notice=coalesce($23, notice), intro=coalesce($24, intro), baskets_enabled=coalesce($25, baskets_enabled),
-		contact_fields=coalesce($26::text[], contact_fields) WHERE id=$1`,
+		contact_fields=coalesce($26::text[], contact_fields),
+		addon_confirm_minutes=coalesce(nullif($27, 0), addon_confirm_minutes) WHERE id=$1`,
 		branchID, in.Name, in.NameEn, in.Address, in.Phone, in.TaxRateBP, in.TaxInclusive, in.ServiceChargeBP,
 		in.PackagingFee, in.MinOrderAmount, in.AcceptTimeoutMinutes, in.DeliveryEnabled, in.PickupEnabled,
 		in.Paused, in.OpenTime, in.CloseTime, in.NotifySMS, in.SchedulingEnabled, in.PrepMinutes,
-		in.KitchenSlowMinutes, in.DetourPercent, in.DetourMeters, in.Notice, in.Intro, in.BasketsEnabled, contactFields)
+		in.KitchenSlowMinutes, in.DetourPercent, in.DetourMeters, in.Notice, in.Intro, in.BasketsEnabled, contactFields, in.AddonConfirmMinutes)
 	if err != nil {
 		return nil, err
 	}

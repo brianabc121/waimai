@@ -184,6 +184,13 @@ func customerView(o *app.Order) *app.Order {
 	// which delivery area an address fell in is the store's business
 	o.ZoneName, o.ZoneDistanceM = "", nil
 	o.StaffNote, o.PlacedBy = "", ""
+	// who in the store added a batch, and its kitchen tags, stay in the store
+	for i := range o.Batches {
+		o.Batches[i].By, o.Batches[i].RoundTags = "", []string{}
+	}
+	for i := range o.Items {
+		o.Items[i].BatchBy, o.Items[i].RoundTags = "", []string{}
+	}
 	return o
 }
 

@@ -31,6 +31,8 @@ type Branch struct {
 	NotifySMS            bool   `json:"notify_sms"`
 	SchedulingEnabled    bool   `json:"scheduling_enabled"`
 	PrepMinutes          int    `json:"prep_minutes"`
+	// AddonConfirmMinutes is how long the store has to confirm a customer's add-on.
+	AddonConfirmMinutes int `json:"addon_confirm_minutes"`
 	// What the work summaries count as a slow dish and as a detour.
 	KitchenSlowMinutes int  `json:"kitchen_slow_minutes"`
 	DetourPercent      int  `json:"detour_percent"`
@@ -154,7 +156,7 @@ const branchCols = `id, merchant_id, slug, name, name_en, address, phone, timezo
 	delivery_enabled, pickup_enabled, paused, open_time, close_time, notify_sms, scheduling_enabled, prep_minutes,
 	lat, lng, zone_mode, zone_tolerance_m, kitchen_slow_minutes, detour_percent, detour_meters,
 	notice, intro, baskets_enabled, country_code, country, province, city, district, postal_code, contact_fields,
-	menu_lang, menu_langs_off, (SELECT m.status = 'suspended' FROM merchants m WHERE m.id = branches.merchant_id)`
+	menu_lang, menu_langs_off, addon_confirm_minutes, (SELECT m.status = 'suspended' FROM merchants m WHERE m.id = branches.merchant_id)`
 
 func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 	var b Branch
@@ -163,7 +165,7 @@ func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime, &b.NotifySMS,
 		&b.SchedulingEnabled, &b.PrepMinutes, &b.Lat, &b.Lng, &b.ZoneMode, &b.ZoneToleranceM,
 		&b.KitchenSlowMinutes, &b.DetourPercent, &b.DetourMeters, &b.Notice, &b.Intro, &b.BasketsEnabled,
-		&b.CountryCode, &b.Country, &b.Province, &b.City, &b.District, &b.PostalCode, &b.ContactFields, &b.MenuLang, &b.MenuLangsOff, &b.Suspended)
+		&b.CountryCode, &b.Country, &b.Province, &b.City, &b.District, &b.PostalCode, &b.ContactFields, &b.MenuLang, &b.MenuLangsOff, &b.AddonConfirmMinutes, &b.Suspended)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, ErrNotFound
