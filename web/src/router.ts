@@ -50,6 +50,7 @@ export const router = createRouter({
         { path: 'promos', component: () => import('./views/PromosView.vue') },
         { path: 'cash', component: () => import('./views/CashView.vue') },
         { path: 'bills', component: () => import('./views/BillsView.vue') },
+        { path: 'reconcile', component: () => import('./views/ReconcileView.vue') },
         { path: 'delivery-map', component: () => import('./views/DeliveryMapView.vue') },
         { path: 'staff', component: () => import('./views/StaffView.vue') },
         { path: 'staff/roles', component: () => import('./views/staff/RolePermsView.vue') },
