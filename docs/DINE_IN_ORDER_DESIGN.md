@@ -1,6 +1,6 @@
 # 代客下单 · 堂食模式 设计方案 v0.1
 
-> 状态：2026-11-24 初稿，等 brian 确认。v0.1.1：按 brian 要求菜品格带图片。第 12 节是待确认的问题，括号里是推荐做法。
+> 状态：2026-11-24 brian 确认，第 12 节全部按推荐（菜品格带图片也已定）。
 > 效果图：[docs/dine-in-order-screens/](dine-in-order-screens/)，原型 [docs/dine-in-order-prototype/index.html](dine-in-order-prototype/index.html)（地址后加 `#s1` 到 `#s6` 切换）。
 >
 > | 效果图 | 内容 |
