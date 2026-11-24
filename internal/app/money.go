@@ -35,6 +35,8 @@ type orderCoupon struct {
 	// Amount is what it took off when last priced; a repricing uses it as
 	// the most it can take off (a coupon never grows back).
 	Amount int64
+	// share is how it was shared over the lines when priced.
+	share pricing.Applied
 }
 
 // moneyLine is one live dish line.
@@ -240,6 +242,10 @@ type priced struct {
 	Promo   *Promotion
 	Coupons []orderCoupon // with what each actually took off
 	Result  pricing.Result
+	// promoShare is how the promotion is shared over the lines.
+	promoShare pricing.Applied
+	// ids maps the engine's line keys to order_items ids, when they are not the ids.
+	ids map[string]int64
 }
 
 // couponStage is where a coupon kind is taken off.
@@ -302,6 +308,7 @@ func priceMoney(in moneyIn) (*priced, error) {
 	}
 	i := 0
 	if in.Promo != nil {
+		p.promoShare = r.Applied[0]
 		if off := r.Applied[0].Off; off > 0 {
 			t.PromotionID, t.PromotionName, t.PromotionNameEn = in.Promo.ID, in.Promo.Name, in.Promo.NameEn
 			t.PromotionDiscount = off
@@ -313,7 +320,7 @@ func priceMoney(in moneyIn) (*priced, error) {
 	for _, kind := range couponOrder {
 		for _, c := range in.Coupons {
 			if c.Kind == kind {
-				c.Amount = r.Applied[i].Off
+				c.Amount, c.share = r.Applied[i].Off, r.Applied[i]
 				p.Coupons = append(p.Coupons, c)
 				i++
 			}
@@ -393,11 +400,18 @@ func saveMoney(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, p *pric
 	if _, err := tx.Exec(ctx, `UPDATE orders SET subtotal=$2, service_charge=$3, tax_amount=$4, tax_inclusive=$5,
 		tax_rate_bp=$6, discount=$7, merchant_discount=$8, platform_subsidy=$9, total=$10, promotion_id=$11,
 		promotion_name=$12, promotion_name_en=$13, adj_percent_bp=$14, staff_discount=$15, adj_mode=$16, round_off=$17,
+		adj_reason = CASE WHEN $14 = 0 AND $16 = '' THEN '' ELSE adj_reason END,
+		adj_by = CASE WHEN $14 = 0 AND $16 = '' THEN NULL ELSE adj_by END,
+		adj_approved_by = CASE WHEN $14 = 0 AND $16 = '' THEN NULL ELSE adj_approved_by END,
+		adj_at = CASE WHEN $14 = 0 AND $16 = '' THEN NULL ELSE adj_at END,
 		version=version+1`+bump+`, updated_at=now() WHERE id=$1`,
 		orderID, t.Subtotal, t.ServiceCharge, t.TaxAmount, t.TaxInclusive, t.TaxRateBP, t.Discount, t.MerchantDiscount,
 		t.PlatformSubsidy, t.Total, promoID, t.PromotionName, t.PromotionNameEn, t.AdjPercentBP, t.StaffDiscount,
 		t.AdjMode, t.RoundOff); err != nil {
 		return wrap("save order money", err)
+	}
+	if err := saveLineShares(ctx, tx, orderID, p.Result, p.ids); err != nil {
+		return err
 	}
 	return saveDiscountRows(ctx, tx, b.ID, orderID, p)
 }
@@ -412,8 +426,9 @@ func saveDiscountRows(ctx context.Context, tx pgx.Tx, branchID, orderID int64, p
 	t := p.Totals
 	if p.Promo != nil && t.PromotionDiscount > 0 {
 		if _, err := tx.Exec(ctx, `INSERT INTO order_discounts (order_id, branch_id, kind, funded_by, name, name_en,
-			amount, promotion_id) VALUES ($1,$2,'promotion','store',$3,$4,$5,$6)`, orderID, branchID, t.PromotionName,
-			t.PromotionNameEn, t.PromotionDiscount, p.Promo.ID); err != nil {
+			amount, promotion_id, per_line, created_at) VALUES ($1,$2,'promotion','store',$3,$4,$5,$6,$7,
+			(SELECT created_at FROM orders WHERE id=$1))`, orderID, branchID, t.PromotionName,
+			t.PromotionNameEn, t.PromotionDiscount, p.Promo.ID, perLine(p.promoShare, p.ids)); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE promotion_redemptions SET amount=$2 WHERE order_id=$1 AND status='applied'`,
@@ -423,10 +438,123 @@ func saveDiscountRows(ctx context.Context, tx pgx.Tx, branchID, orderID int64, p
 	}
 	for _, c := range p.Coupons {
 		if _, err := tx.Exec(ctx, `INSERT INTO order_discounts (order_id, branch_id, kind, funded_by, name, name_en,
-			amount, coupon_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, orderID, branchID, c.Kind, c.FundedBy, c.Name, c.NameEn,
-			c.Amount, c.CouponID); err != nil {
+			amount, coupon_id, per_line, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,
+			(SELECT created_at FROM orders WHERE id=$1))`, orderID, branchID, c.Kind, c.FundedBy, c.Name, c.NameEn,
+			c.Amount, c.CouponID, perLine(c.share, p.ids)); err != nil {
 			return fmt.Errorf("discount row: %w", err)
 		}
 	}
 	return nil
+}
+
+// moneyEvent says why the order amounts written next in this transaction
+// change, for the money ledger (order_money_events, written by the database).
+func moneyEvent(ctx context.Context, tx pgx.Tx, kind string, ref int64, actor Actor) error {
+	refS, idS := "", ""
+	if ref != 0 {
+		refS = strconv.FormatInt(ref, 10)
+	}
+	if actor.ID != 0 {
+		idS = strconv.FormatInt(actor.ID, 10)
+	}
+	_, err := tx.Exec(ctx, `SELECT set_config('waimai.money_kind', $1, true), set_config('waimai.money_ref', $2, true),
+		set_config('waimai.money_actor_type', $3, true), set_config('waimai.money_actor_id', $4, true)`,
+		kind, refS, actor.Type, idS)
+	return err
+}
+
+// saveLineShares writes each dish line's share of the discounts, service
+// charge and tax; ids maps the engine's line keys to order_items ids (nil
+// when the keys are the ids). Voided lines share nothing.
+func saveLineShares(ctx context.Context, tx pgx.Tx, orderID int64, r pricing.Result, ids map[string]int64) error {
+	var lineIDs, disc, svc, tax []int64
+	for _, l := range r.Lines {
+		id, ok := ids[l.Key]
+		if ids == nil {
+			v, err := strconv.ParseInt(l.Key, 10, 64)
+			id, ok = v, err == nil && v > 0
+		}
+		if !ok {
+			continue
+		}
+		lineIDs, disc, svc, tax = append(lineIDs, id), append(disc, l.Discount), append(svc, l.Service), append(tax, l.Tax)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE order_items SET discount_share=0, service_share=0, tax_share=0
+		WHERE order_id=$1 AND prep_status = 'cancelled' AND (discount_share <> 0 OR service_share <> 0 OR tax_share <> 0)`,
+		orderID); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, `UPDATE order_items i SET discount_share=s.d, service_share=s.s, tax_share=s.t
+		FROM unnest($2::bigint[], $3::bigint[], $4::bigint[], $5::bigint[]) AS s(id, d, s, t)
+		WHERE i.id = s.id AND i.order_id = $1`, orderID, lineIDs, disc, svc, tax)
+	return err
+}
+
+// perLine is an applied adjustment's sharing as stored, keyed by line id.
+func perLine(a pricing.Applied, ids map[string]int64) map[string]int64 {
+	out := map[string]int64{}
+	for k, v := range a.PerLine {
+		if ids != nil {
+			id, ok := ids[k]
+			if !ok {
+				continue
+			}
+			k = strconv.FormatInt(id, 10)
+		}
+		out[k] = v
+	}
+	return out
+}
+
+// MoneyEvent is one row of an order's money ledger (docs/PRICING_REVIEW.md
+// §5.3): the order's amounts after a change, and the change.
+type MoneyEvent struct {
+	ID               int64     `json:"id"`
+	Kind             string    `json:"kind"`
+	RefID            *int64    `json:"ref_id"`
+	ActorType        string    `json:"actor_type"`
+	ActorName        string    `json:"actor_name"`
+	Subtotal         int64     `json:"subtotal"`
+	Discount         int64     `json:"discount"`
+	MerchantDiscount int64     `json:"merchant_discount"`
+	PlatformSubsidy  int64     `json:"platform_subsidy"`
+	StaffDiscount    int64     `json:"staff_discount"`
+	RoundOff         int64     `json:"round_off"`
+	ServiceCharge    int64     `json:"service_charge"`
+	TaxAmount        int64     `json:"tax_amount"`
+	Total            int64     `json:"total"`
+	Refunded         int64     `json:"refunded"`
+	DeltaTotal       int64     `json:"delta_total"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
+// OrderMoneyEvents is the order's money ledger, oldest first. Changes made in
+// one transaction (the order and then its discounts) are shown as one row:
+// the last amounts and the sum of the changes.
+func (a *App) OrderMoneyEvents(ctx context.Context, orderID int64) ([]MoneyEvent, error) {
+	rows, err := a.DB.Query(ctx, `SELECT e.id, e.kind, e.ref_id, e.actor_type,
+		COALESCE((SELECT u.display_name FROM users u WHERE u.id = e.actor_id AND e.actor_type = 'staff'), ''),
+		e.subtotal, e.discount, e.merchant_discount, e.platform_subsidy, e.staff_discount, e.round_off,
+		e.service_charge, e.tax_amount, e.total, e.refunded,
+		SUM(e.delta_total) OVER (PARTITION BY e.tx, e.kind), e.created_at,
+		e.id = MAX(e.id) OVER (PARTITION BY e.tx, e.kind)
+		FROM order_money_events e WHERE e.order_id = $1 ORDER BY e.id`, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []MoneyEvent{}
+	for rows.Next() {
+		var e MoneyEvent
+		var last bool
+		if err := rows.Scan(&e.ID, &e.Kind, &e.RefID, &e.ActorType, &e.ActorName, &e.Subtotal, &e.Discount,
+			&e.MerchantDiscount, &e.PlatformSubsidy, &e.StaffDiscount, &e.RoundOff, &e.ServiceCharge, &e.TaxAmount,
+			&e.Total, &e.Refunded, &e.DeltaTotal, &e.CreatedAt, &last); err != nil {
+			return nil, err
+		}
+		if last {
+			out = append(out, e)
+		}
+	}
+	return out, rows.Err()
 }

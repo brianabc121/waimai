@@ -210,6 +210,9 @@ func quoteAddon(ctx context.Context, q Querier, b *Branch, o *lockedOrder, in Ad
 // as batchID), reprices the order and tells the kitchen, the packer and the
 // rider. The order is locked by the caller.
 func (a *App) applyAddon(ctx context.Context, tx pgx.Tx, b *Branch, o *lockedOrder, batchID int64, lines []QuoteLine, actor Actor) (Totals, error) {
+	if err := moneyEvent(ctx, tx, "addon", batchID, actor); err != nil {
+		return Totals{}, err
+	}
 	if err := reserveStock(ctx, tx, lines); err != nil {
 		return Totals{}, err
 	}

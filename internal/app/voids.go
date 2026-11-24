@@ -344,6 +344,9 @@ func (a *App) voidLine(ctx context.Context, tx pgx.Tx, itemID int64, in VoidInpu
 	// The money: everything is priced again on what is left
 	// (docs/VOID_ITEM_DESIGN.md §6); a percentage off at checkout carries
 	// over, a round-off or a typed amount to pay is dropped.
+	if err := moneyEvent(ctx, tx, "void", itemID, actor); err != nil {
+		return nil, err
+	}
 	var after Totals
 	if o.ServiceType == "dine_in" {
 		if after, err = repriceTable(ctx, tx, b, o.ID, in.ReasonKind == "store"); err != nil {

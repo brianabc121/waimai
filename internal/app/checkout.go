@@ -428,6 +428,9 @@ func (a *App) SetOrderAdjust(ctx context.Context, orderID int64, expectedVersion
 		if err != nil {
 			return err
 		}
+		if err := moneyEvent(ctx, tx, "adjust", 0, actor); err != nil {
+			return err
+		}
 		p, err := m.withAdjust(j)
 		if err != nil {
 			return err

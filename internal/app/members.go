@@ -485,7 +485,7 @@ func staffAdjust(ctx context.Context, q Querier, b *Branch, quote *Quote, j *Adj
 	if err != nil {
 		return err
 	}
-	quote.Totals = p.Totals
+	quote.Totals, quote.pr = p.Totals, p
 	return nil
 }
 
@@ -644,6 +644,9 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 		} else {
 			addrLine, addrUnit, addrNote = "", "", ""
 		}
+		if err := moneyEvent(ctx, tx, "placed", 0, actor); err != nil {
+			return err
+		}
 		t := cur.Totals
 		err = tx.QueryRow(ctx, `INSERT INTO orders (merchant_id, branch_id, public_no, pickup_code,
 			access_token_hash, token_nonce, channel, service_type, customer_name, customer_phone, zone_id, zone_name,
@@ -685,10 +688,6 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 				return err
 			}
 		}
-		// the amounts with the discount at checkout, the promotion's row
-		if err := saveMoney(ctx, tx, b, orderID, quotePriced(cur), false); err != nil {
-			return err
-		}
 		if !in.Adjust.empty() {
 			if err := writeAdjusted(ctx, tx, orderID, t, in.Adjust.Reason, actor); err != nil {
 				return err
@@ -710,14 +709,21 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 			orderID).Scan(&batchID); err != nil {
 			return err
 		}
+		lineIDs := []int64{}
 		for _, l := range cur.Lines {
 			opts, _ := json.Marshal(l.Options)
-			if _, err := tx.Exec(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name,
+			var lineID int64
+			if err := tx.QueryRow(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name,
 				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer, note_tags)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,'',$13)`, orderID, b.ID, batchID, l.ItemID, l.Name,
-				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, noteTagsJSON(l.NoteTags)); err != nil {
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,'',$13) RETURNING id`, orderID, b.ID, batchID, l.ItemID, l.Name,
+				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, noteTagsJSON(l.NoteTags)).Scan(&lineID); err != nil {
 				return wrap("insert order item", err)
 			}
+			lineIDs = append(lineIDs, lineID)
+		}
+		// the amounts with the discount at checkout, the promotion's row, each line's share
+		if err := saveMoney(ctx, tx, b, orderID, quotePriced(cur, lineIDs), false); err != nil {
+			return err
 		}
 		if err := audit(ctx, tx, b.ID, orderID, actor, "order.placed_by_staff",
 			map[string]any{"total": t.Total, "service_type": cur.ServiceType, "member_no": m.No, "source": m.Source}); err != nil {

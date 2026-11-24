@@ -23,6 +23,7 @@ import { useRoute } from 'vue-router'
 import { addons, batchSource, batchTitle, itemsByBatch, pendingAddon, addonErr, presetSplit } from '../addon'
 import VoidSheet from './VoidSheet.vue'
 import RefundSheet from './RefundSheet.vue'
+import MoneyLog from './MoneyLog.vue'
 import { copyText, voidMessage, voidNote, voidsOf } from '../voids'
 import type { OrderItem, OrderVoid } from '../types'
 
@@ -404,6 +405,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
             <div v-if="refundDone" class="banner ok small">{{ refundDone }}</div>
             <button v-if="selected.refund_open" class="btn small" style="align-self:flex-start" data-testid="refund-btn" @click="refundDone = ''; refunding = true">{{ t('vd.r.btn') }}</button>
           </div>
+          <MoneyLog v-if="can('order.view')" :key="'ml' + selected.id" :order-id="selected.id" :version="selected.version" :currency="selected.currency" :timezone="selected.timezone" />
           <div v-if="selected.totals.adj_percent_bp || selected.totals.adj_mode" class="row between adjrow" data-testid="adj-row">
             <span class="muted">{{ t('ck.adj') }}</span><span>{{ adjText(selected) }}</span></div>
           <div v-if="selected.payment_status === 'paid' && selected.pay_type" class="row between" data-testid="pay-row">

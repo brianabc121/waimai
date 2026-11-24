@@ -316,7 +316,7 @@ func applyCoupons(quote *Quote, wallet []CustomerCoupon, cfg TaxConfig, promo *P
 	if err != nil {
 		return err
 	}
-	quote.Totals, quote.promo = pr.Totals, pr.Promo
+	quote.Totals, quote.promo, quote.pr = pr.Totals, pr.Promo, pr
 	quote.Coupons = []AppliedCoupon{}
 	ids := []int64{}
 	for _, c := range pr.Coupons {
@@ -346,7 +346,7 @@ func derefIDs(p *[]int64) []int64 {
 // claimCoupons marks the quote's coupons used by the order and records every
 // discount on it. A coupon used meanwhile (another phone, another order)
 // fails the order with QUOTE_CHANGED.
-func claimCoupons(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, phone string, q *Quote) error {
+func claimCoupons(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, phone string, q *Quote, lineIDs []int64) error {
 	for _, c := range q.Coupons {
 		tag, err := tx.Exec(ctx, `UPDATE customer_coupons SET status='used', order_id=$2, used_at=now()
 			WHERE id=$1 AND status='unused' AND expires_at > now()
@@ -358,13 +358,18 @@ func claimCoupons(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, phon
 			return Err(http.StatusConflict, "QUOTE_CHANGED", "a coupon is no longer available, please confirm the new amount")
 		}
 	}
-	return recordDiscounts(ctx, tx, b.ID, orderID, q)
+	return recordDiscounts(ctx, tx, b.ID, orderID, q, lineIDs)
 }
 
 // recordDiscounts writes a new order's discount rows (its promotion and
-// coupons) and who pays for them.
-func recordDiscounts(ctx context.Context, tx pgx.Tx, branchID, orderID int64, q *Quote) error {
-	if err := saveDiscountRows(ctx, tx, branchID, orderID, quotePriced(q)); err != nil {
+// coupons), who pays for them and each dish line's share; lineIDs are the
+// order_items ids of the quote's lines, in order.
+func recordDiscounts(ctx context.Context, tx pgx.Tx, branchID, orderID int64, q *Quote, lineIDs []int64) error {
+	p := quotePriced(q, lineIDs)
+	if err := saveDiscountRows(ctx, tx, branchID, orderID, p); err != nil {
+		return err
+	}
+	if err := saveLineShares(ctx, tx, orderID, p.Result, p.ids); err != nil {
 		return err
 	}
 	_, err := tx.Exec(ctx, `UPDATE orders SET merchant_discount=$2, platform_subsidy=$3 WHERE id=$1`,
@@ -372,16 +377,27 @@ func recordDiscounts(ctx context.Context, tx pgx.Tx, branchID, orderID int64, q 
 	return err
 }
 
-// quotePriced is a quote's amounts as saveMoney takes them.
-func quotePriced(q *Quote) *priced {
+// quotePriced is a quote's amounts as saveMoney takes them, its lines being
+// the order_items lineIDs.
+func quotePriced(q *Quote, lineIDs []int64) *priced {
 	p := &priced{Totals: q.Totals, Promo: q.promo}
+	if q.pr != nil {
+		cp := *q.pr
+		p = &cp
+		p.Totals = q.Totals
+	} else {
+		for _, c := range q.Coupons {
+			id := c.ID
+			p.Coupons = append(p.Coupons, orderCoupon{CouponID: &id, Kind: c.Kind, FundedBy: c.FundedBy, Name: c.Name,
+				NameEn: c.NameEn, Amount: c.Amount})
+		}
+	}
 	if p.Promo == nil && q.Totals.PromotionID != 0 {
 		p.Promo = &Promotion{ID: q.Totals.PromotionID}
 	}
-	for _, c := range q.Coupons {
-		id := c.ID
-		p.Coupons = append(p.Coupons, orderCoupon{CouponID: &id, Kind: c.Kind, FundedBy: c.FundedBy, Name: c.Name,
-			NameEn: c.NameEn, Amount: c.Amount})
+	p.ids = map[string]int64{}
+	for i, id := range lineIDs {
+		p.ids[strconv.Itoa(i)] = id
 	}
 	return p
 }

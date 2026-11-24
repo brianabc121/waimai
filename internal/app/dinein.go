@@ -542,6 +542,9 @@ func (a *App) AddBatch(ctx context.Context, sessionID int64, source, idemKey str
 			WHERE oi.batch_id=$1 AND oi.needs_prep AND m.id = oi.item_id`, batchID); err != nil {
 			return err
 		}
+		if err := moneyEvent(ctx, tx, "table", batchID, actor); err != nil {
+			return err
+		}
 		t, err := recomputeBill(ctx, tx, b, s.OrderID)
 		if err != nil {
 			return err
@@ -665,6 +668,9 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 		}
 		if in.ExpectedManifest == 0 || in.ExpectedManifest != o.ManifestVersion {
 			return ErrVersion
+		}
+		if err := moneyEvent(ctx, tx, "close", 0, actor); err != nil {
+			return err
 		}
 		var cooking int
 		if err := tx.QueryRow(ctx, `SELECT count(*) FROM order_items WHERE order_id=$1

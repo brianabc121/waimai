@@ -104,8 +104,9 @@ type Quote struct {
 	Input         QuoteInput      `json:"input"`
 	// address is the saved address named by Input.AddressID, as it is now.
 	address *Address
-	// promo is the promotion applied, nil when none.
+	// promo is the promotion applied, nil when none; pr the engine's pricing.
 	promo *Promotion
+	pr    *priced
 }
 
 // computeQuote validates the cart against the live menu and prices it. It is
