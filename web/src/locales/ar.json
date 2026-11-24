@@ -3156,5 +3156,18 @@
  "ml.k.close": "إغلاق الفاتورة",
  "ml.k.refund": "استرداد",
  "ml.k.opening": "قبل بدء السجل",
- "ml.k.change": "تغيير"
+ "ml.k.change": "تغيير",
+ "cp.kind.dish_promotion": "عرض على الأطباق",
+ "cp.short.dish_promotion": "طبق",
+ "kind.dish_percent": "أطباق مختارة بخصم",
+ "kind.dish_second": "خصم على الثاني",
+ "promo.second_pct": "الخصم على الثاني (%: 50 نصف السعر، 100 مجانًا)",
+ "promo.dishes": "الأطباق المشمولة",
+ "promo.dishes_n": "تم اختيار {n}",
+ "promo.dish_search": "ابحث بالاسم أو الرمز",
+ "promo.dish_hint": "تُضاف عروض الأطباق إلى عرض الطلب كله، ويُحسب حدّه الأدنى على سعر الأطباق بعدها. الطبق المشمول بعدة عروض يحصل على الأوفر.",
+ "pr.dish_percent": "خصم {pct}% على أطباق مختارة",
+ "pr.dish_second": "خصم {pct}% على الثاني",
+ "pr.dish_half": "الثاني بنصف السعر",
+ "pr.dish_free": "اشترِ واحدًا واحصل على الثاني مجانًا"
 }

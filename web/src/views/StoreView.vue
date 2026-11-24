@@ -13,6 +13,7 @@ import { customer, customerLogout, loadCustomer, loginRoute, prettyPhone } from 
 import { termsAt, type DeliveryTerms } from '../addresses'
 import type { Item, Order, Promotion, Storefront } from '../types'
 import '../addon'
+import { dishPromoOf, dishSavings, isDishPromo } from '../dishPromo'
 import CartPanel from './CartPanel.vue'
 import DishDetail from './DishDetail.vue'
 import MediaCarousel from './MediaCarousel.vue'
@@ -144,10 +145,22 @@ const minimum = computed(() => cart.service === 'delivery' && store.value && !ap
 const promos = computed(() => (store.value?.promotions ?? []).filter(p => cart.service === 'delivery' ? p.applies_delivery : p.applies_pickup && p.kind !== 'free_delivery'))
 // Only offers running right now count on the cart bar.
 const livePromos = computed(() => promos.value.filter(p => p.live_now !== false))
+// What the dish promotions take off the cart; a promotion on the whole order
+// counts its threshold on what is left (docs/PRICING_REVIEW.md step 4).
+const dishOff = computed(() => appendTok ? 0 : dishSavings(livePromos.value, cart.lines.map(l => ({ item_id: l.item_id,
+  unit: linePrice(l, items.value) ?? 0, qty: l.qty }))))
+const goods = computed(() => subtotal.value - dishOff.value)
 const nextPromo = computed(() => {
-  const ahead = livePromos.value.filter(p => p.threshold > subtotal.value).sort((a, b) => a.threshold - b.threshold)[0]
+  const ahead = livePromos.value.filter(p => !isDishPromo(p) && p.threshold > goods.value).sort((a, b) => a.threshold - b.threshold)[0]
   return ahead && subtotal.value > 0 && !appendTok ? ahead : null
 })
+const dealOf = (it: Item) => {
+  const p = dishPromoOf(livePromos.value, it.id)
+  if (!p) return ''
+  // on the dish itself "8折" says it all; "second one half price" stays whole
+  const pct = p.value / 100
+  return p.kind === 'dish_percent' ? t('pr.percent_off', { pct, zhe: (100 - pct) / 10 }) : promoLabel({ ...p, threshold: 0 }, cur.value)
+}
 // The offer the cart already earns, worked out as the server will at checkout:
 // the one that saves the most. The delivery fee is known only once there is an
 // address, so free delivery is weighed with the fee of where the customer is.
@@ -158,18 +171,18 @@ function saving(p: Promotion, sub: number) {
   return 0
 }
 const deal = computed(() => {
-  const sub = subtotal.value
+  const sub = goods.value
   let best: Promotion | null = null, bestTotal = -1
   for (const p of livePromos.value) {
-    if (sub <= 0 || p.threshold > sub) continue
+    if (isDishPromo(p) || sub <= 0 || p.threshold > sub) continue
     const total = p.kind === 'free_delivery' ? deliveryFee.value : saving(p, sub)
     // free delivery with the fee not yet known still counts, behind any money off
     if (total > bestTotal || (total === bestTotal && best?.kind === 'free_delivery' && p.kind !== 'free_delivery')) { best = p; bestTotal = total }
   }
   // an add-on's offer is worked out with the whole order, on the next page
   if (appendTok) return { promo: null, off: 0, now: sub }
-  const off = best && best.kind !== 'free_delivery' ? saving(best, sub) : 0
-  return { promo: best, off, now: sub - off }
+  const off = (best && best.kind !== 'free_delivery' ? saving(best, sub) : 0) + dishOff.value
+  return { promo: best, off, now: subtotal.value - off }
 })
 const hasUnavailable = computed(() => cart.lines.some(l => {
   const it = items.value.get(l.item_id)
@@ -430,7 +443,7 @@ async function sendReport() {
           <button type="button" class="linkish" data-testid="mt-toggle" @click="menuOriginal = !menuOriginal">{{ t(menuOriginal ? 'sf.mt_show_tr' : 'sf.mt_show_orig') }}</button>
         </div>
         <p v-if="query.trim() && !shownCats.length" class="muted" style="text-align:center;padding:36px 0;margin:0">{{ t('sf.search_none') }}</p>
-        <MenuList ref="menu" :categories="shownCats" :currency="cur" :layout="tpl.layout" :can-order="orderable" :qty-of="qtyOf" stats
+        <MenuList ref="menu" :categories="shownCats" :currency="cur" :layout="tpl.layout" :can-order="orderable" :qty-of="qtyOf" :deal-of="dealOf" stats
           @add="open" @dec="dec" @show="dish = $event" />
       </div>
       </div>
@@ -445,9 +458,9 @@ async function sendReport() {
               <b class="now">{{ money(deal.now, cur) }}</b>
               <s v-if="deal.off" class="was">{{ money(subtotal, cur) }}</s>
             </div>
-            <div v-if="count && deal.promo" class="got" data-testid="side-deal">{{ t('sf.got_promo', { name: promoLabel(deal.promo, cur) }) }}<template v-if="deal.off"> · {{ t('sf.saved', { amt: money(deal.off, cur) }) }}</template></div>
+            <div v-if="count && (deal.promo || deal.off)" class="got" data-testid="side-deal"><template v-if="deal.promo">{{ t('sf.got_promo', { name: promoLabel(deal.promo, cur) }) }}</template><template v-if="deal.off"><template v-if="deal.promo"> · </template>{{ t('sf.saved', { amt: money(deal.off, cur) }) }}</template></div>
             <div v-if="count && minimum > subtotal" class="small muted">{{ t('below_min', { amt: money(minimum - subtotal, cur) }) }}</div>
-            <div v-else-if="nextPromo" class="small" style="color:var(--brand-dark)">{{ t('more_for_promo', { amt: money(nextPromo.threshold - subtotal, cur), name: promoLabel(nextPromo, cur) }) }}</div>
+            <div v-else-if="nextPromo" class="small" style="color:var(--brand-dark)">{{ t('more_for_promo', { amt: money(nextPromo.threshold - goods, cur), name: promoLabel(nextPromo, cur) }) }}</div>
             <button v-if="count && missing.length" class="btn block big must" data-testid="required-missing" @click="toRequired">{{ t('sf.required_pick') }} · {{ mn(missing[0]) }}</button>
             <button v-else class="btn primary block big" data-testid="go-checkout" :disabled="blocked" @click="checkout">{{ appendTok ? t('ao.c.go') : t('checkout') }}<template v-if="count"> · {{ money(deal.now, cur) }}</template></button>
           </div>
@@ -466,13 +479,13 @@ async function sendReport() {
             <div class="line1">
               <b class="amt" data-testid="cart-total">{{ money(deal.now, cur) }}</b>
               <s v-if="deal.off" class="was" data-testid="cart-was">{{ money(subtotal, cur) }}</s>
-              <span v-if="deal.promo" class="got" data-testid="cart-deal">{{ deal.off ? t('sf.saved', { amt: money(deal.off, cur) }) : promoLabel(deal.promo, cur) }}</span>
+              <span v-if="deal.promo || deal.off" class="got" data-testid="cart-deal">{{ deal.off || !deal.promo ? t('sf.saved', { amt: money(deal.off, cur) }) : promoLabel(deal.promo, cur) }}</span>
             </div>
             <div class="hint">
               <template v-if="!count">{{ t('cart_empty') }}</template>
               <span v-else-if="hasUnavailable" class="bad">{{ t('sf.has_unavailable') }}</span>
               <template v-else-if="minimum > subtotal">{{ t('below_min', { amt: money(minimum - subtotal, cur) }) }}</template>
-              <template v-else-if="nextPromo">{{ t('more_for_promo', { amt: money(nextPromo.threshold - subtotal, cur), name: promoLabel(nextPromo, cur) }) }}</template>
+              <template v-else-if="nextPromo">{{ t('more_for_promo', { amt: money(nextPromo.threshold - goods, cur), name: promoLabel(nextPromo, cur) }) }}</template>
               <template v-else-if="deal.promo">{{ t('sf.got_promo', { name: promoLabel(deal.promo, cur) }) }}</template>
             </div>
           </div>
@@ -552,6 +565,7 @@ async function sendReport() {
             <div v-for="p in promos" :key="p.id" class="ticket" :class="{ idle: p.live_now === false }" :data-promo="p.id">
               <div class="stub" :class="p.kind">
                 <svg v-if="p.kind === 'free_delivery'" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7" /><circle cx="6.5" cy="17.5" r="1.8" /><circle cx="17" cy="17.5" r="1.8" /></svg>
+                <b v-else-if="isDishPromo(p)">{{ promoLabel({ ...p, threshold: 0 }, cur) }}</b>
                 <b v-else>{{ p.kind === 'amount_off' ? money(p.value, cur) : t('pr.percent_off', { pct: p.value / 100, zhe: (100 - p.value / 100) / 10 }) }}</b>
                 <small>{{ p.threshold > 0 ? t('sf.promo_over', { th: money(p.threshold, cur) }) : t('sf.promo_any') }}</small>
               </div>

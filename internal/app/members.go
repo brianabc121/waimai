@@ -478,6 +478,9 @@ func staffAdjust(ctx context.Context, q Querier, b *Branch, quote *Quote, j *Adj
 	if quote.promo != nil {
 		in.Promo, in.PromoOff = quote.promo, promoOn(quote.promo.Kind, t.PromotionDiscount)
 	}
+	if quote.pr != nil {
+		in.Dish, in.DishPromos = quote.pr.dishIn, quote.pr.dishPromos
+	}
 	if j.Mode != "" {
 		in.Round = j
 	}
@@ -486,6 +489,7 @@ func staffAdjust(ctx context.Context, q Querier, b *Branch, quote *Quote, j *Adj
 		return err
 	}
 	quote.Totals, quote.pr = p.Totals, p
+	quote.DishDiscounts = p.dishDiscounts()
 	return nil
 }
 

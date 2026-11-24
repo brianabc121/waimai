@@ -339,6 +339,8 @@ async function submit() {
           <template v-if="quote">
             <div class="co-row" v-if="quote.totals.service_charge"><span>{{ t('service_charge') }}</span><span>{{ money(quote.totals.service_charge, cur) }}</span></div>
             <div class="co-row" v-if="quote.totals.tax_amount && !quote.totals.tax_inclusive"><span>{{ t('tax') }} {{ quote.totals.tax_rate_bp / 100 }}%</span><span>{{ money(quote.totals.tax_amount, cur) }}</span></div>
+            <div v-for="d in quote.dish_discounts ?? []" :key="'d' + d.promotion_id" class="co-row disc hl" data-testid="dish-line">
+              <span>{{ pick(d.name, d.name_en) || t('cp.kind.dish_promotion') }}</span><span>−{{ money(d.amount, cur) }}</span></div>
             <div class="co-row disc hl" v-if="quote.totals.promotion_discount" data-testid="promo-line"><span>{{ promoName || t('discount') }}</span><span>−{{ money(quote.totals.promotion_discount, cur) }}</span></div>
             <button v-if="choices.length" type="button" class="co-coupons" data-testid="coupon-row" @click="showCoupons = true">
               <span>{{ t('cp.coupons') }} <small>{{ coupons.length ? t('cp.picked', { n: coupons.length }) : choices.some(c => c.usable) ? t('cp.none_picked') : t('cp.none_usable', { n: choices.length }) }}</small></span>
@@ -346,7 +348,7 @@ async function submit() {
             </button>
             <div v-for="c in coupons" :key="c.id" class="co-row disc hl" :class="{ plat: c.funded_by === 'platform' }" data-testid="coupon-line">
               <span><i class="ic" :class="c.kind">{{ kindBadge(c.kind) }}</i>{{ discountLabel({ ...c, coupon_id: c.id }) }}</span><span>−{{ money(c.amount, cur) }}</span></div>
-            <div class="co-row" v-if="quote.totals.discount && (coupons.length || !quote.totals.promotion_discount)"><span>{{ t('cp.total_off') }}</span><span class="off">−{{ money(quote.totals.discount, cur) }}</span></div>
+            <div class="co-row" v-if="quote.totals.discount && (coupons.length || quote.dish_discounts?.length || !quote.totals.promotion_discount)"><span>{{ t('cp.total_off') }}</span><span class="off">−{{ money(quote.totals.discount, cur) }}</span></div>
             <div class="co-row sum"><b>{{ t('total') }}</b><b class="due">{{ money(quote.totals.total, cur) }}</b></div>
             <div class="small muted" v-if="quote.totals.platform_subsidy">{{ t('cp.platform_note') }}</div>
             <div class="co-row small muted" v-if="quote.totals.tax_amount && quote.totals.tax_inclusive"><span>{{ t('tax_included') }} {{ quote.totals.tax_rate_bp / 100 }}%</span><span>{{ money(quote.totals.tax_amount, cur) }}</span></div>

@@ -309,7 +309,7 @@ func (a *App) voidLine(ctx context.Context, tx pgx.Tx, itemID int64, in VoidInpu
 			promoBefore += d.Amount
 		}
 	}
-	if o.ServiceType == "dine_in" && before.Totals.PromotionID != 0 {
+	if o.ServiceType == "dine_in" && before.Totals.PromotionID != 0 && promoBefore == 0 {
 		promoBefore = before.Totals.MerchantDiscount
 	}
 

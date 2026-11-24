@@ -74,7 +74,7 @@ func TestBills(t *testing.T) {
 
 	sum, err := a.BillSummary(ctx, s.branchID, today, today)
 	noErr(t, err)
-	if sum.Orders != 2 || sum.Cancelled != 1 || sum.PlatformDiscount != 1000 || sum.Takings != sum.Paid+1000 || len(sum.Kinds) != 5 {
+	if sum.Orders != 2 || sum.Cancelled != 1 || sum.PlatformDiscount != 1000 || sum.Takings != sum.Paid+1000 || len(sum.Kinds) != 6 {
 		t.Fatalf("summary: %+v", sum)
 	}
 	for _, k := range sum.Kinds {

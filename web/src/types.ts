@@ -46,7 +46,8 @@ export interface NoteTemplate { id: number; name: string; icon: string; sort: nu
 export interface LineNoteTag { id: number; group: string; name: string; group_tr?: string; name_tr?: string }
 export interface Category { id: number; name: string; name_en: string; sort: number; required?: boolean; items: Item[]; name_tr?: string }
 export interface Promotion {
-  id: number; name: string; name_en: string; kind: 'amount_off' | 'percent_off' | 'free_delivery'
+  id: number; name: string; name_en: string; kind: 'amount_off' | 'percent_off' | 'free_delivery' | 'dish_percent' | 'dish_second'
+  item_ids?: number[]
   threshold: number; value: number; max_discount: number | null; applies_delivery: boolean; applies_pickup: boolean
   starts_at: string | null; ends_at: string | null; daily_start: string; daily_end: string
   total_quota: number | null; per_phone_limit: number | null; used_count: number; status: string; live_now: boolean
@@ -187,6 +188,7 @@ export interface TableAccess { slug: string; store_name: string; table_name: str
 export interface BatchLine { item_id: number; qty: number; option_ids: number[]; note: string; note_tag_ids?: number[] }
 export interface Quote { id: string; currency: string; service_type: string; zone_name: string; zone_distance_m: number | null; scheduled_for: string | null; totals: Totals; expires_at: string
   coupons: AppliedCoupon[]; coupon_choices: CouponChoice[]
+  dish_discounts?: { promotion_id: number; name: string; name_en: string; kind: string; amount: number }[]
   lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string; note_tags?: LineNoteTag[]; basket?: number }[] }
 export interface ImportSpecGroup { name: string; min_select: number; max_select: number; options: { name: string; price_delta: number }[] }
 export interface ImportRow {
@@ -226,7 +228,7 @@ export interface CouponChoice extends CustomerCoupon {
   usable: boolean; reason: '' | 'below_threshold' | 'delivery_only' | 'no_saving'; short: number; saves: number; selected: boolean
 }
 export interface AppliedCoupon { id: number; kind: CouponKind; name: string; name_en: string; amount: number; funded_by: 'store' | 'platform' }
-export interface OrderDiscount { kind: 'promotion' | CouponKind; funded_by: 'store' | 'platform'; name: string; name_en: string; amount: number; coupon_id: number | null }
+export interface OrderDiscount { kind: 'promotion' | 'dish_promotion' | CouponKind; funded_by: 'store' | 'platform'; name: string; name_en: string; amount: number; coupon_id: number | null }
 export interface RepurchaseRule {
   enabled: boolean; kind: CouponKind; value: number; threshold: number; valid_days: number; min_order: number
   monthly_cap: number | null; currency: string
@@ -245,7 +247,7 @@ export interface PlatformCouponSummary { currency: string; month_spent: number; 
 export interface BillDiscount extends OrderDiscount { source: string }
 export interface BillOrder {
   id: number; public_no: string; created_at: string; service_type: string; state: 'completed' | 'cancelled' | 'failed' | 'open'
-  food: number; delivery_fee: number; promotion: number; store_free: number; store_threshold: number; store_delivery: number
+  food: number; delivery_fee: number; promotion: number; dish_promotion?: number; store_free: number; store_threshold: number; store_delivery: number
   platform_free: number; paid: number; takings: number; discounts: BillDiscount[]
 }
 export interface BillList { timezone: string; from: string; to: string; currency: string; orders: BillOrder[]; sum: BillOrder; count: number; shown: number }

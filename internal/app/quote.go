@@ -98,10 +98,12 @@ type Quote struct {
 	Totals        Totals      `json:"totals"`
 	// Coupons are the coupons used; CouponChoices are all of the customer's
 	// coupons that work at this store, for the picker.
-	Coupons       []AppliedCoupon `json:"coupons"`
-	CouponChoices []CouponChoice  `json:"coupon_choices"`
-	ExpiresAt     time.Time       `json:"expires_at"`
-	Input         QuoteInput      `json:"input"`
+	Coupons []AppliedCoupon `json:"coupons"`
+	// DishDiscounts are the dish promotions applied (part of Totals.Discount).
+	DishDiscounts []DishDiscount `json:"dish_discounts"`
+	CouponChoices []CouponChoice `json:"coupon_choices"`
+	ExpiresAt     time.Time      `json:"expires_at"`
+	Input         QuoteInput     `json:"input"`
 	// address is the saved address named by Input.AddressID, as it is now.
 	address *Address
 	// promo is the promotion applied, nil when none; pr the engine's pricing.
@@ -223,12 +225,17 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 	if err != nil {
 		return nil, err
 	}
-	promo, d := bestPromotion(promos, time.Now(), b.location(), in.ServiceType, subtotal, deliveryFee)
+	// dish promotions first; a promotion on the whole order then counts what
+	// the dishes cost after them
+	now := time.Now()
+	dish := dishOnly(promos, now, b, in.ServiceType, subtotal)
+	dishAdj := dishAdjustments(dish, quoteDishLines(lines))
+	promo, d := bestPromotion(promos, now, b.location(), in.ServiceType, subtotal-dishOff(dishAdj), deliveryFee)
 	wallet, err := walletFor(ctx, q, phone, b)
 	if err != nil {
 		return nil, err
 	}
-	if err := applyCoupons(quote, wallet, b.taxConfig(), promo, deliveryFee, d); err != nil {
+	if err := applyCoupons(quote, wallet, b.taxConfig(), dish, dishAdj, promo, deliveryFee, d); err != nil {
 		return nil, err
 	}
 	return quote, nil
@@ -449,6 +456,19 @@ func (a *App) CreateQuote(ctx context.Context, slug string, in QuoteInput, phone
 		return nil, wrap("insert quote", err)
 	}
 	return quote, nil
+}
+
+// quoteDishLines is a quote's lines as the dish rules see them, keyed by index.
+func quoteDishLines(lines []QuoteLine) []dishLine {
+	out := make([]dishLine, 0, len(lines))
+	for i, l := range lines {
+		dl := dishLine{Key: keyOf(int64(i)), ItemID: l.ItemID, Qty: l.Qty}
+		if l.Qty > 0 {
+			dl.Unit = l.LineTotal / int64(l.Qty)
+		}
+		out = append(out, dl)
+	}
+	return out
 }
 
 // sameQuote reports whether a re-priced quote still matches what the customer confirmed.

@@ -289,7 +289,8 @@ func pickCoupons(wallet []CustomerCoupon, want []int64, auto bool, service strin
 // applyCoupons prices the cart with its promotion and coupons: the store's
 // coupons after the promotion and before tax, the platform coupon off what is
 // left to pay at the end (money.go).
-func applyCoupons(quote *Quote, wallet []CustomerCoupon, cfg TaxConfig, promo *Promotion, fee int64, promoD Discount) error {
+func applyCoupons(quote *Quote, wallet []CustomerCoupon, cfg TaxConfig, dish []*Promotion, dishAdj []pricing.Adjustment,
+	promo *Promotion, fee int64, promoD Discount) error {
 	in := quote.Input
 	var sub int64
 	lines := []pricing.Line{}
@@ -297,6 +298,7 @@ func applyCoupons(quote *Quote, wallet []CustomerCoupon, cfg TaxConfig, promo *P
 		sub += l.LineTotal
 		lines = append(lines, pricing.Line{Key: strconv.Itoa(i), Amount: l.LineTotal})
 	}
+	sub -= dishOff(dishAdj)
 	pick, err := pickCoupons(wallet, derefIDs(in.CouponIDs), in.CouponIDs == nil, in.ServiceType, sub, fee, promoD)
 	if err != nil {
 		return err
@@ -312,11 +314,13 @@ func applyCoupons(quote *Quote, wallet []CustomerCoupon, cfg TaxConfig, promo *P
 		used = append(used, orderCoupon{CouponID: &id, Kind: p.Kind, FundedBy: "platform", Name: p.Name, NameEn: p.NameEn,
 			Amount: p.Value})
 	}
-	pr, err := priceMoney(moneyIn{Lines: lines, Fees: cfg, Delivery: fee, Promo: promo, PromoOff: promoD, Coupons: used})
+	pr, err := priceMoney(moneyIn{Lines: lines, Fees: cfg, Delivery: fee, Dish: dishAdj, DishPromos: dish, Promo: promo,
+		PromoOff: promoD, Coupons: used})
 	if err != nil {
 		return err
 	}
 	quote.Totals, quote.promo, quote.pr = pr.Totals, pr.Promo, pr
+	quote.DishDiscounts = pr.dishDiscounts()
 	quote.Coupons = []AppliedCoupon{}
 	ids := []int64{}
 	for _, c := range pr.Coupons {
@@ -414,7 +418,7 @@ func releaseCoupons(ctx context.Context, tx pgx.Tx, orderID int64) error {
 func loadDiscounts(ctx context.Context, q Querier, byID map[int64]*Order, ids []int64) error {
 	rows, err := q.Query(ctx, `SELECT order_id, kind, funded_by, name, name_en, amount, coupon_id
 		FROM order_discounts WHERE order_id = ANY($1) ORDER BY order_id,
-			array_position(ARRAY['promotion','store_threshold','store_free','store_delivery','platform_free'], kind), id`, ids)
+			array_position(ARRAY['promotion','dish_promotion','store_threshold','store_free','store_delivery','platform_free'], kind), id`, ids)
 	if err != nil {
 		return err
 	}
