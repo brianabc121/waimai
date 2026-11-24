@@ -1,6 +1,6 @@
-# 堂食/外卖活动拆分、结账优惠、付款方式和对账 设计方案 v0.1（待确认）
+# 堂食/外卖活动拆分、结账优惠、付款方式和对账 设计方案 v0.1（已确认）
 
-> 状态：2026-11-24 v0.1，等 brian 确认。第 12 节是需要拍板的取舍，都先写了推荐值。
+> 状态：2026-11-24 v0.1，brian 确认按这个方案全部落实，第 12 节全部按推荐。
 > 效果图：[docs/checkout-discount-screens/](checkout-discount-screens/)，原型 [docs/checkout-discount-prototype/index.html](checkout-discount-prototype/index.html)（地址后加 `#s1` 到 `#s8` 切换）。
 >
 > | 效果图 | 内容 |
