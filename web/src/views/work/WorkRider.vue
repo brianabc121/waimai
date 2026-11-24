@@ -6,6 +6,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError, get, post, upload } from '../../api'
 import { both, money, t, toMajor, toMinor, whenText } from '../../i18n'
+import { addons, totalBefore } from '../../addon'
 import { useLive } from '../../live'
 import { currentRole, reloadUser, session } from '../../session'
 import type { Order } from '../../types'
@@ -91,7 +92,11 @@ async function act(o: Order, action: string, body: Record<string, unknown> = {})
 
 // ---- cash on delivery ----
 const cash = reactive<{ id: number; value: string }>({ id: 0, value: '' })
-watch(cur, o => { if (o && cash.id !== o.id) { cash.id = o.id; cash.value = String(toMajor(o.totals.total)) } }, { immediate: true })
+// an add-on changes what is due: the box follows the new total
+const cashTotal = ref(0)
+watch(cur, o => { if (o && (cash.id !== o.id || cashTotal.value !== o.totals.total)) { cash.id = o.id; cashTotal.value = o.totals.total; cash.value = String(toMajor(o.totals.total)) } }, { immediate: true })
+// "was ₱379" next to the amount of an order with dishes added (docs/ADD_ON_ORDER_DESIGN.md §7.3)
+const was = (o: Order) => { const b = totalBefore(o); return b != null && b !== o.totals.total ? t('ao.was', { s: money(b, o.currency) }) : '' }
 const quick = computed(() => {
   const d = cur.value ? toMajor(cur.value.totals.total) : 0
   const ups = [100, 500, 1000].map(n => Math.ceil((d + 0.001) / n) * n)
@@ -173,11 +178,11 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
           <div v-if="cur.packing_status !== 'packed'" class="banner warn">{{ t('not_packed') }}</div>
           <div v-else class="banner ok">{{ t('wk.packed_n', { n: cur.bags ?? 0 }) }}</div>
           <div class="card"><div class="k">{{ t('wk.pickup_at') }}</div><b>{{ branchName }}</b></div>
-          <div class="card"><div class="k">{{ t('wk.items') }}</div>
-            <div v-for="i in cur.items" :key="i.id" style="padding:3px 0">{{ i.qty }} × {{ both(i.name, i.name_en) }}</div></div>
+          <div class="card"><div class="k">{{ t('wk.items') }} <span v-if="addons(cur).length" class="tag addon" data-testid="rider-addon">{{ t('ao.tag') }}</span></div>
+            <div v-for="i in cur.items" :key="i.id" style="padding:3px 0">{{ i.qty }} × {{ both(i.name, i.name_en) }}<span v-if="i.batch_seq > 1" class="small" style="color:#b45309"> · {{ t('ao.n', { n: i.batch_seq - 1 }) }}</span></div></div>
           <div class="card"><div class="k">{{ t('wk.payment') }}</div>
             <div class="row between"><span>{{ due(cur) ? t('wk.cod') : t('wk.prepaid') }}</span>
-              <b v-if="due(cur)" class="amt">{{ money(cur.totals.total, cur.currency) }}</b><b v-else style="color:var(--ok)">{{ t('wk.no_cash') }}</b></div></div>
+              <span v-if="due(cur)"><span v-if="was(cur)" class="small muted" data-testid="rider-was">{{ was(cur) }} </span><b class="amt">{{ money(cur.totals.total, cur.currency) }}</b></span><b v-else style="color:var(--ok)">{{ t('wk.no_cash') }}</b></div></div>
           <button class="btn primary block big" :disabled="cur.packing_status !== 'packed' || busy" data-act="pickup" @click="act(cur, 'pickup')">{{ t('wk.confirm_pickup_n', { n: cur.bags ?? 0 }) }}</button>
         </template>
 
@@ -263,13 +268,14 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
       <template v-if="tab === 'tasks'">
         <div v-if="!current.length" class="card muted" data-testid="rider-empty">{{ t('no_tasks') }}</div>
         <div v-for="o in current" :key="o.id" class="card stack" :class="{ fresh: st(o) === 'assigned' }" :data-delivery="o.public_no">
-          <div class="row between"><b class="no">{{ o.public_no }} <span v-if="o.scheduled_for" class="tag info">{{ whenText(o.scheduled_for, o.timezone) }}</span></b>
+          <div class="row between"><b class="no">{{ o.public_no }} <span v-if="o.scheduled_for" class="tag info">{{ whenText(o.scheduled_for, o.timezone) }}</span>
+            <span v-if="addons(o).length" class="tag addon">{{ t('ao.tag') }}</span></b>
             <span class="tag" :class="st(o) === 'assigned' ? 'brand' : 'info'">{{ st(o) === 'assigned' ? t('wk.to_pickup') : t('f.' + o.fulfillment_status) }}</span></div>
           <div v-if="st(o) === 'assigned'" class="line"><span class="pt s"></span><span>{{ branchName }} ·
             <b :style="{ color: o.packing_status === 'packed' ? 'var(--ok)' : 'var(--warn)' }">{{ o.packing_status === 'packed' ? `${t('p.packed')} ${o.bags ?? ''} ${t('bags')}` : t('not_packed') }}</b></span></div>
           <div class="line"><span class="pt"></span><span>{{ o.zone_name }} · {{ o.address_line }} {{ o.address_unit }}</span></div>
           <div class="row between small muted"><span>{{ itemsText(o) }}</span>
-            <span style="white-space:nowrap">{{ due(o) ? t('wk.cod_short') : t('wk.prepaid') }} <b v-if="due(o)" style="color:var(--brand-dark);font-size:16px">{{ money(o.totals.total, o.currency) }}</b></span></div>
+            <span style="white-space:nowrap">{{ due(o) ? t('wk.cod_short') : t('wk.prepaid') }} <span v-if="due(o) && was(o)" class="small muted">{{ was(o) }} </span><b v-if="due(o)" style="color:var(--brand-dark);font-size:16px">{{ money(o.totals.total, o.currency) }}</b></span></div>
           <button class="btn block" :class="{ primary: st(o) === 'assigned' }" data-act="open" @click="open(o)">{{ st(o) === 'assigned' ? t('wk.go_pickup') : t('wk.continue') }}</button>
         </div>
       </template>
@@ -289,3 +295,7 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
     </div>
   </div>
 </template>
+
+<style scoped>
+.tag.addon { background: #fff1e0; color: #b45309; border-color: #f5c48a; }
+</style>

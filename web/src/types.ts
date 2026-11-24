@@ -1,7 +1,7 @@
 export interface Branch {
   id: number; slug: string; name: string; name_en: string; address: string; phone: string
   timezone: string; currency: string; tax_rate_bp: number; tax_inclusive: boolean; service_charge_bp: number
-  packaging_fee: number; min_order_amount: number; accept_timeout_minutes: number
+  packaging_fee: number; min_order_amount: number; accept_timeout_minutes: number; addon_confirm_minutes?: number
   delivery_enabled: boolean; pickup_enabled: boolean; paused: boolean
   open_time: string; close_time: string; open_now: boolean; notify_sms: boolean
   scheduling_enabled: boolean; prep_minutes: number
@@ -124,7 +124,18 @@ export interface Order {
   discounts?: OrderDiscount[]; gift?: CustomerCoupon | null
   // orders placed by staff for a customer: the store member, where the customer asked, who placed it, a note for staff
   member_no?: number | null; order_source?: string; placed_by?: string; staff_note?: string
+  // the order, each add-on and the customer's add-ons waiting for the store (docs/ADD_ON_ORDER_DESIGN.md)
+  batches?: OrderBatch[]; addon?: AddonState
 }
+export interface QuoteLine { item_id: number; name: string; name_en: string; name_tr?: string; unit_price: number; qty: number; line_total: number
+  options: LineOption[]; note: string; note_tags?: LineNoteTag[]; needs_prep?: boolean; basket?: number }
+export interface OrderBatch {
+  seq: number; source: string; status: 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled'; at: string; by?: string
+  round_tags: string[]; total_before: number | null; total_after: number | null; reject_reason?: string; expires_at: string | null
+  lines?: QuoteLine[]
+}
+export interface AddonState { open: boolean; why?: '' | 'handed_off' | 'closed' | 'dine_in'; repack: boolean; customer_left: number; pending: boolean; confirm_minutes: number }
+export interface AddonQuote { currency: string; lines: QuoteLine[]; subtotal: number; before: Totals; after: Totals; extra: number; promo_up: boolean; state: AddonState }
 // a customer of one store, kept by the store (orders placed for a customer)
 export interface StoreMember {
   id: number; no: number; status: 'temp' | 'active'; phone: string; name: string; source: string; contact: string

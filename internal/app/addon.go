@@ -49,6 +49,8 @@ type AddonState struct {
 	CustomerLeft int `json:"customer_left"`
 	// Pending is an add-on of the customer's waiting for the store.
 	Pending bool `json:"pending"`
+	// ConfirmMinutes is how long the store has to answer the customer's add-on.
+	ConfirmMinutes int `json:"confirm_minutes"`
 }
 
 var errAddonClosed = Err(http.StatusConflict, "ADDON_CLOSED",
@@ -482,9 +484,20 @@ func (a *App) StaffAddonQuote(ctx context.Context, orderID int64, in StaffAddonI
 
 // StaffAddon adds dishes to an order for the customer (the customer asked on
 // the phone or in a chat). It takes effect at once.
-func (a *App) StaffAddon(ctx context.Context, orderID int64, idemKey string, in StaffAddonInput, actor Actor) (*Order, error) {
-	ai := in.addon()
-	return a.placeAddon(ctx, orderID, "staff", idemKey, ai, actor)
+func (a *App) StaffAddon(ctx context.Context, orderID int64, idemKey string, in StaffAddonInput, actor Actor) (*StaffAddonResult, error) {
+	o, seq, err := a.placeAddon(ctx, orderID, "staff", idemKey, in.addon(), actor)
+	if err != nil {
+		return nil, err
+	}
+	return &StaffAddonResult{Order: o, Seq: seq, AccessToken: a.orderToken(o.tokenNonce)}, nil
+}
+
+// StaffAddonResult is the order after the add-on, which batch the add-on is
+// (for its ticket) and the customer's link to the order (for the message).
+type StaffAddonResult struct {
+	Order       *Order `json:"order"`
+	Seq         int    `json:"seq"`
+	AccessToken string `json:"access_token"`
 }
 
 func quoteChanged(total int64) error {
@@ -495,28 +508,28 @@ func quoteChanged(total int64) error {
 // placeAddon adds one batch to the order. Staff batches and the customer's on
 // an order the store has not accepted yet take effect at once; the customer's
 // on an accepted order wait for the store as status pending.
-func (a *App) placeAddon(ctx context.Context, orderID int64, source, idemKey string, in AddonInput, actor Actor) (*Order, error) {
+func (a *App) placeAddon(ctx context.Context, orderID int64, source, idemKey string, in AddonInput, actor Actor) (*Order, int, error) {
 	if idemKey == "" || len(idemKey) > 100 {
-		return nil, ErrValidation("Idempotency-Key header is required")
+		return nil, 0, ErrValidation("Idempotency-Key header is required")
 	}
 	if source != "staff" {
 		in.RoundTags = nil
 	}
 	tags, err := cleanTags(in.RoundTags)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var placedBy *int64
 	if source == "staff" && actor.ID != 0 {
 		placedBy = &actor.ID
 	}
+	var rec struct {
+		Seq int `json:"seq"`
+	}
 	err = a.inTx(ctx, func(tx pgx.Tx) error {
 		o, err := lockOrder(ctx, tx, orderID)
 		if err != nil {
 			return err
-		}
-		var rec struct {
-			Seq int `json:"seq"`
 		}
 		replayed, err := idemBegin(ctx, tx, fmt.Sprintf("order-addon:%d", o.ID), idemKey, hashJSON(in), &rec)
 		if err != nil || replayed {
@@ -588,9 +601,10 @@ func (a *App) placeAddon(ctx context.Context, orderID int64, source, idemKey str
 		return idemSave(ctx, tx, fmt.Sprintf("order-addon:%d", o.ID), idemKey, rec)
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return loadOrder(ctx, a.DB, orderID)
+	o, err := loadOrder(ctx, a.DB, orderID)
+	return o, rec.Seq, err
 }
 
 // ---- the customer's own add-ons ----
@@ -632,7 +646,8 @@ func (a *App) CustomerAddon(ctx context.Context, token, idemKey string, in Addon
 	}
 	var customerID int64
 	_ = a.DB.QueryRow(ctx, `SELECT COALESCE(customer_id, 0) FROM orders WHERE id=$1`, id).Scan(&customerID)
-	return a.placeAddon(ctx, id, "customer", idemKey, in, Actor{Type: "customer", ID: customerID})
+	o, _, err := a.placeAddon(ctx, id, "customer", idemKey, in, Actor{Type: "customer", ID: customerID})
+	return o, err
 }
 
 // CancelCustomerAddon withdraws the customer's add-on still waiting for the store.
@@ -847,6 +862,26 @@ func loadBatches(ctx context.Context, q Querier, byID map[int64]*Order, ids []in
 	if err := rows.Err(); err != nil {
 		return err
 	}
+	rows.Close()
+	minutes := map[int64]int{}
+	mrows, err := q.Query(ctx, `SELECT o.id, br.addon_confirm_minutes FROM orders o JOIN branches br ON br.id = o.branch_id
+		WHERE o.id = ANY($1) AND o.service_type <> 'dine_in'`, ids)
+	if err != nil {
+		return err
+	}
+	for mrows.Next() {
+		var id int64
+		var n int
+		if err := mrows.Scan(&id, &n); err != nil {
+			mrows.Close()
+			return err
+		}
+		minutes[id] = n
+	}
+	mrows.Close()
+	if err := mrows.Err(); err != nil {
+		return err
+	}
 	for _, o := range byID {
 		if o.Batches == nil {
 			o.Batches = []OrderBatch{}
@@ -857,7 +892,7 @@ func loadBatches(ctx context.Context, q Querier, byID map[int64]*Order, ids []in
 		lo := &lockedOrder{ServiceType: o.ServiceType, Acceptance: o.AcceptanceStatus, Packing: o.PackingStatus,
 			Fulfillment: o.FulfillmentStatus}
 		open, why := addonOpen(lo)
-		st := &AddonState{Open: open, Why: why, Repack: o.PackingStatus == "packed"}
+		st := &AddonState{Open: open, Why: why, Repack: o.PackingStatus == "packed", ConfirmMinutes: minutes[o.ID]}
 		used := 0
 		for _, b := range o.Batches {
 			if b.Source == "customer" && (b.Status == "pending" || b.Status == "accepted") {

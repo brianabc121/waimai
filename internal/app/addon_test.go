@@ -19,6 +19,14 @@ func (s *store) placeTok(t *testing.T, service string, lines []app.QuoteLineInpu
 	return o, p.AccessToken
 }
 
+func staffAddon(ctx context.Context, id int64, key string, in app.StaffAddonInput, actor app.Actor) (*app.Order, error) {
+	r, err := testApp.StaffAddon(ctx, id, key, in, actor)
+	if err != nil {
+		return nil, err
+	}
+	return r.Order, nil
+}
+
 func countItems(o *app.Order, name string) int {
 	n := 0
 	for _, it := range o.Items {
@@ -58,7 +66,7 @@ func TestStaffAddonDelivery(t *testing.T) {
 	key := uniq("k")
 	in := app.StaffAddonInput{Items: []app.StaffLine{{ItemID: s.tea, Qty: 2}}, RoundTags: []string{"加急"},
 		ExpectedTotal: &q.After.Total}
-	o, err = a.StaffAddon(ctx, o.ID, key, in, s.staff)
+	o, err = staffAddon(ctx, o.ID, key, in, s.staff)
 	noErr(t, err)
 	if countItems(o, "tea") != 3 || o.Totals.Total != q.After.Total || len(o.Batches) != 2 {
 		t.Fatalf("after add-on: tea=%d total=%d/%d batches=%d", countItems(o, "tea"), o.Totals.Total, q.After.Total, len(o.Batches))
@@ -69,7 +77,7 @@ func TestStaffAddonDelivery(t *testing.T) {
 		t.Fatalf("batch: %+v", b)
 	}
 	// a double press adds nothing more
-	o, err = a.StaffAddon(ctx, o.ID, key, in, s.staff)
+	o, err = staffAddon(ctx, o.ID, key, in, s.staff)
 	noErr(t, err)
 	if countItems(o, "tea") != 3 || len(o.Batches) != 2 {
 		t.Fatalf("replay added again: tea=%d", countItems(o, "tea"))
@@ -94,7 +102,7 @@ func TestStaffAddonDelivery(t *testing.T) {
 	packed := o.ManifestVersion
 
 	// packed: one more water goes in, and the order is packed again
-	o, err = a.StaffAddon(ctx, o.ID, uniq("k"), app.StaffAddonInput{Items: []app.StaffLine{{ItemID: s.chicken, Qty: 1,
+	o, err = staffAddon(ctx, o.ID, uniq("k"), app.StaffAddonInput{Items: []app.StaffLine{{ItemID: s.chicken, Qty: 1,
 		OptionIDs: []int64{s.spiceMild}}}}, s.staff)
 	noErr(t, err)
 	if o.PackingStatus != "waiting_items" || o.FulfillmentStatus != "none" || o.ManifestVersion == packed {
@@ -143,14 +151,14 @@ func TestAddonPromotionOnlyGoesUp(t *testing.T) {
 	}
 	big := s.promo(t, app.PromotionInput{Kind: "amount_off", Threshold: 60000, Value: 10000})
 	// an add-on that reaches the bigger tier switches to it
-	o, err := a.StaffAddon(ctx, o.ID, uniq("k"), app.StaffAddonInput{Items: []app.StaffLine{{ItemID: s.tea, Qty: 3}}}, s.staff)
+	o, err := staffAddon(ctx, o.ID, uniq("k"), app.StaffAddonInput{Items: []app.StaffLine{{ItemID: s.tea, Qty: 3}}}, s.staff)
 	noErr(t, err)
 	if o.Totals.PromotionID != big || o.Totals.Discount != 10000 || s.used(t, small) != 0 || s.used(t, big) != 1 {
 		t.Fatalf("after add-on: %+v used small=%d big=%d", o.Totals, s.used(t, small), s.used(t, big))
 	}
 	// a promotion ended since never takes off less than the order had
 	noErr(t, a.SetPromotionStatus(ctx, s.branchID, big, "ended", s.staff))
-	o, err = a.StaffAddon(ctx, o.ID, uniq("k"), app.StaffAddonInput{Items: []app.StaffLine{{ItemID: s.water, Qty: 1}}}, s.staff)
+	o, err = staffAddon(ctx, o.ID, uniq("k"), app.StaffAddonInput{Items: []app.StaffLine{{ItemID: s.water, Qty: 1}}}, s.staff)
 	noErr(t, err)
 	if o.Totals.PromotionID != big || o.Totals.Discount != 10000 {
 		t.Fatalf("after ended promotion: %+v", o.Totals)

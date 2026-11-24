@@ -15,6 +15,7 @@ import ApproveDialog from './ApproveDialog.vue'
 import '../approve'
 import { chatEnabled } from '../chat'
 import './manualStrings'
+import { addons, batchSource, batchTitle, itemsByBatch, pendingAddon, addonErr, presetSplit } from '../addon'
 
 const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 
@@ -37,7 +38,7 @@ const sound = ref(localStorage.getItem('order-sound') !== 'off')
 const now = ref(Date.now())
 setInterval(() => (now.value = Date.now()), 15000)
 
-let knownPending = new Set<number>()
+let knownPending = new Set<number | string>()
 let first = true
 
 // A short two-tone chime for new orders, generated with Web Audio so that no
@@ -60,7 +61,9 @@ async function load() {
   const r = await get<{ orders: Order[] }>(`/merchant/branches/${bid}/orders?scope=${scope.value}`)
   orders.value = r.orders
   if (scope.value === 'active') {
-    const pending = new Set(r.orders.filter(o => o.acceptance_status === 'pending').map(o => o.id))
+    // a new order, or a customer's add-on waiting to be confirmed, rings
+    const pending = new Set([...r.orders.filter(o => o.acceptance_status === 'pending').map(o => o.id),
+      ...r.orders.flatMap(o => (o.batches ?? []).filter(b => b.status === 'pending').map(b => `${o.id}:${b.seq}`))])
     if (!first && [...pending].some(id => !knownPending.has(id))) chime()
     knownPending = pending; first = false
   }
@@ -149,6 +152,19 @@ const canCancel = (o: Order) => o.acceptance_status === 'accepted' && ['none', '
 const canAssign = (o: Order) => can('order.handle') && o.service_type === 'delivery' && o.acceptance_status === 'accepted' && ['none', 'awaiting_handoff'].includes(o.fulfillment_status)
 const waited = (o: Order) => { void now.value; return minutesSince(o.created_at) }
 const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'bad', cancelled: 'bad' }[s] ?? '')
+
+// ---- add-ons (docs/ADD_ON_ORDER_DESIGN.md) ----
+const grouped = (o: Order) => (o.batches?.length ?? 0) > 1 && o.service_type !== 'dine_in'
+const lineCount = (lines: { qty: number }[] | undefined) => (lines ?? []).reduce((n, l) => n + l.qty, 0)
+const pendingSum = (o: Order) => { const b = pendingAddon(o); return b ? (b.total_after ?? 0) - (b.total_before ?? 0) : 0 }
+const leftMin = (iso: string | null) => { void now.value; return iso ? Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 60000)) : 0 }
+const rejecting = ref(false)
+async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', reason = '') {
+  error.value = ''; rejecting.value = false
+  try { await post(`/merchant/orders/${o.id}/batches/${seq}/${action}`, action === 'reject' ? { reason } : {}) }
+  catch (e) { error.value = addonErr(e) }
+  await refreshNow()
+}
 </script>
 
 <template>
@@ -187,7 +203,10 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <span class="tag" v-if="o.acceptance_status === 'accepted'">{{ t('f.' + o.fulfillment_status) }}</span>
             <span class="tag" :class="o.payment_status === 'paid' ? 'ok' : ''">{{ t(o.payment_status) }}</span>
             <span v-if="o.aftersale" class="tag" :class="o.aftersale.status === 'open' ? 'bad' : ''" data-testid="aftersale-tag">{{ t('as.d.' + o.aftersale.status) }}</span>
+            <span v-if="addons(o).length && o.service_type !== 'dine_in'" class="tag addon" data-testid="addon-tag">{{ t('ao.tag') }}<template v-if="addons(o).length > 1"> ×{{ addons(o).length }}</template></span>
           </div>
+          <div v-if="pendingAddon(o)" class="banner warn small" style="margin-top:8px" data-testid="addon-pending-tag">
+            {{ t('ao.pending_head', { n: lineCount(pendingAddon(o)!.lines), s: money(pendingSum(o), o.currency) }) }}</div>
         </button>
       </div>
 
@@ -247,14 +266,48 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
             <div v-if="selected.staff_note" class="banner info small" style="margin-top:6px">{{ t('vo.d.staff_note') }}: {{ selected.staff_note }}</div>
           </div>
 
-          <div class="stack" style="border-top:1px solid var(--line);padding-top:10px">
-            <div v-for="it in selected.items" :key="it.id" class="row top between">
-              <div class="grow"><span v-if="baskets(selected)" class="tag info" style="margin-inline-end:4px">{{ t('basket_short', { n: it.basket }) }}</span><b>{{ it.qty }} ×</b> {{ both(it.name, it.name_en) }}
-                <div class="muted small" v-if="it.options.length">{{ it.options.map(o => both(o.name, o.name_en)).join(' · ') }}</div>
-                <KitchenNote :it="it" /></div>
-              <span class="tag" v-if="selected.acceptance_status === 'accepted'" :class="it.prep_status === 'ready' ? 'ok' : ''">{{ t('i.' + it.prep_status) }}</span>
-              <span class="price">{{ money(it.line_total, selected.currency) }}</span>
+          <div v-if="pendingAddon(selected)" class="banner warn stack" data-testid="addon-pending">
+            <div class="row between wrap"><b>{{ t('ao.pending_head', { n: lineCount(pendingAddon(selected)!.lines), s: money(pendingSum(selected), selected.currency) }) }}</b>
+              <span class="small">⏱ {{ t('ao.pending_left', { n: leftMin(pendingAddon(selected)!.expires_at) }) }}</span></div>
+            <div v-for="(l, i) in pendingAddon(selected)!.lines" :key="i" class="row between small">
+              <span><b>{{ l.qty }} ×</b> {{ both(l.name, l.name_en) }}<span v-if="l.options.length" class="muted"> · {{ l.options.map(o => both(o.name, o.name_en)).join(' · ') }}</span>
+                <span v-if="l.note_tags?.length || l.note" class="muted"> · {{ [...(l.note_tags ?? []).map(x => x.name), l.note].filter(Boolean).join(' · ') }}</span></span>
+              <span>{{ money(l.line_total, selected.currency) }}</span></div>
+            <div class="small">{{ money(pendingAddon(selected)!.total_before ?? 0, selected.currency) }} → <b>{{ money(pendingAddon(selected)!.total_after ?? 0, selected.currency) }}</b></div>
+            <div v-if="can('order.handle')" class="row wrap">
+              <button class="btn primary grow" data-testid="addon-accept" @click="decideAddon(selected, pendingAddon(selected)!.seq, 'accept')">{{ t('ao.accept') }}</button>
+              <button class="btn danger" data-testid="addon-reject" @click="rejecting = !rejecting">{{ t('ao.reject') }}</button>
             </div>
+            <div v-if="rejecting" class="stack" data-testid="addon-reasons"><span class="small">{{ t('ao.reject_title') }}</span>
+              <div class="row wrap"><button v-for="r in presetSplit('ao.reasons')" :key="r" class="btn small" @click="decideAddon(selected, pendingAddon(selected)!.seq, 'reject', r)">{{ r }}</button></div></div>
+          </div>
+          <div v-if="selected.addon && can('order.manual') && (selected.addon.open || addons(selected).length)" class="addonbar" data-testid="addon-box">
+            <template v-if="selected.addon.open">
+              <router-link class="btn primary small" data-testid="addon-new" :to="{ path: '/merchant/orders/new', query: { append: selected.id } }">{{ t('ao.btn') }}</router-link>
+              <span class="small muted">{{ selected.addon.repack ? t('ao.repack') : t(selected.service_type === 'pickup' ? 'ao.until_pickup' : 'ao.until_delivery') }}</span>
+            </template>
+            <span v-else class="small muted" data-testid="addon-closed">{{ t('ao.closed') }}</span>
+          </div>
+
+          <div class="stack" style="border-top:1px solid var(--line);padding-top:10px">
+            <template v-for="g in itemsByBatch(selected)" :key="g.seq">
+              <div v-if="grouped(selected)" class="bhead" :class="{ add: g.seq > 1 }" data-testid="batch-head">
+                <b>{{ batchTitle(g.seq) }}</b>
+                <span v-if="g.batch"> {{ whenText(g.batch.at, selected.timezone).split(' ').pop() }} · {{ batchSource(selected, g.batch) }}</span>
+                <span v-if="g.batch?.round_tags?.length"> · {{ g.batch.round_tags.join(' · ') }}</span>
+                <span v-if="g.seq > 1 && g.batch?.total_before != null" class="muted"> · {{ money(g.batch.total_before, selected.currency) }} → {{ money(g.batch.total_after ?? 0, selected.currency) }}</span>
+                <a v-if="g.seq > 1" class="small" style="margin-inline-start:auto" :href="`/ticket/${selected.id}?batch=${g.seq}`" target="_blank" data-testid="batch-print">{{ t('ao.print_batch') }}</a>
+              </div>
+              <div v-for="it in g.items" :key="it.id" class="row top between">
+                <div class="grow"><span v-if="baskets(selected)" class="tag info" style="margin-inline-end:4px">{{ t('basket_short', { n: it.basket }) }}</span><b>{{ it.qty }} ×</b> {{ both(it.name, it.name_en) }}
+                  <div class="muted small" v-if="it.options.length">{{ it.options.map(o => both(o.name, o.name_en)).join(' · ') }}</div>
+                  <KitchenNote :it="it" /></div>
+                <span class="tag" v-if="selected.acceptance_status === 'accepted'" :class="it.prep_status === 'ready' ? 'ok' : ''">{{ t('i.' + it.prep_status) }}</span>
+                <span class="price">{{ money(it.line_total, selected.currency) }}</span>
+              </div>
+            </template>
+            <div v-for="b in (selected.batches ?? []).filter(b => b.seq > 1 && b.status !== 'accepted' && b.status !== 'pending')" :key="'x' + b.seq" class="small muted" data-testid="batch-dropped">
+              {{ batchTitle(b.seq) }} · {{ t('ao.src.customer') }} · {{ t('ao.st.' + b.status) }}<template v-if="b.reject_reason">（{{ b.reject_reason }}）</template></div>
           </div>
           <TotalsTable :totals="selected.totals" :currency="selected.currency" :delivery="selected.service_type === 'delivery'" :discounts="selected.discounts" />
 
@@ -315,6 +368,10 @@ const accTag = (s: string) => ({ pending: 'warn', accepted: 'info', rejected: 'b
 .ord.pend { border-inline-start: 5px solid var(--warn); }
 .detail { position: sticky; top: calc(var(--shell-top, 0px) + 14px); max-width: 640px; }
 .nopick { text-align: center; padding: 48px 16px; }
+.tag.addon { background: #fff1e0; color: #b45309; border-color: #f5c48a; }
+.addonbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; font-size: 12.5px; color: var(--muted); padding: 4px 0 2px; border-bottom: 1px dashed var(--line); }
+.bhead.add b { color: #b45309; }
 .backlist { display: none; align-self: flex-start; }
 /* on a phone the list and the order take turns on the screen */
 @media (max-width: 767px) {

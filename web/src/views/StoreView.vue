@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import LangButton from './LangButton.vue'
 import { computed, defineAsyncComponent, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ApiError, get, post } from '../api'
 import { addLine, linePrice, pruneNoteTags, useCart } from '../cart'
 import { hasNotes } from '../notes'
@@ -11,7 +11,8 @@ import { mallSpot } from '../mall'
 import { defaultTemplate } from '../theme'
 import { customer, customerLogout, loadCustomer, loginRoute, prettyPhone } from '../customer'
 import { termsAt, type DeliveryTerms } from '../addresses'
-import type { Item, Promotion, Storefront } from '../types'
+import type { Item, Order, Promotion, Storefront } from '../types'
+import '../addon'
 import CartPanel from './CartPanel.vue'
 import DishDetail from './DishDetail.vue'
 import MediaCarousel from './MediaCarousel.vue'
@@ -34,7 +35,16 @@ const AddressSheet = defineAsyncComponent(() => import('./AddressSheet.vue'))
 
 const props = defineProps<{ slug: string }>()
 const router = useRouter()
-const cart = useCart(props.slug)
+// ?append=<order link> adds dishes to that order (docs/ADD_ON_ORDER_DESIGN.md §8):
+// a cart of its own, the order's service, no minimum and no required dishes.
+const appendTok = typeof useRoute().query.append === 'string' ? String(useRoute().query.append) : ''
+const cart = useCart(appendTok ? `${props.slug}#add:${appendTok.slice(0, 10)}` : props.slug)
+const appendOrder = ref<Order | null>(null)
+if (appendTok) void get<Order>(`/customer/orders/${appendTok}`).then(o => {
+  appendOrder.value = o
+  if (o.service_type !== 'dine_in') cart.service = o.service_type
+}).catch(() => null)
+function exitAppend() { router.replace(`/o/${appendTok}`) }
 
 const store = ref<Storefront | null>(null)
 const error = ref('')
@@ -84,6 +94,7 @@ async function relocate() {
   if (!r.deliverable && pinned) cart.lat = cart.lng = null
 }
 async function checkout() {
+  if (appendTok) { router.push(`/o/${appendTok}/append`); return }
   const to = `/s/${props.slug}/checkout`
   // Ordering needs an account; the cart is kept while the customer logs in.
   if (!(await loadCustomer())) router.push(loginRoute(to, props.slug))
@@ -117,7 +128,7 @@ const tpl = computed(() => store.value?.templates?.delivery ?? defaultTemplate('
 const cur = computed(() => store.value?.branch.currency ?? 'PHP')
 const items = computed(() => new Map((store.value?.categories ?? []).flatMap(c => c.items).map(i => [i.id, i])))
 // A closed store can still take orders for later when it offers time slots.
-const canOrder = computed(() => !!store.value && !store.value.branch.paused && (store.value.branch.open_now || store.value.slots.length > 0))
+const canOrder = computed(() => !!store.value && !store.value.branch.paused && (!!appendTok || store.value.branch.open_now || store.value.slots.length > 0))
 const ahead = computed(() => canOrder.value && !store.value!.branch.open_now)
 
 function orderable(it: Item) {
@@ -127,7 +138,7 @@ function orderable(it: Item) {
 const count = computed(() => cart.lines.reduce((n, l) => n + l.qty, 0))
 const subtotal = computed(() => cart.lines.reduce((s, l) => s + (linePrice(l, items.value) ?? 0) * l.qty, 0))
 const zone = computed(() => store.value?.zones.find(z => z.id === cart.zoneId) ?? null)
-const minimum = computed(() => cart.service === 'delivery' && store.value
+const minimum = computed(() => cart.service === 'delivery' && store.value && !appendTok
   ? Math.max(store.value.branch.min_order_amount, (mapMode.value ? terms.value?.min_order : zone.value?.min_order) ?? 0) : 0)
 // Promotions for the chosen service, and a nudge towards the nearest one not yet reached.
 const promos = computed(() => (store.value?.promotions ?? []).filter(p => cart.service === 'delivery' ? p.applies_delivery : p.applies_pickup && p.kind !== 'free_delivery'))
@@ -135,7 +146,7 @@ const promos = computed(() => (store.value?.promotions ?? []).filter(p => cart.s
 const livePromos = computed(() => promos.value.filter(p => p.live_now !== false))
 const nextPromo = computed(() => {
   const ahead = livePromos.value.filter(p => p.threshold > subtotal.value).sort((a, b) => a.threshold - b.threshold)[0]
-  return ahead && subtotal.value > 0 ? ahead : null
+  return ahead && subtotal.value > 0 && !appendTok ? ahead : null
 })
 // The offer the cart already earns, worked out as the server will at checkout:
 // the one that saves the most. The delivery fee is known only once there is an
@@ -155,6 +166,8 @@ const deal = computed(() => {
     // free delivery with the fee not yet known still counts, behind any money off
     if (total > bestTotal || (total === bestTotal && best?.kind === 'free_delivery' && p.kind !== 'free_delivery')) { best = p; bestTotal = total }
   }
+  // an add-on's offer is worked out with the whole order, on the next page
+  if (appendTok) return { promo: null, off: 0, now: sub }
   const off = best && best.kind !== 'free_delivery' ? saving(best, sub) : 0
   return { promo: best, off, now: sub - off }
 })
@@ -261,7 +274,7 @@ const shownCats = computed(() => {
 })
 
 // ---- categories the order must contain something from ----
-const missing = computed(() => onlineCats.value.filter(c => c.required && c.items.some(orderable)
+const missing = computed(() => onlineCats.value.filter(c => !appendTok && c.required && c.items.some(orderable)
   && !cart.lines.some(l => items.value.get(l.item_id)?.category_id === c.id)))
 const menu = ref<InstanceType<typeof MenuList> | null>(null)
 async function toRequired() {
@@ -300,6 +313,10 @@ async function sendReport() {
     </div>
     <div v-else-if="!store" class="section muted">{{ t('loading') }}</div>
     <template v-else>
+      <div v-if="appendTok" class="addbanner" data-testid="addon-banner">
+        <span class="grow">{{ t(appendOrder?.service_type === 'pickup' ? 'ao.c.banner_p' : 'ao.c.banner', { no: appendOrder?.public_no ?? '' }) }}</span>
+        <button class="btn small" data-testid="addon-exit" @click="exitAppend">{{ t('ao.c.exit') }}</button>
+      </div>
       <div class="hero" :class="{ media: media.length || tpl.cover_url }">
       <!-- promotional pictures and videos, else the cover: the same 16:9 frame in every store -->
       <div v-if="media.length" class="hero-media"><MediaCarousel :media="media" /><i class="lip"></i></div>
@@ -432,7 +449,7 @@ async function sendReport() {
             <div v-if="count && minimum > subtotal" class="small muted">{{ t('below_min', { amt: money(minimum - subtotal, cur) }) }}</div>
             <div v-else-if="nextPromo" class="small" style="color:var(--brand-dark)">{{ t('more_for_promo', { amt: money(nextPromo.threshold - subtotal, cur), name: promoLabel(nextPromo, cur) }) }}</div>
             <button v-if="count && missing.length" class="btn block big must" data-testid="required-missing" @click="toRequired">{{ t('sf.required_pick') }} · {{ mn(missing[0]) }}</button>
-            <button v-else class="btn primary block big" data-testid="go-checkout" :disabled="blocked" @click="checkout">{{ t('checkout') }}<template v-if="count"> · {{ money(deal.now, cur) }}</template></button>
+            <button v-else class="btn primary block big" data-testid="go-checkout" :disabled="blocked" @click="checkout">{{ appendTok ? t('ao.c.go') : t('checkout') }}<template v-if="count"> · {{ money(deal.now, cur) }}</template></button>
           </div>
         </div>
       </aside>
@@ -460,7 +477,7 @@ async function sendReport() {
             </div>
           </div>
           <button v-if="count && missing.length" class="go must" data-testid="required-missing" @click="toRequired">{{ t('sf.required_pick') }}</button>
-          <button v-else class="btn primary go" :disabled="blocked" @click="checkout">{{ !canOrder ? (store.branch.paused ? t('paused') : t('closed')) : t('checkout') }}</button>
+          <button v-else class="btn primary go" :disabled="blocked" data-testid="go-checkout-bar" @click="checkout">{{ !canOrder ? (store.branch.paused ? t('paused') : t('closed')) : appendTok ? t('ao.c.go') : t('checkout') }}</button>
         </div>
       </div>
 
@@ -575,6 +592,8 @@ async function sendReport() {
 </template>
 
 <style scoped>
+.addbanner { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  background: linear-gradient(90deg, #f6e2a8, #e9c46a); color: #5a1010; font-weight: 700; font-size: 14px; }
 .mt-note { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #8a7f75; padding: 4px 14px; }
 .mt-note .linkish { background: none; border: 0; padding: 0; color: var(--brand, #b8322a); font-size: 12px; cursor: pointer; text-decoration: underline; }
 .shop { --star: #f5a623; --menu-top: 50px; background: var(--bg);
