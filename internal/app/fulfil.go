@@ -242,6 +242,9 @@ func (a *App) handoff(ctx context.Context, tx pgx.Tx, o *lockedOrder, actor Acto
 			return Err(http.StatusConflict, "ITEMS_NOT_READY", "the order is not packed yet")
 		}
 		// Pay-at-pickup: handing over at the counter is also when cash is taken.
+		if err := a.endPendingAddons(ctx, tx, o.ID, "expired"); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `UPDATE orders SET fulfillment_status='picked_up', payment_status='paid',
 			handed_off_at=now(), completed_at=now(), version=version+1, updated_at=now() WHERE id=$1`, o.ID); err != nil {
 			return err
@@ -267,6 +270,9 @@ func (a *App) handoff(ctx context.Context, tx pgx.Tx, o *lockedOrder, actor Acto
 	if isNoRows(err) {
 		return ErrInvalidState("assign a rider before handing off")
 	} else if err != nil {
+		return err
+	}
+	if err := a.endPendingAddons(ctx, tx, o.ID, "expired"); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE orders SET fulfillment_status='out_for_delivery', handed_off_at=now(),

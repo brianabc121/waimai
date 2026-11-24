@@ -162,7 +162,12 @@ type Order struct {
 	OrderSource string `json:"order_source"`
 	PlacedBy    string `json:"placed_by"`
 	StaffNote   string `json:"staff_note"`
-	tokenNonce  []byte
+	// Batches are the order's batches: the order itself, each add-on (or
+	// dine-in round), and the customer's add-ons waiting for the store.
+	Batches []OrderBatch `json:"batches"`
+	// Addon says whether dishes can still be added (delivery and pickup).
+	Addon      *AddonState `json:"addon,omitempty"`
+	tokenNonce []byte
 }
 
 // DisplayStatus derives the single customer-facing status from the four
@@ -316,6 +321,9 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 		return nil, err
 	}
 
+	if err := loadBatches(ctx, q, byID, ids); err != nil {
+		return nil, err
+	}
 	if err := loadDiscounts(ctx, q, byID, ids); err != nil {
 		return nil, err
 	}
@@ -627,6 +635,9 @@ func (a *App) closeOrder(ctx context.Context, tx pgx.Tx, o *lockedOrder, status,
 		return err
 	}
 	if err := releaseCoupons(ctx, tx, o.ID); err != nil {
+		return err
+	}
+	if err := a.endPendingAddons(ctx, tx, o.ID, "cancelled"); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE order_items SET prep_status='cancelled' WHERE order_id=$1`, o.ID); err != nil {

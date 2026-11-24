@@ -10,6 +10,7 @@ export const router = createRouter({
     { path: '/s/:slug/checkout', component: () => import('./views/CheckoutView.vue'), props: true },
     { path: '/orders', component: () => import('./views/CustomerOrders.vue') },
     { path: '/o/:token', component: () => import('./views/OrderView.vue'), props: true },
+    { path: '/o/:token/append', component: () => import('./views/AddonCheckout.vue'), props: true },
     { path: '/t/:code', component: () => import('./views/TableView.vue'), props: true },
     { path: '/ipad', component: () => import('./views/TableView.vue') },
     { path: '/login', component: () => import('./views/LoginView.vue') },

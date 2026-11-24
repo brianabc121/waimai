@@ -6,7 +6,7 @@ import { noteLine } from '../notes'
 import LangButton from './LangButton.vue'
 import { computed, defineAsyncComponent, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ApiError, get, post } from '../api'
+import { ApiError, api, get, post } from '../api'
 import { contactName, contactPhone } from '../addresses'
 import { prettyPhone } from '../dial'
 import { loadCustomer } from '../customer'
@@ -19,6 +19,7 @@ import TotalsTable from './TotalsTable.vue'
 import CustomerFrame from './me/CustomerFrame.vue'
 import { couponTitle, lastDay } from '../coupons'
 import { chatEnabled } from '../chat'
+import { addonErr, batchTitle, pendingAddon } from '../addon'
 
 // The "contact store" entry shows only where chat is set up.
 const chatOn = ref(false)
@@ -61,7 +62,7 @@ const hint = computed(() => closed.value ? (order.value?.close_reason ? `${t('re
 
 // An order split into baskets is listed basket by basket.
 const multi = computed(() => !!order.value?.items.some(i => i.basket > 1))
-const sorted = computed(() => [...(order.value?.items ?? [])].sort((a, b) => a.basket - b.basket || a.id - b.id))
+const sorted = computed(() => [...(order.value?.items ?? [])].sort((a, b) => a.basket - b.basket || a.batch_seq - b.batch_seq || a.id - b.id))
 const store = computed(() => order.value?.store)
 const storeName = computed(() => store.value ? sn(store.value) : '')
 
@@ -159,6 +160,24 @@ const stateIcon = computed(() => {
 })
 const itemCount = computed(() => order.value?.items.reduce((n, i) => n + i.qty, 0) ?? 0)
 
+// ---- adding dishes (docs/ADD_ON_ORDER_DESIGN.md §8) ----
+const canAdd = computed(() => !!order.value?.addon?.open && order.value.addon.customer_left > 0 && !order.value.addon.pending && !!store.value)
+const waitingAdd = computed(() => order.value ? pendingAddon(order.value) : null)
+// the last add-on the store turned down or let drop, said once under the state
+const droppedAdd = computed(() => {
+  const bs = order.value?.batches ?? []
+  const last = bs[bs.length - 1]
+  return last && last.seq > 1 && (last.status === 'rejected' || last.status === 'expired') ? last : null
+})
+const grouped = computed(() => (order.value?.batches ?? []).filter(b => b.status === 'accepted').length > 1)
+const addMins = computed(() => waitingAdd.value?.expires_at ? Math.max(1, Math.ceil((new Date(waitingAdd.value.expires_at).getTime() - Date.now()) / 60000)) : 0)
+function addDishes() { router.push({ path: `/s/${store.value!.slug}`, query: { append: props.token } }) }
+async function withdraw() {
+  error.value = ''
+  try { order.value = await api<Order>('DELETE', `/customer/orders/${props.token}/append/${waitingAdd.value!.seq}`) }
+  catch (e) { error.value = addonErr(e) }
+}
+
 const copied = ref(false)
 async function copyNo() {
   try { await navigator.clipboard.writeText(order.value!.public_no); copied.value = true; setTimeout(() => (copied.value = false), 1500) } catch { /* no clipboard */ }
@@ -226,6 +245,19 @@ async function copyNo() {
           <div v-if="!online" class="banner warn">{{ t('offline') }}</div>
           <div v-if="error" class="banner bad">{{ error }}</div>
 
+          <button v-if="canAdd" class="od-card od-add" data-testid="act-addon" @click="addDishes">
+            <b>{{ t('ao.c.add') }}</b><span>{{ t(order.service_type === 'pickup' ? 'ao.c.hint_p' : 'ao.c.hint_d') }}</span>
+            <small v-if="(order.addon?.customer_left ?? 0) < 3">{{ t('ao.c.left', { n: order.addon?.customer_left ?? 0 }) }}</small>
+          </button>
+          <section v-if="waitingAdd" class="od-card od-addwait" data-testid="addon-waiting">
+            <div class="od-head"><h2>{{ batchTitle(waitingAdd.seq) }} · {{ t('ao.st.pending') }}</h2>
+              <button class="btn small" data-testid="addon-withdraw" @click="withdraw">{{ t('ao.c.withdraw') }}</button></div>
+            <div v-for="(l, i) in waitingAdd.lines" :key="i" class="od-line"><span>{{ mn(l) }} ×{{ l.qty }}</span><span>{{ money(l.line_total, order.currency) }}</span></div>
+            <p class="muted small">{{ money(waitingAdd.total_before ?? 0, order.currency) }} → <b>{{ money(waitingAdd.total_after ?? 0, order.currency) }}</b> ·
+              {{ t('ao.c.wait_note', { n: addMins }) }}</p>
+          </section>
+          <div v-else-if="droppedAdd" class="banner warn" data-testid="addon-dropped">{{ batchTitle(droppedAdd.seq) }} · {{ t('ao.st.' + droppedAdd.status) }}<template v-if="droppedAdd.reject_reason">（{{ droppedAdd.reject_reason }}）</template></div>
+
           <router-link v-if="order.gift" to="/me/coupons" class="od-gift" data-testid="order-gift">
             <span class="ic">🎁</span>
             <span class="grow"><b>{{ t('cp.gift', { what: couponTitle(order.gift, order.gift.currency) }) }}</b>
@@ -276,6 +308,7 @@ async function copyNo() {
           <div class="od-items">
             <template v-for="(it, i) in sorted" :key="it.id">
               <div v-if="multi && (i === 0 || sorted[i - 1].basket !== it.basket)" class="od-basket" data-testid="basket-head">{{ t('basket_n', { n: it.basket }) }}</div>
+              <div v-else-if="!multi && grouped && (i === 0 || sorted[i - 1].batch_seq !== it.batch_seq)" class="od-basket" data-testid="addon-head">{{ batchTitle(it.batch_seq) }}</div>
               <div class="od-item">
                 <img v-if="it.image_url" :src="it.image_url" alt="" loading="lazy" /><span v-else class="ph">{{ mn(it).slice(0, 1) }}</span>
                 <div class="grow">
@@ -339,6 +372,11 @@ async function copyNo() {
 </template>
 
 <style scoped>
+.od-add { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: start; cursor: pointer;
+  border: 1.5px dashed var(--gold, #c9a24a); background: #fffaf0; color: var(--red, #8f251b); font: inherit; }
+.od-add b { font-size: 16px; } .od-add span { font-size: 12.5px; color: #7a5b3a; } .od-add small { color: #b45309; }
+.od-addwait { border-inline-start: 4px solid #f59e0b; }
+.od-addwait .od-line { display: flex; justify-content: space-between; font-size: 14px; padding: 2px 0; }
 /* Deep red, cream and gold like the rest of the customer's pages. Sizes: body
    14, notes 12, card titles 15–16, the state 20; weights up to 600/700. */
 .od { min-height: 100vh; font-size: 14px; padding-bottom: calc(env(safe-area-inset-bottom) + 28px); background: var(--bg); }
