@@ -3143,5 +3143,18 @@
  "bl.c.refunded_sub": "Devuelto por plato después; no se resta arriba",
  "rc.c.refunds": "Reembolsos por plato",
  "rc.c.net": "neto {v}",
- "rc.cash_refunded": "Reembolsos en efectivo"
+ "rc.cash_refunded": "Reembolsos en efectivo",
+ "ml.btn": "Historial de importes",
+ "ml.empty": "Aún no hay cambios",
+ "ml.total": "Total {s}",
+ "ml.refunded": "Devuelto {s}",
+ "ml.k.placed": "Pedido",
+ "ml.k.addon": "Añadido",
+ "ml.k.void": "Anulado",
+ "ml.k.adjust": "Descuento al cobrar",
+ "ml.k.table": "Ronda en mesa",
+ "ml.k.close": "Cuenta cerrada",
+ "ml.k.refund": "Reembolso",
+ "ml.k.opening": "Antes del historial",
+ "ml.k.change": "Cambio"
 }

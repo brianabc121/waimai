@@ -87,133 +87,29 @@ func addonState(ctx context.Context, q Querier, o *lockedOrder) (*AddonState, er
 
 // ---- pricing ----
 
-// orderMoney is what an order was priced with, read under the order lock.
-type orderMoney struct {
-	Subtotal, DeliveryFee, PackagingFee int64
-	TaxRateBP, ServiceChargeBP          int
-	TaxInclusive                        bool
-	PromotionID                         *int64
-	// PromotionKind is the kind the promotion had when the order took it.
-	PromotionKind      string
-	Phone, ServiceType string
-	Total              int64
-	// What the order's discounts took off, by who pays and on what.
-	promoAmount                    int64
-	couponGoods, couponShip, platf int64
-	// adjPercentBP is the percentage off given at checkout, 0 for none;
-	// roundOff what a round-off or a typed amount took off.
-	adjPercentBP int
-	roundOff     int64
-}
-
-// fees is the order's own fee settings (docs/PRICING_REVIEW.md, problem 4).
-func (m *orderMoney) fees() TaxConfig {
-	return TaxConfig{TaxRateBP: m.TaxRateBP, TaxInclusive: m.TaxInclusive, ServiceChargeBP: m.ServiceChargeBP,
-		PackagingFee: m.PackagingFee}
-}
-
-// promoOn is what an amount the promotion takes off comes off: the delivery
-// fee for free delivery, the dishes otherwise.
-func promoOn(kind string, amount int64) Discount {
-	if kind == "free_delivery" {
-		return Discount{Delivery: amount}
-	}
-	return Discount{Goods: amount}
-}
-
-func readOrderMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, error) {
-	var m orderMoney
-	if err := q.QueryRow(ctx, `SELECT subtotal, delivery_fee, packaging_fee, tax_rate_bp, tax_inclusive, service_charge_bp,
-		promotion_id, promotion_kind, customer_phone, service_type, total, adj_percent_bp, round_off FROM orders WHERE id=$1`, orderID).
-		Scan(&m.Subtotal, &m.DeliveryFee, &m.PackagingFee, &m.TaxRateBP, &m.TaxInclusive, &m.ServiceChargeBP, &m.PromotionID,
-			&m.PromotionKind, &m.Phone, &m.ServiceType, &m.Total, &m.adjPercentBP, &m.roundOff); err != nil {
-		return nil, err
-	}
-	rows, err := q.Query(ctx, `SELECT kind, amount FROM order_discounts WHERE order_id=$1`, orderID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var kind string
-		var amount int64
-		if err := rows.Scan(&kind, &amount); err != nil {
-			return nil, err
-		}
-		switch kind {
-		case "promotion":
-			m.promoAmount += amount
-		case CouponStoreThreshold, CouponStoreFree:
-			m.couponGoods += amount
-		case CouponStoreDelivery:
-			m.couponShip += amount
-		case CouponPlatformFree:
-			m.platf += amount
-		}
-	}
-	return &m, rows.Err()
-}
-
-// addonPrice is the order's amounts with an add-on of extra (dish money).
+// addonPrice is the order's amounts with an add-on.
 type addonPrice struct {
-	Totals Totals
-	// promo is the promotion now applied, nil when none; switched says it is
-	// another one than the order had.
-	promo    *Promotion
-	promoD   Discount
+	*priced
+	// switched says the promotion is another one than the order had.
 	switched bool
 }
 
-// priceWithAddon recomputes an order's amounts with extra more dish money
-// (docs/ADD_ON_ORDER_DESIGN.md §5): the delivery fee and packaging fee stay,
-// the coupons used stay, and the promotion is chosen again on the new amount
-// but never takes off less than it did.
+// addonPolicy is how an add-on decides the promotion
+// (docs/ADD_ON_ORDER_DESIGN.md §5): the order's own is worked out again on
+// the new amount but never takes off less than it did, and another live one
+// is taken when it saves more. Coupons stay; the delivery and packaging
+// fees stay; a percentage off at checkout carries over, a round-off does not.
+func addonPolicy(now time.Time, pick bool) promoPolicy {
+	return promoPolicy{at: now, current: true, floor: true, pick: pick}
+}
+
+// priceWithAddon is the order's amounts with extra more dish money.
 func priceWithAddon(ctx context.Context, q Querier, b *Branch, m *orderMoney, extra int64, now time.Time) (*addonPrice, error) {
-	sub := m.Subtotal + extra
-	var keep *Promotion
-	var keepD Discount
-	if m.PromotionID != nil {
-		ps, err := loadPromotions(ctx, q, b.ID, "p.id = "+fmt.Sprint(*m.PromotionID), "")
-		if err != nil {
-			return nil, err
-		}
-		if len(ps) == 1 {
-			keep = &ps[0]
-			keepD = keep.discount(sub, m.DeliveryFee)
-			if keepD.total() < m.promoAmount { // never less than the order had
-				keepD = promoOn(m.PromotionKind, m.promoAmount)
-			}
-		}
-	}
-	res := &addonPrice{promo: keep, promoD: keepD}
-	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope='delivery'", m.Phone)
+	p, switched, err := m.reprice(ctx, q, b, m.withExtra(extra), addonPolicy(now, true))
 	if err != nil {
 		return nil, err
 	}
-	if best, d := bestPromotion(promos, now, b.location(), m.ServiceType, sub, m.DeliveryFee); best != nil &&
-		(keep == nil || best.ID != keep.ID) && d.total() > keepD.total() {
-		res.promo, res.promoD, res.switched = best, d, true
-	}
-	cfg := m.fees()
-	d := Discount{Goods: res.promoD.Goods + m.couponGoods, Delivery: res.promoD.Delivery + m.couponShip}
-	t := ComputeTotals(sub, m.DeliveryFee, cfg, d)
-	if res.promo != nil {
-		t.PromotionID, t.PromotionName, t.PromotionNameEn = res.promo.ID, res.promo.Name, res.promo.NameEn
-		t.PromotionDiscount = min(res.promoD.total(), t.MerchantDiscount)
-	}
-	t.applyPlatform(m.platf)
-	// A percentage off given at checkout carries over to the new amount; a
-	// round-off does not (docs/CHECKOUT_DISCOUNT_DESIGN.md §5.4).
-	if m.adjPercentBP > 0 {
-		base := adjBase{subtotal: sub, fee: m.DeliveryFee, cfg: cfg, d: d, platf: m.platf, promoID: t.PromotionID,
-			promoName: t.PromotionName, promoNameEn: t.PromotionNameEn, promoAmount: t.PromotionDiscount}
-		var err error
-		if t, err = base.price(Adjust{PercentBP: m.adjPercentBP}); err != nil {
-			return nil, err
-		}
-	}
-	res.Totals = t
-	return res, nil
+	return &addonPrice{priced: p, switched: switched}, nil
 }
 
 // AddonQuote is what an add-on would cost, before it is placed.
@@ -286,7 +182,7 @@ func quoteAddon(ctx context.Context, q Querier, b *Branch, o *lockedOrder, in Ad
 			return nil, err
 		}
 	}
-	m, err := readOrderMoney(ctx, q, o.ID)
+	m, err := loadMoney(ctx, q, o.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +201,7 @@ func quoteAddon(ctx context.Context, q Querier, b *Branch, o *lockedOrder, in Ad
 		return nil, err
 	}
 	return &AddonQuote{Currency: b.Currency, Lines: lines, Subtotal: sub, Before: before.Totals, After: after.Totals,
-		Extra: after.Totals.Total - m.Total, PromoUp: after.promoD.total() > m.promoAmount, State: st}, nil
+		Extra: after.Totals.Total - m.Total, PromoUp: after.Totals.PromotionDiscount > m.PromoAmount, State: st}, nil
 }
 
 // ---- applying an add-on ----
@@ -314,6 +210,9 @@ func quoteAddon(ctx context.Context, q Querier, b *Branch, o *lockedOrder, in Ad
 // as batchID), reprices the order and tells the kitchen, the packer and the
 // rider. The order is locked by the caller.
 func (a *App) applyAddon(ctx context.Context, tx pgx.Tx, b *Branch, o *lockedOrder, batchID int64, lines []QuoteLine, actor Actor) (Totals, error) {
+	if err := moneyEvent(ctx, tx, "addon", batchID, actor); err != nil {
+		return Totals{}, err
+	}
 	if err := reserveStock(ctx, tx, lines); err != nil {
 		return Totals{}, err
 	}
@@ -342,64 +241,34 @@ func (a *App) applyAddon(ctx context.Context, tx pgx.Tx, b *Branch, o *lockedOrd
 			return Totals{}, err
 		}
 	}
-	m, err := readOrderMoney(ctx, tx, o.ID)
+	// The order's lines now include the add-on.
+	m, err := loadMoney(ctx, tx, o.ID)
 	if err != nil {
 		return Totals{}, err
 	}
-	p, err := priceWithAddon(ctx, tx, b, m, sub, time.Now())
+	before := m.Total
+	p, switched, err := m.reprice(ctx, tx, b, nil, addonPolicy(time.Now(), true))
 	if err != nil {
 		return Totals{}, err
 	}
-	if p.switched {
+	if switched {
 		// Another promotion now saves more: give the old use back and take one
 		// of the new. If the new one ran out meanwhile, keep the old one.
-		if err := switchPromotion(ctx, tx, b.ID, p.promo.ID, o.ID, m.Phone, p.Totals.PromotionDiscount); err != nil {
+		if err := switchPromotion(ctx, tx, b.ID, p.Promo.ID, o.ID, m.Phone, p.Totals.PromotionDiscount); err != nil {
 			if !isCode(err, "QUOTE_CHANGED") {
 				return Totals{}, err
 			}
-			if p, err = priceWithAddonOnly(ctx, tx, b, m, sub); err != nil {
+			if p, _, err = m.reprice(ctx, tx, b, nil, addonPolicy(time.Now(), false)); err != nil {
 				return Totals{}, err
 			}
 		}
 	}
+	if err := saveMoney(ctx, tx, b, o.ID, p, true); err != nil {
+		return Totals{}, err
+	}
 	t := p.Totals
-	var promoID *int64
-	if p.promo != nil {
-		promoID = &p.promo.ID
-	}
-	if _, err := tx.Exec(ctx, `UPDATE orders SET subtotal=$2, service_charge=$3, tax_amount=$4, discount=$5, total=$6,
-		merchant_discount=$7, platform_subsidy=$8, promotion_id=$9, promotion_name=$10, promotion_name_en=$11,
-		version=version+1, manifest_version=manifest_version+1, updated_at=now() WHERE id=$1`,
-		o.ID, t.Subtotal, t.ServiceCharge, t.TaxAmount, t.Discount, t.Total, t.MerchantDiscount, t.PlatformSubsidy,
-		promoID, t.PromotionName, t.PromotionNameEn); err != nil {
-		return Totals{}, err
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM order_discounts WHERE order_id=$1 AND kind='promotion'`, o.ID); err != nil {
-		return Totals{}, err
-	}
-	if promoID != nil && t.PromotionDiscount > 0 {
-		if _, err := tx.Exec(ctx, `INSERT INTO order_discounts (order_id, branch_id, kind, funded_by, name, name_en,
-			amount, promotion_id) VALUES ($1,$2,'promotion','store',$3,$4,$5,$6)`, o.ID, b.ID, t.PromotionName,
-			t.PromotionNameEn, t.PromotionDiscount, *promoID); err != nil {
-			return Totals{}, err
-		}
-		if _, err := tx.Exec(ctx, `UPDATE promotion_redemptions SET amount=$2 WHERE order_id=$1 AND status='applied'`,
-			o.ID, t.PromotionDiscount); err != nil {
-			return Totals{}, err
-		}
-	}
-	// The discount at checkout: the percentage is taken off the new amount,
-	// a round-off or a typed amount to pay is dropped.
-	if _, err := reapplyAdjust(ctx, tx, b, o.ID); err != nil {
-		return Totals{}, err
-	}
-	if err := tx.QueryRow(ctx, `SELECT service_charge, tax_amount, total, staff_discount, round_off, adj_mode
-		FROM orders WHERE id=$1`, o.ID).Scan(&t.ServiceCharge, &t.TaxAmount, &t.Total, &t.StaffDiscount, &t.RoundOff,
-		&t.AdjMode); err != nil {
-		return Totals{}, err
-	}
 	if _, err := tx.Exec(ctx, `UPDATE order_batches SET total_before=$2, total_after=$3 WHERE id=$1`,
-		batchID, m.Total, t.Total); err != nil {
+		batchID, before, t.Total); err != nil {
 		return Totals{}, err
 	}
 	if accepted {
@@ -426,49 +295,10 @@ func (a *App) applyAddon(ctx context.Context, tx pgx.Tx, b *Branch, o *lockedOrd
 		return Totals{}, err
 	}
 	if err := audit(ctx, tx, b.ID, o.ID, actor, "order.addon", map[string]any{"batch_id": batchID,
-		"lines": len(lines), "batch_total": sub, "total_before": m.Total, "total": t.Total}); err != nil {
+		"lines": len(lines), "batch_total": sub, "total_before": before, "total": t.Total}); err != nil {
 		return Totals{}, err
 	}
 	return t, notify(ctx, tx, Event{BranchID: b.ID, OrderID: o.ID, RiderIDs: riders})
-}
-
-// priceWithAddonOnly is priceWithAddon without looking for a better promotion.
-func priceWithAddonOnly(ctx context.Context, q Querier, b *Branch, m *orderMoney, extra int64) (*addonPrice, error) {
-	sub := m.Subtotal + extra
-	res := &addonPrice{}
-	if m.PromotionID != nil {
-		ps, err := loadPromotions(ctx, q, b.ID, "p.id = "+fmt.Sprint(*m.PromotionID), "")
-		if err != nil {
-			return nil, err
-		}
-		if len(ps) == 1 {
-			res.promo = &ps[0]
-			res.promoD = res.promo.discount(sub, m.DeliveryFee)
-			if res.promoD.total() < m.promoAmount {
-				res.promoD = promoOn(m.PromotionKind, m.promoAmount)
-			}
-		}
-	}
-	cfg := m.fees()
-	d := Discount{Goods: res.promoD.Goods + m.couponGoods, Delivery: res.promoD.Delivery + m.couponShip}
-	t := ComputeTotals(sub, m.DeliveryFee, cfg, d)
-	if res.promo != nil {
-		t.PromotionID, t.PromotionName, t.PromotionNameEn = res.promo.ID, res.promo.Name, res.promo.NameEn
-		t.PromotionDiscount = min(res.promoD.total(), t.MerchantDiscount)
-	}
-	t.applyPlatform(m.platf)
-	// A percentage off given at checkout carries over to the new amount; a
-	// round-off does not (docs/CHECKOUT_DISCOUNT_DESIGN.md §5.4).
-	if m.adjPercentBP > 0 {
-		base := adjBase{subtotal: sub, fee: m.DeliveryFee, cfg: cfg, d: d, platf: m.platf, promoID: t.PromotionID,
-			promoName: t.PromotionName, promoNameEn: t.PromotionNameEn, promoAmount: t.PromotionDiscount}
-		var err error
-		if t, err = base.price(Adjust{PercentBP: m.adjPercentBP}); err != nil {
-			return nil, err
-		}
-	}
-	res.Totals = t
-	return res, nil
 }
 
 // switchPromotion moves the order's promotion use to another promotion

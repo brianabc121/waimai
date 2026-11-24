@@ -341,14 +341,15 @@ func (a *App) voidLine(ctx context.Context, tx pgx.Tx, itemID int64, in VoidInpu
 		}
 	}
 
-	// The money.
+	// The money: everything is priced again on what is left
+	// (docs/VOID_ITEM_DESIGN.md §6); a percentage off at checkout carries
+	// over, a round-off or a typed amount to pay is dropped.
+	if err := moneyEvent(ctx, tx, "void", itemID, actor); err != nil {
+		return nil, err
+	}
 	var after Totals
 	if o.ServiceType == "dine_in" {
-		var keepID, keepAmount int64
-		if in.ReasonKind == "store" {
-			keepID, keepAmount = before.Totals.PromotionID, before.Totals.MerchantDiscount
-		}
-		if after, err = recomputeBillKeep(ctx, tx, b, o.ID, keepID, keepAmount); err != nil {
+		if after, err = repriceTable(ctx, tx, b, o.ID, in.ReasonKind == "store"); err != nil {
 			return nil, err
 		}
 	} else {
@@ -367,16 +368,6 @@ func (a *App) voidLine(ctx context.Context, tx pgx.Tx, itemID int64, in VoidInpu
 				return nil, err
 			}
 		}
-	}
-	// The discount at checkout: the percentage is taken off the new amount,
-	// a round-off or a typed amount to pay is dropped.
-	if _, err := reapplyAdjust(ctx, tx, b, o.ID); err != nil {
-		return nil, err
-	}
-	if err := tx.QueryRow(ctx, `SELECT service_charge, tax_amount, total, staff_discount, round_off, adj_mode
-		FROM orders WHERE id=$1`, o.ID).Scan(&after.ServiceCharge, &after.TaxAmount, &after.Total, &after.StaffDiscount,
-		&after.RoundOff, &after.AdjMode); err != nil {
-		return nil, err
 	}
 	q.After = after
 	q.Less = q.Before.Total - after.Total
@@ -439,149 +430,48 @@ func (a *App) voidLine(ctx context.Context, tx pgx.Tx, itemID int64, in VoidInpu
 	return q, notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID, RiderIDs: riders})
 }
 
-// voidPrice is a delivery or pickup order's amounts with removed less dish
-// money (docs/VOID_ITEM_DESIGN.md §6): the delivery and packaging fees and
-// the coupons stay; the promotion keeps its amount when the store is at
-// fault, and is worked out again on what is left when the customer is.
-func voidPrice(ctx context.Context, q Querier, b *Branch, m *orderMoney, ordered time.Time, removed int64, kind string, mayPick bool) (*addonPrice, error) {
-	sub := max(m.Subtotal-removed, 0)
-	res := &addonPrice{}
-	var cur *Promotion
-	if m.PromotionID != nil {
-		ps, err := loadPromotions(ctx, q, b.ID, "p.id = "+fmt.Sprint(*m.PromotionID), "")
-		if err != nil {
-			return nil, err
-		}
-		if len(ps) == 1 {
-			cur = &ps[0]
-		}
-	}
+// voidPolicy is how a void or a refund of a delivery or pickup order
+// decides the promotion (docs/VOID_ITEM_DESIGN.md §6): the store's fault
+// keeps it at its amount; the customer's works it out again on what is left,
+// with the promotion hours of when they ordered, and may move to another
+// promotion that now saves more (pick).
+func voidPolicy(m *orderMoney, kind string, pick bool) promoPolicy {
 	if kind == "store" {
-		if cur != nil && m.promoAmount > 0 {
-			res.promo = cur
-			if m.PromotionKind == "free_delivery" {
-				res.promoD = Discount{Delivery: min(m.promoAmount, m.DeliveryFee)}
-			} else {
-				res.promoD = Discount{Goods: min(m.promoAmount, sub)}
-			}
-		}
-	} else {
-		if cur != nil && sub >= cur.Threshold {
-			res.promo, res.promoD = cur, cur.discount(sub, m.DeliveryFee)
-		}
-		if mayPick {
-			promos, err := loadPromotions(ctx, q, b.ID, "p.status='active'", m.Phone)
-			if err != nil {
-				return nil, err
-			}
-			// The promotion's hours are those of when the customer ordered.
-			if best, d := bestPromotion(promos, ordered, b.location(), m.ServiceType, sub, m.DeliveryFee); best != nil &&
-				(cur == nil || best.ID != cur.ID) && d.total() > res.promoD.total() {
-				res.promo, res.promoD, res.switched = best, d, true
-			}
-		}
+		return promoPolicy{keep: true}
 	}
-	cfg := m.fees()
-	// Coupons stay, but only on what the promotion left of the dishes.
-	d := Discount{Goods: res.promoD.Goods + min(m.couponGoods, max(0, sub-res.promoD.Goods)),
-		Delivery: res.promoD.Delivery + m.couponShip}
-	t := ComputeTotals(sub, m.DeliveryFee, cfg, d)
-	if res.promo != nil {
-		t.PromotionID, t.PromotionName, t.PromotionNameEn = res.promo.ID, res.promo.Name, res.promo.NameEn
-		t.PromotionDiscount = min(res.promoD.total(), t.MerchantDiscount)
-	}
-	t.applyPlatform(m.platf)
-	// A percentage off given at checkout is taken off what is left
-	// (docs/PRICING_REVIEW.md, problem 2).
-	if m.adjPercentBP > 0 {
-		base := adjBase{subtotal: sub, fee: m.DeliveryFee, cfg: cfg, d: d, platf: m.platf, promoID: t.PromotionID,
-			promoName: t.PromotionName, promoNameEn: t.PromotionNameEn, promoAmount: t.PromotionDiscount}
-		var err error
-		if t, err = base.price(Adjust{PercentBP: m.adjPercentBP}); err != nil {
-			return nil, err
-		}
-	}
-	res.Totals = t
-	return res, nil
+	return promoPolicy{at: m.Created, current: true, pick: pick}
 }
 
 // repriceAfterVoid writes a delivery or pickup order's new amounts after its
-// dishes changed (the voided line is already cancelled).
+// dishes changed (the voided line is already cancelled). Coupons stay but
+// never take off more than the promotion left of the dishes.
 func (a *App) repriceAfterVoid(ctx context.Context, tx pgx.Tx, b *Branch, o *lockedOrder, kind string) (Totals, error) {
-	m, err := readOrderMoney(ctx, tx, o.ID)
+	m, err := loadMoney(ctx, tx, o.ID)
 	if err != nil {
 		return Totals{}, err
 	}
-	var live int64
-	var ordered time.Time
-	if err := tx.QueryRow(ctx, `SELECT COALESCE((SELECT sum(line_total) FROM order_items WHERE order_id=$1
-		AND prep_status <> 'cancelled'), 0), (SELECT created_at FROM orders WHERE id=$1)`, o.ID).Scan(&live, &ordered); err != nil {
-		return Totals{}, err
-	}
-	p, err := voidPrice(ctx, tx, b, m, ordered, m.Subtotal-live, kind, true)
+	p, switched, err := m.reprice(ctx, tx, b, nil, voidPolicy(m, kind, true))
 	if err != nil {
 		return Totals{}, err
 	}
-	if p.switched {
-		if err := switchPromotion(ctx, tx, b.ID, p.promo.ID, o.ID, m.Phone, p.Totals.PromotionDiscount); err != nil {
+	if switched {
+		if err := switchPromotion(ctx, tx, b.ID, p.Promo.ID, o.ID, m.Phone, p.Totals.PromotionDiscount); err != nil {
 			if !isCode(err, "QUOTE_CHANGED") {
 				return Totals{}, err
 			}
 			// The other promotion ran out meanwhile: the order's own, if it still applies.
-			if p, err = voidPrice(ctx, tx, b, m, ordered, m.Subtotal-live, kind, false); err != nil {
+			if p, _, err = m.reprice(ctx, tx, b, nil, voidPolicy(m, kind, false)); err != nil {
 				return Totals{}, err
 			}
 		}
 	}
-	t := p.Totals
-	var promoID *int64
-	if p.promo != nil && t.PromotionDiscount > 0 {
-		promoID = &p.promo.ID
-	} else {
-		t.PromotionID, t.PromotionName, t.PromotionNameEn, t.PromotionDiscount = 0, "", "", 0
-		if m.PromotionID != nil {
-			// Nothing applies any more: the promotion's use is given back.
-			if err := releasePromotion(ctx, tx, o.ID); err != nil {
-				return Totals{}, err
-			}
-		}
-	}
-	if _, err := tx.Exec(ctx, `UPDATE orders SET subtotal=$2, service_charge=$3, tax_amount=$4, discount=$5, total=$6,
-		merchant_discount=$7, platform_subsidy=$8, promotion_id=$9, promotion_name=$10, promotion_name_en=$11,
-		version=version+1, updated_at=now() WHERE id=$1`,
-		o.ID, t.Subtotal, t.ServiceCharge, t.TaxAmount, t.Discount, t.Total, t.MerchantDiscount, t.PlatformSubsidy,
-		promoID, t.PromotionName, t.PromotionNameEn); err != nil {
-		return Totals{}, err
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM order_discounts WHERE order_id=$1 AND kind='promotion'`, o.ID); err != nil {
-		return Totals{}, err
-	}
-	if promoID != nil {
-		if _, err := tx.Exec(ctx, `INSERT INTO order_discounts (order_id, branch_id, kind, funded_by, name, name_en,
-			amount, promotion_id) VALUES ($1,$2,'promotion','store',$3,$4,$5,$6)`, o.ID, b.ID, t.PromotionName,
-			t.PromotionNameEn, t.PromotionDiscount, *promoID); err != nil {
-			return Totals{}, err
-		}
-		if _, err := tx.Exec(ctx, `UPDATE promotion_redemptions SET amount=$2 WHERE order_id=$1 AND status='applied'`,
-			o.ID, t.PromotionDiscount); err != nil {
+	if p.Promo == nil && m.Promo != nil {
+		// Nothing applies any more: the promotion's use is given back.
+		if err := releasePromotion(ctx, tx, o.ID); err != nil {
 			return Totals{}, err
 		}
 	}
-	// Coupons stay, but never take off more than the promotion left of the
-	// dishes, so the discount lines add up to the discount (problem 3).
-	if room := max(0, t.Subtotal-min(p.promoD.Goods, t.Subtotal)); room < m.couponGoods {
-		if _, err := tx.Exec(ctx, `WITH c AS (SELECT id, amount, sum(amount) OVER (ORDER BY id) AS run FROM order_discounts
-			WHERE order_id=$1 AND kind IN ('store_threshold','store_free'))
-			UPDATE order_discounts d SET amount = GREATEST(0, LEAST(c.amount, $2 - (c.run - c.amount)))
-			FROM c WHERE d.id = c.id`, o.ID, room); err != nil {
-			return Totals{}, err
-		}
-	}
-	if _, err := tx.Exec(ctx, `UPDATE order_discounts SET amount=$2 WHERE order_id=$1 AND kind='platform_free'`,
-		o.ID, t.PlatformSubsidy); err != nil {
-		return Totals{}, err
-	}
-	return t, nil
+	return p.Totals, saveMoney(ctx, tx, b, o.ID, p, false)
 }
 
 // ---- the kitchen ----
@@ -779,6 +669,7 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		}
 		rows.Close()
 		q := &RefundQuote{Lines: []RefundLine{}}
+		less := map[int64]int64{}
 		seen := map[int64]bool{}
 		for _, l := range in.Lines {
 			if l.Qty <= 0 || seen[l.ItemID] {
@@ -800,48 +691,27 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 			}
 			q.Lines = append(q.Lines, RefundLine{ItemID: l.ItemID, Name: name, Qty: l.Qty, Amount: unit * int64(l.Qty)})
 			q.Dishes += unit * int64(l.Qty)
+			less[l.ItemID] += unit * int64(l.Qty)
 		}
 		// Price the order as if these dishes had been voided, with everything
 		// the order had: its promotion (kept when the store is at fault), its
 		// coupons, the percentage off and the round-off given at checkout
-		// (docs/PRICING_REVIEW.md, problems 1 and 2).
-		var after Totals
-		m, err := readOrderMoney(ctx, tx, o.ID)
+		// (docs/PRICING_REVIEW.md, problems 1 and 2). No other promotion is
+		// taken for a refund.
+		m, err := loadMoney(ctx, tx, o.ID)
 		if err != nil {
 			return err
 		}
+		pol := voidPolicy(m, in.ReasonKind, false)
 		if o.ServiceType == "dine_in" {
-			var keepID int64
-			if in.ReasonKind == "store" && m.PromotionID != nil {
-				keepID = *m.PromotionID
-			}
-			var merchant int64
-			if err := tx.QueryRow(ctx, `SELECT discount - platform_subsidy FROM orders WHERE id=$1`, o.ID).Scan(&merchant); err != nil {
-				return err
-			}
-			sub := max(m.Subtotal-q.Dishes, 0)
-			if after, err = dineBillTotals(ctx, tx, b, o.ID, sub, keepID, merchant); err != nil {
-				return err
-			}
-			if m.adjPercentBP > 0 {
-				base := adjBase{subtotal: sub, cfg: m.fees(), d: Discount{Goods: after.Discount}}
-				if after, err = base.price(Adjust{PercentBP: m.adjPercentBP}); err != nil {
-					return err
-				}
-			}
-		} else {
-			var ordered time.Time
-			if err := tx.QueryRow(ctx, `SELECT created_at FROM orders WHERE id=$1`, o.ID).Scan(&ordered); err != nil {
-				return err
-			}
-			// No other promotion is taken for a refund: the order keeps its own or none.
-			p, err := voidPrice(ctx, tx, b, m, ordered, q.Dishes, in.ReasonKind, false)
-			if err != nil {
-				return err
-			}
-			after = p.Totals
+			pol = dinePolicy(m, in.ReasonKind == "store")
 		}
-		after.Total = max(0, after.Total-m.roundOff)
+		p, _, err := m.reprice(ctx, tx, b, m.without(less), pol)
+		if err != nil {
+			return err
+		}
+		after := p.Totals
+		after.Total = max(0, after.Total-m.RoundOff)
 		q.Left = o.Total - paidBack
 		q.Suggested = max(0, min(o.Total-after.Total, q.Left))
 		out = q

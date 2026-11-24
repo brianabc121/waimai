@@ -3143,5 +3143,18 @@
  "bl.c.refunded_sub": "後から料理ごとに返金した額（上の金額からは差し引いていません）",
  "rc.c.refunds": "料理ごとの返金",
  "rc.c.net": "差引 {v}",
- "rc.cash_refunded": "現金での返金"
+ "rc.cash_refunded": "現金での返金",
+ "ml.btn": "金額の記録",
+ "ml.empty": "まだ記録がありません",
+ "ml.total": "請求 {s}",
+ "ml.refunded": "返金 {s}",
+ "ml.k.placed": "注文",
+ "ml.k.addon": "追加注文",
+ "ml.k.void": "取消",
+ "ml.k.adjust": "会計時の割引",
+ "ml.k.table": "追加",
+ "ml.k.close": "会計",
+ "ml.k.refund": "返金",
+ "ml.k.opening": "記録開始前",
+ "ml.k.change": "変更"
 }

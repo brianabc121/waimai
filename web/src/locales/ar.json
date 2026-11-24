@@ -3143,5 +3143,18 @@
  "bl.c.refunded_sub": "ما أُعيد لاحقًا حسب الطبق؛ غير مخصوم أعلاه",
  "rc.c.refunds": "استرداد حسب الطبق",
  "rc.c.net": "الصافي {v}",
- "rc.cash_refunded": "استرداد نقدي"
+ "rc.cash_refunded": "استرداد نقدي",
+ "ml.btn": "سجل المبالغ",
+ "ml.empty": "لا توجد تغييرات بعد",
+ "ml.total": "الإجمالي {s}",
+ "ml.refunded": "تم رد {s}",
+ "ml.k.placed": "الطلب",
+ "ml.k.addon": "إضافة",
+ "ml.k.void": "إلغاء طبق",
+ "ml.k.adjust": "خصم عند الدفع",
+ "ml.k.table": "جولة على الطاولة",
+ "ml.k.close": "إغلاق الفاتورة",
+ "ml.k.refund": "استرداد",
+ "ml.k.opening": "قبل بدء السجل",
+ "ml.k.change": "تغيير"
 }

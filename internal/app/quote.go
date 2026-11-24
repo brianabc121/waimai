@@ -104,6 +104,9 @@ type Quote struct {
 	Input         QuoteInput      `json:"input"`
 	// address is the saved address named by Input.AddressID, as it is now.
 	address *Address
+	// promo is the promotion applied, nil when none; pr the engine's pricing.
+	promo *Promotion
+	pr    *priced
 }
 
 // computeQuote validates the cart against the live menu and prices it. It is
@@ -221,16 +224,11 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		return nil, err
 	}
 	promo, d := bestPromotion(promos, time.Now(), b.location(), in.ServiceType, subtotal, deliveryFee)
-	var promoID int64
-	var promoName, promoNameEn string
-	if promo != nil {
-		promoID, promoName, promoNameEn = promo.ID, promo.Name, promo.NameEn
-	}
 	wallet, err := walletFor(ctx, q, phone, b)
 	if err != nil {
 		return nil, err
 	}
-	if err := applyCoupons(quote, wallet, b.taxConfig(), promoID, promoName, promoNameEn, subtotal, deliveryFee, d); err != nil {
+	if err := applyCoupons(quote, wallet, b.taxConfig(), promo, deliveryFee, d); err != nil {
 		return nil, err
 	}
 	return quote, nil

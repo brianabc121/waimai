@@ -16,6 +16,7 @@ func (s *Server) voidRoutes(auth *gin.RouterGroup) {
 	auth.POST("/kitchen/voids/:id/ack", s.ackVoid)
 	auth.POST("/merchant/orders/:id/refunds", s.refundOrder)
 	auth.GET("/merchant/branches/:bid/voids", s.voidLog)
+	auth.GET("/merchant/orders/:id/money-events", s.moneyEvents)
 }
 
 // voidScope checks who may void a line: the table's people for a dine-in
@@ -123,5 +124,15 @@ func (s *Server) voidLog(c *gin.Context) {
 		return
 	}
 	l, err := s.App.VoidLog(c, bid, c.Query("date"))
+	reply(c, l, err)
+}
+
+// moneyEvents is the order's money ledger: every change to its amounts.
+func (s *Server) moneyEvents(c *gin.Context) {
+	id, ok := s.orderScope(c, pOrderView)
+	if !ok {
+		return
+	}
+	l, err := s.App.OrderMoneyEvents(c, id)
 	reply(c, l, err)
 }

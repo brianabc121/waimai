@@ -3143,5 +3143,18 @@
 "bl.c.refunded_sub":"這些訂單之後按菜退給顧客的錢，未從上面扣除",
 "rc.c.refunds":"按菜退款",
 "rc.c.net":"扣除後 {v}",
-"rc.cash_refunded":"現金退款"
+"rc.cash_refunded":"現金退款",
+"ml.btn":"金額記錄",
+"ml.empty":"還沒有記錄",
+"ml.total":"應收 {s}",
+"ml.refunded":"退回 {s}",
+"ml.k.placed":"下單",
+"ml.k.addon":"加單",
+"ml.k.void":"退菜",
+"ml.k.adjust":"結帳優惠",
+"ml.k.table":"加菜",
+"ml.k.close":"結帳",
+"ml.k.refund":"退款",
+"ml.k.opening":"記錄開始前",
+"ml.k.change":"改動"
 }

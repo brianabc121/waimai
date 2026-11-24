@@ -1,6 +1,6 @@
 package app
 
-import "context"
+import "github.com/brianabc121/waimai/internal/pricing"
 
 // Money amounts are integers in the currency's minor unit.
 
@@ -46,59 +46,25 @@ type Totals struct {
 	Total int64 `json:"total"`
 }
 
-// applyPlatform takes a platform coupon off what the customer pays. It is
-// paid by the platform, so the store's tax and service charge do not change.
-// It returns how much was taken off: never more than is left to pay.
-func (t *Totals) applyPlatform(value int64) int64 {
-	v := min(max(value, 0), t.Total)
-	t.PlatformSubsidy = v
-	t.Discount += v
-	t.Total -= v
-	return v
-}
-
-// mulDivRound returns a*b/d rounded half up.
-func mulDivRound(a, b, d int64) int64 {
-	return (a*b + d/2) / d
-}
-
-// ComputeTotals implements docs/DESIGN.md §4.2. The delivery fee is not taxed.
-// A discount on goods lowers the amount that service charge and tax are
-// computed on; a delivery discount only lowers the amount due.
+// ComputeTotals implements docs/DESIGN.md §4.2 for one amount of dishes and
+// a discount on them and on the delivery fee: the delivery fee is not taxed;
+// a discount on dishes lowers what service charge and tax are worked out on.
+// (Orders are priced by priceMoney in money.go; this is for the promotion
+// trial and the tests.)
 func ComputeTotals(subtotal, deliveryFee int64, cfg TaxConfig, d Discount) Totals {
-	d.Goods = min(d.Goods, subtotal)
-	d.Delivery = min(d.Delivery, deliveryFee)
-	goods := subtotal - d.Goods
-	t := Totals{
-		Subtotal:     subtotal,
-		PackagingFee: cfg.PackagingFee,
-		DeliveryFee:  deliveryFee,
-		TaxInclusive: cfg.TaxInclusive,
-		TaxRateBP:    cfg.TaxRateBP,
-		Discount:     d.total(),
-	}
+	in := pricing.Input{Lines: []pricing.Line{{Key: "dishes", Amount: subtotal}},
+		Fees: pricing.Fees{TaxRateBP: cfg.TaxRateBP, TaxInclusive: cfg.TaxInclusive, ServiceChargeBP: cfg.ServiceChargeBP,
+			Packaging: cfg.PackagingFee, Delivery: deliveryFee},
+		Adjustments: []pricing.Adjustment{{Kind: "discount", Stage: pricing.StageOrder, Amount: d.Goods},
+			{Kind: "discount", Stage: pricing.StageDelivery, Amount: d.Delivery}}}
+	r, _ := pricing.Price(in) // nothing here can fail
+	tt := r.Totals
+	t := Totals{Subtotal: tt.Subtotal, PackagingFee: tt.Packaging, DeliveryFee: tt.Delivery, ServiceCharge: tt.ServiceCharge,
+		TaxAmount: tt.Tax, TaxInclusive: tt.TaxInclusive, TaxRateBP: tt.TaxRateBP,
+		Discount: tt.GoodsDiscount + tt.DeliveryDiscount, Total: tt.Total}
 	t.MerchantDiscount = t.Discount
-	t.ServiceCharge = mulDivRound(goods, int64(cfg.ServiceChargeBP), 10000)
-	base := goods + t.PackagingFee + t.ServiceCharge
-	rate := int64(cfg.TaxRateBP)
-	if cfg.TaxInclusive {
-		t.TaxAmount = mulDivRound(base, rate, 10000+rate)
-	} else {
-		t.TaxAmount = mulDivRound(base, rate, 10000)
-	}
-	t.Total = subtotal + t.PackagingFee + t.DeliveryFee + t.ServiceCharge - t.Discount
-	if !cfg.TaxInclusive {
-		t.Total += t.TaxAmount
-	}
 	return t
 }
 
-// orderFees reads the fee settings an order was priced with: the rates are
-// kept on the order, so a later change at the store does not reach it
-// (docs/PRICING_REVIEW.md, problem 4).
-func orderFees(ctx context.Context, q Querier, orderID int64) (TaxConfig, error) {
-	var c TaxConfig
-	err := q.QueryRow(ctx, `SELECT tax_rate_bp, tax_inclusive, service_charge_bp, packaging_fee FROM orders WHERE id=$1`,
-		orderID).Scan(&c.TaxRateBP, &c.TaxInclusive, &c.ServiceChargeBP, &c.PackagingFee)
-	return c, err
-}
+// mulDivRound returns a*b/d rounded half up.
+func mulDivRound(a, b, d int64) int64 { return pricing.MulDivRound(a, b, d) }

@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/brianabc121/waimai/internal/pricing"
 )
 
 // Orders the store places for a customer who sent their order over WeChat,
@@ -467,25 +469,23 @@ func staffAdjust(ctx context.Context, q Querier, b *Branch, quote *Quote, j *Adj
 		return nil
 	}
 	t := quote.Totals
-	base := adjBase{subtotal: t.Subtotal, fee: t.DeliveryFee, cfg: b.taxConfig(), promoID: t.PromotionID,
-		promoName: t.PromotionName, promoNameEn: t.PromotionNameEn, promoAmount: t.PromotionDiscount}
-	base.cfg.PackagingFee = t.PackagingFee
-	if t.PromotionID != 0 {
-		var kind string
-		if err := q.QueryRow(ctx, `SELECT kind FROM promotions WHERE id=$1`, t.PromotionID).Scan(&kind); err != nil {
-			return err
-		}
-		if kind == "free_delivery" {
-			base.d.Delivery = t.MerchantDiscount
-		} else {
-			base.d.Goods = t.MerchantDiscount
-		}
+	cfg := b.taxConfig()
+	cfg.PackagingFee = t.PackagingFee
+	in := moneyIn{Fees: cfg, Delivery: t.DeliveryFee, StaffBP: j.PercentBP}
+	for i, l := range quote.Lines {
+		in.Lines = append(in.Lines, pricing.Line{Key: strconv.Itoa(i), Amount: l.LineTotal})
 	}
-	nt, err := base.price(*j)
+	if quote.promo != nil {
+		in.Promo, in.PromoOff = quote.promo, promoOn(quote.promo.Kind, t.PromotionDiscount)
+	}
+	if j.Mode != "" {
+		in.Round = j
+	}
+	p, err := priceMoney(in)
 	if err != nil {
 		return err
 	}
-	quote.Totals = nt
+	quote.Totals, quote.pr = p.Totals, p
 	return nil
 }
 
@@ -644,6 +644,9 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 		} else {
 			addrLine, addrUnit, addrNote = "", "", ""
 		}
+		if err := moneyEvent(ctx, tx, "placed", 0, actor); err != nil {
+			return err
+		}
 		t := cur.Totals
 		err = tx.QueryRow(ctx, `INSERT INTO orders (merchant_id, branch_id, public_no, pickup_code,
 			access_token_hash, token_nonce, channel, service_type, customer_name, customer_phone, zone_id, zone_name,
@@ -706,14 +709,21 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 			orderID).Scan(&batchID); err != nil {
 			return err
 		}
+		lineIDs := []int64{}
 		for _, l := range cur.Lines {
 			opts, _ := json.Marshal(l.Options)
-			if _, err := tx.Exec(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name,
+			var lineID int64
+			if err := tx.QueryRow(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name,
 				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer, note_tags)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,'',$13)`, orderID, b.ID, batchID, l.ItemID, l.Name,
-				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, noteTagsJSON(l.NoteTags)); err != nil {
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,'',$13) RETURNING id`, orderID, b.ID, batchID, l.ItemID, l.Name,
+				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, noteTagsJSON(l.NoteTags)).Scan(&lineID); err != nil {
 				return wrap("insert order item", err)
 			}
+			lineIDs = append(lineIDs, lineID)
+		}
+		// the amounts with the discount at checkout, the promotion's row, each line's share
+		if err := saveMoney(ctx, tx, b, orderID, quotePriced(cur, lineIDs), false); err != nil {
+			return err
 		}
 		if err := audit(ctx, tx, b.ID, orderID, actor, "order.placed_by_staff",
 			map[string]any{"total": t.Total, "service_type": cur.ServiceType, "member_no": m.No, "source": m.Source}); err != nil {

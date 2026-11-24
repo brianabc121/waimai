@@ -3143,5 +3143,18 @@
  "bl.c.refunded_sub": "Tiền trả lại theo món sau đó; chưa trừ ở trên",
  "rc.c.refunds": "Hoàn tiền theo món",
  "rc.c.net": "còn {v}",
- "rc.cash_refunded": "Hoàn tiền mặt"
+ "rc.cash_refunded": "Hoàn tiền mặt",
+ "ml.btn": "Lịch sử số tiền",
+ "ml.empty": "Chưa có thay đổi",
+ "ml.total": "Tổng {s}",
+ "ml.refunded": "Đã hoàn {s}",
+ "ml.k.placed": "Đặt món",
+ "ml.k.addon": "Gọi thêm",
+ "ml.k.void": "Hủy món",
+ "ml.k.adjust": "Giảm giá khi thanh toán",
+ "ml.k.table": "Gọi thêm tại bàn",
+ "ml.k.close": "Đóng hóa đơn",
+ "ml.k.refund": "Hoàn tiền",
+ "ml.k.opening": "Trước khi ghi",
+ "ml.k.change": "Thay đổi"
 }

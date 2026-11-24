@@ -3143,5 +3143,18 @@
  "bl.c.refunded_sub": "Rendu par plat ensuite ; non déduit ci-dessus",
  "rc.c.refunds": "Remboursements par plat",
  "rc.c.net": "net {v}",
- "rc.cash_refunded": "Remboursements en espèces"
+ "rc.cash_refunded": "Remboursements en espèces",
+ "ml.btn": "Historique des montants",
+ "ml.empty": "Aucun changement",
+ "ml.total": "Total {s}",
+ "ml.refunded": "Remboursé {s}",
+ "ml.k.placed": "Commande",
+ "ml.k.addon": "Ajout",
+ "ml.k.void": "Annulation",
+ "ml.k.adjust": "Remise à l'encaissement",
+ "ml.k.table": "Tournée à table",
+ "ml.k.close": "Addition réglée",
+ "ml.k.refund": "Remboursement",
+ "ml.k.opening": "Avant l'historique",
+ "ml.k.change": "Modification"
 }

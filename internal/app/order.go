@@ -52,6 +52,11 @@ type OrderItem struct {
 	Basket int `json:"basket"`
 	// ImageURL is the dish's current picture; only the customer's order page gets it.
 	ImageURL string `json:"image_url,omitempty"`
+	// The line's share of the order's money (docs/PRICING_REVIEW.md §5.3):
+	// store-paid discounts on it, and its part of the service charge and tax.
+	DiscountShare int64 `json:"discount_share"`
+	ServiceShare  int64 `json:"service_share"`
+	TaxShare      int64 `json:"tax_share"`
 }
 
 type DeliveryTask struct {
@@ -314,7 +319,8 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 		CASE WHEN o.service_type = 'dine_in' OR b.seq > 1 THEN COALESCE(b.decided_at, b.created_at)
 			ELSE GREATEST(o.accepted_at, o.release_at) END,
 		i.prep_started_at, COALESCE((SELECT u.display_name FROM users u WHERE u.id = i.prep_started_by), ''),
-		i.ready_at, COALESCE((SELECT u.display_name FROM users u WHERE u.id = i.ready_by), '')
+		i.ready_at, COALESCE((SELECT u.display_name FROM users u WHERE u.id = i.ready_by), ''),
+		i.discount_share, i.service_share, i.tax_share
 		FROM order_items i JOIN order_batches b ON b.id = i.batch_id JOIN orders o ON o.id = i.order_id
 		WHERE i.order_id = ANY($1) ORDER BY i.id`, ids)
 	if err != nil {
@@ -328,7 +334,8 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 			&it.LineTotal, &opts, &it.Note, &it.NeedsPrep, &it.PrepStatus, &it.StationID, &it.StationName,
 			&it.BatchSeq, &it.BatchSource, &it.ServedAt, &it.VoidReason, &it.Basket, &it.NameTr, &tags,
 			&it.BatchAt, &it.RoundTags, &it.BatchBy, &it.RushAt,
-			&it.KitchenAt, &it.PrepStartedAt, &it.StartedBy, &it.ReadyAt, &it.ReadyBy); err != nil {
+			&it.KitchenAt, &it.PrepStartedAt, &it.StartedBy, &it.ReadyAt, &it.ReadyBy,
+			&it.DiscountShare, &it.ServiceShare, &it.TaxShare); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -581,6 +588,9 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			in.CustomerName, in.AddressLine, in.AddressUnit, in.AddressNote = ad.ContactName, ad.line(), ad.Unit, ad.Note
 			destLat, destLng = ad.Lat, ad.Lng
 		}
+		if err := moneyEvent(ctx, tx, "placed", 0, Actor{Type: "customer"}); err != nil {
+			return err
+		}
 		var orderID int64
 		err = tx.QueryRow(ctx, `INSERT INTO orders (merchant_id, branch_id, public_no, pickup_code,
 			access_token_hash, token_nonce, service_type, customer_name, customer_phone, zone_id, zone_name,
@@ -621,23 +631,26 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 				return err
 			}
 		}
-		if err := claimCoupons(ctx, tx, b, orderID, phone, cur); err != nil {
-			return err
-		}
 		var batchID int64
 		if err := tx.QueryRow(ctx, `INSERT INTO order_batches (order_id, seq) VALUES ($1, 1) RETURNING id`,
 			orderID).Scan(&batchID); err != nil {
 			return err
 		}
+		lineIDs := []int64{}
 		for _, l := range cur.Lines {
 			opts, _ := json.Marshal(l.Options)
-			if _, err := tx.Exec(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name,
+			var lineID int64
+			if err := tx.QueryRow(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name,
 				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer, note_tags)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`, orderID, b.ID, batchID, l.ItemID, l.Name,
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`, orderID, b.ID, batchID, l.ItemID, l.Name,
 				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, max(1, l.Basket), l.NameTr,
-				noteTagsJSON(l.NoteTags)); err != nil {
+				noteTagsJSON(l.NoteTags)).Scan(&lineID); err != nil {
 				return wrap("insert order item", err)
 			}
+			lineIDs = append(lineIDs, lineID)
+		}
+		if err := claimCoupons(ctx, tx, b, orderID, phone, cur, lineIDs); err != nil {
+			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE quotes SET used_order_id=$2 WHERE id::text=$1`, in.QuoteID, orderID); err != nil {
 			return err
