@@ -9,6 +9,8 @@ import { get, post } from '../api'
 import { locale, setLocale, t } from '../i18n'
 import { can, currentRole, logout, reloadUser, session, setAdminView } from '../session'
 import './loginStrings'
+import '../approve'
+import ApprovePinDialog from './ApprovePinDialog.vue'
 import { pagePerms } from '../perms'
 import { useShell } from '../shell'
 import { storeChats } from '../chat'
@@ -67,6 +69,8 @@ watch(() => route.path, p => { if (p === '/merchant/messages') chatNew.value = f
 
 async function out() { await logout(); session.loaded = true; router.replace('/login') }
 const viewing = computed(() => !!session.user?.is_platform_admin)
+// Managers and owners keep their own approval code (docs/STAFF_ACCESS_DESIGN.md §7).
+const pinOpen = ref(false)
 function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' }
 </script>
 
@@ -113,6 +117,7 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
           <span class="small grow who">{{ session.user?.display_name }}</span>
           <LangButton class="lang" />
         </div>
+        <button v-if="!viewing && (role === 'owner' || role === 'manager')" class="btn link" data-testid="pin-open" @click="pinOpen = true">{{ t('ap.my') }}<span v-if="!session.user?.has_approve_pin" class="small muted"> · {{ t('ap.not_set') }}</span></button>
         <router-link v-if="!viewing" class="btn link" to="/login/pick" data-testid="switch-identity">{{ t('lg.switch') }}</router-link>
         <button class="btn link" @click="out">{{ t('sign_out') }}</button>
       </div>
@@ -127,6 +132,7 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
       <div v-else-if="blocked" class="page"><div class="banner warn" data-testid="no-perm">{{ t('rp.no_page') }}</div></div>
       <router-view v-else :key="session.branchId" />
     </main>
+    <ApprovePinDialog v-if="pinOpen" @close="pinOpen = false" />
   </div>
 </template>
 

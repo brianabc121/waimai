@@ -54,6 +54,8 @@ type User struct {
 	// Entry is where this sign-in leads: the store's back office, the staff
 	// workbench or the platform's back office (docs/STAFF_ACCESS_DESIGN.md §5).
 	Entry string `json:"entry,omitempty"`
+	// HasApprovePin tells whether the person has set a manager approval code.
+	HasApprovePin bool `json:"has_approve_pin"`
 }
 
 // Where a sign-in leads.
@@ -105,8 +107,8 @@ func (u *User) InStore(branchID int64) bool {
 
 func (a *App) loadUser(ctx context.Context, id int64) (*User, error) {
 	u := &User{Roles: []BranchRole{}}
-	err := a.DB.QueryRow(ctx, `SELECT id, username, display_name, phone, is_platform_admin FROM users
-		WHERE id=$1 AND active`, id).Scan(&u.ID, &u.Username, &u.DisplayName, &u.Phone, &u.IsPlatformAdmin)
+	err := a.DB.QueryRow(ctx, `SELECT id, username, display_name, phone, is_platform_admin, approve_pin_hash IS NOT NULL FROM users
+		WHERE id=$1 AND active`, id).Scan(&u.ID, &u.Username, &u.DisplayName, &u.Phone, &u.IsPlatformAdmin, &u.HasApprovePin)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	} else if err != nil {

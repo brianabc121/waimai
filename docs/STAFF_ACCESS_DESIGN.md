@@ -256,3 +256,12 @@ brian 的原话：商家后台还需要有员工可以登入。员工角色是�
 - 平台管理员：`POST /admin/auth/login`、`POST /admin/auth/logout`，Cookie `sid_admin`。`/api/v1/admin/...` 只认这个 Cookie。只读进入门店时页面带 `X-Session: admin`（实时推送带 `?as=admin`），商家和员工的页面带 `X-Session: staff`；图片这类带不了请求头的，浏览器里只有平台登录时也能看。
 - 页面：`/login` 两个标签（App 里只有员工工作台）、`/login/pick` 选择身份（上次用的排第一；从工作台点门店会就地要密码）、侧栏底部“切换身份”（原来的门店下拉框去掉）、`/admin/login` 深蓝色的平台登录页。
 - 浏览器测试 `e2e/entry.cjs`；其他浏览器测试里平台管理员改走 `/admin/login`，只有岗位的员工带 `?next=/work` 登录（自动选中员工工作台标签）。
+
+### 第三批（已实现）
+
+- 迁移 00055：`users` 加 `approve_pin_hash`、`approve_fails`、`approve_locked_until`；新表 `approvals`（一次性授权，5 分钟内有效）；`audit_logs` 加 `approved_by`。
+- 设授权码：商家后台侧栏底部“授权码”（店主和经理才有），输新的 6 位码和登录密码，`PUT /auth/approve-pin`。`/auth/me` 带 `has_approve_pin`。
+- 授权：`GET /merchant/branches/{bid}/approvers?perm=` 列出这家店自己有这项权限、设了授权码的店主和经理；`POST /merchant/branches/{bid}/approvals`（授权人 id + 授权码 + 权限）返回一次性令牌。输错回 `BAD_PIN`（带剩余次数），连错 5 次锁 15 分钟（`APPROVAL_LOCKED`），不能自己给自己授权。
+- 执行：带请求头 `X-Approval: 令牌` 调原来的接口。只在“角色没有这项权限”（`FORBIDDEN`）时才用授权，用过就作废（`APPROVAL_INVALID`）；工作台会话不能用授权代替后台登录。
+- 现在能授权的是“取消订单”和“售后和退款”。订单页上锁住的按钮写“请经理授权”，点了弹出授权框，授权后照常填原因执行，页面上方显示“某某已授权”；操作记录里 `approved_by` 记授权人。
+- 测试：`TestManagerApproval`，浏览器测试 `e2e/approve.cjs`。
