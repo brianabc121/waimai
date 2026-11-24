@@ -264,7 +264,7 @@ function stText(it: { prep_status: string; served_at: string | null; batch_at?: 
               <div v-if="bill.tags.length || bill.moved_from" class="dd-chiprow"><span v-for="x in bill.tags" :key="x" class="dd-tag">{{ x }}</span>
                 <span v-if="bill.moved_from" class="dd-tag dim">{{ t('dd.moved_from', { name: bill.moved_from }) }}</span></div></div>
             <div class="sb">
-              <div class="dd-stats"><div><b>{{ m(bill.order.totals.total) }}</b>{{ t('dd.ordered') }}</div><div><b>{{ Math.floor(mins(bill.opened_at)) }}</b>{{ t('dd.minutes') }}</div>
+              <div class="dd-stats"><div><b>{{ m(bill.order.totals.total) }}</b>{{ t('dd.ordered') }}</div><div><b>{{ Math.max(0, Math.floor(mins(bill.opened_at))) }}</b>{{ t('dd.minutes') }}</div>
                 <div><b :class="{ warn: selTable.session.unserved_qty }">{{ selTable.session.unserved_qty }}</b>{{ t('dd.unserved') }}</div></div>
               <div v-for="it in sideItems" :key="it.id" class="dd-mini"><b>{{ it.qty }}</b><span class="grow">{{ it.name }}<template v-if="it.options.length || it.note_tags?.length"> · {{ [...it.options.map(o => o.name), ...(it.note_tags ?? []).map(x => x.name)].join(' ') }}</template></span>
                 <span class="dd-st" :class="stText(it)[0]">{{ stText(it)[1] }}</span></div>

@@ -53,6 +53,12 @@ function restore(): Saved {
 }
 const round = reactive<Saved>(restore())
 watch(() => [round.lines, round.tags], () => { round.key = newKey() }, { deep: true })
+// A sent or dropped round starts over with a new key. The screen closes right
+// after, before the watcher below runs, so it is saved here at once.
+function reset() {
+  round.lines = []; round.tags = []; round.key = newKey()
+  try { sessionStorage.removeItem(storeKey) } catch { /* private mode */ }
+}
 watch(round, s => { try { sessionStorage.setItem(storeKey, JSON.stringify(s)) } catch { /* private mode */ } }, { deep: true })
 
 const lineKey = (l: DeskLine) => `${l.item_id}:${[...l.option_ids].sort((a, b) => a - b).join(',')}:${[...l.note_tags].sort((a, b) => a - b).join(',')}:${l.note.trim()}`
@@ -170,7 +176,8 @@ async function send(expected = total.value, key = round.key) {
       expected_total: expected, round_tags: round.tags,
     }, { 'Idempotency-Key': key })
     const no = roundNo.value
-    round.lines = []; round.tags = []; changed.value = null; cartOpen.value = false
+    reset()
+    changed.value = null; cartOpen.value = false
     emit('sent', b, no)
   } catch (e) {
     if (e instanceof ApiError && e.code === 'QUOTE_CHANGED') changed.value = Number(e.details?.total ?? 0)
@@ -181,7 +188,7 @@ async function send(expected = total.value, key = round.key) {
 function sendNew() { if (changed.value !== null) void send(changed.value, newKey()) }
 function cancel() {
   if (count.value && !confirm(t('dd.discard'))) return
-  round.lines = []; round.tags = []
+  reset()
   emit('back')
 }
 const cartOpen = ref(false)

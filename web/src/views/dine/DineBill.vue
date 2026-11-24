@@ -55,7 +55,7 @@ function again(it: OrderItem) {
 const voiding = reactive<{ item: OrderItem | null; qty: number; reason: string; writing: boolean; text: string; busy: boolean }>(
   { item: null, qty: 1, reason: '', writing: false, text: '', busy: false })
 const reasons = computed(() => presetList(props.presets, 'void_reasons'))
-function startVoid(it: OrderItem) { Object.assign(voiding, { item: it, qty: it.qty, reason: '', writing: false, text: '', busy: false }) }
+function startVoid(it: OrderItem) { Object.assign(voiding, { item: it, qty: 1, reason: '', writing: false, text: '', busy: false }) }
 async function confirmVoid() {
   const it = voiding.item!
   const reason = voiding.writing ? voiding.text.trim() : voiding.reason
