@@ -298,6 +298,23 @@ func TestTenantIsolationAndRoles(t *testing.T) {
 	cashier.want(409, "INVALID_STATE", "POST", "/merchant/orders/"+oid+"/accept", map[string]any{"expected_version": 1})
 	itemID := fmt.Sprint(int64(o["items"].([]any)[0].(map[string]any)["id"].(float64)))
 
+	// cooking progress: the desk sees it and can rush a dish; the kitchen and riders cannot open it
+	prog := cashier.want(200, "", "GET", "/merchant/branches/"+b1+"/progress", nil)
+	if po := prog["orders"].([]any)[0].(map[string]any); po["customer_phone"] != "" || prog["target_minutes"].(float64) != 15 {
+		t.Fatalf("progress: %v", prog)
+	}
+	cashier.want(200, "", "GET", "/merchant/branches/"+b1+"/progress/done", nil)
+	cashier.want(422, "VALIDATION", "GET", "/merchant/branches/"+b1+"/progress/done?date=x", nil)
+	kitchen.want(403, "FORBIDDEN", "GET", "/merchant/branches/"+b1+"/progress", nil)
+	rider.want(403, "FORBIDDEN", "GET", "/merchant/branches/"+b1+"/progress", nil)
+	owner2.want(404, "NOT_FOUND", "GET", "/merchant/branches/"+b1+"/progress", nil)
+	owner2.want(404, "NOT_FOUND", "POST", "/merchant/order-items/"+itemID+"/rush", nil)
+	kitchen.want(403, "FORBIDDEN", "POST", "/merchant/order-items/"+itemID+"/rush", nil)
+	rushed := cashier.want(200, "", "POST", "/merchant/order-items/"+itemID+"/rush", nil)
+	if rushed["items"].([]any)[0].(map[string]any)["rush_at"] == nil {
+		t.Fatalf("not rushed: %v", rushed)
+	}
+
 	// kitchen sees dishes but not the customer's phone or address
 	board := kitchen.want(200, "", "GET", "/kitchen/branches/"+b1+"/board", nil)
 	ko := board["orders"].([]any)[0].(map[string]any)

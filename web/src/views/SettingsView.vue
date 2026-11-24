@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import '../addon'
+import '../progress'
 import { onMounted, reactive, ref } from 'vue'
 import { get, patch, post, put } from '../api'
 import { both, extend, money, pick, t, toMajor, toMinor } from '../i18n'
@@ -17,7 +18,7 @@ const saved = ref(false)
 const texts = ref<InstanceType<typeof StoreTextsCard> | null>(null)
 
 const s = reactive({ name: '', name_en: '', address: '', phone: '', tax: 12, tax_inclusive: true, service: 0, packaging: 0,
-  min_order: 0, accept_timeout_minutes: 10, addon_confirm_minutes: 5, delivery_enabled: true, pickup_enabled: true, paused: false, open_time: '00:00', close_time: '00:00', notify_sms: true, scheduling_enabled: false, prep_minutes: 30,
+  min_order: 0, accept_timeout_minutes: 10, addon_confirm_minutes: 5, cook_target_minutes: 15, delivery_enabled: true, pickup_enabled: true, paused: false, open_time: '00:00', close_time: '00:00', notify_sms: true, scheduling_enabled: false, prep_minutes: 30,
   kitchen_slow_minutes: 15, detour_percent: 30, detour_km: 1, notice: '', intro: '', baskets_enabled: true, contact_fields: [] as string[] })
 const st = reactive({ id: 0, name: '', name_en: '', active: true })
 
@@ -55,7 +56,7 @@ async function load() {
   branch.value = b; zones.value = m.zones; stations.value = m.stations
   Object.assign(s, { name: b.name, name_en: b.name_en, address: b.address, phone: b.phone, tax: b.tax_rate_bp / 100,
     tax_inclusive: b.tax_inclusive, service: b.service_charge_bp / 100, packaging: toMajor(b.packaging_fee), min_order: toMajor(b.min_order_amount),
-    accept_timeout_minutes: b.accept_timeout_minutes, addon_confirm_minutes: b.addon_confirm_minutes ?? 5, delivery_enabled: b.delivery_enabled, pickup_enabled: b.pickup_enabled,
+    accept_timeout_minutes: b.accept_timeout_minutes, addon_confirm_minutes: b.addon_confirm_minutes ?? 5, cook_target_minutes: b.cook_target_minutes ?? 15, delivery_enabled: b.delivery_enabled, pickup_enabled: b.pickup_enabled,
     paused: b.paused, open_time: b.open_time, close_time: b.close_time, notify_sms: b.notify_sms,
     scheduling_enabled: b.scheduling_enabled, prep_minutes: b.prep_minutes,
     kitchen_slow_minutes: b.kitchen_slow_minutes, detour_percent: b.detour_percent, detour_km: b.detour_meters / 1000,
@@ -71,7 +72,7 @@ async function run(fn: () => Promise<unknown>) {
 const saveSettings = () => run(() => put(`/merchant/branches/${bid}/settings`, {
   name: s.name, name_en: s.name_en, address: s.address, phone: s.phone, tax_rate_bp: Math.round(s.tax * 100), tax_inclusive: s.tax_inclusive,
   service_charge_bp: Math.round(s.service * 100), packaging_fee: toMinor(s.packaging), min_order_amount: toMinor(s.min_order),
-  accept_timeout_minutes: s.accept_timeout_minutes, addon_confirm_minutes: s.addon_confirm_minutes, delivery_enabled: s.delivery_enabled, pickup_enabled: s.pickup_enabled,
+  accept_timeout_minutes: s.accept_timeout_minutes, addon_confirm_minutes: s.addon_confirm_minutes, cook_target_minutes: s.cook_target_minutes, delivery_enabled: s.delivery_enabled, pickup_enabled: s.pickup_enabled,
   paused: s.paused, open_time: s.open_time, close_time: s.close_time, notify_sms: s.notify_sms,
   scheduling_enabled: s.scheduling_enabled, prep_minutes: s.prep_minutes,
   kitchen_slow_minutes: s.kitchen_slow_minutes, detour_percent: s.detour_percent, detour_meters: Math.round(s.detour_km * 1000),
@@ -118,6 +119,7 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
         <label class="field"><span>{{ t('accept_timeout') }}</span><input type="number" min="1" max="120" v-model.number="s.accept_timeout_minutes" /></label>
         <label class="field"><span>{{ t('ao.set.minutes') }}</span><input type="number" min="1" max="60" data-testid="addon-minutes" v-model.number="s.addon_confirm_minutes" :title="t('ao.set.minutes_hint')" /></label>
         <label class="field"><span>{{ t('prep_minutes') }}</span><input type="number" min="5" max="240" v-model.number="s.prep_minutes" /></label>
+        <label class="field"><span>{{ t('kp.set.target') }}</span><input type="number" min="5" max="90" name="cook_target_minutes" data-testid="cook-target" v-model.number="s.cook_target_minutes" :title="t('kp.set.target_hint')" /></label>
         <label class="field"><span>{{ t('set.slow_minutes') }}</span><input type="number" min="1" max="120" name="kitchen_slow_minutes" v-model.number="s.kitchen_slow_minutes" /></label>
         <label class="field"><span>{{ t('set.detour_percent') }}</span><input type="number" min="5" max="300" name="detour_percent" v-model.number="s.detour_percent" /></label>
         <label class="field"><span>{{ t('set.detour_km') }}</span><input type="number" min="0.1" max="20" step="0.1" name="detour_km" v-model.number="s.detour_km" /></label>

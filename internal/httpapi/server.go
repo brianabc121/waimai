@@ -131,6 +131,7 @@ func need(perms ...string) []string { return perms }
 var (
 	pAny          = need(needAny)
 	pOrderView    = need(app.PermOrderView)
+	pProgress     = need(app.PermOrderProgress)
 	pHandle       = need(app.PermOrderHandle)
 	pCancel       = need(app.PermOrderCancel)
 	pAftersale    = need(app.PermOrderAftersale)
@@ -525,6 +526,9 @@ func (s *Server) Router() *gin.Engine {
 
 	// kitchen and packing
 	auth.GET("/kitchen/branches/:bid/board", s.kitchenBoard)
+	auth.GET("/merchant/branches/:bid/progress", s.progress)
+	auth.GET("/merchant/branches/:bid/progress/done", s.progressDone)
+	auth.POST("/merchant/order-items/:id/rush", s.rushDish)
 	auth.POST("/kitchen/items/:id/:action", s.itemAction)
 	auth.POST("/kitchen/orders/:id/pack", s.packOrder)
 

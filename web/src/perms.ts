@@ -6,6 +6,7 @@ import { extend } from './i18n'
 // "kitchen" is anyone who works a station or the packing counter.
 const pages: [string, string[]][] = [
   ['/merchant/orders/new', ['order.manual', 'table.use']],
+  ['/merchant/progress', ['order.progress']],
   ['/merchant/orders', ['order.view']],
   ['/merchant/members', ['member.view']],
   ['/merchant/addresses', ['member.view']],
@@ -81,6 +82,8 @@ extend({
 
   'rp.p.order.view': ['看订单', 'See orders'],
   'rp.d.order.view': ['订单列表、订单详情、新单提醒', 'Order list, order details, new-order alerts'],
+  'rp.p.order.progress': ['看烹饪进度', 'See cooking progress'],
+  'rp.d.order.progress': ['哪些菜在做、做好了；催菜要再有“处理订单”', 'Which dishes are cooking or ready; rushing also needs Handle orders'],
   'rp.p.order.handle': ['处理订单', 'Handle orders'],
   'rp.d.order.handle': ['接单、拒单、交给骑手、指派和改派骑手、重新配送', 'Accept, reject, hand over, assign riders, redeliver'],
   'rp.p.order.manual': ['代客下单', 'Order for customers'],

@@ -9,7 +9,7 @@ export interface Branch {
   menu_lang?: string; menu_langs_off?: string[]
   // the name, notice and introduction in the customer's language (customer pages)
   name_tr?: string; notice_tr?: string; intro_tr?: string
-  kitchen_slow_minutes: number; detour_percent: number; detour_meters: number
+  kitchen_slow_minutes: number; cook_target_minutes?: number; detour_percent: number; detour_meters: number
   lat: number | null; lng: number | null; zone_mode: 'list' | 'map'; zone_tolerance_m: number
   notice: string; intro: string; baskets_enabled: boolean
   // which of wechat, telegram, line, whatsapp the address form asks customers for
@@ -85,6 +85,8 @@ export interface OrderItem {
   batch_seq: number; batch_source: string; served_at: string | null; void_reason?: string
   // dine-in: when the round was sent, its notes, who sent it, and when the kitchen was asked to hurry
   batch_at?: string; round_tags?: string[]; batch_by?: string; rush_at?: string | null
+  // cooking progress: when it reached the kitchen, who started it and who made it
+  kitchen_at?: string | null; prep_started_at?: string | null; started_by?: string; ready_at?: string | null; ready_by?: string
   basket: number
   // the dish's picture; only on the customer's order page
   image_url?: string
@@ -119,7 +121,7 @@ export interface Order {
   accept_deadline: string; scheduled_for: string | null; release_at: string | null; timezone: string; created_at: string; items: OrderItem[]; delivery: DeliveryTask | null; cash: Cash | null
   session_id: number | null; table_name: string; amount_received: number | null; payment_note: string
   pay_method?: string; table_tags?: string[]
-  aftersale: Aftersale | null; store?: OrderStore; completed_at?: string | null
+  aftersale: Aftersale | null; store?: OrderStore; completed_at?: string | null; accepted_at?: string | null; closed_at?: string | null
   // the promotion and each coupon taken off; the coupon this order earned (customer page only)
   discounts?: OrderDiscount[]; gift?: CustomerCoupon | null
   // orders placed by staff for a customer: the store member, where the customer asked, who placed it, a note for staff

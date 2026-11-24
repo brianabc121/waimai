@@ -15,6 +15,8 @@ import ApproveDialog from './ApproveDialog.vue'
 import '../approve'
 import { chatEnabled } from '../chat'
 import './manualStrings'
+import { readyTag } from '../progress'
+import { useRoute } from 'vue-router'
 import { addons, batchSource, batchTitle, itemsByBatch, pendingAddon, addonErr, presetSplit } from '../addon'
 
 const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
@@ -32,7 +34,8 @@ const bid = session.branchId!
 const scope = ref<'active' | 'history'>('active')
 const orders = ref<Order[]>([])
 const riders = ref<RiderInfo[]>([])
-const selectedId = ref<number | null>(null)
+// ?order=ID opens that order (from the cooking progress page)
+const selectedId = ref<number | null>(Number(useRoute().query.order) || null)
 const error = ref('')
 const sound = ref(localStorage.getItem('order-sound') !== 'off')
 const now = ref(Date.now())
@@ -200,6 +203,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
             <span class="tag" :class="accTag(o.acceptance_status)">{{ t('a.' + o.acceptance_status) }}</span>
             <span v-if="unread(o)" class="tag bad" :data-unread="o.public_no">{{ t('rd.unread') }}</span>
             <span class="tag" v-if="o.acceptance_status === 'accepted'">{{ t('p.' + o.packing_status) }}</span>
+            <span v-if="scope === 'active' && readyTag(o)" class="tag" :class="{ ok: readyTag(o)!.ready === readyTag(o)!.total }" data-testid="cp-order-tag">{{ t('kp.order_tag', { a: readyTag(o)!.ready, b: readyTag(o)!.total }) }}</span>
             <span class="tag" v-if="o.acceptance_status === 'accepted'">{{ t('f.' + o.fulfillment_status) }}</span>
             <span class="tag" :class="o.payment_status === 'paid' ? 'ok' : ''">{{ t(o.payment_status) }}</span>
             <span v-if="o.aftersale" class="tag" :class="o.aftersale.status === 'open' ? 'bad' : ''" data-testid="aftersale-tag">{{ t('as.d.' + o.aftersale.status) }}</span>
@@ -222,6 +226,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
             <span class="tag">{{ t('p.' + selected.packing_status) }}</span>
             <span class="tag">{{ t('f.' + selected.fulfillment_status) }}</span>
             <span class="tag" :class="selected.payment_status === 'paid' ? 'ok' : 'warn'">{{ t(selected.payment_method) }} · {{ t(selected.payment_status) }}</span>
+            <router-link v-if="readyTag(selected) && can('order.progress') && scope === 'active'" class="tag cp-tag" :class="{ ok: readyTag(selected)!.ready === readyTag(selected)!.total }" :to="`/merchant/progress?order=${selected.id}`" data-testid="cp-order-link">{{ t('kp.order_tag', { a: readyTag(selected)!.ready, b: readyTag(selected)!.total }) }} ›</router-link>
           </div>
           <div v-if="selected.close_reason" class="banner bad">{{ t('reason') }}: {{ reasonText(selected.close_reason) }}</div>
           <div v-if="selected.aftersale" class="banner stack" :class="selected.aftersale.status === 'open' ? 'warn' : 'info'" data-testid="aftersale-box">
@@ -361,6 +366,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
 </template>
 
 <style scoped>
+.cp-tag { cursor: pointer; border: 1px solid currentColor; }
 .desk { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 14px; align-items: start; }
 .list { display: flex; flex-direction: column; gap: 10px; }
 .ord { text-align: start; cursor: pointer; width: 100%; }
