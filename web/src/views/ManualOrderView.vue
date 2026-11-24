@@ -7,7 +7,7 @@
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError, get, newKey, post, put } from '../api'
-import { both, has, money, promoLabel, t, whenText } from '../i18n'
+import { has, mn, money, pick, promoLabel, t, whenText } from '../i18n'
 import { currentRole, session } from '../session'
 import { dialOf, e164, localDigits, splitPhone } from '../dial'
 import type { AddressHint, Item, OptionGroup, Order, Quote, Storefront, StoreMember } from '../types'
@@ -43,7 +43,7 @@ const lines = ref<Line[]>([])
 const selKey = ref(0)
 const isSpec = (g: OptionGroup) => g.max_select === 1
 const optionsOf = (l: Line) => l.item.groups.flatMap(g => g.options.map(o => ({ g, o, n: l.picks[o.id] ?? 0 })))
-const specText = (l: Line) => optionsOf(l).filter(x => x.n && isSpec(x.g)).map(x => both(x.o.name, x.o.name_en)).join('、')
+const specText = (l: Line) => optionsOf(l).filter(x => x.n && isSpec(x.g)).map(x => mn(x.o)).join('、')
 const addonsOf = (l: Line) => optionsOf(l).filter(x => x.n && !isSpec(x.g))
 const hasAddons = (l: Line) => l.item.groups.some(g => !isSpec(g))
 const unit = (l: Line) => l.item.price + optionsOf(l).reduce((s, x) => s + x.o.price_delta * x.n, 0)
@@ -371,7 +371,7 @@ const total = computed(() => totals.value?.total ?? (lines.value.length ? subtot
 const promo = computed(() => {
   // the offer this order gets, else the one it could get
   const tt = totals.value
-  if (tt?.promotion_id) return both(tt.promotion_name, tt.promotion_name_en)
+  if (tt?.promotion_id) return pick(tt.promotion_name, tt.promotion_name_en)
   const p = store.value?.promotions?.find(p => p.live_now && (service.value === 'delivery' ? p.applies_delivery : p.applies_pickup))
   return p ? promoLabel(p, cur.value) : ''
 })
@@ -401,7 +401,7 @@ function flash(s: string) { toast.value = s; setTimeout(() => { if (toast.value 
 
 // The message for the customer. Before ordering it lists what was put in; after, it is the order itself.
 function message(o?: Order, token?: string): string {
-  const name = store.value ? both(store.value.branch.name, '') : ''
+  const name = store.value ? store.value.branch.name : ''
   const out: string[] = []
   if (o) out.push(t('vo.msg.head', { store: name, no: o.public_no }))
   const rows = o ? o.items.map(i => ({ code: items.value.find(x => x.id === i.item_id)?.code ?? '', name: i.name, qty: i.qty, sum: i.line_total,
@@ -495,7 +495,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
           <template v-for="(l, i) in lines" :key="l.key">
             <div class="tr" :class="{ sel: l.key === selKey }" data-testid="mo-line" @click="selKey = l.key">
               <span class="no">{{ i + 1 }}</span>
-              <span class="name"><span v-if="l.item.code" class="code">{{ l.item.code }}</span><b>{{ both(l.item.name, l.item.name_en) }}</b>
+              <span class="name"><span v-if="l.item.code" class="code">{{ l.item.code }}</span><b>{{ mn(l.item) }}</b>
                 <span v-if="specText(l)" class="spec">{{ specText(l) }}</span></span>
               <span class="c"><span class="qty"><button :aria-label="'−'" @click.stop="setQty(l, -1)">−</button><b data-testid="mo-qty">{{ l.qty }}</b><button class="f" data-testid="mo-plus" @click.stop="setQty(l, 1)">+</button></span></span>
               <span class="r">{{ m(unit(l)) }}</span><span class="r b">{{ m(unit(l) * l.qty) }}</span>
@@ -506,7 +506,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
               <span></span>
               <div class="addons">
                 <div v-for="a in addonsOf(l)" :key="a.o.id" class="addon" data-testid="mo-addon">
-                  <span>+ {{ both(a.o.name, a.o.name_en) }}</span>
+                  <span>+ {{ mn(a.o) }}</span>
                   <span class="qty sm"><button @click="setAddon(l, a.g, a.o.id, -1)">−</button>{{ a.n }}<button class="f" @click="setAddon(l, a.g, a.o.id, 1)">+</button></span>
                   <span class="r">{{ m(a.o.price_delta * a.n) }}</span>
                 </div>
@@ -514,7 +514,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
                   <input v-model="addonQ" :placeholder="'＋ ' + t('vo.addon_ph')" data-testid="mo-addon-q" @keydown.enter.prevent="addAddon(l)" />
                   <span class="addon-hits">
                     <button v-for="x in (addonQ ? addonHits : optionsOf(l).filter(x => !isSpec(x.g) && !x.o.sold_out).slice(0, 8))" :key="x.o.id" class="chip"
-                      @click="setAddon(l, x.g, x.o.id, 1); addonQ = ''">{{ both(x.o.name, x.o.name_en) }} {{ x.o.price_delta ? '+' + m(x.o.price_delta) : '' }}</button>
+                      @click="setAddon(l, x.g, x.o.id, 1); addonQ = ''">{{ mn(x.o) }} {{ x.o.price_delta ? '+' + m(x.o.price_delta) : '' }}</button>
                   </span>
                 </div>
               </div>
@@ -614,7 +614,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
                 {{ t('vo.zone') }}
                 <select v-if="listMode" v-model="zoneId" class="zsel" data-testid="mo-zone">
                   <option :value="null">{{ t('vo.unknown') }}</option>
-                  <option v-for="z in store?.zones ?? []" :key="z.id" :value="z.id">{{ both(z.name, z.name_en) }} · {{ m(z.fee) }}</option>
+                  <option v-for="z in store?.zones ?? []" :key="z.id" :value="z.id">{{ mn(z) }} · {{ m(z.fee) }}</option>
                 </select>
                 <span v-else class="tag" :class="{ bad: quote?.zone_name }">{{ quote?.zone_name || t('vo.unknown') }}</span>
                 {{ t('vo.delivery_fee') }} <span class="tag">{{ feeText }}<template v-if="feeOverride != null"> · {{ t('vo.fee_set') }}</template></span>
@@ -667,7 +667,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
             <input ref="pickInput" v-model="pickQ" class="inp" data-testid="mo-pick" autocomplete="off" @keydown="pickKey" @focus="pickFocus" @blur="later(() => (pickOpen = false))" />
             <div v-if="pickOpen && pickQ.trim()" class="drop" style="left:80px;right:0;top:44px" data-testid="mo-pick-drop">
               <div v-for="(it, i) in hits" :key="it.id" class="it" :class="{ on: i === pickAt, off: it.sold_out }" @mousedown.prevent="choose(it)">
-                <em>{{ it.code }}</em> {{ both(it.name, it.name_en) }}<span class="grow"></span>
+                <em>{{ it.code }}</em> {{ mn(it) }}<span class="grow"></span>
                 <span v-if="it.sold_out" class="tag">{{ t('vo.sold_out') }}</span>{{ m(it.price) }}
               </div>
               <div v-if="!hits.length" class="it muted">{{ t('vo.no_match') }}</div>
@@ -700,14 +700,14 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
     <!-- options of a dish -->
     <div v-if="spec" class="sheet-mask" @click.self="spec = null">
       <div class="sheet" data-testid="mo-spec">
-        <div class="sheet-head"><b>{{ t('vo.spec_title') }} · {{ both(spec.item.name, spec.item.name_en) }}</b><button class="btn small" @click="spec = null">✕</button></div>
+        <div class="sheet-head"><b>{{ t('vo.spec_title') }} · {{ mn(spec.item) }}</b><button class="btn small" @click="spec = null">✕</button></div>
         <div class="sheet-body">
           <div v-for="g in spec.item.groups" :key="g.id" class="sgroup">
-            <div class="row between"><b>{{ both(g.name, g.name_en) }}</b>
+            <div class="row between"><b>{{ mn(g) }}</b>
               <span class="muted small">{{ g.min_select ? t('vo.spec_need', { n: g.min_select }) : t('vo.spec_upto', { n: g.max_select }) }}</span></div>
             <div class="row wrap">
               <button v-for="o in g.options" :key="o.id" class="chip" :class="{ on: spec.picks[o.id] }" :disabled="o.sold_out" @click="specToggle(g, o.id)">
-                {{ both(o.name, o.name_en) }}<template v-if="o.price_delta"> +{{ m(o.price_delta) }}</template><template v-if="o.sold_out"> · {{ t('vo.sold_out') }}</template></button>
+                {{ mn(o) }}<template v-if="o.price_delta"> +{{ m(o.price_delta) }}</template><template v-if="o.sold_out"> · {{ t('vo.sold_out') }}</template></button>
             </div>
           </div>
         </div>
