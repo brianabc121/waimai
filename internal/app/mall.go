@@ -512,7 +512,7 @@ func (a *App) mallPromos(ctx context.Context, list []*MallStore) error {
 		byID[s.id] = s
 	}
 	rows, err := a.DB.Query(ctx, `SELECT p.branch_id, `+promoCols+`, 0 FROM promotions p
-		WHERE p.branch_id = ANY($1) AND p.status = 'active' ORDER BY p.branch_id, p.id`, storeIDs(list))
+		WHERE p.branch_id = ANY($1) AND p.status = 'active' AND p.scope = 'delivery' ORDER BY p.branch_id, p.id`, storeIDs(list))
 	if err != nil {
 		return err
 	}
@@ -523,7 +523,7 @@ func (a *App) mallPromos(ctx context.Context, list []*MallStore) error {
 		var p Promotion
 		if err := rows.Scan(&bid, &p.ID, &p.Name, &p.NameEn, &p.Kind, &p.Threshold, &p.Value, &p.MaxDiscount,
 			&p.AppliesDelivery, &p.AppliesPickup, &p.StartsAt, &p.EndsAt, &p.DailyStart, &p.DailyEnd,
-			&p.TotalQuota, &p.PerPhoneLimit, &p.UsedCount, &p.Status, &p.phoneUsed); err != nil {
+			&p.TotalQuota, &p.PerPhoneLimit, &p.UsedCount, &p.Status, &p.Scope, &p.phoneUsed); err != nil {
 			return err
 		}
 		s := byID[bid]

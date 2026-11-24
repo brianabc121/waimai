@@ -30,6 +30,9 @@ type Promotion struct {
 	PerPhoneLimit   *int       `json:"per_phone_limit"`
 	UsedCount       int        `json:"used_count"`
 	Status          string     `json:"status"`
+	// Scope is delivery (delivery and pickup orders) or dine_in (table
+	// bills). The two sets never mix.
+	Scope string `json:"scope"`
 	// LiveNow says whether the promotion would apply to an order placed now
 	// (active, inside its dates and daily window, quota left).
 	LiveNow bool `json:"live_now"`
@@ -71,6 +74,8 @@ func (p *Promotion) why(now time.Time, loc *time.Location, service string, subto
 		return "not_active"
 	case !p.inWindow(now, loc):
 		return "outside_time"
+	case (service == "dine_in") != (p.Scope == "dine_in"):
+		return "service_type"
 	case service == "delivery" && !p.AppliesDelivery, service == "pickup" && !p.AppliesPickup:
 		return "service_type"
 	case p.Kind == "free_delivery" && service != "delivery":
@@ -122,7 +127,7 @@ func bestPromotion(ps []Promotion, now time.Time, loc *time.Location, service st
 
 const promoCols = `p.id, p.name, p.name_en, p.kind, p.threshold, p.value, p.max_discount, p.applies_delivery,
 	p.applies_pickup, p.starts_at, p.ends_at, p.daily_start, p.daily_end, p.total_quota, p.per_phone_limit,
-	p.used_count, p.status`
+	p.used_count, p.status, p.scope`
 
 // loadPromotions returns a branch's promotions, oldest first. With a phone,
 // each one also carries how often that customer has used it.
@@ -140,7 +145,7 @@ func loadPromotions(ctx context.Context, q Querier, branchID int64, where, phone
 		var p Promotion
 		if err := rows.Scan(&p.ID, &p.Name, &p.NameEn, &p.Kind, &p.Threshold, &p.Value, &p.MaxDiscount,
 			&p.AppliesDelivery, &p.AppliesPickup, &p.StartsAt, &p.EndsAt, &p.DailyStart, &p.DailyEnd,
-			&p.TotalQuota, &p.PerPhoneLimit, &p.UsedCount, &p.Status, &p.phoneUsed); err != nil {
+			&p.TotalQuota, &p.PerPhoneLimit, &p.UsedCount, &p.Status, &p.Scope, &p.phoneUsed); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -168,9 +173,10 @@ func (a *App) ListPromotions(ctx context.Context, branchID int64) ([]Promotion, 
 	return ps, nil
 }
 
-// livePromotions is what the storefront advertises: promotions that apply right now.
-func livePromotions(ctx context.Context, q Querier, b *Branch) ([]Promotion, error) {
-	ps, err := loadPromotions(ctx, q, b.ID, "p.status='active'", "")
+// livePromotions is what the storefront advertises: promotions of one scope
+// (delivery or dine_in) that apply right now.
+func livePromotions(ctx context.Context, q Querier, b *Branch, scope string) ([]Promotion, error) {
+	ps, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope="+scopeSQL(scope), "")
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +191,17 @@ func livePromotions(ctx context.Context, q Querier, b *Branch) ([]Promotion, err
 	return out, nil
 }
 
+// scopeSQL is a promotion scope as an SQL literal; anything unknown is delivery.
+func scopeSQL(scope string) string {
+	if scope == "dine_in" {
+		return "'dine_in'"
+	}
+	return "'delivery'"
+}
+
 type PromotionInput struct {
+	// Scope is set when the promotion is created and never changes.
+	Scope string `json:"scope"`
 	Name            string     `json:"name"`
 	NameEn          string     `json:"name_en"`
 	Kind            string     `json:"kind"`
@@ -213,12 +229,24 @@ func (in *PromotionInput) validate() error {
 	if in.DailyEnd == "" {
 		in.DailyEnd = "00:00"
 	}
+	switch in.Scope {
+	case "", "delivery":
+		in.Scope = "delivery"
+	case "dine_in":
+		// Dine-in bills have no delivery fee, and guests rarely leave a phone.
+		if in.Kind == "free_delivery" {
+			return ErrValidation("dine-in promotions cannot be free delivery")
+		}
+		in.AppliesDelivery, in.AppliesPickup, in.PerPhoneLimit = false, false, nil
+	default:
+		return ErrValidation("scope must be delivery or dine_in")
+	}
 	switch {
 	case in.Name == "" || len(in.Name) > 80 || len(in.NameEn) > 80:
 		return ErrValidation("name is required")
 	case in.Threshold < 0:
 		return ErrValidation("threshold cannot be negative")
-	case !in.AppliesDelivery && !in.AppliesPickup:
+	case in.Scope == "delivery" && !in.AppliesDelivery && !in.AppliesPickup:
 		return ErrValidation("choose at least one service type")
 	case !hhmm.MatchString(in.DailyStart) || !hhmm.MatchString(in.DailyEnd):
 		return ErrValidation("daily times must be HH:MM")
@@ -265,21 +293,24 @@ func (a *App) SavePromotion(ctx context.Context, branchID, id int64, in Promotio
 		if id == 0 {
 			if err := tx.QueryRow(ctx, `INSERT INTO promotions (branch_id, name, name_en, kind, threshold, value,
 				max_discount, applies_delivery, applies_pickup, starts_at, ends_at, daily_start, daily_end,
-				total_quota, per_phone_limit) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
+				total_quota, per_phone_limit, scope) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
 				branchID, in.Name, in.NameEn, in.Kind, in.Threshold, in.Value, in.MaxDiscount, in.AppliesDelivery,
 				in.AppliesPickup, in.StartsAt, in.EndsAt, in.DailyStart, in.DailyEnd, in.TotalQuota,
-				in.PerPhoneLimit).Scan(&id); err != nil {
+				in.PerPhoneLimit, in.Scope).Scan(&id); err != nil {
 				return err
 			}
 		} else {
-			var status string
+			var status, scope string
 			var used int
-			err := tx.QueryRow(ctx, `SELECT status, used_count FROM promotions WHERE id=$1 AND branch_id=$2 FOR UPDATE`,
-				id, branchID).Scan(&status, &used)
+			err := tx.QueryRow(ctx, `SELECT status, used_count, scope FROM promotions WHERE id=$1 AND branch_id=$2 FOR UPDATE`,
+				id, branchID).Scan(&status, &used, &scope)
 			if isNoRows(err) {
 				return ErrNotFound
 			} else if err != nil {
 				return err
+			}
+			if scope != in.Scope {
+				return ErrValidation("a promotion cannot move between delivery and dine-in; create a new one")
 			}
 			if status == "ended" {
 				return ErrInvalidState("an ended promotion cannot be edited")
@@ -368,20 +399,24 @@ type TrialResult struct {
 // Drafts and paused promotions are evaluated as if they were active, so an
 // offer can be checked before it is published; ended ones are left out.
 func (a *App) TrialPromotions(ctx context.Context, branchID int64, in TrialInput) (*TrialResult, error) {
-	if in.ServiceType != "delivery" && in.ServiceType != "pickup" {
-		return nil, ErrValidation("service_type must be delivery or pickup")
+	if in.ServiceType != "delivery" && in.ServiceType != "pickup" && in.ServiceType != "dine_in" {
+		return nil, ErrValidation("service_type must be delivery, pickup or dine_in")
 	}
 	if in.Subtotal < 0 || in.DeliveryFee < 0 {
 		return nil, ErrValidation("amounts cannot be negative")
 	}
-	if in.ServiceType == "pickup" {
+	if in.ServiceType != "delivery" {
 		in.DeliveryFee = 0
+	}
+	scope := "delivery"
+	if in.ServiceType == "dine_in" {
+		scope = "dine_in"
 	}
 	b, err := a.BranchByID(ctx, branchID)
 	if err != nil {
 		return nil, err
 	}
-	ps, err := loadPromotions(ctx, a.DB, branchID, "p.status <> 'ended'", "")
+	ps, err := loadPromotions(ctx, a.DB, branchID, "p.status <> 'ended' AND p.scope="+scopeSQL(scope), "")
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +441,11 @@ func (a *App) TrialPromotions(ctx context.Context, branchID int64, in TrialInput
 		row.Wins = best != nil && best.ID == p.ID
 		res.Rows = append(res.Rows, row)
 	}
-	res.Totals = ComputeTotals(in.Subtotal, in.DeliveryFee, b.taxConfig(), d)
+	cfg := b.taxConfig()
+	if scope == "dine_in" {
+		cfg = b.dineInTax()
+	}
+	res.Totals = ComputeTotals(in.Subtotal, in.DeliveryFee, cfg, d)
 	return res, nil
 }
 

@@ -4,7 +4,8 @@
 import LangButton from './LangButton.vue'
 import { computed, ref, watch } from 'vue'
 import { ApiError, get, post } from '../api'
-import { locale, setLocale, t } from '../i18n'
+import { locale, promoLabel, setLocale, t } from '../i18n'
+import '../checkout'
 import { useLive } from '../live'
 import { defaultTemplate, themeVars } from '../theme'
 import type { BatchLine, Bill, Storefront, TableAccess } from '../types'
@@ -146,6 +147,8 @@ const liveCount = computed(() => bill.value?.order.items.filter(i => i.prep_stat
       <div v-show="tab === 'menu'">
         <img v-if="tpl.cover_url" :src="tpl.cover_url" alt="" class="cover" />
         <div class="section" v-if="store.branch.paused" style="padding-bottom:0"><div class="banner warn">{{ t('paused') }}</div></div>
+        <div class="section" v-if="store.dine_promotions?.length" style="padding-bottom:0" data-test="dine-promos">
+          <div class="banner warn"><b>{{ t('ck.dine_offers') }}</b> · {{ store.dine_promotions.map(p => promoLabel(p, cur)).join(' · ') }}</div></div>
         <DineMenu ref="menu" :categories="store.categories" :currency="cur" :busy="busy" :layout="tpl.layout"
           :storage-key="`table-cart:${ipad ? 'ipad' : code}:${bill.session_id}`" @submit="submit">
           <template #notice><div v-if="error" class="banner bad">{{ error }}</div></template>

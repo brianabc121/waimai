@@ -2892,5 +2892,13 @@
  "kp.done.waiting": "Aún en el local",
  "kp.order_tag": "{a}/{b} listos",
  "kp.set.target": "Meta de cocina (minutos)",
- "kp.set.target_hint": "Los temporizadores del avance y de la pantalla de cocina se ponen amarillos a dos tercios y rojos al pasarla"
+ "kp.set.target_hint": "Los temporizadores del avance y de la pantalla de cocina se ponen amarillos a dos tercios y rojos al pasarla",
+ "ck.tab_delivery": "Ofertas a domicilio",
+ "ck.tab_dine": "Ofertas en el local",
+ "ck.tab_coupons": "Cupones (a domicilio)",
+ "ck.new_dine": "Nueva oferta en el local",
+ "ck.delivery_hint": "Las ofertas a domicilio solo valen para pedidos a domicilio y para recoger, nunca para cuentas de mesa.",
+ "ck.dine_hint": "Las ofertas en el local solo rebajan cuentas de mesa (abiertas por el personal o pedidas por código QR) y no aparecen en la tienda a domicilio; las ofertas a domicilio nunca rebajan una cuenta de mesa. Una oferta por cuenta, la que más ahorra; su cupo se usa al pagar.",
+ "ck.dine_time_hint": "El horario diario cuenta desde que se abrió la mesa: una mesa abierta dentro del horario mantiene la oferta aunque pague más tarde.",
+ "ck.dine_offers": "Ofertas en el local"
 }
