@@ -716,7 +716,9 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 		}
 		// The dine-in promotion takes its quota only now: an open table holds none.
 		var promoID, discount int64
-		if err := tx.QueryRow(ctx, `SELECT COALESCE(promotion_id, 0), discount FROM orders WHERE id=$1`, o.ID).
+		if err := tx.QueryRow(ctx, `SELECT COALESCE(promotion_id, 0),
+			COALESCE((SELECT sum(d.amount) FROM order_discounts d WHERE d.order_id = o.id AND d.kind = 'promotion'), o.discount)
+			FROM orders o WHERE o.id=$1`, o.ID).
 			Scan(&promoID, &discount); err != nil {
 			return err
 		}

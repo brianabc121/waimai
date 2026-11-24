@@ -103,8 +103,8 @@ func addonPolicy(now time.Time, pick bool) promoPolicy {
 	return promoPolicy{at: now, current: true, floor: true, pick: pick}
 }
 
-// priceWithAddon is the order's amounts with extra more dish money.
-func priceWithAddon(ctx context.Context, q Querier, b *Branch, m *orderMoney, extra int64, now time.Time) (*addonPrice, error) {
+// priceWithAddon is the order's amounts with the add-on's lines extra.
+func priceWithAddon(ctx context.Context, q Querier, b *Branch, m *orderMoney, extra []QuoteLine, now time.Time) (*addonPrice, error) {
 	p, switched, err := m.reprice(ctx, q, b, m.withExtra(extra), addonPolicy(now, true))
 	if err != nil {
 		return nil, err
@@ -186,13 +186,13 @@ func quoteAddon(ctx context.Context, q Querier, b *Branch, o *lockedOrder, in Ad
 	if err != nil {
 		return nil, err
 	}
-	before, err := priceWithAddon(ctx, q, b, m, 0, time.Now())
+	before, err := priceWithAddon(ctx, q, b, m, nil, time.Now())
 	if err != nil {
 		return nil, err
 	}
 	// "Before" is what the order says now, not a fresh pricing of it.
 	before.Totals.Total = m.Total
-	after, err := priceWithAddon(ctx, q, b, m, sub, time.Now())
+	after, err := priceWithAddon(ctx, q, b, m, lines, time.Now())
 	if err != nil {
 		return nil, err
 	}

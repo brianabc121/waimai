@@ -33,6 +33,7 @@ type BillOrder struct {
 	Food           int64          `json:"food"` // the dishes at full price
 	DeliveryFee    int64          `json:"delivery_fee"`
 	Promotion      int64          `json:"promotion"`
+	DishPromotion  int64          `json:"dish_promotion"`
 	StoreFree      int64          `json:"store_free"`
 	StoreThreshold int64          `json:"store_threshold"`
 	StoreDelivery  int64          `json:"store_delivery"`
@@ -46,6 +47,7 @@ func (o *BillOrder) add(x *BillOrder) {
 	o.Food += x.Food
 	o.DeliveryFee += x.DeliveryFee
 	o.Promotion += x.Promotion
+	o.DishPromotion += x.DishPromotion
 	o.StoreFree += x.StoreFree
 	o.StoreThreshold += x.StoreThreshold
 	o.StoreDelivery += x.StoreDelivery
@@ -99,10 +101,10 @@ func (a *App) Bills(ctx context.Context, branchID int64, from, to, filter string
 	switch filter {
 	case "":
 	case "coupon":
-		cond = ` AND EXISTS (SELECT 1 FROM order_discounts d WHERE d.order_id = o.id AND d.kind <> 'promotion')`
+		cond = ` AND EXISTS (SELECT 1 FROM order_discounts d WHERE d.order_id = o.id AND d.kind NOT IN ('promotion','dish_promotion'))`
 	case "none":
 		cond = ` AND NOT EXISTS (SELECT 1 FROM order_discounts d WHERE d.order_id = o.id)`
-	case "promotion", CouponStoreFree, CouponStoreThreshold, CouponStoreDelivery, CouponPlatformFree:
+	case "promotion", "dish_promotion", CouponStoreFree, CouponStoreThreshold, CouponStoreDelivery, CouponPlatformFree:
 		cond = ` AND EXISTS (SELECT 1 FROM order_discounts d WHERE d.order_id = o.id AND d.kind = '` + filter + `')`
 	default:
 		return nil, ErrValidation("unknown filter")
@@ -151,7 +153,7 @@ func (a *App) Bills(ctx context.Context, branchID int64, from, to, filter string
 				COALESCE(c.source, '')
 			FROM order_discounts d LEFT JOIN customer_coupons c ON c.id = d.coupon_id
 			WHERE d.order_id = ANY($1) ORDER BY d.order_id,
-				array_position(ARRAY['promotion','store_threshold','store_free','store_delivery','platform_free'], d.kind), d.id`, ids)
+				array_position(ARRAY['promotion','dish_promotion','store_threshold','store_free','store_delivery','platform_free'], d.kind), d.id`, ids)
 		if err != nil {
 			return nil, err
 		}
@@ -170,6 +172,8 @@ func (a *App) Bills(ctx context.Context, branchID int64, from, to, filter string
 			switch d.Kind {
 			case "promotion":
 				o.Promotion += d.Amount
+			case "dish_promotion":
+				o.DishPromotion += d.Amount
 			case CouponStoreFree:
 				o.StoreFree += d.Amount
 			case CouponStoreThreshold:
@@ -233,7 +237,7 @@ type BillSummary struct {
 	Settlements []Settlement `json:"settlements"`
 }
 
-var billKinds = []string{"promotion", CouponStoreFree, CouponStoreThreshold, CouponStoreDelivery, CouponPlatformFree}
+var billKinds = []string{"promotion", "dish_promotion", CouponStoreFree, CouponStoreThreshold, CouponStoreDelivery, CouponPlatformFree}
 
 func (a *App) BillSummary(ctx context.Context, branchID int64, from, to string) (*BillSummary, error) {
 	if err := billDays(from, to); err != nil {
@@ -287,7 +291,7 @@ func (a *App) BillSummary(ctx context.Context, branchID int64, from, to string) 
 	for _, k := range billKinds {
 		x := got[k]
 		x.Kind, x.FundedBy = k, fundedBy(k)
-		if k == "promotion" {
+		if k == "promotion" || k == "dish_promotion" {
 			x.FundedBy = "store"
 		}
 		s.Kinds = append(s.Kinds, x)

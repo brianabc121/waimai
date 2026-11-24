@@ -3156,5 +3156,18 @@
  "ml.k.close": "Addition réglée",
  "ml.k.refund": "Remboursement",
  "ml.k.opening": "Avant l'historique",
- "ml.k.change": "Modification"
+ "ml.k.change": "Modification",
+ "cp.kind.dish_promotion": "Promo sur plats",
+ "cp.short.dish_promotion": "Plat",
+ "kind.dish_percent": "Plats en promotion",
+ "kind.dish_second": "Remise sur le deuxième",
+ "promo.second_pct": "Remise sur le deuxième (% : 50 = moitié prix, 100 = offert)",
+ "promo.dishes": "Plats concernés",
+ "promo.dishes_n": "{n} choisis",
+ "promo.dish_search": "Rechercher par nom ou code",
+ "promo.dish_hint": "Les promos sur plats s'ajoutent à une promo sur la commande entière, dont le minimum compte le prix des plats après elles. Un plat présent dans plusieurs promos reçoit la plus avantageuse.",
+ "pr.dish_percent": "Plats choisis {pct} % de remise",
+ "pr.dish_second": "Deuxième {pct} % de remise",
+ "pr.dish_half": "Deuxième à moitié prix",
+ "pr.dish_free": "Un acheté, un offert"
 }

@@ -12,7 +12,9 @@ import '../notes'
 const props = defineProps<{ categories: Category[]; currency: string; layout: string
   canOrder: (it: Item) => boolean; qtyOf: (it: Item) => number
   // Show how many of a dish were sold and how many are left (the delivery store page).
-  stats?: boolean }>()
+  stats?: boolean
+  // dealOf is the dish promotion on a dish, as a short label ("" for none).
+  dealOf?: (it: Item) => string }>()
 defineEmits<{ add: [item: Item]; dec: [item: Item]; show: [item: Item] }>()
 
 const cats = computed(() => props.categories.filter(c => c.items.length))
@@ -76,6 +78,7 @@ defineExpose({ scrollTo })
               <div v-else class="ph">{{ mn(it).slice(0, 1) }}</div>
               <div class="grow">
                 <div class="bold clamp2" :title="mn(it)">{{ mn(it) }}</div>
+                <span v-if="dealOf?.(it)" class="deal" data-testid="dish-deal">{{ dealOf(it) }}</span>
                 <div class="stats" v-if="stats">
                   <span>{{ t('sold_n', { n: it.sold ?? 0 }) }}</span>
                   <span v-if="it.stock_qty != null">{{ t('stock_n', { n: it.stock_qty }) }}</span>
@@ -103,6 +106,7 @@ defineExpose({ scrollTo })
 </template>
 
 <style scoped>
+.deal { display: inline-block; align-self: flex-start; width: fit-content; margin-top: 2px; padding: 0 6px; border: 1px solid #c2410c; border-radius: 4px; color: #c2410c; font-size: 11px; line-height: 16px; }
 .cats { display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px; position: sticky; top: var(--menu-top, 0px); background: var(--bg); z-index: 10; }
 .cats button { position: relative; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 14px; white-space: nowrap; cursor: pointer; }
 .cats button.on { border-color: var(--brand); color: var(--brand-dark); }

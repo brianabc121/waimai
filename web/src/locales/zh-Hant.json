@@ -3156,5 +3156,18 @@
 "ml.k.close":"結帳",
 "ml.k.refund":"退款",
 "ml.k.opening":"記錄開始前",
-"ml.k.change":"改動"
+"ml.k.change":"改動",
+"cp.kind.dish_promotion":"菜品活動",
+"cp.short.dish_promotion":"菜",
+"kind.dish_percent":"指定菜品打折",
+"kind.dish_second":"第二份優惠",
+"promo.second_pct":"第二份減（%，50 為半價，100 為買一送一）",
+"promo.dishes":"參加的菜品",
+"promo.dishes_n":"已選 {n} 道",
+"promo.dish_search":"搜尋菜名或編號",
+"promo.dish_hint":"菜品活動可以和滿減一起用，滿減按菜品優惠後的金額算門檻；同一道菜參加多個菜品活動時，自動用最省的那個。",
+"pr.dish_percent":"指定菜品{zhe}折",
+"pr.dish_second":"第二份{zhe}折",
+"pr.dish_half":"第二份半價",
+"pr.dish_free":"買一送一"
 }

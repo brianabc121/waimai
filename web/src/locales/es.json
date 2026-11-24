@@ -3156,5 +3156,18 @@
  "ml.k.close": "Cuenta cerrada",
  "ml.k.refund": "Reembolso",
  "ml.k.opening": "Antes del historial",
- "ml.k.change": "Cambio"
+ "ml.k.change": "Cambio",
+ "cp.kind.dish_promotion": "Promoción de platos",
+ "cp.short.dish_promotion": "Plato",
+ "kind.dish_percent": "Platos con descuento",
+ "kind.dish_second": "Descuento en la segunda unidad",
+ "promo.second_pct": "Descuento en la segunda (%: 50 es mitad de precio, 100 es gratis)",
+ "promo.dishes": "Platos de la promoción",
+ "promo.dishes_n": "{n} elegidos",
+ "promo.dish_search": "Buscar por nombre o código",
+ "promo.dish_hint": "Las promociones de platos se suman a una del pedido completo, cuyo mínimo cuenta lo que cuestan los platos después de ellas. Un plato en varias promociones recibe la que más ahorra.",
+ "pr.dish_percent": "Platos elegidos {pct} % de descuento",
+ "pr.dish_second": "Segunda unidad {pct} % de descuento",
+ "pr.dish_half": "Segunda unidad a mitad de precio",
+ "pr.dish_free": "Compra uno y llévate otro gratis"
 }

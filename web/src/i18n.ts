@@ -200,6 +200,11 @@ const dict: Record<string, [string, string]> = {
   promo_name: ['活动', 'Promotion'], promo_rule: ['规则', 'Rule'], promo_when: ['时间', 'When'], promo_usage: ['已用', 'Used'],
   promo_name_ph: ['例如：满300减30', 'e.g. Spend 300, save 30'], promo_kind: ['类型', 'Type'],
   'kind.amount_off': ['满减', 'Amount off'], 'kind.percent_off': ['折扣', 'Percent off'], 'kind.free_delivery': ['免配送费', 'Free delivery'],
+  'kind.dish_percent': ['指定菜品打折', 'Dishes at a discount'], 'kind.dish_second': ['第二份优惠', 'Second one off'],
+  'promo.second_pct': ['第二份减（%，50 为半价，100 为买一送一）', 'Off the second one (%: 50 is half price, 100 is free)'],
+  'promo.dishes': ['参加的菜品', 'Dishes in the promotion'], 'promo.dishes_n': ['已选 {n} 道', '{n} chosen'],
+  'promo.dish_search': ['搜索菜名或编号', 'Search by name or code'],
+  'promo.dish_hint': ['菜品活动可以和满减一起用，满减按菜品优惠后的金额算门槛；同一道菜参加多个菜品活动时，自动用最省的那个。', 'Dish promotions add to a promotion on the whole order, whose minimum spend counts what the dishes cost after them. A dish in several dish promotions gets the one that saves the most.'],
   promo_threshold: ['菜品满多少可用', 'Minimum spend'], promo_amount: ['减多少', 'Amount off'], promo_percent: ['优惠百分比（10 表示九折）', 'Percent off (10 = 10% off)'],
   promo_cap: ['最多减', 'Maximum discount'], promo_starts: ['开始日期时间', 'Starts'], promo_ends: ['结束日期时间', 'Ends'],
   promo_daily_start: ['每天开始', 'Daily from'], promo_daily_end: ['每天结束', 'Daily until'],
@@ -299,7 +304,9 @@ const dict: Record<string, [string, string]> = {
   cat_required: ['必选', 'Required'], cat_required_on: ['设为必选', 'Make required'], cat_required_off: ['取消必选', 'Not required'],
   cat_required_hint: ['必选分类：顾客至少要从里面选一样才能下单', 'Required: a customer must choose at least one dish from it'],
   'pr.amount_off': ['减{amt}', '{amt} off'], 'pr.percent_off': ['{zhe}折', '{pct}% off'], 'pr.cap': ['（最多减{amt}）', ' (up to {amt})'],
-  'pr.free_delivery': ['免配送费', 'Free delivery'], 'pr.over': ['满{th}{what}', '{what} over {th}'],
+  'pr.free_delivery': ['免配送费', 'Free delivery'],
+  'pr.dish_percent': ['指定菜品{zhe}折', 'Chosen dishes {pct}% off'], 'pr.dish_second': ['第二份{zhe}折', 'Second one {pct}% off'],
+  'pr.dish_half': ['第二份半价', 'Second one half price'], 'pr.dish_free': ['买一送一', 'Buy one, get one free'], 'pr.over': ['满{th}{what}', '{what} over {th}'],
   'pr.amount_off_sp': ['减 {amt}', '{amt} off'], 'pr.percent_off_sp': ['{zhe} 折', '{pct}% off'], 'pr.cap_sp': ['，最多减 {amt}', ', up to {amt}'],
   lang: ['语言', 'Language'], lang_auto: ['跟随浏览器', 'Same as browser'], lang_remember: ['选好后这个浏览器会记住', 'This browser will remember your choice'],
   'ago.s': ['{n} 秒前', '{n}s ago'], 'ago.m': ['{n} 分钟前', '{n}m ago'], 'ago.h': ['{n} 小时前', '{n}h ago'],
@@ -451,6 +458,10 @@ export function promoLabel(p: { kind: string; threshold: number; value: number; 
     const pct = p.value / 100
     what = t('pr.percent_off', { pct, zhe: (100 - pct) / 10 })
     if (p.max_discount) what += t('pr.cap', { amt: money(p.max_discount, currency) })
+  } else if (p.kind === 'dish_percent' || p.kind === 'dish_second') {
+    const pct = p.value / 100, zhe = (100 - pct) / 10
+    what = p.kind === 'dish_percent' ? t('pr.dish_percent', { pct, zhe })
+      : p.value === 5000 ? t('pr.dish_half') : p.value === 10000 ? t('pr.dish_free') : t('pr.dish_second', { pct, zhe })
   } else what = t('pr.free_delivery')
   if (!th) return what
   return t('pr.over', { th, what })

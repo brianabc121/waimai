@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -39,10 +40,13 @@ type orderCoupon struct {
 	share pricing.Applied
 }
 
-// moneyLine is one live dish line.
+// moneyLine is one live dish line: what it costs, which dish it is and what
+// one of it costs (so a dish promotion can count how many are left).
 type moneyLine struct {
 	ID     int64
 	Amount int64
+	ItemID int64
+	Unit   int64
 }
 
 // orderMoney is what an order was priced with, read under the order lock.
@@ -60,7 +64,9 @@ type orderMoney struct {
 	// took it, and what it took off; nil when none.
 	Promo       *Promotion
 	PromoAmount int64
-	Coupons     []orderCoupon
+	// Dish are the dish promotions the order used, as they were then.
+	Dish    []*Promotion
+	Coupons []orderCoupon
 	// The discount at checkout: the share still charged (0 = none), and a
 	// round-off or typed amount (Mode "round" or "set_total").
 	StaffBP  int
@@ -82,14 +88,14 @@ func loadMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, erro
 		&m.DeliveryFee, &m.Total, &promoID, &promoKind, &discount, &platform, &m.StaffBP, &m.AdjMode, &m.RoundOff); err != nil {
 		return nil, err
 	}
-	rows, err := q.Query(ctx, `SELECT id, line_total FROM order_items WHERE order_id=$1 AND prep_status <> 'cancelled'
-		ORDER BY id`, orderID)
+	rows, err := q.Query(ctx, `SELECT id, line_total, item_id, CASE WHEN qty > 0 THEN line_total / qty ELSE 0 END
+		FROM order_items WHERE order_id=$1 AND prep_status <> 'cancelled' ORDER BY id`, orderID)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		var l moneyLine
-		if err := rows.Scan(&l.ID, &l.Amount); err != nil {
+		if err := rows.Scan(&l.ID, &l.Amount, &l.ItemID, &l.Unit); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -99,8 +105,8 @@ func loadMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, erro
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	rows, err = q.Query(ctx, `SELECT coupon_id, kind, funded_by, name, name_en, amount FROM order_discounts
-		WHERE order_id=$1 ORDER BY id`, orderID)
+	rows, err = q.Query(ctx, `SELECT coupon_id, kind, funded_by, name, name_en, amount, promotion_id, rule
+		FROM order_discounts WHERE order_id=$1 ORDER BY id`, orderID)
 	if err != nil {
 		return nil, err
 	}
@@ -108,9 +114,19 @@ func loadMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, erro
 	var others int64
 	for rows.Next() {
 		var c orderCoupon
-		if err := rows.Scan(&c.CouponID, &c.Kind, &c.FundedBy, &c.Name, &c.NameEn, &c.Amount); err != nil {
+		var pid *int64
+		var rule []byte
+		if err := rows.Scan(&c.CouponID, &c.Kind, &c.FundedBy, &c.Name, &c.NameEn, &c.Amount, &pid, &rule); err != nil {
 			rows.Close()
 			return nil, err
+		}
+		if c.Kind == "dish_promotion" {
+			if pid != nil {
+				if p, ok := promoFromRule(*pid, c.Name, c.NameEn, rule); ok {
+					m.Dish = append(m.Dish, p)
+				}
+			}
+			continue
 		}
 		if c.Kind == "promotion" {
 			havePromoRow = true
@@ -229,6 +245,10 @@ type moneyIn struct {
 	Delivery int64
 	Promo    *Promotion
 	PromoOff Discount
+	// Dish are the dish promotions' adjustments (dishAdjustments), and the
+	// promotions they come from.
+	Dish       []pricing.Adjustment
+	DishPromos []*Promotion
 	// Coupons in the order they are taken off; Amount is the most each
 	// takes off (a platform coupon's value).
 	Coupons []orderCoupon
@@ -246,6 +266,28 @@ type priced struct {
 	promoShare pricing.Applied
 	// ids maps the engine's line keys to order_items ids, when they are not the ids.
 	ids map[string]int64
+	// dish are the dish promotions applied, each with what it took off per dish.
+	dish []dishApplied
+	// dishIn is what went in for them, to price the same dishes again.
+	dishIn     []pricing.Adjustment
+	dishPromos []*Promotion
+}
+
+// dishDiscounts is what each dish promotion took off, for showing.
+func (p *priced) dishDiscounts() []DishDiscount {
+	out := []DishDiscount{}
+	for _, d := range p.dish {
+		out = append(out, DishDiscount{PromotionID: d.Promo.ID, Name: d.Promo.Name, NameEn: d.Promo.NameEn,
+			Kind: d.Promo.Kind, Amount: d.Off})
+	}
+	return out
+}
+
+// dishApplied is one dish promotion on an order: what it took off on each
+// dish, all together.
+type dishApplied struct {
+	Promo *Promotion
+	pricing.Applied
 }
 
 // couponStage is where a coupon kind is taken off.
@@ -260,7 +302,7 @@ func couponStage(kind string) pricing.Stage {
 }
 
 func priceMoney(in moneyIn) (*priced, error) {
-	var adj []pricing.Adjustment
+	adj := append([]pricing.Adjustment{}, in.Dish...)
 	if in.Promo != nil {
 		a := pricing.Adjustment{Kind: "promotion", Ref: in.Promo.ID, Name: in.Promo.Name, NameEn: in.Promo.NameEn,
 			FundedBy: "store", Stage: pricing.StageOrder, Amount: in.PromoOff.Goods}
@@ -306,16 +348,45 @@ func priceMoney(in moneyIn) (*priced, error) {
 	if in.Round != nil {
 		t.AdjMode = in.Round.Mode
 	}
-	i := 0
+	// the dish promotions, one entry each, in the order they first appear
+	p.dishIn, p.dishPromos = in.Dish, in.DishPromos
+	byRef := map[int64]int{}
+	for _, a := range r.Applied[:len(in.Dish)] {
+		if a.Off == 0 {
+			continue
+		}
+		k, ok := byRef[a.Ref]
+		if !ok {
+			var promo *Promotion
+			for _, dp := range in.DishPromos {
+				if dp.ID == a.Ref {
+					promo = dp
+				}
+			}
+			if promo == nil {
+				promo = &Promotion{ID: a.Ref, Name: a.Name, NameEn: a.NameEn}
+			}
+			k = len(p.dish)
+			byRef[a.Ref] = k
+			p.dish = append(p.dish, dishApplied{Promo: promo, Applied: pricing.Applied{Adjustment: a.Adjustment,
+				PerLine: map[string]int64{}}})
+		}
+		d := &p.dish[k]
+		d.Off += a.Off
+		for key, v := range a.PerLine {
+			d.PerLine[key] += v
+		}
+	}
+	i := len(in.Dish)
 	if in.Promo != nil {
-		p.promoShare = r.Applied[0]
-		if off := r.Applied[0].Off; off > 0 {
+		p.promoShare = r.Applied[i]
+		if off := r.Applied[i].Off; off > 0 {
 			t.PromotionID, t.PromotionName, t.PromotionNameEn = in.Promo.ID, in.Promo.Name, in.Promo.NameEn
 			t.PromotionDiscount = off
 		} else {
 			p.Promo = nil
 		}
-		i = 1
+		i++
 	}
 	for _, kind := range couponOrder {
 		for _, c := range in.Coupons {
@@ -331,12 +402,14 @@ func priceMoney(in moneyIn) (*priced, error) {
 }
 
 // input is the order's own money as engine input, on lines (nil for the
-// order's live lines), with promo taking off promoOff.
-func (m *orderMoney) input(lines []moneyLine, promo *Promotion, promoOff Discount) moneyIn {
+// order's live lines), with the dish promotions dish and promo taking off
+// promoOff.
+func (m *orderMoney) input(lines []moneyLine, dish []*Promotion, promo *Promotion, promoOff Discount) moneyIn {
 	if lines == nil {
 		lines = m.Lines
 	}
-	in := moneyIn{Fees: m.Fees, Delivery: m.DeliveryFee, Promo: promo, PromoOff: promoOff, StaffBP: m.StaffBP}
+	in := moneyIn{Fees: m.Fees, Delivery: m.DeliveryFee, Promo: promo, PromoOff: promoOff, StaffBP: m.StaffBP,
+		Dish: dishAdjustments(dish, dishLinesOf(lines)), DishPromos: dish}
 	for _, l := range lines {
 		in.Lines = append(in.Lines, pricing.Line{Key: strconv.FormatInt(l.ID, 10), Amount: l.Amount})
 	}
@@ -356,12 +429,43 @@ func (m *orderMoney) reprice(ctx context.Context, q Querier, b *Branch, lines []
 			sub += l.Amount
 		}
 	}
+	if lines == nil {
+		lines = m.Lines
+	}
+	// the dish promotions first: the order's own as they were, and, when
+	// pol may move to a better offer, those running now on other dishes
+	dish := append([]*Promotion{}, m.Dish...)
+	if pol.pick {
+		live, err := liveDishPromos(ctx, q, b, m.ServiceType, pol.at, sub)
+		if err != nil {
+			return nil, false, err
+		}
+		for _, p := range live {
+			if !slices.ContainsFunc(dish, func(d *Promotion) bool { return d.ID == p.ID }) {
+				dish = append(dish, p)
+			}
+		}
+	}
+	sub -= dishOff(dishAdjustments(dish, dishLinesOf(lines)))
 	promo, off, switched, err := m.choosePromo(ctx, q, b, sub, pol)
 	if err != nil {
 		return nil, false, err
 	}
-	p, err := priceMoney(m.input(lines, promo, off))
+	p, err := priceMoney(m.input(lines, dish, promo, off))
 	return p, switched, err
+}
+
+// dishLinesOf is lines as the dish rules see them.
+func dishLinesOf(lines []moneyLine) []dishLine {
+	out := make([]dishLine, 0, len(lines))
+	for _, l := range lines {
+		q := 0
+		if l.Unit > 0 {
+			q = int(l.Amount / l.Unit)
+		}
+		out = append(out, dishLine{Key: keyOf(l.ID), ItemID: l.ItemID, Unit: l.Unit, Qty: q})
+	}
+	return out
 }
 
 // without is the order's live lines less some dish money (line id → amount).
@@ -376,11 +480,15 @@ func (m *orderMoney) without(less map[int64]int64) []moneyLine {
 	return out
 }
 
-// withExtra is the order's live lines and extra dish money as one more line.
-func (m *orderMoney) withExtra(extra int64) []moneyLine {
+// withExtra is the order's live lines and the lines of an add-on not yet placed.
+func (m *orderMoney) withExtra(extra []QuoteLine) []moneyLine {
 	out := append([]moneyLine{}, m.Lines...)
-	if extra > 0 {
-		out = append(out, moneyLine{ID: -1, Amount: extra})
+	for i, l := range extra {
+		ml := moneyLine{ID: int64(-1 - i), Amount: l.LineTotal, ItemID: l.ItemID}
+		if l.Qty > 0 {
+			ml.Unit = l.LineTotal / int64(l.Qty)
+		}
+		out = append(out, ml)
 	}
 	return out
 }
@@ -434,6 +542,14 @@ func saveDiscountRows(ctx context.Context, tx pgx.Tx, branchID, orderID int64, p
 		if _, err := tx.Exec(ctx, `UPDATE promotion_redemptions SET amount=$2 WHERE order_id=$1 AND status='applied'`,
 			orderID, t.PromotionDiscount); err != nil {
 			return err
+		}
+	}
+	for _, d := range p.dish {
+		if _, err := tx.Exec(ctx, `INSERT INTO order_discounts (order_id, branch_id, kind, funded_by, name, name_en,
+			amount, promotion_id, per_line, rule, created_at) VALUES ($1,$2,'dish_promotion','store',$3,$4,$5,$6,$7,$8,
+			(SELECT created_at FROM orders WHERE id=$1))`, orderID, branchID, d.Promo.Name, d.Promo.NameEn, d.Off,
+			d.Promo.ID, perLine(d.Applied, p.ids), ruleOf(d.Promo)); err != nil {
+			return fmt.Errorf("dish promotion row: %w", err)
 		}
 	}
 	for _, c := range p.Coupons {

@@ -3156,5 +3156,18 @@
  "ml.k.close": "Đóng hóa đơn",
  "ml.k.refund": "Hoàn tiền",
  "ml.k.opening": "Trước khi ghi",
- "ml.k.change": "Thay đổi"
+ "ml.k.change": "Thay đổi",
+ "cp.kind.dish_promotion": "KM món",
+ "cp.short.dish_promotion": "Món",
+ "kind.dish_percent": "Giảm giá món chọn",
+ "kind.dish_second": "Giảm món thứ hai",
+ "promo.second_pct": "Giảm món thứ hai (%: 50 là nửa giá, 100 là miễn phí)",
+ "promo.dishes": "Món áp dụng",
+ "promo.dishes_n": "Đã chọn {n} món",
+ "promo.dish_search": "Tìm theo tên hoặc mã",
+ "promo.dish_hint": "KM món cộng dồn với KM cả đơn; mức tối thiểu của KM cả đơn tính trên tiền món sau KM món. Món có nhiều KM món sẽ được KM lợi nhất.",
+ "pr.dish_percent": "Món chọn giảm {pct}%",
+ "pr.dish_second": "Món thứ hai giảm {pct}%",
+ "pr.dish_half": "Món thứ hai nửa giá",
+ "pr.dish_free": "Mua 1 tặng 1"
 }

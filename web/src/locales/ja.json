@@ -3156,5 +3156,18 @@
  "ml.k.close": "会計",
  "ml.k.refund": "返金",
  "ml.k.opening": "記録開始前",
- "ml.k.change": "変更"
+ "ml.k.change": "変更",
+ "cp.kind.dish_promotion": "料理の特典",
+ "cp.short.dish_promotion": "品",
+ "kind.dish_percent": "対象料理の割引",
+ "kind.dish_second": "2点目割引",
+ "promo.second_pct": "2点目の割引率（%、50で半額、100で1つ無料）",
+ "promo.dishes": "対象の料理",
+ "promo.dishes_n": "{n}品を選択",
+ "promo.dish_search": "料理名・番号で検索",
+ "promo.dish_hint": "料理の特典は注文全体の特典と併用でき、その最低金額は料理の割引後の金額で判定します。同じ料理に複数の料理特典がある場合は、最もお得なものが使われます。",
+ "pr.dish_percent": "対象料理 {pct}%オフ",
+ "pr.dish_second": "2点目 {pct}%オフ",
+ "pr.dish_half": "2点目半額",
+ "pr.dish_free": "1つ買うと1つ無料"
 }

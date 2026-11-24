@@ -57,7 +57,7 @@ const exportHref = computed(() => `/api/v1/merchant/branches/${bid}/bills?from=$
 const storeCoupons = (o: BillOrder) => o.store_free + o.store_threshold
 const totalOff = computed(() => sum.value ? sum.value.kinds.reduce((s, k) => s + k.amount, 0) : 0)
 const rate = computed(() => sum.value?.repurchase.issued ? Math.round(sum.value.repurchase.used * 100 / sum.value.repurchase.issued) : 0)
-const FILTERS = ['', 'coupon', 'none', 'promotion', 'store_free', 'store_threshold', 'store_delivery', 'platform_free']
+const FILTERS = ['', 'coupon', 'none', 'promotion', 'dish_promotion', 'store_free', 'store_threshold', 'store_delivery', 'platform_free']
 const filterName = (f: string) => f === '' ? t('bl.f.all') : f === 'coupon' || f === 'none' ? t('bl.f.' + f) : kindName(f as 'promotion')
 async function showSettlement(id: number) {
   if (settleOrders.value[id]) { delete settleOrders.value[id]; return }
@@ -100,7 +100,7 @@ async function showSettlement(id: number) {
                 <td><b>{{ o.public_no }}</b><div class="small muted">{{ dayOf(o.created_at, tz).slice(5) }} {{ clock(o.created_at, tz) }}</div></td>
                 <td>{{ t('bl.' + o.service_type) }}</td>
                 <td class="r">{{ m(o.food) }}</td><td class="r">{{ m(o.delivery_fee) }}</td>
-                <td class="r neg">{{ off(o.promotion) }}</td><td class="r neg">{{ off(storeCoupons(o)) }}</td><td class="r neg">{{ off(o.store_delivery) }}</td>
+                <td class="r neg">{{ off(o.promotion + (o.dish_promotion ?? 0)) }}</td><td class="r neg">{{ off(storeCoupons(o)) }}</td><td class="r neg">{{ off(o.store_delivery) }}</td>
                 <td class="r plat">{{ o.platform_free ? '+' + money(o.platform_free, cur) : '—' }}</td>
                 <td class="r">{{ o.state === 'completed' ? money(o.paid, cur) : money(0, cur) }}</td>
                 <td class="r"><b>{{ o.state === 'completed' ? money(o.takings, cur) : money(0, cur) }}</b></td>
@@ -123,7 +123,7 @@ async function showSettlement(id: number) {
           <tfoot v-if="list.orders.length"><tr data-testid="bill-sum">
             <td colspan="2"><b>{{ t('bl.sum', { n: list.orders.filter(o => o.state === 'completed').length }) }}</b></td>
             <td class="r">{{ m(list.sum.food) }}</td><td class="r">{{ m(list.sum.delivery_fee) }}</td>
-            <td class="r neg">{{ off(list.sum.promotion) }}</td><td class="r neg">{{ off(storeCoupons(list.sum)) }}</td><td class="r neg">{{ off(list.sum.store_delivery) }}</td>
+            <td class="r neg">{{ off(list.sum.promotion + (list.sum.dish_promotion ?? 0)) }}</td><td class="r neg">{{ off(storeCoupons(list.sum)) }}</td><td class="r neg">{{ off(list.sum.store_delivery) }}</td>
             <td class="r plat">{{ list.sum.platform_free ? '+' + money(list.sum.platform_free, cur) : '—' }}</td>
             <td class="r">{{ money(list.sum.paid, cur) }}</td><td class="r"><b>{{ money(list.sum.takings, cur) }}</b></td><td></td>
           </tr></tfoot>
@@ -202,7 +202,7 @@ async function showSettlement(id: number) {
 .dline .amt { margin-inline-start: auto; color: #b8392a; }
 .badge { display: inline-block; font-size: 12px; border-radius: 5px; padding: 1px 7px; background: #fde7d8; color: #9a3412; white-space: nowrap; }
 .badge.store_delivery { background: #fdf0d5; color: #92400e; } .badge.platform_free { background: #ede9fe; color: #5b21b6; }
-.badge.promotion { background: #e8eef7; color: #334e7a; }
+.badge.promotion, .badge.dish_promotion { background: #e8eef7; color: #334e7a; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
 .cards .card { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; }
 .cards span { font-size: 12.5px; color: var(--muted); } .cards b { font-size: 21px; font-variant-numeric: tabular-nums; } .cards small { font-size: 12px; color: var(--muted); }

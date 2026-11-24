@@ -344,7 +344,7 @@ func (m *orderMoney) withAdjust(j Adjust) (*priced, error) {
 	if m.Promo != nil && m.PromoAmount > 0 {
 		promo, off = m.Promo, promoOn(m.Promo.Kind, m.PromoAmount)
 	}
-	in := m.input(nil, promo, off)
+	in := m.input(nil, m.Dish, promo, off)
 	in.StaffBP = j.PercentBP
 	if j.Mode != "" {
 		in.Round = &j

@@ -151,7 +151,7 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, from, to strin
 			COALESCE(sum(COALESCE(cc.amount_returned, cc.amount_collected)) FILTER (WHERE cc.reconcile_status <> 'pending'), 0),
 			COALESCE(sum(cc.amount_collected) FILTER (WHERE cc.reconcile_status = 'pending'), 0),
 			COALESCE(sum(GREATEST(0, o.discount - o.platform_subsidy - COALESCE((SELECT sum(d.amount) FROM order_discounts d
-				WHERE d.order_id = o.id AND d.kind <> 'promotion' AND d.funded_by = 'store'), 0))) FILTER (WHERE o.promotion_id IS NOT NULL), 0),
+				WHERE d.order_id = o.id AND d.kind NOT IN ('promotion','dish_promotion') AND d.funded_by = 'store'), 0))), 0),
 			COALESCE(sum(o.staff_discount), 0), COALESCE(sum(o.round_off), 0)
 		FROM orders o JOIN branches b ON b.id = o.branch_id
 			LEFT JOIN cash_collections cc ON cc.order_id = o.id
@@ -172,7 +172,7 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, from, to strin
 	// coupons the store paid for
 	if err := a.DB.QueryRow(ctx, `SELECT COALESCE(sum(d.amount), 0) FROM order_discounts d
 		JOIN orders o ON o.id = d.order_id JOIN branches b ON b.id = o.branch_id
-		WHERE `+paidInPeriod+` AND d.kind <> 'promotion' AND d.funded_by = 'store'`, branchID, from, to).Scan(&out.Discounts.Coupon); err != nil {
+		WHERE `+paidInPeriod+` AND d.kind NOT IN ('promotion','dish_promotion') AND d.funded_by = 'store'`, branchID, from, to).Scan(&out.Discounts.Coupon); err != nil {
 		return nil, err
 	}
 	out.Discounts.Total = out.Discounts.Promotion + out.Discounts.Coupon + out.Discounts.Staff + out.Discounts.RoundOff

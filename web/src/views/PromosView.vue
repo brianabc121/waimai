@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { get, post, put } from '../api'
 import { money, promoLabel, t, toMajor, toMinor } from '../i18n'
 import { currentRole, session } from '../session'
-import type { Promotion, Totals } from '../types'
+import type { Category, Promotion, Totals } from '../types'
 import { useRoute, useRouter } from 'vue-router'
 import CouponRules from './CouponRules.vue'
 import '../coupons'
@@ -25,7 +25,7 @@ const error = ref('')
 const all = ref<Promotion[]>([])
 async function load() { all.value = (await get<{ promotions: Promotion[] }>(`/merchant/branches/${bid}/promotions`)).promotions }
 watch([all, scope], () => { promos.value = all.value.filter(p => (p.scope ?? 'delivery') === scope.value) }, { immediate: true })
-onMounted(load)
+onMounted(() => { void load(); void loadMenu() })
 
 async function run(fn: () => Promise<unknown>) {
   error.value = ''
@@ -36,10 +36,37 @@ async function run(fn: () => Promise<unknown>) {
 // Dates use the browser's time zone, which is normally the store's.
 interface Form { id: number; scope: 'delivery' | 'dine_in'; name: string; name_en: string; kind: Promotion['kind']; threshold: number; value: number
   cap: number | ''; applies_delivery: boolean; applies_pickup: boolean; starts: string; ends: string
-  daily_start: string; daily_end: string; quota: number | ''; per_phone: number | '' }
+  daily_start: string; daily_end: string; quota: number | ''; per_phone: number | ''; items: number[] }
 const blank = (): Form => ({ id: 0, scope: scope.value, name: '', name_en: '', kind: 'amount_off', threshold: 0, value: 0, cap: '', applies_delivery: true,
-  applies_pickup: true, starts: '', ends: '', daily_start: '00:00', daily_end: '00:00', quota: '', per_phone: '' })
+  applies_pickup: true, starts: '', ends: '', daily_start: '00:00', daily_end: '00:00', quota: '', per_phone: '', items: [] })
 const form = reactive<{ open: boolean; f: Form }>({ open: false, f: blank() })
+
+// Promotions on chosen dishes (docs/PRICING_REVIEW.md step 4): a percentage
+// off, typed as "20" for 20% off, and the dishes it is on.
+const isDish = (k: string) => k === 'dish_percent' || k === 'dish_second'
+const pctKind = (k: string) => k === 'percent_off' || isDish(k)
+const menu = ref<Category[]>([])
+const dishFilter = ref('')
+async function loadMenu() {
+  if (menu.value.length) return
+  try { menu.value = (await get<{ categories: Category[] }>(`/merchant/branches/${bid}/menu`)).categories } catch (e) { error.value = (e as Error).message }
+}
+watch(() => form.f.kind, k => { if (form.open && isDish(k)) void loadMenu() })
+const dishGroups = computed(() => {
+  const q = dishFilter.value.trim().toLowerCase()
+  return menu.value.map(c => ({ ...c, items: c.items.filter(i => (!q || i.name.toLowerCase().includes(q) || (i.name_en ?? '').toLowerCase().includes(q) || (i.code ?? '').toLowerCase().includes(q))) }))
+    .filter(c => c.items.length)
+})
+function toggleDish(id: number) {
+  const i = form.f.items.indexOf(id)
+  if (i >= 0) form.f.items.splice(i, 1); else form.f.items.push(id)
+}
+const dishNames = (p: Promotion) => {
+  const names = new Map(menu.value.flatMap(c => c.items.map(i => [i.id, i.name] as const)))
+  const ids = p.item_ids ?? []
+  const shown = ids.slice(0, 3).map(id => names.get(id)).filter(Boolean)
+  return shown.length ? shown.join('、') + (ids.length > 3 ? ' …' : '') : t('promo.dishes_n', { n: ids.length })
+}
 
 const pad = (n: number) => String(n).padStart(2, '0')
 function toLocal(iso: string | null) {
@@ -52,22 +79,24 @@ const num = (v: number | '') => (v === '' || v === null ? null : Number(v))
 
 function edit(p: Promotion | null) {
   form.f = p ? { id: p.id, scope: p.scope ?? 'delivery', name: p.name, name_en: p.name_en, kind: p.kind, threshold: toMajor(p.threshold),
-    value: p.kind === 'percent_off' ? p.value / 100 : toMajor(p.value), cap: p.max_discount === null ? '' : toMajor(p.max_discount),
+    value: pctKind(p.kind) ? p.value / 100 : toMajor(p.value), cap: p.max_discount === null ? '' : toMajor(p.max_discount),
     applies_delivery: p.applies_delivery, applies_pickup: p.applies_pickup, starts: toLocal(p.starts_at), ends: toLocal(p.ends_at),
-    daily_start: p.daily_start, daily_end: p.daily_end, quota: p.total_quota ?? '', per_phone: p.per_phone_limit ?? '' } : blank()
+    daily_start: p.daily_start, daily_end: p.daily_end, quota: p.total_quota ?? '', per_phone: p.per_phone_limit ?? '', items: [...(p.item_ids ?? [])] } : blank()
   error.value = ''
   form.open = true
+  if (isDish(form.f.kind)) void loadMenu()
 }
 
 async function save() {
   const f = form.f
   const dineIn = f.scope === 'dine_in'
   const body = { scope: f.scope, name: f.name, name_en: f.name_en, kind: f.kind, threshold: toMinor(f.threshold),
-    value: f.kind === 'percent_off' ? Math.round(Number(f.value) * 100) : f.kind === 'amount_off' ? toMinor(f.value) : 0,
+    value: pctKind(f.kind) ? Math.round(Number(f.value) * 100) : f.kind === 'amount_off' ? toMinor(f.value) : 0,
     max_discount: f.kind === 'percent_off' && num(f.cap) ? toMinor(f.cap as number) : null,
     applies_delivery: !dineIn && f.applies_delivery, applies_pickup: !dineIn && f.kind !== 'free_delivery' && f.applies_pickup,
     starts_at: toISO(f.starts), ends_at: toISO(f.ends), daily_start: f.daily_start || '00:00', daily_end: f.daily_end || '00:00',
-    total_quota: num(f.quota), per_phone_limit: dineIn ? null : num(f.per_phone) }
+    total_quota: isDish(f.kind) ? null : num(f.quota), per_phone_limit: dineIn || isDish(f.kind) ? null : num(f.per_phone),
+    item_ids: isDish(f.kind) ? f.items : [] }
   if (await run(() => f.id ? put(`/merchant/branches/${bid}/promotions/${f.id}`, body) : post(`/merchant/branches/${bid}/promotions`, body))) form.open = false
 }
 
@@ -121,6 +150,7 @@ async function runTrial() {
           <tr v-for="p in promos" :key="p.id">
             <td><b>{{ p.name }}</b><div class="muted small">{{ p.name_en }}</div></td>
             <td>{{ promoLabel(p, cur) }}
+              <div class="muted small" v-if="isDish(p.kind)" data-testid="promo-dishes">{{ dishNames(p) }}</div>
               <div class="muted small" v-if="!dine">{{ [p.applies_delivery && t('delivery'), p.applies_pickup && t('pickup')].filter(Boolean).join(' · ') }}</div></td>
             <td class="small">{{ when(p) }}</td>
             <td>{{ p.used_count }}<span v-if="p.total_quota"> / {{ p.total_quota }}</span>
@@ -177,11 +207,27 @@ async function runTrial() {
             <label class="field"><span>{{ t('promo_kind') }}</span><select v-model="form.f.kind">
               <option value="amount_off">{{ t('kind.amount_off') }}</option>
               <option value="percent_off">{{ t('kind.percent_off') }}</option>
-              <option v-if="form.f.scope !== 'dine_in'" value="free_delivery">{{ t('kind.free_delivery') }}</option></select></label>
+              <option v-if="form.f.scope !== 'dine_in'" value="free_delivery">{{ t('kind.free_delivery') }}</option>
+              <option value="dish_percent">{{ t('kind.dish_percent') }}</option>
+              <option value="dish_second">{{ t('kind.dish_second') }}</option></select></label>
             <label class="field"><span>{{ t('promo_threshold') }} ({{ cur }})</span><input type="number" min="0" step="0.01" v-model.number="form.f.threshold" /></label>
             <label class="field" v-if="form.f.kind === 'amount_off'"><span>{{ t('promo_amount') }} ({{ cur }})</span><input type="number" min="0.01" step="0.01" v-model.number="form.f.value" required /></label>
             <label class="field" v-if="form.f.kind === 'percent_off'"><span>{{ t('promo_percent') }}</span><input type="number" min="1" max="99" step="0.5" v-model.number="form.f.value" required /></label>
+            <label class="field" v-if="form.f.kind === 'dish_percent'"><span>{{ t('promo_percent') }}</span><input type="number" min="1" max="99" step="0.5" v-model.number="form.f.value" required data-testid="dish-pct" /></label>
+            <label class="field" v-if="form.f.kind === 'dish_second'"><span>{{ t('promo.second_pct') }}</span><input type="number" min="1" max="100" step="1" v-model.number="form.f.value" required data-testid="dish-second" /></label>
             <label class="field" v-if="form.f.kind === 'percent_off'"><span>{{ t('promo_cap') }} ({{ cur }})</span><input type="number" min="0" step="0.01" v-model="form.f.cap" :placeholder="t('unlimited')" /></label>
+          </div>
+          <div v-if="isDish(form.f.kind)" class="stack dishpick" data-testid="dish-pick">
+            <div class="row between"><b>{{ t('promo.dishes') }}</b><span class="muted small">{{ t('promo.dishes_n', { n: form.f.items.length }) }}</span></div>
+            <input v-model="dishFilter" :placeholder="t('promo.dish_search')" />
+            <div class="dishlist">
+              <template v-for="c in dishGroups" :key="c.id">
+                <div class="muted small cat">{{ c.name }}</div>
+                <label v-for="i in c.items" :key="i.id" class="check"><input type="checkbox" :checked="form.f.items.includes(i.id)" @change="toggleDish(i.id)" />
+                  <span v-if="i.code" class="muted">{{ i.code }}</span> {{ i.name }} <span class="muted small">{{ money(i.price, cur) }}</span></label>
+              </template>
+            </div>
+            <p class="muted small">{{ t('promo.dish_hint') }}</p>
           </div>
           <div class="grid2" v-if="form.f.scope !== 'dine_in'">
             <label class="check"><input type="checkbox" v-model="form.f.applies_delivery" />{{ t('delivery') }}</label>
@@ -192,8 +238,8 @@ async function runTrial() {
             <label class="field"><span>{{ t('promo_ends') }}</span><input type="datetime-local" v-model="form.f.ends" /></label>
             <label class="field"><span>{{ t('promo_daily_start') }}</span><input type="time" v-model="form.f.daily_start" /></label>
             <label class="field"><span>{{ t('promo_daily_end') }}</span><input type="time" v-model="form.f.daily_end" /></label>
-            <label class="field"><span>{{ t('promo_quota') }}</span><input type="number" min="1" step="1" v-model="form.f.quota" :placeholder="t('unlimited')" /></label>
-            <label class="field" v-if="form.f.scope !== 'dine_in'"><span>{{ t('promo_per_phone') }}</span><input type="number" min="1" step="1" v-model="form.f.per_phone" :placeholder="t('unlimited')" /></label>
+            <label class="field" v-if="!isDish(form.f.kind)"><span>{{ t('promo_quota') }}</span><input type="number" min="1" step="1" v-model="form.f.quota" :placeholder="t('unlimited')" /></label>
+            <label class="field" v-if="form.f.scope !== 'dine_in' && !isDish(form.f.kind)"><span>{{ t('promo_per_phone') }}</span><input type="number" min="1" step="1" v-model="form.f.per_phone" :placeholder="t('unlimited')" /></label>
           </div>
           <p class="muted small">{{ t('promo_time_hint') }}</p>
           <p v-if="form.f.scope === 'dine_in'" class="muted small">{{ t('ck.dine_time_hint') }}</p>
@@ -210,4 +256,8 @@ async function runTrial() {
 
 <style scoped>
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: center; }
+.dishpick { margin: 8px 0; }
+.dishlist { max-height: 240px; overflow: auto; border: 1px solid var(--line, #e5e7eb); border-radius: 8px; padding: 4px 10px; }
+.dishlist .cat { margin-top: 6px; }
+.dishlist .check { display: flex; gap: 6px; align-items: center; padding: 3px 0; }
 </style>

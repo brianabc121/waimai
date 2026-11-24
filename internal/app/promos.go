@@ -16,7 +16,7 @@ type Promotion struct {
 	Name            string     `json:"name"`
 	NameEn          string     `json:"name_en"`
 	NameTr          string     `json:"name_tr,omitempty"`
-	Kind            string     `json:"kind"` // amount_off, percent_off, free_delivery
+	Kind            string     `json:"kind"` // a key of promoRules (rules.go)
 	Threshold       int64      `json:"threshold"`
 	Value           int64      `json:"value"`
 	MaxDiscount     *int64     `json:"max_discount"`
@@ -36,6 +36,8 @@ type Promotion struct {
 	// LiveNow says whether the promotion would apply to an order placed now
 	// (active, inside its dates and daily window, quota left).
 	LiveNow bool `json:"live_now"`
+	// ItemIDs are the dishes a dish promotion is on.
+	ItemIDs []int64 `json:"item_ids"`
 
 	phoneUsed int // redemptions by the quoting customer, when known
 }
@@ -90,19 +92,11 @@ func (p *Promotion) why(now time.Time, loc *time.Location, service string, subto
 	return ""
 }
 
-// discount computes the saving, ignoring eligibility.
+// discount computes what a whole-order promotion saves, ignoring
+// eligibility; a dish promotion saves nothing here (see dishAdjustments).
 func (p *Promotion) discount(subtotal, deliveryFee int64) Discount {
-	switch p.Kind {
-	case "amount_off":
-		return Discount{Goods: min(p.Value, subtotal)}
-	case "percent_off":
-		d := mulDivRound(subtotal, p.Value, 10000)
-		if p.MaxDiscount != nil {
-			d = min(d, *p.MaxDiscount)
-		}
-		return Discount{Goods: min(d, subtotal)}
-	case "free_delivery":
-		return Discount{Delivery: deliveryFee}
+	if r := promoRules[p.Kind]; r.order != nil {
+		return r.order(p, subtotal, deliveryFee)
 	}
 	return Discount{}
 }
@@ -114,7 +108,7 @@ func bestPromotion(ps []Promotion, now time.Time, loc *time.Location, service st
 	var bestD Discount
 	for i := range ps {
 		p := &ps[i]
-		if p.why(now, loc, service, subtotal) != "" {
+		if p.isDish() || p.why(now, loc, service, subtotal) != "" {
 			continue
 		}
 		d := p.discount(subtotal, deliveryFee)
@@ -127,7 +121,7 @@ func bestPromotion(ps []Promotion, now time.Time, loc *time.Location, service st
 
 const promoCols = `p.id, p.name, p.name_en, p.kind, p.threshold, p.value, p.max_discount, p.applies_delivery,
 	p.applies_pickup, p.starts_at, p.ends_at, p.daily_start, p.daily_end, p.total_quota, p.per_phone_limit,
-	p.used_count, p.status, p.scope`
+	p.used_count, p.status, p.scope, ARRAY(SELECT pi.item_id FROM promotion_items pi WHERE pi.promotion_id = p.id ORDER BY pi.item_id)`
 
 // loadPromotions returns a branch's promotions, oldest first. With a phone,
 // each one also carries how often that customer has used it.
@@ -145,7 +139,7 @@ func loadPromotions(ctx context.Context, q Querier, branchID int64, where, phone
 		var p Promotion
 		if err := rows.Scan(&p.ID, &p.Name, &p.NameEn, &p.Kind, &p.Threshold, &p.Value, &p.MaxDiscount,
 			&p.AppliesDelivery, &p.AppliesPickup, &p.StartsAt, &p.EndsAt, &p.DailyStart, &p.DailyEnd,
-			&p.TotalQuota, &p.PerPhoneLimit, &p.UsedCount, &p.Status, &p.Scope, &p.phoneUsed); err != nil {
+			&p.TotalQuota, &p.PerPhoneLimit, &p.UsedCount, &p.Status, &p.Scope, &p.ItemIDs, &p.phoneUsed); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -216,6 +210,8 @@ type PromotionInput struct {
 	DailyEnd        string     `json:"daily_end"`
 	TotalQuota      *int       `json:"total_quota"`
 	PerPhoneLimit   *int       `json:"per_phone_limit"`
+	// ItemIDs are the dishes of a dish promotion.
+	ItemIDs []int64 `json:"item_ids"`
 }
 
 var hhmm = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
@@ -255,32 +251,14 @@ func (in *PromotionInput) validate() error {
 	case in.TotalQuota != nil && *in.TotalQuota < 1, in.PerPhoneLimit != nil && *in.PerPhoneLimit < 1:
 		return ErrValidation("limits must be at least 1")
 	}
-	switch in.Kind {
-	case "amount_off":
-		if in.Value <= 0 {
-			return ErrValidation("amount off must be greater than 0")
-		}
-		// "spend 100, get 150 off" is almost certainly a typo.
-		if in.Threshold < in.Value {
-			return ErrValidation("the minimum spend must be at least the amount off")
-		}
-		in.MaxDiscount = nil
-	case "percent_off":
-		if in.Value <= 0 || in.Value >= 10000 {
-			return ErrValidation("percent off must be between 0 and 100")
-		}
-		if in.MaxDiscount != nil && *in.MaxDiscount <= 0 {
-			return ErrValidation("the cap must be greater than 0")
-		}
-	case "free_delivery":
-		if !in.AppliesDelivery {
-			return ErrValidation("free delivery only makes sense for delivery orders")
-		}
-		in.Value, in.MaxDiscount, in.AppliesPickup = 0, nil, false
-	default:
-		return ErrValidation("kind must be amount_off, percent_off or free_delivery")
+	r, ok := promoRules[in.Kind]
+	if !ok {
+		return ErrValidation("unknown kind of promotion")
 	}
-	return nil
+	if !r.dish {
+		in.ItemIDs = nil
+	}
+	return r.check(in)
 }
 
 // SavePromotion creates (id 0, as a draft) or edits a promotion. Orders that
@@ -325,6 +303,21 @@ func (a *App) SavePromotion(ctx context.Context, branchID, id int64, in Promotio
 				in.AppliesPickup, in.StartsAt, in.EndsAt, in.DailyStart, in.DailyEnd, in.TotalQuota,
 				in.PerPhoneLimit); err != nil {
 				return err
+			}
+		}
+		// the dishes of a dish promotion: this store's own, not archived
+		if _, err := tx.Exec(ctx, `DELETE FROM promotion_items WHERE promotion_id=$1`, id); err != nil {
+			return err
+		}
+		if len(in.ItemIDs) > 0 {
+			tag, err := tx.Exec(ctx, `INSERT INTO promotion_items (promotion_id, item_id)
+				SELECT $1, m.id FROM menu_items m WHERE m.id = ANY($2) AND m.branch_id = $3 AND NOT m.archived`,
+				id, in.ItemIDs, branchID)
+			if err != nil {
+				return err
+			}
+			if int(tag.RowsAffected()) != len(in.ItemIDs) {
+				return ErrValidation("a chosen dish is not on this store's menu")
 			}
 		}
 		if err := audit(ctx, tx, branchID, 0, actor, "promotion.saved", map[string]any{"promotion_id": id, "input": in}); err != nil {
@@ -416,7 +409,10 @@ func (a *App) TrialPromotions(ctx context.Context, branchID int64, in TrialInput
 	if err != nil {
 		return nil, err
 	}
-	ps, err := loadPromotions(ctx, a.DB, branchID, "p.status <> 'ended' AND p.scope="+scopeSQL(scope), "")
+	// an amount of dishes says nothing of which dishes: the trial is for
+	// promotions on the whole order
+	ps, err := loadPromotions(ctx, a.DB, branchID, "p.status <> 'ended' AND p.kind NOT IN ('dish_percent','dish_second') AND p.scope="+
+		scopeSQL(scope), "")
 	if err != nil {
 		return nil, err
 	}

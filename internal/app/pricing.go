@@ -46,6 +46,15 @@ type Totals struct {
 	Total int64 `json:"total"`
 }
 
+// DishDiscount is what one dish promotion took off an order.
+type DishDiscount struct {
+	PromotionID int64  `json:"promotion_id"`
+	Name        string `json:"name"`
+	NameEn      string `json:"name_en"`
+	Kind        string `json:"kind"`
+	Amount      int64  `json:"amount"`
+}
+
 // ComputeTotals implements docs/DESIGN.md §4.2 for one amount of dishes and
 // a discount on them and on the delivery fee: the delivery fee is not taxed;
 // a discount on dishes lowers what service charge and tax are worked out on.

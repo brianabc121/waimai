@@ -31,6 +31,6 @@ defineProps<{ totals: Totals; currency: string; delivery: boolean; discounts?: O
 
 <style scoped>
 .badge { display: inline-block; font-style: normal; font-size: 11px; line-height: 17px; padding: 0 4px; border-radius: 4px; background: var(--brand); color: #fff; margin-inline-end: 6px; vertical-align: 1px; }
-.badge.promotion { background: #d97706; } .badge.store_delivery { background: #b8792a; } .badge.platform_free { background: #6d28d9; }
+.badge.promotion, .badge.dish_promotion { background: #d97706; } .badge.store_delivery { background: #b8792a; } .badge.platform_free { background: #6d28d9; }
 .plat td:last-child { color: #6d28d9; }
 </style>
