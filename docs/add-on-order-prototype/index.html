@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>加单 · 原型</title>
+<!-- 方案见 ../ADD_ON_ORDER_DESIGN.md。数据都是示意。用系统真实样式表的 .warm 配色，其余样式写在这里。
+     打开 index.html#s1 到 #s6 看各张效果图。 -->
+<link rel="stylesheet" href="../../web/src/styles.css">
+<style>
+  body { margin: 0; background: #ddd; }
+  section { display: none; } section.show { display: block; }
+  .pc { width: 1440px; height: 900px; overflow: hidden; display: flex; position: relative; font-size: 14px; background: #f6f6f4; }
+  .warm { --ok: #2f7d4a; --ok-soft: #e3f1e6; --warn: #c2650a; --warn-soft: #fde9cf; }
+  .ok { --ok: #2f7d4a; --ok-soft: #e3f1e6; --warn: #c2650a; --warn-soft: #fde9cf; }
+
+  /* 商家后台外壳 */
+  .nav { width: 200px; flex: none; background: #1c1f24; color: #d6d8dc; padding: 18px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .nav .brand { font-size: 18px; font-weight: 800; color: #fff; padding: 0 10px 4px; }
+  .nav .role { padding: 0 10px 14px; font-size: 12px; color: #9aa0a8; } .nav .role b { background: #dbe7ff; color: #1d4ed8; border-radius: 999px; padding: 1px 8px; margin-inline-end: 6px; font-weight: 600; }
+  .nav a { padding: 9px 12px; border-radius: 8px; font-size: 15px; color: #d6d8dc; }
+  .nav a.on { background: #2b3037; color: #fff; box-shadow: inset 3px 0 0 #e0582b; }
+  .content { flex: 1; min-width: 0; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; }
+  .hd { display: flex; align-items: center; gap: 12px; }
+  .hd .bk { border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; padding: 6px 12px; font-weight: 600; }
+  .hd h1 { margin: 0; font-size: 24px; }
+  .chip { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12.5px; font-weight: 700; }
+  .chip.blue { background: #dbe7ff; color: #1d4ed8; } .chip.org { background: #fde9cf; color: #c2650a; } .chip.green { background: #e3f1e6; color: #2f7d4a; } .chip.gray { background: #eceef0; color: #6b7280; }
+  .hd .meta { margin-inline-start: auto; color: #6b7280; font-size: 13px; }
+  .cols { display: grid; grid-template-columns: 1fr 380px; gap: 16px; min-height: 0; flex: 1; }
+  .box { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 18px; }
+  .box h3 { margin: 0 0 8px; font-size: 16px; }
+  .seghead { display: flex; align-items: center; gap: 8px; margin: 12px 0 2px; padding: 6px 10px; border-radius: 8px; background: #f4f5f6; font-size: 13px; color: #4b5563; font-weight: 600; }
+  .seghead.add { background: #fff1e2; color: #a2510a; }
+  .seghead.pend { background: #fff7e0; color: #8a5a00; border: 1px dashed #e8b64c; }
+  .seghead .r { margin-inline-start: auto; font-weight: 500; }
+  .ln { display: flex; gap: 10px; padding: 8px 10px; border-bottom: 1px dashed #e5e7eb; font-size: 14px; }
+  .ln .q { width: 40px; color: #6b7280; } .ln .p { margin-inline-start: auto; } .ln small { color: #9a6b3a; }
+  .ln .st { font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 1px 8px; margin-inline-start: 8px; }
+  .tot { display: flex; justify-content: space-between; padding: 6px 10px; font-size: 14px; } .tot.big { font-size: 17px; font-weight: 800; border-top: 1px solid #e5e7eb; padding-top: 10px; margin-top: 4px; }
+  .was { text-decoration: line-through; color: #9ca3af; font-weight: 500; font-size: 13px; margin-inline-end: 6px; }
+  .btn { display: inline-block; border-radius: 10px; padding: 10px 18px; font-weight: 700; font-size: 15px; border: 1px solid #e5e7eb; background: #fff; }
+  .btn.green { background: #1f8a4c; color: #fff; border-color: #1f8a4c; }
+  .btn.red { background: #b8321f; color: #fff; border-color: #b8321f; }
+  .btn.redo { color: #b8321f; border: 1.5px solid #b8321f; }
+  .btn.big { display: block; text-align: center; padding: 14px; font-size: 17px; }
+  .hint { font-size: 12.5px; color: #6b7280; margin-top: 6px; }
+  .callout { border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+  .callout.org { background: #fff4e5; color: #8a4b08; border: 1px solid #f6d4a8; }
+  .callout.blue { background: #eef4ff; color: #1e3a8a; border: 1px solid #cbdaf8; }
+  .anno { position: absolute; background: #ffe76a; color: #3b2a00; font-size: 12.5px; font-weight: 600; padding: 6px 10px; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.18); z-index: 50; max-width: 260px; line-height: 1.45; }
+  .anno::before { content: attr(data-n); display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #3b2a00; color: #ffe76a; font-size: 11px; margin-inline-end: 6px; }
+
+  /* 代客下单（.warm） */
+  .mo { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .motop { height: 58px; background: var(--red-bg, #8f251b); color: #fff; display: flex; align-items: center; gap: 14px; padding: 0 20px; flex: none; }
+  .motop .b { color: var(--gold); font-weight: 600; } .motop h1 { margin: 0; font-size: 20px; } .motop .s { color: #f8dfa6; font-size: 14px; }
+  .motop .pill { margin-inline-start: auto; background: rgba(255,255,255,.14); border: 1px solid rgba(244,207,115,.5); border-radius: 999px; padding: 5px 14px; font-size: 13px; }
+  .mobody { flex: 1; display: flex; min-height: 0; }
+  .moleft { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--paper); }
+  .thead { display: grid; grid-template-columns: 60px 1fr 120px 90px 100px 150px; background: var(--red); color: #fff; font-weight: 700; padding: 10px 16px; font-size: 14px; }
+  .trow { display: grid; grid-template-columns: 60px 1fr 120px 90px 100px 150px; padding: 9px 16px; border-bottom: 1px solid var(--line); align-items: center; font-size: 14px; }
+  .trow.lock { background: #f1e8da; color: #7b6657; }
+  .trow .tag { font-size: 12px; color: #9a6b3a; display: block; }
+  .qbox { display: inline-flex; align-items: center; gap: 8px; } .qbox i { font-style: normal; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--red); color: var(--red); display: grid; place-items: center; font-weight: 800; }
+  .rhead { padding: 7px 16px; font-size: 13px; font-weight: 700; display: flex; gap: 8px; align-items: center; }
+  .rhead.lock { background: #e6d8c4; color: #6b5340; } .rhead.new { background: #fbe7b3; color: #8f251b; }
+  .rhead .r { margin-inline-start: auto; font-weight: 500; }
+  .mobar { margin-top: auto; background: #5a1a12; color: #f6e6d8; padding: 14px 18px; display: flex; align-items: center; gap: 22px; }
+  .mobar .k { font-size: 13px; color: #e2c7b3; } .mobar b { color: #fff; font-size: 16px; }
+  .mobar .cmp { font-size: 15px; } .mobar .cmp b { font-size: 24px; color: var(--gold); }
+  .mobar .up { background: rgba(244,207,115,.18); color: var(--gold); border: 1px solid rgba(244,207,115,.5); border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 700; }
+  .moright { width: 440px; flex: none; background: var(--paper); border-inline-start: 1px solid var(--line); padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .frow { display: grid; grid-template-columns: 76px 1fr; gap: 10px; align-items: center; font-size: 14px; }
+  .frow > span:first-child { color: var(--muted); font-weight: 600; }
+  .ro { background: #f3eadc; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: #5b4636; }
+  .inp { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; color: #a8968a; }
+  .inp.on { border: 2px solid var(--red); color: var(--ink); }
+  .dd { background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 20px rgba(0,0,0,.12); overflow: hidden; margin-top: -4px; }
+  .dd div { padding: 8px 12px; font-size: 14px; display: flex; gap: 10px; } .dd div.on { background: #fbe7b3; } .dd small { margin-inline-start: auto; color: var(--muted); }
+  .wbtn { background: var(--red); color: #fff; border-radius: 12px; text-align: center; padding: 15px 0; font-size: 18px; font-weight: 800; }
+  .wbtn.ghost { background: #fff; color: var(--red); border: 1.5px solid var(--red); padding: 10px 0; font-size: 15px; }
+  .lockbar { background: #fff4e0; border: 1px solid #efcf8f; color: #7a4a0a; border-radius: 10px; padding: 9px 12px; font-size: 13px; }
+
+  /* 弹窗 */
+  .mask { position: absolute; inset: 0; background: rgba(30,20,10,.45); z-index: 20; }
+  .modal { position: absolute; z-index: 30; background: #fff; border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,.35); overflow: hidden; }
+  .modal .mh { padding: 14px 18px; border-bottom: 1px solid #eee; font-size: 18px; font-weight: 800; display: flex; gap: 8px; align-items: center; }
+  .modal .mb { padding: 14px 18px; }
+  .msg { background: #f4f1ea; border-radius: 10px; padding: 12px 14px; font-size: 13.5px; line-height: 1.7; white-space: pre-line; }
+  .ticket { width: 290px; background: #fff; font-family: ui-monospace, Menlo, monospace; padding: 14px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.25); position: absolute; z-index: 30; font-size: 13px; line-height: 1.6; }
+  .ticket .big { font-size: 26px; font-weight: 900; text-align: center; border: 3px solid #000; margin: 6px 0; }
+  .ticket hr { border: 0; border-top: 1px dashed #000; }
+  .phone-frame { width: 390px; height: 844px; border-radius: 44px; background: #111; padding: 12px; box-shadow: 0 16px 40px rgba(0,0,0,.3); }
+  .scr { width: 100%; height: 100%; border-radius: 34px; overflow: hidden; position: relative; display: flex; flex-direction: column; font-size: 14px; }
+
+  /* 顾客端 */
+  .ctop { background: var(--red); color: #fff; padding: 44px 16px 14px; display: flex; align-items: center; gap: 10px; flex: none;
+    background-image: radial-gradient(circle at 0 0, rgba(244,207,115,.18) 0 18px, transparent 19px), radial-gradient(circle at 18px 18px, rgba(244,207,115,.18) 0 18px, transparent 19px); background-size: 36px 36px; }
+  .ctop h2 { margin: 0; font-size: 17px; flex: 1; text-align: center; } .ctop .bk { color: var(--gold); font-size: 22px; width: 24px; }
+  .cbody { flex: 1; overflow: hidden; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
+  .ccard { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .ccard h4 { margin: 0 0 6px; font-size: 15px; }
+  .sline { display: flex; justify-content: space-between; font-size: 13.5px; padding: 4px 0; }
+  .sline .m { color: var(--muted); }
+  .gold-row { background: #fbe7b3; border-radius: 8px; padding: 6px 8px; color: #7a4a0a; font-weight: 700; }
+  .addbtn { border: 1.5px solid var(--red); color: var(--red); background: #fff; border-radius: 12px; padding: 11px; text-align: center; font-weight: 800; font-size: 15px; }
+  .addbtn small { display: block; font-weight: 500; font-size: 12px; color: var(--muted); }
+  .banner { background: linear-gradient(90deg, #f4cf73, #fbe7b3); color: #5a1a12; padding: 9px 14px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex: none; }
+  .banner .x { margin-inline-start: auto; font-weight: 600; border: 1px solid #8f251b; border-radius: 999px; padding: 2px 10px; font-size: 12px; }
+  .cats { width: 84px; flex: none; background: #f3e7d4; font-size: 13px; }
+  .cats div { padding: 14px 8px; color: var(--muted); } .cats div.on { background: var(--paper); color: var(--ink); font-weight: 700; box-shadow: inset 3px 0 0 var(--red); }
+  .dish { display: flex; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .dish .img { width: 72px; height: 72px; border-radius: 10px; flex: none; background: #e9d6b8; display: grid; place-items: center; color: #8f6b4a; font-weight: 800; font-size: 18px; }
+  .dish .t { font-weight: 700; } .dish .pr { color: var(--red); font-weight: 800; margin-top: 6px; display: flex; align-items: center; }
+  .dish .plus { margin-inline-start: auto; width: 26px; height: 26px; border-radius: 50%; background: var(--red); color: #fff; display: grid; place-items: center; font-weight: 800; }
+  .dish .cnt { margin-inline-start: auto; display: flex; gap: 8px; align-items: center; } .dish .cnt i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--red); color: var(--red); display: grid; place-items: center; font-weight: 800; }
+  .cbar { flex: none; background: #3b1f14; color: #fff; display: flex; align-items: center; gap: 10px; padding: 10px 12px 26px; }
+  .cbar .bk2 { width: 46px; height: 46px; border-radius: 50%; background: var(--gold); color: #5a1a12; display: grid; place-items: center; font-weight: 900; position: relative; }
+  .cbar .bk2 i { position: absolute; top: -4px; right: -4px; background: #e03a2a; color: #fff; font-style: normal; font-size: 11px; border-radius: 999px; padding: 0 6px; }
+  .cbar .go { margin-inline-start: auto; background: var(--red); border-radius: 999px; padding: 11px 18px; font-weight: 800; }
+  .pend { background: #fff4e0; border: 1px dashed #e8b64c; border-radius: 10px; padding: 8px 10px; }
+  .stp { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 8px; }
+
+  /* 后厨 / 骑手 */
+  .kds { background: #111418; color: #e8eaed; flex: 1; padding: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-content: start; }
+  .kc { background: #1d2228; border-radius: 12px; overflow: hidden; border: 2px solid #2c333b; }
+  .kc.hot { border-color: #f08a24; box-shadow: 0 0 0 3px rgba(240,138,36,.25); }
+  .kc .kh { padding: 10px 12px; display: flex; gap: 8px; align-items: baseline; background: #262c33; font-weight: 800; font-size: 18px; }
+  .kc .kh small { font-size: 12.5px; color: #9aa4ae; font-weight: 500; } .kc .kh .tm { margin-inline-start: auto; font-size: 14px; color: #ffcf6b; }
+  .kc .ks { padding: 5px 12px; font-size: 12.5px; font-weight: 700; color: #9aa4ae; background: #20262c; }
+  .kc .ks.add { background: #5a3307; color: #ffcf8a; }
+  .kc .ki { padding: 7px 12px; font-size: 16px; display: flex; gap: 8px; border-top: 1px solid #2c333b; }
+  .kc .ki.done { color: #6b747e; text-decoration: line-through; } .kc .ki small { color: #ffcf6b; font-size: 13px; }
+  .kc .ki .b { margin-inline-start: auto; font-size: 12px; background: #2f7d4a; color: #fff; border-radius: 6px; padding: 2px 8px; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<!-- ======================= S1 商家订单详情：加单入口 ======================= -->
+<section id="s1">
+<div class="pc ok">
+  <div class="nav">
+    <div class="brand">马卡蒂小馆</div><div class="role"><b>接单员</b>小林</div>
+    <a class="on">订单</a><a>会员管理</a><a>客户地址</a><a>桌台</a><a>后厨</a><a>消息</a><a>菜单</a><a>骑手</a><a>平台客服</a>
+  </div>
+  <div class="content">
+    <div class="hd"><span class="bk">‹ 订单</span><h1>#A1086</h1><span class="chip org">加单后等菜 · 原已打包</span><span class="chip gray">外卖 · 货到付款</span><span class="meta">11-24 12:41 下单 · 顾客 App</span></div>
+    <div class="cols">
+      <div class="box" style="overflow:hidden">
+        <h3>菜品 <span style="font-weight:500;color:#6b7280;font-size:13px">原单 + 加单 1 次</span></h3>
+        <div class="seghead">原单 · 12:41 · 顾客下单<span class="r">3 份 · ₱360</span></div>
+        <div class="ln"><span class="q">×1</span>海南鸡饭（大）<span class="p">₱199</span></div>
+        <div class="ln"><span class="q">×1</span>干炒牛河 <small>少油</small><span class="p">₱126</span></div>
+        <div class="ln"><span class="q">×1</span>冻柠茶 <small>少冰</small><span class="p">₱35</span></div>
+        <div class="seghead add">加单 1 · 12:55 · 店员 小林（客户微信）<span class="r">2 份 · ₱205</span></div>
+        <div class="ln"><span class="q">×1</span>珍珠奶茶 <small>少糖 · 去冰</small><span class="st" style="background:#fde9cf;color:#c2650a">制作中</span><span class="p">₱85</span></div>
+        <div class="ln"><span class="q">×1</span>盐酥鸡<span class="st" style="background:#fde9cf;color:#c2650a">制作中</span><span class="p">₱120</span></div>
+        <div class="seghead pend">顾客加菜 · 13:02 · 等你确认（还剩 4:12）<span class="r">1 份 · +₱45</span></div>
+        <div class="ln" style="background:#fffbef"><span class="q">×1</span>卤蛋<span class="p">₱45</span></div>
+        <div style="display:flex;gap:10px;padding:8px 10px 4px"><span class="btn green" style="padding:7px 16px">确认加菜</span><span class="btn" style="padding:7px 16px">拒绝…</span><span class="hint" style="margin:auto 0">确认后金额变成 ₱599</span></div>
+        <div style="margin-top:10px">
+          <div class="tot"><span>菜品</span><span>₱565</span></div>
+          <div class="tot"><span>满减 <span class="chip" style="background:#fbe7b3;color:#7a4a0a">升档：满 ₱500 减 ₱60</span></span><span>−₱60</span></div>
+          <div class="tot"><span>配送费</span><span>₱49</span></div>
+          <div class="tot big"><span>合计（骑手收）</span><span><span class="was">₱379</span>₱554</span></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="box">
+          <h3>操作</h3>
+          <span class="btn red big">＋ 加单</span>
+          <div class="hint">骑手取餐前都能加。这单<b>已打包 2 袋</b>，加单后要重新打包。</div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><span class="btn" style="color:#9ca3af;background:#f3f4f6">交给骑手</span><span class="btn">改派骑手</span><span class="btn">联系顾客</span></div>
+          <div class="callout org" style="margin-top:12px">加单 1 的菜还没做好：交给骑手按钮会等这 2 份做好、重新打包后才能点。</div>
+        </div>
+        <div class="box">
+          <h3>顾客和配送</h3>
+          <div class="ln" style="border:0;padding:4px 0"><span style="width:60px;color:#6b7280">顾客</span>Grace · +63 917 555 0013</div>
+          <div class="ln" style="border:0;padding:4px 0"><span style="width:60px;color:#6b7280">地址</span>2975 Kalayaan Ave, 5F</div>
+          <div class="ln" style="border:0;padding:4px 0"><span style="width:60px;color:#6b7280">骑手</span>王师傅 · 已派单，已推送“加单”</div>
+        </div>
+        <div class="box" style="font-size:13px;color:#4b5563;line-height:1.7">
+          <h3>操作记录</h3>
+          12:41 顾客下单 · 12:42 小林 接单<br>12:52 打包完成 2 袋 · 12:53 派给 王师傅<br><b style="color:#a2510a">12:55 小林 加单 2 份 +₱175，退回“等菜”</b><br><b style="color:#8a5a00">13:02 顾客加菜 1 份，等确认</b>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="anno" data-n="1" style="left:1040px;top:670px">截止前一直有“＋加单”，下面一行写清楚能加到什么时候、加了会怎样</div>
+  <div class="anno" data-n="2" style="left:330px;top:720px">菜品按“原单 / 加单 N”分段，写时间和谁加的；和堂食的“第 N 轮”同一个组件</div>
+  <div class="anno" data-n="3" style="left:620px;top:720px">顾客自己加的要确认，5 分钟不处理自动失效</div>
+  <div class="anno" data-n="4" style="left:330px;top:800px">满减按总额重算只升不降；配送费不另收；骑手收新总额</div>
+</div>
+</section>
+
+<!-- ======================= S2 代客下单页：加单模式 ======================= -->
+<section id="s2">
+<div class="pc warm">
+  <div class="nav">
+    <div class="brand">马卡蒂小馆</div><div class="role"><b>接单员</b>小林</div>
+    <a class="on">订单</a><a>会员管理</a><a>客户地址</a><a>桌台</a><a>后厨</a><a>消息</a><a>菜单</a><a>骑手</a>
+  </div>
+  <div class="mo">
+    <div class="motop"><span class="b">‹ 订单 #A1086</span><h1>给 #A1086 加单</h1><span class="s">已打包 · 已派骑手 王师傅</span><span class="pill">骑手取餐前都能加 · 加单后要重新打包</span></div>
+    <div class="mobody">
+      <div class="moleft">
+        <div class="thead"><span>编号</span><span>商品</span><span>数量</span><span>单价</span><span>小计</span><span>备注</span></div>
+        <div class="rhead lock">🔒 原单 · 12:41 · 顾客下单<span class="r">已送厨，不能改</span></div>
+        <div class="trow lock"><span>A1</span><span>海南鸡饭（大）</span><span>1</span><span>₱199</span><span>₱199</span><span></span></div>
+        <div class="trow lock"><span>B3</span><span>干炒牛河</span><span>1</span><span>₱126</span><span>₱126</span><span>少油</span></div>
+        <div class="trow lock"><span>D2</span><span>冻柠茶</span><span>1</span><span>₱35</span><span>₱35</span><span>少冰</span></div>
+        <div class="rhead new">＋ 这次加单<span class="r">2 份 · ₱205</span></div>
+        <div class="trow"><span><b>C3</b></span><span>珍珠奶茶<span class="tag">口味：少糖 · 去冰</span></span><span class="qbox"><i>−</i>1<i>＋</i></span><span>₱85</span><span><b>₱85</b></span><span>少糖 去冰 ▾</span></div>
+        <div class="trow"><span><b>B7</b></span><span>盐酥鸡</span><span class="qbox"><i>−</i>1<i>＋</i></span><span>₱120</span><span><b>₱120</b></span><span style="color:#a8968a">选口味 ▾</span></div>
+        <div style="padding:30px;text-align:center;color:#a8968a">在右边“选择商品”里输编号或菜名，回车加入。原单的菜不能改。</div>
+        <div class="mobar">
+          <span class="k">这次加 <b>2</b> 份 <b>₱205</b></span>
+          <span class="k">配送费 <b>不另收</b></span>
+          <span class="up">满减升档：满 ₱500 减 ₱60（原减 ₱30）</span>
+          <span class="cmp" style="margin-inline-start:auto">₱379 → <b>₱554</b>　多收 <b style="font-size:20px">₱175</b></span>
+        </div>
+      </div>
+      <div class="moright">
+        <div class="lockbar">加单不改顾客、地址和配送费。要改地址请联系顾客后在订单详情里改。</div>
+        <div class="frow"><span>会员</span><div class="ro">#000012 Grace</div></div>
+        <div class="frow"><span>电话</span><div class="ro">+63 917 555 0013</div></div>
+        <div class="frow"><span>地址</span><div class="ro">2975 Kalayaan Ave, 5F</div></div>
+        <div class="frow"><span>配送费</span><div class="ro">₱49（原单已算，不另收）</div></div>
+        <div class="frow"><span>付款</span><div class="ro">货到付款 · 骑手收 ₱554</div></div>
+        <div class="frow" style="margin-top:6px"><span>选择商品</span><div class="inp on">盐</div></div>
+        <div class="dd"><div class="on"><b>B7</b>盐酥鸡<small>₱120</small></div><div><b>B8</b>椒盐排骨<small>₱160</small></div><div><b>S2</b>盐焗鸡翅<small>剩 2</small></div></div>
+        <div class="frow"><span>加单备注</span><div class="inp">顾客和后厨都看得到（选填）</div></div>
+        <div class="frow"><span>店内备注</span><div class="inp">只有店员看得到（选填）</div></div>
+        <div style="margin-top:auto;display:grid;gap:10px">
+          <div class="wbtn">确认加单 · +₱175</div>
+          <div class="wbtn ghost">取消，回到订单</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="anno" data-n="1" style="left:330px;top:470px">原单灰底上锁，只能看；有过加单的也列在这里</div>
+  <div class="anno" data-n="2" style="left:620px;top:470px">新加的菜和代客下单一样：输编号回车，规格、口味模板照旧</div>
+  <div class="anno" data-n="3" style="left:330px;top:560px">底栏改成“前后对比”：原来多少、加后多少、多收多少</div>
+  <div class="anno" data-n="4" style="left:1010px;top:680px">顾客、地址、配送费只读</div>
+</div>
+</section>
+
+<!-- ======================= S3 加单之后 ======================= -->
+<section id="s3">
+<div class="pc warm" style="background:#6b6560">
+  <div class="mask" style="background:rgba(30,20,10,.25)"></div>
+  <div class="modal" style="left:60px;top:70px;width:520px">
+    <div class="mh"><span style="color:#2f7d4a">✓</span>已给 #A1086 加单<span class="chip green" style="margin-inline-start:auto">已复制</span></div>
+    <div class="mb">
+      <div style="font-size:13px;color:#6b7280;margin-bottom:8px">下面这段已经复制好，粘贴回微信给顾客：</div>
+      <div class="msg">Grace，已为您在订单 #A1086 加了：
+C3 珍珠奶茶 ×1（少糖 去冰）₱85
+B7 盐酥鸡 ×1 ₱120
+满减升档：满₱500减₱60
+订单合计改为 ₱554（原 ₱379），和原来的菜一起送，不另收配送费。
+查看进度：https://waimai.example/o/7Kq2…</div>
+      <div style="display:flex;gap:10px;margin-top:14px"><span class="btn">再复制一次</span><span class="btn">打印补单小票</span><span class="btn red" style="margin-inline-start:auto">回到订单</span></div>
+      <div class="hint" style="margin-top:12px">顾客那边也会收到站内消息和新金额。</div>
+    </div>
+  </div>
+  <div class="ticket" style="left:640px;top:70px">
+    <div style="text-align:center;font-weight:700">马卡蒂小馆 · 后厨</div>
+    <div class="big">加单 1</div>
+    <div>原单 <b>#A1086</b> · 外卖 · Grace</div>
+    <div>12:55 · 店员 小林</div>
+    <hr>
+    <div><b>1 × 珍珠奶茶</b></div><div>　· 少糖 · 去冰</div>
+    <div><b>1 × 盐酥鸡</b></div>
+    <hr>
+    <div>和原单一起出餐</div>
+    <div>原单已打包 2 袋，加装后重新封袋</div>
+  </div>
+  <div class="phone-frame" style="position:absolute;z-index:30;left:990px;top:30px;transform:scale(.95);transform-origin:top left">
+    <div class="scr" style="background:#f2f3f5">
+      <div style="padding:46px 16px 10px;background:#fff;font-weight:800;font-size:17px;text-align:center;border-bottom:1px solid #eee">我的任务</div>
+      <div style="margin:10px;background:#fff;border-radius:14px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.08)">
+        <div style="display:flex;gap:8px;align-items:center"><b style="font-size:17px">#A1086</b><span class="chip org">加单</span><span class="chip gray" style="margin-inline-start:auto">等出餐</span></div>
+        <div style="margin-top:6px;color:#4b5563;font-size:13px">2975 Kalayaan Ave, 5F · 1.8 km</div>
+        <div style="margin-top:10px;background:#fff4e5;border:1px solid #f6d4a8;border-radius:10px;padding:10px;font-size:13px;color:#8a4b08">
+          <b>这单加了 2 份菜</b>，后厨在做，打包好后再取。<br>预计出餐 13:08（原 12:52）
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:14px"><span>到门口收款</span><span><span class="was">₱379</span><b style="font-size:20px;color:#b8321f">₱554</b></span></div>
+        <div style="margin-top:12px;background:#e5e7eb;color:#9ca3af;border-radius:10px;text-align:center;padding:12px;font-weight:700">等打包完成再取餐</div>
+      </div>
+      <div style="position:absolute;left:12px;right:12px;top:50px;background:rgba(30,30,30,.92);color:#fff;border-radius:16px;padding:10px 12px;font-size:13px;box-shadow:0 8px 20px rgba(0,0,0,.3)">
+        <b>外卖工作台</b> · 现在<br>#A1086 加了 2 份菜，收款改为 ₱554
+      </div>
+    </div>
+  </div>
+  <div class="anno" data-n="1" style="left:70px;top:520px">弹窗自动复制给顾客的消息（话术可在设置里改）</div>
+  <div class="anno" data-n="2" style="left:640px;top:520px">后厨补单小票只列这次的菜，大字“加单 1”</div>
+  <div class="anno" data-n="3" style="left:640px;top:600px">已派单的骑手收到推送，收款金额自动改</div>
+</div>
+</section>
+
+<!-- ======================= S4 顾客：订单详情加菜入口 → 点餐页加菜模式 ======================= -->
+<section id="s4">
+<div class="pc warm" style="background:#e8e0d4;justify-content:center;align-items:center;gap:70px">
+  <div class="phone-frame">
+    <div class="scr warm">
+      <div class="ctop"><span class="bk">‹</span><h2>订单详情</h2><span style="width:24px"></span></div>
+      <div class="cbody">
+        <div class="ccard">
+          <div style="font-size:19px;font-weight:800">商家正在备餐</div>
+          <div style="color:var(--muted);font-size:13px;margin-top:2px">预计 13:20 送达 · 骑手 王师傅</div>
+          <div class="addbtn" style="margin-top:12px">＋ 加菜<small>骑手取餐前都能加 · 和原来的菜一起送，不另收配送费</small></div>
+        </div>
+        <div class="ccard">
+          <h4>马卡蒂小馆</h4>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px">原单 · 12:41</div>
+          <div class="sline"><span>海南鸡饭（大）×1</span><span>₱199</span></div>
+          <div class="sline"><span>干炒牛河 ×1 <span class="m">少油</span></span><span>₱126</span></div>
+          <div class="sline"><span>冻柠茶 ×1 <span class="m">少冰</span></span><span>₱35</span></div>
+          <div class="sline gold-row" style="margin-top:6px"><span>满减 满₱300减₱30</span><span>−₱30</span></div>
+          <div class="sline"><span class="m">配送费</span><span>₱49</span></div>
+          <div class="sline" style="font-weight:800;font-size:16px;border-top:1px solid var(--line);margin-top:4px;padding-top:8px"><span>货到付款</span><span>₱379</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="font-size:40px;color:#8f251b">→</div>
+  <div class="phone-frame">
+    <div class="scr warm">
+      <div class="ctop"><span class="bk">‹</span><h2>马卡蒂小馆</h2><span style="width:24px"></span></div>
+      <div class="banner">＋ 正在给订单 #A1086 加菜 · 一起送<span class="x">退出加菜</span></div>
+      <div style="flex:1;display:flex;min-height:0;background:var(--paper)">
+        <div class="cats"><div class="on">热销</div><div>饮品</div><div>小吃</div><div>饭类</div><div>面类</div></div>
+        <div style="flex:1;min-width:0">
+          <div class="dish"><div class="img">奶茶</div><div style="flex:1"><div class="t">珍珠奶茶</div><div style="font-size:12px;color:var(--muted)">可选甜度、冰量</div><div class="pr">₱85<span class="cnt"><i>−</i>1<i>＋</i></span></div></div></div>
+          <div class="dish"><div class="img">柠茶</div><div style="flex:1"><div class="t">冻柠茶</div><div style="font-size:12px;color:var(--muted)">原单点过</div><div class="pr">₱35<span class="plus">＋</span></div></div></div>
+          <div class="dish"><div class="img">豆浆</div><div style="flex:1"><div class="t">鲜磨豆浆</div><div style="font-size:12px;color:var(--muted)">冷 / 热</div><div class="pr">₱40<span class="plus">＋</span></div></div></div>
+          <div class="dish"><div class="img">盐酥</div><div style="flex:1"><div class="t">盐酥鸡</div><div style="font-size:12px;color:var(--muted)">月售 320</div><div class="pr">₱120<span class="cnt"><i>−</i>1<i>＋</i></span></div></div></div>
+          <div class="dish"><div class="img">芒果</div><div style="flex:1"><div class="t">芒果西米露</div><div style="font-size:12px;color:var(--muted)">剩 3</div><div class="pr">₱95<span class="plus">＋</span></div></div></div>
+        </div>
+      </div>
+      <div class="cbar"><div class="bk2">篮<i>2</i></div><div><div style="font-weight:800;font-size:17px">+₱205</div><div style="font-size:11.5px;color:#e2c7b3">满减升到减₱60 · 不另收配送费</div></div><span class="go">去加菜</span></div>
+    </div>
+  </div>
+  <div class="anno" data-n="1" style="left:30px;top:620px;max-width:200px">状态卡下面就是“加菜”，写清截止和不另收配送费；骑手取餐后按钮消失</div>
+  <div class="anno" data-n="2" style="left:1205px;top:420px;max-width:200px">点餐页顶上金色横幅表示在“加菜”，购物车和平时的分开</div>
+</div>
+</section>
+
+<!-- ======================= S5 顾客：加菜结算 → 等商家确认 ======================= -->
+<section id="s5">
+<div class="pc warm" style="background:#e8e0d4;justify-content:center;align-items:center;gap:70px">
+  <div class="phone-frame">
+    <div class="scr warm">
+      <div class="ctop"><span class="bk">‹</span><h2>确认加菜</h2><span style="width:24px"></span></div>
+      <div class="cbody">
+        <div class="ccard" style="font-size:13px"><b>送到</b>　2975 Kalayaan Ave, 5F<div style="color:var(--muted);margin-top:4px">和原来的菜一起送 · 骑手 王师傅 · 货到付款</div></div>
+        <div class="ccard">
+          <div class="sline m"><span>原单 3 份（已下单）</span><span>₱360</span></div>
+          <div style="font-size:12px;color:#a2510a;margin:8px 0 2px;font-weight:700">这次加</div>
+          <div class="sline"><span>珍珠奶茶 ×1 <span class="m">少糖 去冰</span></span><span>₱85</span></div>
+          <div class="sline"><span>盐酥鸡 ×1</span><span>₱120</span></div>
+        </div>
+        <div class="ccard">
+          <div class="sline"><span class="m">菜品</span><span>₱565</span></div>
+          <div class="sline gold-row"><span>满减升档 满₱500减₱60</span><span>−₱60 <small style="font-weight:500">（原 −₱30）</small></span></div>
+          <div class="sline"><span class="m">配送费</span><span>₱49 <small class="m">已算，不另收</small></span></div>
+          <div class="sline"><span class="m">优惠券</span><span class="m">这次加菜不能再用券</span></div>
+          <div class="sline" style="border-top:1px solid var(--line);margin-top:4px;padding-top:8px"><span>订单合计</span><span><span class="was">₱379</span><b>₱554</b></span></div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);padding:0 4px">商家确认后才生效。骑手取餐前商家没确认，这次加菜自动取消，不影响原单。</div>
+      </div>
+      <div class="cbar"><div><div style="font-size:12px;color:#e2c7b3">这次多付</div><div style="font-weight:800;font-size:20px;color:var(--gold)">₱175</div></div><span class="go">确认加菜</span></div>
+    </div>
+  </div>
+  <div style="font-size:40px;color:#8f251b">→</div>
+  <div class="phone-frame">
+    <div class="scr warm">
+      <div class="ctop"><span class="bk">‹</span><h2>订单详情</h2><span style="width:24px"></span></div>
+      <div class="cbody">
+        <div class="ccard">
+          <div style="font-size:19px;font-weight:800">商家正在备餐</div>
+          <div style="color:var(--muted);font-size:13px;margin-top:2px">预计 13:20 送达</div>
+          <div class="pend" style="margin-top:10px;font-size:13px;color:#7a4a0a"><b>加菜已提交，等商家确认</b>　还剩 4:12<br>确认后合计变为 ₱554<div style="display:flex;gap:8px;margin-top:8px"><span class="stp" style="border:1px solid #8f251b;color:#8f251b;padding:3px 12px">撤回加菜</span></div></div>
+          <div class="addbtn" style="margin-top:10px;opacity:.55">＋ 再加菜<small>等这次确认后才能再加</small></div>
+        </div>
+        <div class="ccard">
+          <h4>马卡蒂小馆</h4>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px">原单 · 12:41</div>
+          <div class="sline"><span>海南鸡饭（大）×1</span><span>₱199</span></div>
+          <div class="sline"><span>干炒牛河 ×1</span><span>₱126</span></div>
+          <div class="sline"><span>冻柠茶 ×1</span><span>₱35</span></div>
+          <div style="font-size:12px;color:#a2510a;margin:8px 0 4px;font-weight:700;display:flex">加菜 1 · 13:02<span class="stp" style="margin-inline-start:auto;background:#fde9cf;color:#c2650a">等商家确认</span></div>
+          <div class="sline"><span>珍珠奶茶 ×1</span><span>₱85</span></div>
+          <div class="sline"><span>盐酥鸡 ×1</span><span>₱120</span></div>
+          <div class="sline" style="font-weight:800;font-size:16px;border-top:1px solid var(--line);margin-top:6px;padding-top:8px"><span>货到付款</span><span>₱379 <small class="m" style="font-weight:500">确认后 ₱554</small></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="anno" data-n="1" style="left:30px;top:620px;max-width:200px">满减升档金色高亮；配送费不另收；不能再用券</div>
+  <div class="anno" data-n="2" style="left:1150px;top:220px">提交后“等商家确认”，可撤回；5 分钟没确认自动取消</div>
+</div>
+</section>
+
+<!-- ======================= S6 后厨、打包、骑手 + 和堂食统一 ======================= -->
+<section id="s6">
+<div class="pc ok" style="flex-direction:column">
+  <div style="height:52px;background:#1c1f24;color:#fff;display:flex;align-items:center;gap:14px;padding:0 18px;flex:none"><b style="font-size:18px">后厨屏 · 热厨</b><span style="color:#9aa4ae">马卡蒂小馆</span><span style="margin-inline-start:auto;background:#5a3307;color:#ffcf8a;border-radius:999px;padding:4px 12px;font-weight:700">2 单有加单</span></div>
+  <div class="kds">
+    <div class="kc hot">
+      <div class="kh">#A1086 <small>外卖 · Grace</small><span class="tm">14 分</span></div>
+      <div class="ks">原单 · 12:41</div>
+      <div class="ki done">1 海南鸡饭（大）<span class="b">已好</span></div>
+      <div class="ki done">1 干炒牛河 <small>少油</small><span class="b">已好</span></div>
+      <div class="ks add">＋ 加单 1 · 12:55 · 和原单一起出</div>
+      <div class="ki">1 珍珠奶茶 <small>少糖 · 去冰</small></div>
+      <div class="ki">1 盐酥鸡</div>
+    </div>
+    <div class="kc hot">
+      <div class="kh">A3 桌 <small>堂食 · 3 人</small><span class="tm">42 分</span></div>
+      <div class="ks">第 1 轮 · 18:02 · 店员 阿玲</div>
+      <div class="ki done">1 小炒黄牛肉 <small>大份</small><span class="b">已上</span></div>
+      <div class="ks">第 2 轮 · 18:20 · 顾客扫码</div>
+      <div class="ki done">1 蒜蓉菜心<span class="b">已好</span></div>
+      <div class="ks add">＋ 第 3 轮 · 18:44 · 店员 阿玲 · 先上饮料</div>
+      <div class="ki">1 酸菜鱼 <small>微辣</small></div>
+    </div>
+    <div class="kc">
+      <div class="kh">#A1091 <small>自取 · 陈小姐</small><span class="tm">6 分</span></div>
+      <div class="ks">原单 · 12:58</div>
+      <div class="ki">2 扬州炒饭</div>
+      <div class="ki">1 椒盐排骨</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 16px 16px;background:#111418">
+    <div class="box">
+      <h3>打包台 · #A1086 <span class="chip org">加单后重新打包</span></h3>
+      <div class="callout org">已打包 2 袋。加单 1 有 <b>2 份</b>要加装：珍珠奶茶、盐酥鸡（还在做）。</div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:10px"><span>袋数</span><span class="btn">−</span><b style="font-size:20px">3</b><span class="btn">＋</span><span class="btn" style="margin-inline-start:auto;color:#9ca3af;background:#f3f4f6">等菜做好再打包</span></div>
+      <div class="hint">拿旧清单点“打包完成”会被拦下：“订单加了菜，再核对一次”。</div>
+    </div>
+    <div class="box">
+      <h3>同一套“轮次”显示</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+        <div><div class="seghead" style="margin-top:0">原单 · 12:41 · 顾客</div><div class="seghead add">加单 1 · 12:55 · 店员 小林</div><div class="seghead pend">顾客加菜 · 等确认</div><div class="hint">外卖、自取：截止到骑手取餐 / 顾客取走</div></div>
+        <div><div class="seghead" style="margin-top:0">第 1 轮 · 18:02 · 店员</div><div class="seghead">第 2 轮 · 18:20 · 扫码</div><div class="seghead add">第 3 轮 · 18:44 · 店员</div><div class="hint">堂食：截止到结账关台（PR #103）</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="anno" data-n="1" style="left:60px;top:470px">加单在原订单卡里另起一段，橙色“＋加单”，几分钟内闪烁</div>
+  <div class="anno" data-n="2" style="left:520px;top:470px">堂食的新一轮和外卖加单在后厨长一样</div>
+</div>
+</section>
+
+<script>
+  const show = () => { const id = (location.hash || '#s1').slice(1); document.querySelectorAll('section').forEach(s => s.classList.toggle('show', s.id === id)) }
+  addEventListener('hashchange', show); show()
+</script>
+</body>
+</html>
