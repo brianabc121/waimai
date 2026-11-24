@@ -201,7 +201,7 @@ func scopeSQL(scope string) string {
 
 type PromotionInput struct {
 	// Scope is set when the promotion is created and never changes.
-	Scope string `json:"scope"`
+	Scope           string     `json:"scope"`
 	Name            string     `json:"name"`
 	NameEn          string     `json:"name_en"`
 	Kind            string     `json:"kind"`
