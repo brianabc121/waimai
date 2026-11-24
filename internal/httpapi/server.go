@@ -202,6 +202,22 @@ func permError(c *gin.Context, branchID int64, perms []string) error {
 		}
 		return app.Err(http.StatusForbidden, "WORK_SESSION", "sign in to the back office for this")
 	}
+	// A workbench sign-in reaches only what the workbench uses: the live
+	// updates, the menu and stations, and what a station or the packing
+	// counter does (docs/STAFF_ACCESS_DESIGN.md §5.4).
+	if u.Entry == app.EntryWork {
+		for _, p := range perms {
+			if p == needAny || p == needKitchen && u.InStore(branchID) {
+				return true
+			}
+		}
+		if role == "staff" {
+			fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "your role cannot do this"))
+		} else {
+			fail(c, app.Err(http.StatusForbidden, "WORK_SESSION", "sign in to the back office for this"))
+		}
+		return false
+	}
 	for _, p := range perms {
 		switch {
 		case p == needAny,
