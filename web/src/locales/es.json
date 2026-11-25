@@ -3377,5 +3377,12 @@
  "ox.cs.listed": "Últimos {n}",
  "ox.cs.tip": "Introduce lo entregado y confirma; si difiere, se marca como diferencia.",
  "ox.bl.sub": "Pedidos a domicilio y para llevar: importes, quién paga cada descuento, liquidaciones",
- "ox.rc.sub": "Revisa cobros por método, marca pagos en línea, revisa descuentos"
+ "ox.rc.sub": "Revisa cobros por método, marca pagos en línea, revisa descuentos",
+ "al.e.phone_dial": "Escribe un celular +{dial} válido",
+ "al.dial": "Código de país del celular",
+ "dp.title": "Elige un país o región",
+ "dp.search": "Busca un país, región o código",
+ "dp.common": "Frecuentes",
+ "dp.all": "Todos",
+ "dp.none": "Sin resultados"
 }

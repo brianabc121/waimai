@@ -6,11 +6,12 @@ import { ApiError } from '../api'
 import { CONTACT_FIELDS, deleteAddress, deletePhoto, photoUrl, saveAddress, savePhoto, termsText, type Address, type AddressInput, type DeliveryTerms } from '../addresses'
 import { cart } from '../cart'
 import { customer } from '../customer'
-import { DIALS, dialOf, e164, phoneOk as validPhone, splitPhone } from '../dial'
+import { dialOf, e164, phoneOk as validPhone, SAMPLE, splitPhone } from '../dial'
 import { t } from '../i18n'
 import { mallSpot } from '../mall'
 import { mapsKey } from '../maps'
 import { shrink } from '../photo'
+import DialPicker from './DialPicker.vue'
 import PlacePicker, { type Picked } from './PlacePicker.vue'
 
 const props = defineProps<{
@@ -164,8 +165,8 @@ const titles = ['mr', 'ms'] as const
             <label class="l" for="af-phone">{{ t('ad.f.phone') }}<i class="req">*</i></label>
             <span class="v">
               <span class="af-phone">
-                <select v-model="dial" :aria-label="t('ad.f.dial')" data-testid="af-dial"><option v-for="d in DIALS" :key="d" :value="d">+{{ d }}</option></select>
-                <input id="af-phone" v-model="f.phone" type="tel" inputmode="tel" maxlength="18" autocomplete="tel-national" :placeholder="dial === '63' ? '9XX XXX XXXX' : t('ad.f.phone_ph')" data-testid="af-phone" />
+                <DialPicker v-model="dial" :first="country" :label="t('ad.f.dial')" testid="af-dial" class="af-dial" />
+                <input id="af-phone" v-model="f.phone" type="tel" inputmode="tel" maxlength="18" autocomplete="tel-national" :placeholder="SAMPLE[dial] ?? t('ad.f.phone_ph')" data-testid="af-phone" />
               </span>
               <span class="hint" v-if="prefilled">{{ t('ad.f.phone_hint') }}</span>
             </span>
@@ -271,11 +272,7 @@ const titles = ['mr', 'ms'] as const
 
 /* telephone: the country code, then the number */
 .af-phone { display: flex; align-items: center; }
-.af-phone select { width: auto; flex: none; border: 0; border-inline-end: 1px solid var(--af-line); border-radius: 0; background: none; padding: 4px 22px 4px 0; margin-inline-end: 14px;
-  font-weight: 600; font-size: 15px; cursor: pointer; appearance: none; -webkit-appearance: none;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a7b6d' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center; }
-.af-phone select:focus { outline: none; }
-.af-phone select:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+.af-phone :deep(.af-dial) { background: none; border-radius: 0; border-inline-end: 1px solid var(--af-line); padding: 4px 12px 4px 0; margin-inline-end: 14px; font-size: 15px; }
 
 /* photo of the door */
 .af-photo img { display: block; width: 120px; height: 90px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; }

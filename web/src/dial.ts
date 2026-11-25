@@ -1,5 +1,5 @@
-// Telephone country codes. The address form starts on the code of the country
-// the store is in; the customer can pick another for a number from abroad.
+// Telephone country codes. The login page and the address form start on the
+// code of the country the store is in; the customer can pick another.
 
 // ISO 3166-1 alpha-2 → country calling code
 export const CODES: Record<string, string> = {
@@ -21,7 +21,8 @@ export const CODES: Record<string, string> = {
   UY: '598', UZ: '998', VA: '39', VC: '1', VE: '58', VG: '1', VI: '1', VN: '84', VU: '678', WS: '685', XK: '383', YE: '967', ZA: '27', ZM: '260', ZW: '263',
 }
 
-// The code used where the store's country is not known (yet): customers log in with a number of this country.
+// The code used where nothing else says which: the country the system started
+// in, and how a number written without a code is read (internal/app/auth.go).
 export const HOME_DIAL = '63'
 
 // Every code once, smallest first, for the picker.
@@ -39,22 +40,51 @@ export function splitPhone(p: string): { dial: string; local: string } | null {
 }
 
 // What was typed after the code, as the digits to dial from abroad: no
-// spaces, no leading 0, and not the code written out a second time.
+// spaces, no leading 0 (except in Italy, where it is part of the number), and
+// not the code written out a second time.
 export function localDigits(dial: string, typed: string): string {
   let d = typed.replace(/\D/g, '')
   if (typed.trim().startsWith('+') && d.startsWith(dial)) d = d.slice(dial.length)
+  else if (typed.trim().startsWith('00') && d.startsWith('00' + dial)) d = d.slice(2 + dial.length)
   if (dial === '63') d = d.replace(/^63(?=9\d{9}$)/, '')
-  return d.replace(/^0+/, '')
+  return dial === '39' ? d : d.replace(/^0+/, '')
 }
 
-// A Philippine mobile number is 9XX XXX XXXX. Elsewhere only the length is
-// checked: a whole number is at most 15 digits.
-export function phoneOk(dial: string, typed: string): boolean {
+// Mobile numbers of these countries are checked digit by digit; elsewhere
+// only the length is (a whole number is 7 to 15 digits). The same rules as
+// normalizeE164 in internal/app/auth.go.
+const MOBILE: Record<string, RegExp> = { '63': /^9\d{9}$/, '86': /^1\d{10}$/ }
+
+// mobile: the number must be able to receive a text (the login number). A
+// number to call may be a landline, except in the home country as before.
+export function phoneOk(dial: string, typed: string, mobile = false): boolean {
   const d = localDigits(dial, typed)
-  return dial === '63' ? /^9\d{9}$/.test(d) : d.length >= 5 && dial.length + d.length >= 7 && dial.length + d.length <= 15
+  const re = MOBILE[dial]
+  if (re && (mobile || dial === HOME_DIAL)) return re.test(d)
+  return d.length >= 5 && dial.length + d.length >= 7 && dial.length + d.length <= 15
 }
+
+// What a number of the country looks like, for the empty box.
+export const SAMPLE: Record<string, string> = { '63': '9XX XXX XXXX', '86': '1XX XXXX XXXX' }
 
 export const e164 = (dial: string, typed: string) => `+${dial}${localDigits(dial, typed)}`
+
+// Where most overseas Chinese customers are from or live, first in the picker.
+export const COMMON = ['CN', 'HK', 'MO', 'TW', 'SG', 'MY', 'PH', 'TH', 'ID', 'VN', 'MM', 'KH', 'LA', 'BN',
+  'US', 'CA', 'AU', 'NZ', 'GB', 'FR', 'DE', 'IT', 'ES', 'NL', 'JP', 'KR', 'AE']
+
+// The country's name in the given language ("PH", "zh-CN" → "菲律宾").
+export function countryName(cc: string, lang: string): string {
+  try { return new Intl.DisplayNames([lang, 'en'], { type: 'region' }).of(cc) ?? cc } catch { return cc }
+}
+
+// The region the browser is set to ("en-PH" → "PH"), if it names one.
+export function browserCountry(): string {
+  for (const l of navigator.languages ?? [navigator.language]) {
+    try { const r = new Intl.Locale(l).maximize().region; if (r && CODES[r]) return r } catch { /* not a tag */ }
+  }
+  return ''
+}
 
 // "+63 917 555 0123"; other countries as the code and the number.
 export function prettyPhone(p: string): string {

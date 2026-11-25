@@ -60,7 +60,7 @@ async function load() {
     pruneNoteTags(items.value)
     document.title = sn(s.branch)
     // "Home" in the bottom navigation comes back to the store last looked at.
-    rememberStore({ slug: props.slug, name: sn(s.branch), currency: s.branch.currency })
+    rememberStore({ slug: props.slug, name: sn(s.branch), currency: s.branch.currency, country: s.branch.country_code })
     void isFavorite(props.slug).then(on => { favorite.value = on }).catch(() => null)
     void loadProfile()
     // Fall back to a service the store actually offers.

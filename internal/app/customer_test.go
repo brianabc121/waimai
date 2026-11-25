@@ -14,7 +14,7 @@ func freshPhone() string { return fmt.Sprintf("+6394%08d", time.Now().UnixNano()
 func TestCustomerPhoneFormats(t *testing.T) {
 	a := need(t)
 	ctx := context.Background()
-	for _, bad := range []string{"12345", "+8613800138000", "+63 2 8123 4567", "0917 555 012", "+63917555012345"} {
+	for _, bad := range []string{"12345", "+86 138 0013 800", "+999 1234 5678", "+63 2 8123 4567", "0917 555 012", "+63917555012345"} {
 		_, err := a.RequestOTP(ctx, bad, "")
 		wantCode(t, err, "PHONE_INVALID")
 	}
@@ -35,6 +35,17 @@ func TestCustomerPhoneFormats(t *testing.T) {
 	noErr(t, a.CustomerLogout(ctx, token))
 	_, err = a.CustomerBySession(ctx, token)
 	wantCode(t, err, "PHONE_NOT_VERIFIED")
+
+	// A number of another country logs in with its calling code, and
+	// 00 86 ... is the same account as +86 ...
+	cn := fmt.Sprintf("139%08d", time.Now().UnixNano()%1e8)
+	code, err = a.RequestOTP(ctx, "+86 "+cn, "")
+	noErr(t, err)
+	_, phone, err = a.VerifyOTP(ctx, "0086"+cn, code)
+	noErr(t, err)
+	if phone != "+86"+cn {
+		t.Fatalf("a mainland China number normalised to %s", phone)
+	}
 }
 
 func TestCustomerAccountIsKeptAcrossLogins(t *testing.T) {

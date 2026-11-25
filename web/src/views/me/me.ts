@@ -4,6 +4,7 @@ import { del, get, post, put, upload } from '../../api'
 import { customer, loadCustomer } from '../../customer'
 import { currencySymbol, extend, has, intlTag, money, pick, t } from '../../i18n'
 import { couponTitle } from '../../coupons'
+import { HOME_DIAL, splitPhone } from '../../dial'
 import './messageStrings'
 import type { Promotion } from '../../types'
 
@@ -91,17 +92,19 @@ export const platformInfo = () => get<PlatformInfo>('/platform/info')
 
 // ---- "home" is the marketplace; the last store is still remembered ----
 // The last store the customer looked at on this device.
-export interface HomeStore { slug: string; name: string; currency: string }
+export interface HomeStore { slug: string; name: string; currency: string; country?: string }
 export function homeStore(): HomeStore | null {
   try { const h = JSON.parse(localStorage.getItem('home_store') || 'null'); return h && typeof h.slug === 'string' ? h : null } catch { return null }
 }
 export function rememberStore(h: HomeStore) { localStorage.setItem('home_store', JSON.stringify(h)) }
 export const homePath = () => '/'
 
-// +639175550123 -> 0917 *** 0123: what stands in for a name nobody has set.
+// +639175550123 -> 0917 *** 0123, +8613800138000 -> +86 138 *** 8000: what
+// stands in for a name nobody has set.
 export function maskedPhone(p: string): string {
-  const d = p.replace(/^\+\d{2}/, '0')
-  return d.length >= 8 ? `${d.slice(0, 4)} *** ${d.slice(-4)}` : p
+  const sp = splitPhone(p)
+  if (!sp || sp.local.length < 7) return p
+  return sp.dial === HOME_DIAL ? `0${sp.local.slice(0, 3)} *** ${sp.local.slice(-4)}` : `+${sp.dial} ${sp.local.slice(0, 3)} *** ${sp.local.slice(-4)}`
 }
 export const displayName = (p: Profile) => p.nickname || maskedPhone(p.phone)
 

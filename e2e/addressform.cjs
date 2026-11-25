@@ -5,7 +5,7 @@
 ;(async () => {
 const { chromium } = require('playwright')
 const fs = require('fs')
-const { addAddress } = require('./lib.cjs')
+const { addAddress, pickZone } = require('./lib.cjs')
 
 const BASE = process.env.BASE_URL || 'http://localhost:8080'
 const SHOTS = process.env.SHOTS_DIR || 'e2e/shots'
@@ -39,7 +39,7 @@ const ask = async (fields) => {
   const box = name => owner.locator(`${tid('contact-fields')} input[value=${name}]`)
   await box('wechat').waitFor()
   for (const f of ['wechat', 'telegram', 'line', 'whatsapp']) await box(f).setChecked(fields.includes(f))
-  await owner.locator(`form:has(${tid('contact-fields')}) button.primary`).click()
+  await owner.locator(`form:has(${tid('contact-fields')}) .setfoot button.primary`).click()
   await owner.waitForSelector('.banner.ok')
 }
 
@@ -72,7 +72,7 @@ const shown = async () => {
   return out.join(',')
 }
 if ((await shown()) !== 'wechat,line,whatsapp') throw new Error('the form asks for ' + await shown())
-if ((await page.inputValue(tid('af-dial'))) !== '63' || (await page.inputValue(tid('af-phone'))) !== local) throw new Error('the phone should start as +63 and the login number')
+if ((await page.getAttribute(tid('af-dial'), 'data-dial')) !== '63' || (await page.inputValue(tid('af-phone'))) !== local) throw new Error('the phone should start as +63 and the login number')
 await page.screenshot({ path: `${SHOTS}/af2-form-empty.png` })
 await page.fill(tid('af-line'), 'wang.line')
 await page.fill(tid('af-whatsapp'), '+63 917 555 0123')
@@ -83,6 +83,7 @@ if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth 
   throw new Error('the form is wider than the screen')
 await addAddress(page, { name: '王小明', unit: '12F', wechat: 'wang88', photo: true })
 await page.waitForSelector('.totals')
+await pickZone(page)
 step('the form shows those three and not Telegram; the phone starts as +63 with the login number')
 
 await page.locator('.bottombar .btn.primary').click()
@@ -120,7 +121,7 @@ await page.click(tid('my-addresses'))
 await page.click(tid('address-new'))
 await page.waitForSelector(tid('address-form'))
 // the login number is not a number of that country, so it is not filled in
-if ((await page.inputValue(tid('af-dial'))) !== '65' || (await page.inputValue(tid('af-phone'))) !== '') throw new Error('a store in Singapore should start on +65 with no number')
+if ((await page.getAttribute(tid('af-dial'), 'data-dial')) !== '65' || (await page.inputValue(tid('af-phone'))) !== '') throw new Error('a store in Singapore should start on +65 with no number')
 await page.click(tid('af-save'))
 await page.fill(tid('af-phone'), '12')
 await page.fill(tid('af-name'), '陈')
@@ -130,7 +131,7 @@ await addAddress(page, { name: '陈大文', unit: '5A' })
 await page.locator(`${tid('address-row')}:has-text("+65 91234567")`).waitFor()
 // an address keeps the code it was saved with, whatever store it is opened from
 await page.click(`${tid('address-row')}:has-text("12F") ${tid('address-edit')}`)
-if ((await page.inputValue(tid('af-dial'))) !== '63' || (await page.inputValue(tid('af-phone'))) !== local) throw new Error('a saved number keeps its own code')
+if ((await page.getAttribute(tid('af-dial'), 'data-dial')) !== '63' || (await page.inputValue(tid('af-phone'))) !== local) throw new Error('a saved number keeps its own code')
 step('a store in Singapore starts on +65; saved numbers keep their own code')
 await ctx.close()
 } finally {

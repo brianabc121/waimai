@@ -41,6 +41,25 @@ await page.goto(BASE + '/s/makati/checkout')
 await page.waitForURL(u => u.pathname === '/account/login')
 await page.waitForSelector(tid('login-phone'))
 
+// The code starts on the store's country. Another can be searched and picked,
+// or typed with the number, which moves it to the picker.
+const dialNow = () => page.getAttribute(tid('login-dial'), 'data-dial')
+if ((await dialNow()) !== '63') throw new Error('the code should start on the store\'s country')
+await page.click(tid('login-dial'))
+await page.locator(`${tid('dial-sheet')} :text("常用")`).waitFor()
+await shot('ac1b-dial-picker')
+await page.fill(tid('dial-search'), '新加坡')
+await page.click(`${tid('dial-sheet')} .dp-row[data-cc=SG]`)
+if ((await dialNow()) !== '65') throw new Error('Singapore should give +65')
+await page.fill(tid('login-phone'), '+86 138 0013 8000')
+await page.locator(tid('login-phone')).blur()
+if ((await dialNow()) !== '86' || (await page.inputValue(tid('login-phone'))) !== '13800138000') throw new Error('a number typed with +86 should move the code to the picker')
+await page.click(tid('login-dial'))
+await page.fill(tid('dial-search'), '+63')
+await page.click(`${tid('dial-sheet')} .dp-row[data-cc=PH]`)
+if ((await dialNow()) !== '63') throw new Error('back to +63')
+step('the country code follows the store, and can be searched, picked or typed with the number')
+
 // A wrong number and a missing tick are caught before anything is sent.
 await page.fill(tid('login-phone'), '12345')
 await page.click(tid('login-send'))
@@ -82,7 +101,7 @@ await page.waitForSelector(tid('address-form'))
 if ((await page.inputValue(tid('af-phone'))) !== local) throw new Error('a new address should start with the login number')
 // The telephone code is that of the store's country (the Philippines), and
 // only the contact names this store asks for are on the form.
-if ((await page.inputValue(tid('af-dial'))) !== '63') throw new Error('the telephone code should follow the store\'s country')
+if ((await page.getAttribute(tid('af-dial'), 'data-dial')) !== '63') throw new Error('the telephone code should follow the store\'s country')
 await page.waitForSelector(tid('af-wechat'))
 await page.waitForSelector(tid('af-telegram'))
 if (await page.locator(`${tid('af-line')}, ${tid('af-whatsapp')}`).count()) throw new Error('LINE and WhatsApp are not asked for by this store')

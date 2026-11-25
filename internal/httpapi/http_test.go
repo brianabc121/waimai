@@ -234,7 +234,7 @@ func TestCustomerAccount(t *testing.T) {
 	if s := anon.want(200, "", "GET", "/customer/session", nil); s["verified"] != false {
 		t.Fatalf("anonymous session: %v", s)
 	}
-	anon.want(422, "PHONE_INVALID", "POST", "/otp/request", map[string]string{"phone": "+8613800138000"})
+	anon.want(422, "PHONE_INVALID", "POST", "/otp/request", map[string]string{"phone": "+86 138 0013 800"})
 
 	cust := verifiedCustomer(t)
 	s := cust.want(200, "", "GET", "/customer/session", nil)
