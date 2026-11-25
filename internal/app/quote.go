@@ -70,6 +70,9 @@ type LineOption struct {
 	Topping bool `json:"topping,omitempty"`
 }
 
+// maxOptionPortions is how many of one option a staff line may hold.
+const maxOptionPortions = 20
+
 // isTopping says whether a chosen option is an extra (加料), as LineOption.Topping.
 func isTopping(g OptionGroup, o Option) bool {
 	return g.ToppingTemplateID != nil || (g.MinSelect == 0 && o.PriceDelta > 0)
@@ -395,14 +398,21 @@ func priceLines(ctx context.Context, q Querier, branchID int64, service string, 
 		matched := 0
 		optionGone := false
 		for _, g := range it.Groups {
+			// n counts the kinds chosen: a group's min and max are about how
+			// many different options, so staff may add two portions of one
+			// topping (up to maxOptionPortions) without using up the group.
 			n := 0
 			for _, o := range g.Options {
 				k := chosen[o.ID]
 				if k == 0 {
 					continue
 				}
+				if k > maxOptionPortions {
+					return nil, 0, ErrD(http.StatusUnprocessableEntity, "OPTIONS_INVALID", "too many portions of one option",
+						map[string]any{"item_id": it.ID, "group_id": g.ID})
+				}
 				matched++
-				n += k
+				n++
 				if o.SoldOut {
 					optionGone = true
 				}

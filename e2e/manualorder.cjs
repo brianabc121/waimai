@@ -59,7 +59,17 @@ await page.fill(tid('mo-addon-q'), '九层塔')
 await page.press(tid('mo-addon-q'), 'Enter')
 await page.waitForSelector(`${tid('mo-addon')}:has-text("加九层塔")`)
 expect((await text(page, tid('mo-addon'))).includes(' 2 '), true, 'two portions of basil: ' + await text(page, tid('mo-addon')))
-step('an add-on counted twice')
+// the group allows two kinds, not two portions: a third basil and a garlic still go in
+await page.fill(tid('mo-addon-q'), '九层塔')
+await page.press(tid('mo-addon-q'), 'Enter')
+await page.fill(tid('mo-addon-q'), '加蒜')
+await page.press(tid('mo-addon-q'), 'Enter')
+await page.waitForSelector(`${tid('mo-addon')}:has-text("加蒜")`)
+expect((await text(page, `${tid('mo-addon')}:has-text("九层塔")`)).includes(' 3 '), true, 'three portions of basil: ' + await text(page, tid('mo-addon')))
+await page.click(`${tid('mo-addon')}:has-text("九层塔") button:has-text("−")`)
+await page.click(`${tid('mo-addon')}:has-text("加蒜") button:has-text("−")`)
+await page.waitForSelector(`${tid('mo-addon')}:has-text("加蒜")`, { state: 'detached' })
+step('an add-on counted twice; the group limit is on kinds, so a third portion and a second kind fit')
 
 // a new member: the next number, held for an hour
 await page.click(tid('mo-new-member'))
