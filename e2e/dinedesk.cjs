@@ -51,6 +51,12 @@ const expectText = async (loc, re, what) => { const s = await loc.innerText(); i
 const BEEF = 5, RICE = 4, TEA = 9   // seed: 牛肉面 (spice required + flavour notes), 卤肉饭, 珍珠奶茶 (notes)
 
 // ---------- iPad, landscape ----------
+// voiding a dish already made needs a manager's code: the owner sets one first
+const owner = await open({ width: 1280, height: 800 }, false)
+await login(owner, 'owner1')
+await api(owner, 'PUT', '/auth/approve-pin', { pin: '246810', password: 'demo1234' })
+await owner.context().close()
+
 const pad = await open({ width: 1180, height: 820 })
 await login(pad, 'cashier1')
 await pad.goto(BASE + '/merchant/orders/new')
@@ -144,6 +150,13 @@ await pad.waitForSelector(tid('void-stage'))
 await pad.locator(tid('void-reason')).first().click()
 await shot(pad, 'dd07-void')
 await pad.click(tid('void-ok'))
+// the rice was already made, so it is a loss and a manager approves it
+// (the manager's code is the one thing typed, so the focus count restarts after it)
+await pad.waitForSelector(tid('approve-dialog'))
+await noTyping(pad, 'before the manager code')
+await pad.fill(tid('approve-pin'), '246810')
+await pad.click(tid('approve-go'))
+await pad.evaluate(() => (window.__typed = []))
 await pad.locator(`${tid('dd-bill-item')}.void`).waitFor()
 await expectText(pad.locator(`${tid('dd-bill-item')}:has-text("卤肉饭"):not(.void)`), /×1/, 'rice left after voiding one')
 step('served the noodles; voided one of the two rice with a tapped reason')
@@ -186,8 +199,8 @@ await shot(pad, 'dd10-closed')
 await pad.click(tid('dd-done'))
 await pad.locator(`${tid(`dd-table-${B}`)}.free`).waitFor()
 const closed = await api(pad, 'GET', `/merchant/table-sessions/${bill03.session_id}`)
-if (closed.status !== 'closed' || closed.order.pay_method !== '现金' || closed.order.amount_received <= closed.order.totals.total)
-  throw new Error(`closed bill: ${closed.status} ${closed.order.pay_method} ${closed.order.amount_received}/${closed.order.totals.total}`)
+if (closed.status !== 'closed' || closed.order.pay_type !== 'cash' || closed.order.amount_received <= closed.order.totals.total)
+  throw new Error(`closed bill: ${closed.status} ${closed.order.pay_type} ${closed.order.amount_received}/${closed.order.totals.total}`)
 await noTyping(pad, 'iPad')
 step(`paid in cash with change and closed table ${B}; the iPad never focused a text box`)
 
