@@ -3390,5 +3390,7 @@
  "cm.members": "會員列表",
  "cm.addresses": "送餐地址",
  "deco.nav": "店鋪裝修",
- "fin.nav": "財務"
+ "fin.nav": "財務",
+ "nav.expand": "展開",
+ "nav.collapse": "收起"
 }

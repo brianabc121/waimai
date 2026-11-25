@@ -3390,5 +3390,7 @@
  "cm.members": "Danh sách hội viên",
  "cm.addresses": "Địa chỉ giao hàng",
  "deco.nav": "Trang trí cửa hàng",
- "fin.nav": "Tài chính"
+ "fin.nav": "Tài chính",
+ "nav.expand": "Mở rộng",
+ "nav.collapse": "Thu gọn"
 }

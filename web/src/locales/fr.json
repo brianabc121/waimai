@@ -3390,5 +3390,7 @@
  "cm.members": "Liste des membres",
  "cm.addresses": "Adresses de livraison",
  "deco.nav": "Habillage de la boutique",
- "fin.nav": "Finances"
+ "fin.nav": "Finances",
+ "nav.expand": "Déplier",
+ "nav.collapse": "Replier"
 }

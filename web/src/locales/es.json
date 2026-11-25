@@ -3390,5 +3390,7 @@
  "cm.members": "Lista de socios",
  "cm.addresses": "Direcciones de entrega",
  "deco.nav": "Diseño de la tienda",
- "fin.nav": "Finanzas"
+ "fin.nav": "Finanzas",
+ "nav.expand": "Desplegar",
+ "nav.collapse": "Plegar"
 }

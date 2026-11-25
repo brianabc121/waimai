@@ -3390,5 +3390,7 @@
  "cm.members": "قائمة الأعضاء",
  "cm.addresses": "عناوين التوصيل",
  "deco.nav": "تصميم المتجر",
- "fin.nav": "المالية"
+ "fin.nav": "المالية",
+ "nav.expand": "توسيع",
+ "nav.collapse": "طي"
 }

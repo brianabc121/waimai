@@ -3390,5 +3390,7 @@
  "cm.members": "会員一覧",
  "cm.addresses": "配達先住所",
  "deco.nav": "店舗デザイン",
- "fin.nav": "財務"
+ "fin.nav": "財務",
+ "nav.expand": "展開",
+ "nav.collapse": "折りたたむ"
 }

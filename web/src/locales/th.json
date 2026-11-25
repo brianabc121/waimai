@@ -3390,5 +3390,7 @@
  "cm.members": "รายชื่อสมาชิก",
  "cm.addresses": "ที่อยู่จัดส่ง",
  "deco.nav": "ตกแต่งร้าน",
- "fin.nav": "การเงิน"
+ "fin.nav": "การเงิน",
+ "nav.expand": "ขยาย",
+ "nav.collapse": "ย่อ"
 }

@@ -2,7 +2,7 @@
 // dine-in desk) and 外卖下单 (delivery and pickup). Each is its own page with
 // no switch between them; old /merchant/orders/new links land on the page they
 // meant; each page follows its own permission. Run on a computer, a tablet and
-// a phone. 消息 groups 客户消息 (customers' chats) and 平台消息 (platform support).
+// a phone. Every group with pages under it folds and starts folded. 消息 groups 客户消息 (customers' chats) and 平台消息 (platform support).
 // Usage: BASE_URL=http://localhost:8080 node e2e/pospages.cjs   (needs seed data)
 const { chromium, devices } = require('playwright')
 const { mkdirSync } = require('node:fs')
@@ -39,8 +39,14 @@ const api = (page, method, url, body) => page.evaluate(async ([method, url, body
   return r.json()
 }, [method, url, body])
 // the side menu: a column on a computer, a drawer behind ☰ on a tablet or a phone
+// Pages under a group may be folded away: open the group first.
+const GROUP = { 'nav-pos-dine': 'nav-pos', 'nav-pos-delivery': 'nav-pos', 'nav-members': 'nav-cm', 'nav-addresses': 'nav-cm',
+  'nav-messages': 'nav-msg', 'nav-support': 'nav-msg' }
 async function nav(page, id) {
-  if (!(await page.locator(tid(id)).isVisible())) await page.click(tid('nav-open'))
+  const head = GROUP[id] ? tid(GROUP[id]) : tid(id)
+  if (!(await page.locator(head).isVisible())) await page.click(tid('nav-open'))
+  await page.locator(head).waitFor({ state: 'visible' })
+  if (!(await page.locator(tid(id)).count())) await page.click(head)
   await page.click(tid(id))
 }
 
@@ -58,27 +64,39 @@ for (const [name, opts] of sizes) {
   if (name === 'pc') owner = page
   if (await page.locator(tid('nav-open')).isVisible()) await page.click(tid('nav-open'))
   await page.locator(tid('nav-pos')).waitFor({ state: 'visible' })
-  expect((await page.locator(tid('nav-pos')).innerText()).trim(), '点单', `${name}: menu group`)
-  expect((await page.locator(tid('nav-pos-dine')).innerText()).trim(), '堂食下单', `${name}: dine-in link`)
-  expect((await page.locator(tid('nav-pos-delivery')).innerText()).trim(), '外卖下单', `${name}: delivery link`)
-  // the group comes first, above "orders"
-  const order = await page.locator('.shell-links > *').evaluateAll(els => els.map(e => e.getAttribute('data-testid') || e.textContent.trim()))
-  expect(order.slice(0, 4).join(','), 'nav-pos,nav-pos-dine,nav-pos-delivery,订单', `${name}: menu order`)
-  // 消息: customer messages and platform messages under one group
-  expect((await page.locator(tid('nav-msg')).innerText()).trim(), '消息', `${name}: messages group`)
-  const msgs = await page.locator('.shell-links > *').evaluateAll(els => els.map(e => e.getAttribute('data-testid')))
-  const at = msgs.indexOf('nav-msg')
-  expect(msgs.slice(at, at + 3).join(','), 'nav-msg,nav-messages,nav-support', `${name}: messages group order`)
-  expect((await page.locator(tid('nav-messages')).innerText()).trim(), '客户消息', `${name}: customer messages link`)
-  expect((await page.locator(tid('nav-support')).innerText()).trim(), '平台消息', `${name}: platform messages link`)
-  // 客户管理, 店铺装修, 财务: more groups, each followed by its pages
-  const links = await page.locator('.shell-links > *').evaluateAll(els => els.map(e => [e.getAttribute('data-testid'), e.textContent.trim()]))
-  for (const [grp, want] of [['nav-cm', '客户管理,会员列表,送餐地址'], ['nav-deco', '店铺装修,宣传物料,模板'], ['nav-fin', '财务,核款,账单,对账']]) {
-    const i = links.findIndex(l => l[0] === grp), n = want.split(',').length
-    expect(links.slice(i, i + n).map(l => l[1]).join(','), want, `${name}: ${grp} group`)
-  }
+  const menu = () => page.locator('.shell-links > *').evaluateAll(els => els.map(e => e.getAttribute('data-testid') || e.textContent.trim()))
+  // every group with pages under it starts folded (the orders page is in none of them)
+  expect((await menu()).slice(0, 8).join(','), 'nav-pos,订单,nav-cm,桌台,后厨,nav-msg,菜单,nav-deco', `${name}: folded menu`)
+  for (const id of ['nav-pos-dine', 'nav-progress', 'nav-members', 'nav-messages', 'nav-media', 'nav-cash'])
+    expect(await page.locator(tid(id)).count(), 0, `${name}: ${id} folded away`)
   await page.waitForTimeout(300)   // the drawer slides in
-  await page.screenshot({ path: `${SHOTS}/pos-${name}-menu.png` })
+  await page.screenshot({ path: `${SHOTS}/fold-${name}-folded.png` })
+  for (const id of ['nav-pos', 'nav-orders-fold', 'nav-cm', 'nav-msg', 'nav-deco', 'nav-fin']) await page.click(tid(id))
+  expect(await page.locator(tid('nav-pos')).getAttribute('aria-expanded'), 'true', `${name}: 点单 opened`)
+  const opened = await menu()
+  for (const want of ['nav-pos,nav-pos-dine,nav-pos-delivery,订单,nav-progress,nav-voids,nav-cm,nav-members,nav-addresses',
+    'nav-msg,nav-messages,nav-support', 'nav-deco,nav-media,nav-templates', 'nav-fin,nav-cash,nav-bills,nav-reconcile']) {
+    const first = want.split(',')[0], i = opened.indexOf(first)
+    expect(opened.slice(i, i + want.split(',').length).join(','), want, `${name}: ${first} opened`)
+  }
+  const label = async id => (await page.locator(tid(id)).innerText()).trim()
+  expect([await label('nav-pos'), await label('nav-pos-dine'), await label('nav-pos-delivery')].join(','), '点单,堂食下单,外卖下单', `${name}: 点单 names`)
+  expect([await label('nav-msg'), await label('nav-messages'), await label('nav-support')].join(','), '消息,客户消息,平台消息', `${name}: 消息 names`)
+  expect([await label('nav-cm'), await label('nav-members'), await label('nav-addresses')].join(','), '客户管理,会员列表,送餐地址', `${name}: 客户管理 names`)
+  expect([await label('nav-deco'), await label('nav-media'), await label('nav-templates')].join(','), '店铺装修,宣传物料,模板', `${name}: 店铺装修 names`)
+  expect([await label('nav-fin'), await label('nav-cash'), await label('nav-bills'), await label('nav-reconcile')].join(','), '财务,核款,账单,对账', `${name}: 财务 names`)
+  await page.waitForTimeout(300)   // the drawer slides in
+  await page.screenshot({ path: `${SHOTS}/fold-${name}-open.png` })
+  await page.click(tid('nav-deco'))
+  expect(await page.locator(tid('nav-media')).count(), 0, `${name}: 店铺装修 folds again`)
+  // a page opened from a link opens its own group and only that one
+  await page.goto(BASE + '/merchant/bills')
+  await page.locator(`${tid('nav-open')}:visible, ${tid('nav-fin')}:visible`).first().waitFor()
+  if (await page.locator(tid('nav-open')).isVisible()) await page.click(tid('nav-open'))
+  await page.locator(tid('nav-bills')).waitFor({ state: 'visible' })
+  expect(await page.locator(`${tid('nav-pos-dine')}, ${tid('nav-members')}, ${tid('nav-messages')}, ${tid('nav-media')}`).count(), 0, `${name}: other groups stay folded`)
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: `${SHOTS}/fold-${name}-bills.png` })
 
   await nav(page, 'nav-pos-dine')
   await page.waitForURL(u => u.pathname === '/merchant/order/dine')
@@ -143,6 +161,7 @@ try {
   await api(page, 'PUT', '/merchant/branches/1/role-perms', { cashier: before.cashier.filter(p => p !== 'table.use'), manager: before.manager })
   await login(cashier, 'cashier1')
   await cashier.goto(BASE + '/merchant/orders')
+  await cashier.click(tid('nav-pos'))
   await cashier.waitForSelector(tid('nav-pos-delivery'))
   expect(await cashier.locator(tid('nav-pos-dine')).count(), 0, 'no dine-in link without 桌台收银')
   await cashier.goto(BASE + '/merchant/orders/new?mode=dine')
