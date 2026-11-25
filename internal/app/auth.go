@@ -407,46 +407,85 @@ func normalizePhone(p string) (string, error) {
 	return p, nil
 }
 
-// Customers log in with a mobile number of one country for now.
+// Customers log in with a mobile number of any country, written with its
+// calling code (+86 138 0013 8000). A number without one is read as a number
+// of this country, the one the system started in: that is how every number was
+// written before the code could be chosen.
 const customerCountryCode = "63"
 
-var customerPhoneRe = regexp.MustCompile(`^9[0-9]{9}$`)
-
-// normalizeCustomerPhone accepts the ways people write a Philippine mobile
-// number (+63 917 555 0123, 0917 555 0123, 917 555 0123) and returns +639XXXXXXXXX.
-func normalizeCustomerPhone(p string) (string, error) {
-	p = strings.NewReplacer(" ", "", "-", "", "(", "", ")", "").Replace(p)
-	local := p
-	switch {
-	case strings.HasPrefix(p, "+"+customerCountryCode):
-		local = p[1+len(customerCountryCode):]
-	case strings.HasPrefix(p, customerCountryCode) && len(p) == len(customerCountryCode)+10:
-		local = p[len(customerCountryCode):]
-	case strings.HasPrefix(p, "0"):
-		local = p[1:]
-	}
-	if !customerPhoneRe.MatchString(local) {
-		return "", Err(http.StatusUnprocessableEntity, "PHONE_INVALID", "enter a valid +63 mobile number")
-	}
-	return "+" + customerCountryCode + local, nil
+// Mobile numbers of these countries are checked digit by digit; elsewhere only
+// the length is (a whole number is 7 to 15 digits). The same rules as
+// web/src/dial.ts.
+var mobileRes = map[string]*regexp.Regexp{
+	"63": regexp.MustCompile(`^9[0-9]{9}$`),  // the Philippines: 9XX XXX XXXX
+	"86": regexp.MustCompile(`^1[0-9]{10}$`), // mainland China: 1XX XXXX XXXX
 }
 
-var contactPhoneRe = regexp.MustCompile(`^\+[1-9][0-9]{6,14}$`)
+var digitsRe = regexp.MustCompile(`^[0-9]+$`)
 
-// normalizeContactPhone is for the number a rider calls at an address. It
-// need not be in the country customers log in from: a number written with
-// another country's code (+86 138 0013 8000) is kept as it is. Anything else
-// is read as a number of the login country.
-func normalizeContactPhone(p string) (string, error) {
-	p = strings.NewReplacer(" ", "", "-", "", "(", "", ")", "").Replace(p)
-	if strings.HasPrefix(p, "+") && !strings.HasPrefix(p, "+"+customerCountryCode) {
-		if !contactPhoneRe.MatchString(p) {
-			return "", Err(http.StatusUnprocessableEntity, "PHONE_INVALID", "enter a valid phone number with its country code")
+// splitDial splits "+639175550123" into "63" and "9175550123". No calling code
+// is the start of another, so the one that fits is the only one.
+func splitDial(p string) (dial, local string) {
+	d := strings.TrimPrefix(p, "+")
+	for n := 3; n >= 1; n-- {
+		if len(d) > n && knownDial(d[:n]) {
+			return d[:n], d[n:]
 		}
-		return p, nil
 	}
-	return normalizeCustomerPhone(p)
+	return "", ""
 }
+
+var dialSet = func() map[string]bool {
+	m := map[string]bool{}
+	for _, d := range dialCodes {
+		m[d] = true
+	}
+	return m
+}()
+
+func knownDial(d string) bool { return dialSet[d] }
+
+// normalizeE164 turns the ways people write a phone number into E.164
+// (+639175550123). Accepted: +63 917 555 0123, 0063 917..., and for the home
+// country also 0917 555 0123, 917 555 0123 and 63 917 555 0123. A trunk 0
+// written after the code (+44 07911 123456) is dropped, except in Italy, where
+// it is part of the number. With mobile set the number must be a mobile one
+// where the country's mobile numbers are known (see mobileRes); the home
+// country's rule always applies.
+func normalizeE164(p string, mobile bool) (string, error) {
+	p = strings.NewReplacer(" ", "", "-", "", "(", "", ")", "", ".", "").Replace(p)
+	if strings.HasPrefix(p, "00") {
+		p = "+" + p[2:]
+	}
+	var dial, local string
+	if strings.HasPrefix(p, "+") {
+		dial, local = splitDial(p)
+	} else {
+		dial, local = customerCountryCode, p
+		if strings.HasPrefix(p, customerCountryCode) && len(p) == len(customerCountryCode)+10 {
+			local = p[len(customerCountryCode):]
+		}
+	}
+	if dial != "39" {
+		local = strings.TrimLeft(local, "0")
+	}
+	bad := Err(http.StatusUnprocessableEntity, "PHONE_INVALID", "enter a valid mobile number with its country code")
+	if dial == "" || !digitsRe.MatchString(local) || len(local) < 5 || len(dial)+len(local) < 7 || len(dial)+len(local) > 15 {
+		return "", bad
+	}
+	if re := mobileRes[dial]; re != nil && (mobile || dial == customerCountryCode) && !re.MatchString(local) {
+		return "", bad
+	}
+	return "+" + dial + local, nil
+}
+
+// normalizeCustomerPhone is for the number a customer logs in with: a mobile
+// number that can receive the code.
+func normalizeCustomerPhone(p string) (string, error) { return normalizeE164(p, true) }
+
+// normalizeContactPhone is for the number a rider calls at an address. It may
+// be a landline, so outside the home country only its length is checked.
+func normalizeContactPhone(p string) (string, error) { return normalizeE164(p, false) }
 
 func (a *App) otpHash(phone, code string) []byte {
 	m := hmac.New(sha256.New, a.Secret)

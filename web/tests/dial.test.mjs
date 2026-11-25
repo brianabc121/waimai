@@ -49,3 +49,24 @@ test('pretty', () => {
   assert.equal(d.prettyPhone('+8613800138000'), '+86 13800138000')
   assert.equal(d.prettyPhone('hello'), 'hello')
 })
+
+test('a login number must be a mobile where the rule is known', () => {
+  assert.ok(d.phoneOk('86', '138 0013 8000', true))
+  assert.ok(!d.phoneOk('86', '21 1234 5678', true))
+  assert.ok(d.phoneOk('86', '21 1234 5678'))           // a landline is fine for an address
+  assert.ok(d.phoneOk('65', '8123 4567', true))
+  assert.ok(d.phoneOk('1', '(415) 555-0123', true))
+  assert.ok(!d.phoneOk('63', '2 8123 4567'))            // at home the old rule stays
+})
+
+test('a trunk 0 and the code written twice are dropped, except in Italy', () => {
+  assert.equal(d.e164('44', '07911 123456'), '+447911123456')
+  assert.equal(d.e164('86', '0086 138 0013 8000'), '+8613800138000')
+  assert.equal(d.e164('39', '06 1234 5678'), '+390612345678')
+})
+
+test('countries have names in the language shown', () => {
+  assert.equal(d.countryName('PH', 'en'), 'Philippines')
+  assert.equal(d.countryName('CN', 'zh-CN'), '中国')
+  for (const cc of d.COMMON) assert.ok(d.CODES[cc], cc)
+})

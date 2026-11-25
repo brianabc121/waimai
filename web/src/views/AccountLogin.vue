@@ -2,10 +2,14 @@
 // Customer login: a mobile number and a texted code, nothing else. A number
 // that has no account yet gets one when the code checks out.
 import LangButton from './LangButton.vue'
+import DialPicker from './DialPicker.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError, get, post } from '../api'
 import { loadCustomer, prettyPhone } from '../customer'
+import { browserCountry, dialOf, e164, HOME_DIAL, phoneOk as validPhone, SAMPLE, splitPhone } from '../dial'
+import { mall, mallRegions } from '../mall'
+import { homeStore } from './me/me'
 import { extend, locale, pick, setLocale, t, sn } from '../i18n'
 import { defaultTemplate, themeVars } from '../theme'
 import type { Storefront } from '../types'
@@ -22,6 +26,8 @@ extend({
   'al.need_agree': ['请先阅读并勾选同意协议', 'Please tick the box to agree first'],
   'al.login': ['登录', 'Log in'], 'al.logging': ['登录中…', 'Logging in…'], 'al.clear': ['清空', 'Clear'],
   'al.e.phone': ['请输入正确的 +63 手机号，例如 917 555 0123', 'Enter a valid +63 mobile number, e.g. 917 555 0123'],
+  'al.e.phone_dial': ['请输入正确的 +{dial} 手机号', 'Enter a valid +{dial} mobile number'],
+  'al.dial': ['手机号的国家或地区区号', 'Country code of the mobile number'],
   'al.e.code': ['验证码不对或已过期，请重新获取', 'That code is wrong or has expired. Get a new one.'],
   'al.e.wait': ['发送太频繁，请一分钟后再试', 'Please wait a minute before asking for another code'],
   'al.e.daily': ['今天获取验证码的次数已用完，请明天再试', 'No more codes today. Please try again tomorrow.'],
@@ -36,23 +42,49 @@ const store = ref<Storefront | null>(null)
 const tpl = computed(() => store.value?.templates?.delivery ?? defaultTemplate('delivery'))
 const name = computed(() => store.value ? sn(store.value.branch) : '')
 
-const phone = ref((localStorage.getItem('phone') || '').replace(/^\+63/, ''))
+// The number used last time, with its own code. Otherwise the code starts on
+// the store's country, then on where the customer seems to be (see guessDial).
+const saved = splitPhone(localStorage.getItem('phone') || '')
+const dial = ref(saved?.dial ?? HOME_DIAL)
+const phone = ref(saved?.local ?? '')
+let dialSet = !!saved
 const code = ref('')
 const agreed = ref(false)
 const sentTo = ref(''), devCode = ref(''), error = ref('')
 const wait = ref(0), busy = ref(false)
 let timer = 0
 
-// What is sent: the national number without spaces or a leading zero.
-const local = computed(() => phone.value.replace(/[^0-9]/g, '').replace(/^63(?=9\d{9}$)/, '').replace(/^0/, ''))
-const phoneOk = computed(() => /^9\d{9}$/.test(local.value))
-const full = computed(() => '+63' + local.value)
+// What is sent: the whole number, +<code><national number without a leading 0>.
+const phoneOk = computed(() => validPhone(dial.value, phone.value, true))
+const full = computed(() => e164(dial.value, phone.value))
+const phoneError = () => dial.value === HOME_DIAL ? t('al.e.phone') : t('al.e.phone_dial', { dial: dial.value })
+
+function pickDial(d: string) { dial.value = d; dialSet = true }
+// A whole number pasted or typed with its code (+86 138…, 0086 138…) moves the code to the picker.
+function takeCode() {
+  const v = phone.value.trim().replace(/^00/, '+')
+  if (!v.startsWith('+')) return
+  const sp = splitPhone(v)
+  if (sp && sp.local) { pickDial(sp.dial); phone.value = sp.local }
+}
+
+// Without a store: the country of the store last visited or the place chosen
+// in the marketplace, then the browser's region when the platform has stores
+// there, then the country with the most stores.
+async function guessDial(): Promise<string> {
+  const known = homeStore()?.country || mall.loc?.region?.country_code
+  if (known) return dialOf(known)
+  const countries = await mallRegions().catch(() => [])
+  const mine = browserCountry()
+  const c = countries.find(x => x.country_code === mine) ?? [...countries].sort((a, b) => b.stores - a.stores)[0]
+  return dialOf(c?.country_code)
+}
 
 function describe(e: unknown): string {
   if (!(e instanceof ApiError)) return String(e)
   switch (e.code) {
     case 'NETWORK': return t('offline')
-    case 'PHONE_INVALID': case 'VALIDATION': return t('al.e.phone')
+    case 'PHONE_INVALID': case 'VALIDATION': return phoneError()
     case 'OTP_INVALID': return t('al.e.code')
     case 'OTP_DAILY_LIMIT': return t('al.e.daily')
     case 'SMS_FAILED': return t('al.e.sms')
@@ -70,7 +102,8 @@ function countdown(n: number) {
 
 async function sendCode() {
   error.value = ''
-  if (!phoneOk.value) { error.value = t('al.e.phone'); return }
+  takeCode()
+  if (!phoneOk.value) { error.value = phoneError(); return }
   if (!agreed.value) { error.value = t('al.need_agree'); return }
   if (wait.value > 0 || busy.value) return
   busy.value = true
@@ -112,6 +145,9 @@ function back() {
 onMounted(async () => {
   if (await loadCustomer(true)) { router.replace(next.value || (slug.value ? `/s/${slug.value}` : '/me')); return }
   if (slug.value) store.value = await get<Storefront>(`/stores/${slug.value}`).catch(() => null)
+  if (dialSet) return
+  const d = store.value ? dialOf(store.value.branch.country_code) : await guessDial()
+  if (!dialSet) dial.value = d
 })
 onBeforeUnmount(() => clearInterval(timer))
 </script>
@@ -133,11 +169,11 @@ onBeforeUnmount(() => clearInterval(timer))
       <form class="body" @submit.prevent="login">
         <h1>{{ t('al.title') }}</h1>
         <div class="small muted">{{ t('al.hint') }}</div>
-        <label class="inp">
-          <span class="cc">+63</span>
-          <input v-model="phone" type="tel" inputmode="tel" autocomplete="tel-national" maxlength="16" :placeholder="t('al.phone_ph')" data-testid="login-phone" />
+        <div class="inp">
+          <DialPicker :model-value="dial" :first="store?.branch.country_code" :label="t('al.dial')" testid="login-dial" @update:model-value="pickDial" />
+          <input v-model="phone" type="tel" inputmode="tel" autocomplete="tel-national" maxlength="20" :placeholder="SAMPLE[dial] ?? t('al.phone_ph')" data-testid="login-phone" @blur="takeCode" />
           <button v-if="phone" type="button" class="x" :aria-label="t('al.clear')" @click="phone = ''">×</button>
-        </label>
+        </div>
         <label class="inp">
           <input v-model="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" :placeholder="t('al.code_ph')" data-testid="login-code"
             @input="code = code.replace(/[^0-9]/g, '')" />
@@ -170,7 +206,6 @@ onBeforeUnmount(() => clearInterval(timer))
 .inp { display: flex; align-items: center; gap: 10px; border: 1px solid #cfd4da; border-radius: 12px; height: 54px; padding: 0 14px; background: #fff; }
 .inp:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
 .inp input { border: 0; outline: 0; flex: 1; min-width: 0; font-size: 16px; padding: 0; background: none; height: 100%; }
-.cc { background: #f3f4f6; border-radius: 8px; padding: 6px 10px; font-weight: 600; }
 .x { border: 0; background: none; color: #9aa1ab; font-size: 22px; cursor: pointer; padding: 4px; }
 .act { border: 0; background: none; color: var(--brand); font-weight: 600; font-size: 15px; white-space: nowrap; cursor: pointer; padding: 6px 0; }
 .act.wait, .act:disabled { color: #9aa1ab; font-weight: 400; cursor: default; }
