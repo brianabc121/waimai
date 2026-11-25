@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>排队叫号屏 · 原型</title>
+<!-- 方案见 ../QUEUE_DISPLAY_DESIGN.md。数据都是示意。打开 index.html#s1 到 #s7 看各张效果图。 -->
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #ddd; font-family: -apple-system, "PingFang SC", "Noto Sans CJK SC", "WenQuanYi Zen Hei", "Microsoft YaHei", sans-serif; color: #3b1f14; }
+  section { display: none; } section.show { display: block; }
+  :root { --red: #a02c20; --red-deep: #8f251b; --gold: #f4cf73; --gold-soft: #fbe7b3; --paper: #fffaf2; --bg: #f8efe1; --ink: #3b1f14; --muted: #7b6657; --line: #e6d8c4;
+    --motif: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cg fill='none' stroke='%23f4cf73' stroke-opacity='.17'%3E%3Ccircle cx='0' cy='0' r='28'/%3E%3Ccircle cx='56' cy='0' r='28'/%3E%3Ccircle cx='0' cy='56' r='28'/%3E%3Ccircle cx='56' cy='56' r='28'/%3E%3Ccircle cx='28' cy='28' r='28'/%3E%3C/g%3E%3Cg fill='%23f4cf73' fill-opacity='.3'%3E%3Cpath d='M28 25l3 3-3 3-3-3zM0 -3l3 3-3 3-3-3zM56 -3l3 3-3 3-3-3zM0 53l3 3-3 3-3-3zM56 53l3 3-3 3-3-3z'/%3E%3C/g%3E%3C/svg%3E");
+    --red-bg: linear-gradient(90deg, rgba(143,37,27,.8) 0, rgba(143,37,27,.25) 45%, rgba(143,37,27,0) 75%), var(--motif) 0 0 / 56px 56px, var(--red); }
+  .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; letter-spacing: 1px; }
+
+  /* ---------- TV ---------- */
+  .tv { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
+  .tvtop { height: 104px; background: var(--red-bg); color: #fff; display: flex; align-items: center; padding: 0 44px; gap: 20px; flex: none; }
+  .tvtop .logo { width: 64px; height: 64px; border-radius: 16px; background: var(--gold); color: var(--red-deep); display: grid; place-items: center; font-size: 34px; font-weight: 900; }
+  .tvtop h1 { margin: 0; font-size: 40px; letter-spacing: 2px; }
+  .tvtop .sub { font-size: 24px; color: var(--gold-soft); }
+  .tvtop .clock { margin-inline-start: auto; font-size: 40px; font-weight: 700; }
+  .tvtop .snd { font-size: 18px; background: rgba(255,255,255,.15); border-radius: 999px; padding: 6px 14px; }
+  .tea { flex: 1; display: grid; grid-template-columns: 1fr 1fr 1.35fr; gap: 24px; padding: 28px 36px 20px; min-height: 0; }
+  .tcol { border-radius: 24px; background: var(--paper); border: 2px solid var(--line); display: flex; flex-direction: column; overflow: hidden; }
+  .tcol h2 { margin: 0; padding: 20px 28px; font-size: 40px; display: flex; align-items: baseline; gap: 14px; }
+  .tcol h2 small { font-size: 22px; color: var(--muted); font-weight: 500; }
+  .tcol h2 .cnt { margin-inline-start: auto; font-size: 30px; border-radius: 999px; padding: 2px 18px; }
+  .tcol.wait h2 { background: #efe7da; color: #5b4636; } .tcol.wait .cnt { background: #fff; }
+  .tcol.cook h2 { background: var(--gold); color: #6b3a05; } .tcol.cook .cnt { background: #fff6d8; }
+  .tcol.ready { background: var(--red); border-color: var(--red); color: #fff; }
+  .tcol.ready h2 { background: var(--red-bg); color: #fff; } .tcol.ready h2 small { color: var(--gold-soft); } .tcol.ready .cnt { background: var(--gold); color: var(--red-deep); }
+  .nums { display: flex; flex-wrap: wrap; gap: 16px; padding: 24px 26px; align-content: flex-start; }
+  .nums span { font-size: 58px; font-weight: 800; width: calc(33.33% - 11px); text-align: center; padding: 10px 0; border-radius: 16px; background: #fff; border: 2px solid var(--line); }
+  .wait .nums span { color: #8a7563; font-size: 52px; }
+  .cook .nums span { border-color: #f1d58e; color: #7a4a06; background: #fffbea; }
+  .ready .nums span { background: rgba(255,255,255,.1); border-color: rgba(244,207,115,.45); color: #fff; width: calc(50% - 8px); font-size: 72px; }
+  .more { margin: 0 26px 20px; color: var(--muted); font-size: 24px; }
+  .hero { margin: 26px 26px 6px; border-radius: 22px; background: var(--gold); color: var(--red-deep); text-align: center; padding: 18px 0 14px; box-shadow: 0 0 0 8px rgba(244,207,115,.3), 0 18px 40px rgba(0,0,0,.25); }
+  .hero b { display: block; font-size: 150px; line-height: 1; font-weight: 900; }
+  .hero em { font-style: normal; font-size: 30px; font-weight: 700; }
+  .tvfoot { height: 150px; flex: none; margin: 0 36px 26px; border-radius: 22px; overflow: hidden; display: flex; gap: 20px; }
+  .promo { flex: 1; border-radius: 22px; background: linear-gradient(110deg, #f6d8a8 0%, #f3b97b 45%, #c9432e 100%); display: flex; align-items: center; padding: 0 40px; gap: 30px; color: #4a1c0f; position: relative; overflow: hidden; }
+  .promo .cup { width: 92px; height: 118px; border-radius: 10px 10px 30px 30px; background: linear-gradient(#fff6e8, #e7b57a); border: 4px solid #fff; box-shadow: 0 8px 20px rgba(0,0,0,.2); }
+  .promo h3 { margin: 0; font-size: 42px; } .promo p { margin: 6px 0 0; font-size: 24px; }
+  .promo .dots { position: absolute; bottom: 14px; right: 30px; display: flex; gap: 8px; } .promo .dots i { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,.5); } .promo .dots i:first-child { background: #fff; width: 30px; border-radius: 6px; }
+  .tip { width: 520px; border-radius: 22px; background: var(--paper); border: 2px solid var(--line); padding: 20px 28px; font-size: 24px; color: var(--muted); display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+  .tip b { color: var(--ink); font-size: 28px; }
+
+  /* restaurant TV */
+  .rest { flex: 1; display: grid; grid-template-columns: 760px minmax(0, 1fr); gap: 24px; padding: 26px 36px 0; min-height: 0; }
+  .calling { border-radius: 26px; background: var(--red); color: #fff; padding: 26px 34px; display: flex; flex-direction: column; background-image: var(--motif); background-size: 56px 56px; }
+  .calling .lab { font-size: 32px; color: var(--gold-soft); display: flex; align-items: center; gap: 12px; }
+  .calling .lab i { width: 18px; height: 18px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 8px rgba(244,207,115,.3); }
+  .bigno { font-size: 220px; font-weight: 900; line-height: 1; margin: 18px 0 4px; color: var(--gold); letter-spacing: 6px; }
+  .bigto { font-size: 58px; font-weight: 800; } .bigto small { font-size: 34px; font-weight: 500; color: var(--gold-soft); margin-inline-start: 12px; }
+  .recent { margin-top: auto; border-top: 2px solid rgba(244,207,115,.35); padding-top: 18px; }
+  .recent h4 { margin: 0 0 10px; font-size: 24px; color: var(--gold-soft); font-weight: 500; }
+  .recent div { display: flex; gap: 14px; }
+  .recent span { flex: 1; background: rgba(255,255,255,.1); border-radius: 14px; padding: 10px 14px; font-size: 22px; }
+  .recent span b { display: block; font-size: 40px; }
+  .rright { min-width: 0; display: grid; grid-template-rows: auto 1fr; gap: 20px; min-height: 0; }
+  .gtable { background: var(--paper); border: 2px solid var(--line); border-radius: 22px; overflow: hidden; }
+  .gtable table { width: 100%; border-collapse: collapse; font-size: 30px; }
+  .gtable th { background: #f4ebde; color: var(--muted); font-size: 22px; font-weight: 600; text-align: start; padding: 12px 24px; }
+  .gtable td { padding: 14px 24px; border-top: 2px solid #f1e6d4; }
+  .gtable td.g b { display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: var(--red); color: #fff; font-size: 30px; margin-inline-end: 14px; vertical-align: middle; }
+  .gtable td.g small { color: var(--muted); font-size: 22px; margin-inline-start: 8px; }
+  .gtable td.c { font-weight: 900; color: var(--red); font-size: 38px; }
+  .gtable td.w b { font-size: 38px; } .gtable td.t { color: #7a4a06; font-weight: 700; }
+  .waitgrid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 20px; min-height: 0; }
+  .wlist { background: var(--paper); border: 2px solid var(--line); border-radius: 22px; padding: 16px 24px; }
+  .wlist h3, .missed h3 { margin: 0 0 10px; font-size: 28px; }
+  .wrow { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 2px dashed #efe2cf; }
+  .wrow:first-of-type { border-top: 0; }
+  .wrow .l { width: 46px; height: 46px; border-radius: 12px; background: #f4ebde; color: var(--red); font-weight: 900; font-size: 26px; display: grid; place-items: center; flex: none; }
+  .wrow span { font-size: 30px; font-weight: 700; color: #5b4636; width: 118px; }
+  .wrow span.vip { color: var(--red); }
+  .wrow em { font-style: normal; color: var(--muted); font-size: 22px; margin-inline-start: auto; }
+  .missed { background: #fff3e6; border: 2px dashed #e8b27a; border-radius: 22px; padding: 16px 22px; }
+  .missed p { margin: 0 0 12px; color: #a2510a; font-size: 22px; }
+  .missed div { display: flex; flex-wrap: wrap; gap: 12px; }
+  .missed span { font-size: 34px; font-weight: 800; color: #a2510a; background: #fff; border-radius: 12px; padding: 4px 14px; text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: rgba(162,81,10,.4); }
+  .qrbox { width: 520px; border-radius: 22px; background: var(--paper); border: 2px solid var(--line); display: flex; align-items: center; gap: 22px; padding: 0 24px; }
+  .qr { width: 118px; height: 118px; flex: none; background: #fff; border: 8px solid #fff; outline: 2px solid var(--line); border-radius: 6px; }
+  .qr svg { display: block; width: 100%; height: 100%; }
+  .qrbox b { font-size: 34px; display: block; } .qrbox p { margin: 6px 0 0; color: var(--muted); font-size: 22px; }
+
+  /* ---------- back office ---------- */
+  .pc { width: 1440px; height: 900px; overflow: hidden; display: flex; background: #f7f1e7; font-size: 14px; }
+  .nav { width: 208px; flex: none; background: #1f2329; color: #d6d8dc; padding: 18px 10px; display: flex; flex-direction: column; gap: 1px; }
+  .nav .brand { font-size: 17px; font-weight: 800; color: #fff; padding: 0 10px 6px; }
+  .nav .role { padding: 0 10px 14px; font-size: 12px; color: #9aa0a8; } .nav .role b { background: #3d444d; color: #fff; border-radius: 999px; padding: 1px 8px; margin-inline-end: 6px; }
+  .nav a { padding: 9px 12px; border-radius: 8px; font-size: 15px; color: #e5e7eb; font-weight: 600; }
+  .nav a.sub { padding-inline-start: 28px; font-size: 14px; font-weight: 500; color: #c9cdd3; }
+  .nav a.on { background: #2b3037; color: #fff; box-shadow: inset 3px 0 0 #a02c20; }
+  .nav .new { background: #a02c20; color: #fff; font-size: 10px; border-radius: 4px; padding: 0 4px; margin-inline-start: 6px; vertical-align: 2px; }
+  .page { flex: 1; min-width: 0; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+  .ohead { display: flex; align-items: flex-start; gap: 10px; }
+  .ohead h1 { font-size: 26px; margin: 0; color: #2f1810; } .ohead p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+  .ohead .acts { margin-inline-start: auto; display: flex; gap: 10px; align-items: center; }
+  .btn { border: 1px solid #eadfce; background: #fffdf9; border-radius: 10px; padding: 8px 14px; font-weight: 700; font-size: 14px; color: #3b1f14; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  .btn.p { background: var(--red); border-color: var(--red); color: #fff; }
+  .btn.g { background: #1f7a45; border-color: #1f7a45; color: #fff; }
+  .btn.o { border-color: #efb9a8; color: var(--red); background: #fff; }
+  .btn.big { font-size: 16px; padding: 10px 18px; }
+  .btn.sm { padding: 5px 10px; font-size: 13px; border-radius: 8px; }
+  .tabs { display: flex; gap: 8px; border-bottom: 1px solid #eadfce; }
+  .tabs span { padding: 9px 18px; font-size: 16px; font-weight: 600; color: #5b4636; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+  .tabs span.on { color: var(--red); border-bottom-color: var(--red); }
+  .tabs .r { margin-inline-start: auto; align-self: center; color: var(--muted); font-size: 13px; display: flex; gap: 8px; align-items: center; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 10px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+  .pill.ok { background: #e3f3e8; color: #1f7a45; } .pill.ok::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.red { background: #fde2dd; color: #b42318; } .pill.gold { background: #fdf0cf; color: #8a5a00; } .pill.gray { background: #eeeae4; color: #6b5a4c; }
+  .pill.blue { background: #e4ecfb; color: #1d4ed8; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat { background: #fffdf9; border: 1px solid #eadfce; border-radius: 12px; padding: 12px 16px; }
+  .stat small { color: var(--muted); font-size: 13px; } .stat b { display: block; font-size: 26px; margin-top: 2px; } .stat b.r { color: var(--red); }
+  .stat em { font-style: normal; color: var(--muted); font-size: 12.5px; }
+  .body3 { display: grid; grid-template-columns: 190px minmax(0, 1fr) 360px; gap: 12px; flex: 1; min-height: 0; }
+  .rail { background: #fffdf9; border: 1px solid #eadfce; border-radius: 12px; padding: 10px 0; }
+  .rail h3 { margin: 0; padding: 2px 14px 10px; font-size: 15px; }
+  .rail a { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-inline-start: 3px solid transparent; font-size: 14.5px; }
+  .rail a .l { width: 24px; height: 24px; border-radius: 7px; background: #f4ebde; color: var(--red); font-weight: 900; display: grid; place-items: center; font-size: 13px; }
+  .rail a small { color: var(--muted); font-size: 12px; display: block; }
+  .rail a .n { margin-inline-start: auto; color: var(--muted); font-weight: 600; }
+  .rail a.on { background: #fbeae3; border-inline-start-color: var(--red); color: var(--red); font-weight: 700; } .rail a.on .n { color: var(--red); }
+  .rail .tipx { margin: 10px 14px 0; padding-top: 10px; border-top: 1px solid #eadfce; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+  .panel { background: #fffdf9; border: 1px solid #eadfce; border-radius: 12px; padding: 12px 14px; min-height: 0; overflow: hidden; }
+  .panel h2 { margin: 0 0 10px; font-size: 17px; display: flex; align-items: center; gap: 8px; } .panel h2 .n { color: var(--muted); font-weight: 500; font-size: 14px; } .panel h2 .grow { flex: 1; }
+  .qrow { display: grid; grid-template-columns: 86px 62px 84px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; border: 1px solid #f0e6d7; margin-bottom: 7px; background: #fff; }
+  .qrow.called { background: #fff8e6; border-color: #f1d58e; }
+  .qrow.jump { box-shadow: inset 3px 0 0 #1d4ed8; }
+  .qrow .no { font-size: 22px; font-weight: 900; color: var(--red); }
+  .qrow .pp { font-weight: 700; font-size: 15px; } .qrow .pp small { color: var(--muted); font-weight: 500; }
+  .qrow .wt { font-weight: 800; font-size: 13px; border-radius: 999px; padding: 2px 9px; background: #eeeae4; justify-self: start; }
+  .qrow .wt.y { background: #fef3c7; color: #a15c00; } .qrow .wt.r { background: #d92d20; color: #fff; }
+  .qrow .info { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 12.5px; min-width: 0; }
+  .src { font-size: 12px; border: 1px solid #e5d6c0; border-radius: 6px; padding: 0 6px; color: #6b5a4c; background: #fffaf2; }
+  .qrow .ops { display: flex; gap: 6px; }
+  .grp-h { display: flex; align-items: center; gap: 8px; margin: 10px 2px 6px; font-weight: 800; color: #5b4636; font-size: 13.5px; }
+  .grp-h .l { width: 22px; height: 22px; border-radius: 6px; background: var(--red); color: #fff; display: grid; place-items: center; font-size: 12px; }
+  .grp-h em { font-style: normal; color: var(--muted); font-weight: 500; }
+  .tcard { border: 1px solid #eadfce; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; background: #fff; }
+  .tcard.free { border-top: 4px solid #8cc9a2; }
+  .tcard.soon { border-top: 4px solid #f1d58e; background: #fffdf6; }
+  .tcard .th { display: flex; align-items: center; gap: 8px; } .tcard .th b { font-size: 20px; } .tcard .th small { color: var(--muted); }
+  .tcard .th .pill { margin-inline-start: auto; }
+  .sug { margin-top: 8px; border-radius: 10px; background: #fbf4ea; padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
+  .sug.up { background: #eef3ff; border: 1px dashed #9db5f0; }
+  .sug .no { font-size: 18px; font-weight: 900; color: var(--red); }
+  .sug .why { font-size: 12.5px; color: var(--muted); flex: 1; min-width: 0; line-height: 1.35; }
+  .sug .btn { margin-inline-start: auto; }
+  .note { color: var(--muted); font-size: 12.5px; }
+
+  /* overlays (04) */
+  .shade { position: absolute; inset: 0; background: rgba(40,20,10,.45); }
+  .sheets { position: absolute; inset: 0; display: flex; gap: 22px; align-items: center; justify-content: center; padding: 20px; }
+  .sheet { background: #fffdf9; border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,.3); padding: 20px 22px; }
+  .sheet h3 { margin: 0 0 4px; font-size: 20px; } .sheet .sub { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+  .lab2 { font-weight: 700; margin: 14px 0 8px; font-size: 14px; display: flex; align-items: center; gap: 8px; } .lab2 small { color: var(--muted); font-weight: 500; }
+  .pgrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .pgrid span { border: 1.5px solid #eadfce; border-radius: 12px; height: 52px; display: grid; place-items: center; font-size: 20px; font-weight: 800; background: #fff; }
+  .pgrid span.on { background: var(--red); color: #fff; border-color: var(--red); }
+  .pgrid span.more { font-size: 14px; color: var(--muted); white-space: nowrap; }
+  .grpbar { display: flex; align-items: center; gap: 8px; background: #fbf4ea; border-radius: 10px; padding: 8px 12px; margin-top: 10px; font-size: 13.5px; }
+  .grpbar b { color: var(--red); }
+  .inp { border: 1.5px solid #eadfce; border-radius: 10px; padding: 10px 12px; display: flex; gap: 10px; color: var(--muted); background: #fff; font-size: 15px; }
+  .inp b { color: var(--ink); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; } .chips span { border: 1.5px solid #eadfce; border-radius: 999px; padding: 6px 14px; font-weight: 600; background: #fff; }
+  .chips span.on { border-color: var(--red); color: var(--red); background: #fbeae3; }
+  .sheet .foot { display: flex; gap: 10px; margin-top: 18px; } .sheet .foot .btn { flex: 1; justify-content: center; }
+  .ticket { width: 290px; background: #fff; padding: 22px 20px 26px; font-family: "Noto Sans Mono CJK SC", "WenQuanYi Zen Hei Mono", monospace; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.3); position: relative; color: #111; }
+  .ticket::after { content: ""; position: absolute; left: 0; right: 0; bottom: -10px; height: 10px; background: radial-gradient(circle at 7px 0, transparent 7px, #fff 7.5px) 0 0 / 14px 10px; }
+  .ticket .s { font-size: 15px; } .ticket .n { font-size: 64px; font-weight: 900; letter-spacing: 4px; margin: 6px 0; font-family: inherit; }
+  .ticket hr { border: 0; border-top: 1.5px dashed #999; margin: 10px 0; }
+  .ticket .qr { margin: 10px auto 6px; width: 110px; height: 110px; outline: none; }
+  .ticket small { font-size: 12.5px; display: block; line-height: 1.6; }
+  .tmini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tmini span { border: 1.5px solid #eadfce; border-radius: 12px; padding: 10px; background: #fff; font-weight: 800; font-size: 17px; position: relative; }
+  .tmini span small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; }
+  .tmini span.rec { border-color: var(--red); background: #fbeae3; color: var(--red); }
+  .tmini span.rec i { position: absolute; top: -9px; right: 8px; font-style: normal; font-size: 11px; background: var(--red); color: #fff; border-radius: 999px; padding: 0 7px; }
+  .tmini span.busy { opacity: .45; background: #f3efe9; }
+  .tmini span.hold { border-color: #e5b94c; background: #fff8e2; }
+  .warnline { margin-top: 10px; background: #fff3e6; color: #a2510a; border-radius: 10px; padding: 8px 10px; font-size: 13px; }
+
+  /* ---------- phones ---------- */
+  .phones { width: 1640px; height: 940px; background: #e9dfd0; display: flex; gap: 28px; padding: 46px 34px 20px; }
+  .phone { width: 375px; height: 812px; border-radius: 40px; background: var(--bg); overflow: hidden; box-shadow: 0 0 0 10px #1c1c1e, 0 20px 50px rgba(0,0,0,.3); display: flex; flex-direction: column; position: relative; flex: none; margin-top: 10px; }
+  .phcap { position: absolute; top: -34px; left: 0; right: 0; text-align: center; font-weight: 700; color: #5b4636; font-size: 15px; }
+  .wrapph { position: relative; padding-top: 24px; }
+  .ptop { background: var(--red-bg); color: #fff; padding: 46px 18px 16px; }
+  .ptop .row { display: flex; align-items: center; gap: 10px; }
+  .ptop .av { width: 44px; height: 44px; border-radius: 12px; background: var(--gold); color: var(--red-deep); font-weight: 900; display: grid; place-items: center; font-size: 20px; }
+  .ptop h4 { margin: 0; font-size: 17px; } .ptop small { color: var(--gold-soft); font-size: 12.5px; }
+  .pbody { padding: 14px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
+  .pcard { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .pcard h5 { margin: 0 0 8px; font-size: 15px; }
+  .gl { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13.5px; border-top: 1px dashed #eadbc5; } .gl:first-of-type { border-top: 0; }
+  .gl .l { width: 22px; height: 22px; border-radius: 6px; background: var(--red); color: #fff; font-weight: 800; display: grid; place-items: center; font-size: 12px; }
+  .gl em { font-style: normal; margin-inline-start: auto; color: var(--muted); } .gl b { color: var(--red); }
+  .ppg { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .ppg span { height: 40px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; display: grid; place-items: center; font-weight: 800; font-size: 16px; }
+  .ppg span.on { background: var(--red); color: #fff; border-color: var(--red); }
+  .pin { border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fff; color: var(--muted); font-size: 14px; display: flex; gap: 8px; }
+  .pin b { color: var(--ink); font-weight: 600; }
+  .agree { font-size: 12.5px; color: var(--muted); display: flex; gap: 6px; align-items: center; } .agree i { width: 16px; height: 16px; border-radius: 4px; background: var(--red); flex: none; }
+  .pbtn { background: var(--red); color: #fff; border-radius: 999px; text-align: center; padding: 13px; font-weight: 800; font-size: 16px; }
+  .pbtn.ghost { background: #fff; color: var(--red); border: 1.5px solid var(--red); padding: 10px; font-size: 14px; }
+  .pbtn.gold { background: var(--gold); color: var(--red-deep); }
+  .bigt { text-align: center; padding: 18px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 16px; }
+  .bigt small { color: var(--muted); font-size: 13px; } .bigt b { display: block; font-size: 64px; font-weight: 900; color: var(--red); line-height: 1.1; letter-spacing: 2px; }
+  .bigt .meta { font-size: 14px; color: #5b4636; }
+  .ahead { display: flex; text-align: center; border-top: 1px dashed var(--line); margin-top: 12px; padding-top: 12px; }
+  .ahead div { flex: 1; } .ahead b { display: block; font-size: 26px; color: var(--ink); line-height: 1.2; letter-spacing: 0; } .ahead small { font-size: 12px; }
+  .prog { height: 8px; border-radius: 999px; background: #efe3cf; overflow: hidden; margin-top: 12px; } .prog i { display: block; height: 100%; width: 62%; background: linear-gradient(90deg, var(--gold), var(--red)); }
+  .row2 { display: flex; gap: 10px; } .row2 > * { flex: 1; }
+  .callme { flex: 1; background: var(--red); background-image: var(--motif); background-size: 56px 56px; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px 24px; gap: 8px; }
+  .callme .ring { width: 96px; height: 96px; border-radius: 50%; background: var(--gold); color: var(--red-deep); display: grid; place-items: center; font-size: 46px; box-shadow: 0 0 0 14px rgba(244,207,115,.25), 0 0 0 30px rgba(244,207,115,.12); margin-bottom: 26px; }
+  .callme h2 { margin: 0; font-size: 34px; } .callme .no { font-size: 68px; font-weight: 900; color: var(--gold); letter-spacing: 3px; line-height: 1.1; }
+  .callme .to { font-size: 24px; font-weight: 800; background: rgba(255,255,255,.12); border-radius: 14px; padding: 10px 22px; }
+  .callme p { color: var(--gold-soft); font-size: 14px; margin: 6px 0 0; }
+  .callme .cd { font-size: 15px; background: rgba(0,0,0,.18); border-radius: 999px; padding: 6px 16px; margin-top: 14px; }
+  .missedp { background: #fff3e6; border: 1.5px dashed #e8b27a; border-radius: 16px; padding: 18px; text-align: center; color: #a2510a; }
+  .missedp b { display: block; font-size: 48px; text-decoration: line-through; text-decoration-thickness: 3px; }
+  .ord { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px; text-align: center; }
+  .ord b { display: block; font-size: 60px; color: var(--red); font-weight: 900; line-height: 1.1; }
+
+  /* ---------- settings ---------- */
+  .setg { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; flex: 1; min-height: 0; }
+  .stbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .stbl th { background: #f4ebde; text-align: start; padding: 8px 10px; font-size: 12.5px; color: #5b4636; }
+  .stbl td { padding: 9px 10px; border-bottom: 1px solid #f0e6d7; vertical-align: middle; }
+  .stbl .l { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: var(--red); color: #fff; font-weight: 900; }
+  .fld { display: inline-flex; align-items: center; border: 1px solid #eadfce; border-radius: 8px; padding: 4px 10px; background: #fff; font-weight: 600; gap: 4px; }
+  .tb { display: inline-block; border: 1px solid #e5d6c0; border-radius: 6px; padding: 1px 7px; margin: 1px 2px; background: #fffaf2; font-size: 12.5px; }
+  .srow { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0e6d7; }
+  .srow .t { flex: 1; } .srow .t b { display: block; font-size: 14px; } .srow .t small { color: var(--muted); font-size: 12.5px; }
+  .sw { width: 42px; height: 24px; border-radius: 999px; background: #d6cfc5; position: relative; flex: none; } .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+  .sw.on { background: #1f7a45; } .sw.on::after { left: 21px; }
+  .seg2 { display: inline-flex; border: 1px solid #eadfce; border-radius: 9px; overflow: hidden; } .seg2 span { padding: 5px 12px; font-weight: 600; font-size: 13px; background: #fff; } .seg2 span.on { background: var(--red); color: #fff; }
+  .scr { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid #f0e6d7; border-radius: 10px; margin-bottom: 8px; background: #fff; }
+  .scr .ic { width: 46px; height: 30px; border-radius: 4px; border: 3px solid #3b1f14; position: relative; } .scr .ic.v { width: 26px; height: 40px; }
+  .scr .t { flex: 1; } .scr .t b { display: block; } .scr .t small { color: var(--muted); }
+  .paircode { font-size: 30px; font-weight: 900; letter-spacing: 8px; color: var(--red); background: #fbf4ea; border-radius: 10px; padding: 6px 14px; }
+  .ptbl td:nth-child(n+2), .ptbl th:nth-child(n+2) { text-align: center; }
+  .ck { color: #1f7a45; font-weight: 900; } .x { color: #b9aea0; }
+
+  /* ---------- 07 ---------- */
+  .s7 { width: 1440px; height: 1000px; background: #e9dfd0; display: flex; gap: 26px; padding: 20px 26px; }
+  .portrait { width: 540px; height: 960px; flex: none; overflow: hidden; border-radius: 10px; box-shadow: 0 0 0 10px #1c1c1e, 0 20px 40px rgba(0,0,0,.25); }
+  .portrait .inner { width: 1080px; height: 1920px; transform: scale(.5); transform-origin: 0 0; background: var(--bg); display: flex; flex-direction: column; }
+  .pready { margin: 30px 36px 0; border-radius: 28px; background: var(--red); background-image: var(--motif); background-size: 56px 56px; color: #fff; padding: 28px 36px 36px; }
+  .pready h2 { margin: 0 0 20px; font-size: 54px; display: flex; align-items: baseline; gap: 16px; } .pready h2 small { font-size: 28px; color: var(--gold-soft); font-weight: 500; }
+  .pready .hero { margin: 0 0 24px; } .pready .hero b { font-size: 200px; }
+  .pready .g { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .pready .g span { font-size: 86px; font-weight: 800; text-align: center; border-radius: 18px; border: 2px solid rgba(244,207,115,.45); background: rgba(255,255,255,.1); padding: 8px 0; }
+  .p2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 28px 36px 0; flex: 1; min-height: 0; }
+  .p2 .tcol h2 { font-size: 46px; }
+  .p2 .nums span { width: calc(50% - 8px); font-size: 64px; }
+  .pfoot { height: 300px; margin: 28px 36px 36px; border-radius: 28px; flex: none; }
+  .s7 .pc { width: auto; flex: 1; height: 960px; border-radius: 6px; }
+  .s7 .nav { width: 180px; }
+  .rd { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #eadfce; border-radius: 12px; background: #fff; margin-bottom: 9px; }
+  .rd.new { border-color: #e5b94c; background: #fff8e2; }
+  .rd .no { font-size: 34px; font-weight: 900; color: var(--red); width: 90px; }
+  .rd .t { flex: 1; color: var(--muted); font-size: 13px; } .rd .t b { color: var(--ink); font-size: 14.5px; display: block; }
+  .smallnums { display: flex; flex-wrap: wrap; gap: 8px; } .smallnums span { border: 1px solid #eadfce; background: #fff; border-radius: 8px; padding: 4px 12px; font-weight: 800; font-size: 17px; color: #5b4636; }
+  .smallnums.cook span { background: #fffbea; border-color: #f1d58e; color: #7a4a06; }
+</style>
+</head>
+<body>
+
+<!-- ================= 01 奶茶店模式大屏 ================= -->
+<section id="s1">
+  <div class="tv">
+    <div class="tvtop">
+      <div class="logo">河</div>
+      <div><h1>河马奶茶 · 中山店</h1><div class="sub">请留意您的取餐号</div></div>
+      <span class="snd">🔊 声音已打开</span>
+      <div class="clock num">14:32</div>
+    </div>
+    <div class="tea">
+      <div class="tcol wait">
+        <h2>等待制作 <small>已下单，排队中</small><span class="cnt num">14</span></h2>
+        <div class="nums num"><span>041</span><span>042</span><span>043</span><span>044</span><span>045</span><span>046</span><span>047</span><span>048</span><span>049</span><span>050</span><span>051</span><span>052</span></div>
+        <div class="more">还有 2 单 · 请耐心等待</div>
+      </div>
+      <div class="tcol cook">
+        <h2>制作中 <small>正在为您制作</small><span class="cnt num">5</span></h2>
+        <div class="nums num"><span>034</span><span>037</span><span>038</span><span>039</span><span>040</span></div>
+      </div>
+      <div class="tcol ready">
+        <h2>请取餐 <small>请到取餐台出示取餐号</small><span class="cnt num">4</span></h2>
+        <div class="hero"><b class="num">036</b><em>🔔 请 036 号取餐</em></div>
+        <div class="nums num"><span>031</span><span>033</span><span>035</span></div>
+      </div>
+    </div>
+    <div class="tvfoot">
+      <div class="promo"><div class="cup"></div><div><h3>新品 · 杨枝甘露</h3><p>今天下单第二杯半价（宣传物料轮播）</p></div><div class="dots"><i></i><i></i><i></i></div></div>
+      <div class="tip"><b>取餐提示</b>号码做好会放大并语音播报<br>15 分钟未取会撤下，请到柜台询问</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 02 饭店模式大屏 ================= -->
+<section id="s2">
+  <div class="tv">
+    <div class="tvtop">
+      <div class="logo">河</div>
+      <div><h1>河马火锅 · 中山店</h1><div class="sub">排队叫号 · 请留意叫号和您手机上的提醒</div></div>
+      <span class="snd">🔊 声音已打开</span>
+      <div class="clock num">18:46</div>
+    </div>
+    <div class="rest">
+      <div class="calling">
+        <div class="lab"><i></i>正在叫号</div>
+        <div class="bigno num">A012</div>
+        <div class="bigto">请到 05 号桌<small>2 位 · 第 2 次叫号</small></div>
+        <div class="recent">
+          <h4>刚刚叫过</h4>
+          <div>
+            <span><b class="num">B009</b>请到 12 号桌</span>
+            <span><b class="num">C003</b>请到前台</span>
+            <span><b class="num">A011</b>请到 03 号桌</span>
+          </div>
+        </div>
+      </div>
+      <div class="rright">
+        <div class="gtable">
+          <table>
+            <tr><th>桌型</th><th>当前叫到</th><th>等待</th><th>预计等待</th></tr>
+            <tr><td class="g"><b>A</b>小桌<small>1–2 人</small></td><td class="c num">A012</td><td class="w"><b class="num">5</b> 桌</td><td class="t">约 15–20 分钟</td></tr>
+            <tr><td class="g"><b>B</b>中桌<small>3–4 人</small></td><td class="c num">B009</td><td class="w"><b class="num">4</b> 桌</td><td class="t">约 20–25 分钟</td></tr>
+            <tr><td class="g"><b>C</b>大桌<small>5–8 人</small></td><td class="c num">C003</td><td class="w"><b class="num">2</b> 桌</td><td class="t">约 30–35 分钟</td></tr>
+            <tr><td class="g"><b>D</b>包间<small>9 人以上</small></td><td class="c num">D001</td><td class="w"><b class="num">1</b> 桌</td><td class="t">约 40 分钟</td></tr>
+          </table>
+        </div>
+        <div class="waitgrid">
+          <div class="wlist">
+            <h3>等待中</h3>
+            <div class="wrow"><div class="l">A</div><span class="num">A013</span><span class="num">A014</span><span class="num">A015</span><span class="num">A016</span><em>前 4 位</em></div>
+            <div class="wrow"><div class="l">B</div><span class="num vip">B013</span><span class="num">B010</span><span class="num">B011</span><em>插队按新顺序</em></div>
+            <div class="wrow"><div class="l">C</div><span class="num">C004</span><span class="num">C005</span><em></em></div>
+            <div class="wrow"><div class="l">D</div><span class="num">D002</span><em></em></div>
+          </div>
+          <div class="missed">
+            <h3>过号</h3>
+            <p>过号请到前台找店员复号（顺延 3 位）</p>
+            <div><span class="num">A008</span><span class="num">B006</span><span class="num">A010</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tvfoot" style="margin-top:22px">
+      <div class="qrbox"><div class="qr"></div><div><b>手机扫码取号</b><p>不用在门口等，叫到号会提醒你<br>也可以找店员拿纸质号码</p></div></div>
+      <div class="promo"><div class="cup" style="border-radius:50%;width:110px;height:110px;background:radial-gradient(circle,#ffd18a,#c9432e)"></div><div><h3>招牌牛油锅底 · 会员 9 折</h3><p>宣传物料轮播，可在设置里关掉</p></div><div class="dots"><i></i><i></i><i></i></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 03 店员操作端 ================= -->
+<section id="s3">
+  <div class="pc">
+    <div class="nav">
+      <div class="brand">河马火锅 · 中山店</div>
+      <div class="role"><b>店主</b>店长 owner1</div>
+      <a>点单</a>
+      <a class="sub">堂食下单</a>
+      <a class="sub">外卖下单</a>
+      <a class="sub on">排队叫号<span class="new">新</span></a>
+      <a>订单</a>
+      <a>客户管理</a>
+      <a>桌台</a>
+      <a>消息</a>
+      <a>菜单</a>
+      <a>店铺装修</a>
+      <a>优惠</a>
+      <a>财务</a>
+      <a>配送管理</a>
+      <a>员工</a>
+      <a>设置</a>
+    </div>
+    <div class="page">
+      <div class="ohead">
+        <div><h1>排队叫号</h1><p>扫码取号和店员取号都在这里叫号、入座；空桌会推荐该叫谁</p></div>
+        <div class="acts"><span class="pill ok">正在取号</span><span class="btn">暂停取号</span><span class="btn">打开叫号屏 ↗</span><span class="btn p big">＋ 取号</span></div>
+      </div>
+      <div class="tabs"><span class="on">排队叫号</span><span>取餐叫号</span><span>排队记录</span><span>设置</span><span class="r">叫号屏 2 块在线 · 实时更新</span></div>
+      <div class="stats">
+        <div class="stat"><small>等待中</small><b class="r num">10 桌</b><em>A 5 · B 4 · C 0 · D 1</em></div>
+        <div class="stat"><small>已叫未到</small><b class="num">2</b><em>A012 叫了 2 次</em></div>
+        <div class="stat"><small>今天已入座</small><b class="num">46 桌</b><em>扫码 31 · 纸质 12 · 店员 3</em></div>
+        <div class="stat"><small>今天平均等待</small><b class="num">18 分钟</b><em>过号 4 · 取消 3</em></div>
+      </div>
+      <div class="body3">
+        <div class="rail">
+          <h3>桌型</h3>
+          <a class="on">全部<span class="n">10</span></a>
+          <a><span class="l">A</span><div>小桌<small>1–2 人 · 约 15 分</small></div><span class="n">5</span></a>
+          <a><span class="l">B</span><div>中桌<small>3–4 人 · 约 20 分</small></div><span class="n">4</span></a>
+          <a><span class="l">C</span><div>大桌<small>5–8 人 · 现在不用等</small></div><span class="n">0</span></a>
+          <a><span class="l">D</span><div>包间<small>9 人以上</small></div><span class="n">1</span></a>
+          <a>过号<span class="n">3</span></a>
+          <div class="tipx">等待超过预计时间变黄，超过 1.5 倍变红。叫号 5 分钟没到会标红提醒点“过号”。</div>
+        </div>
+        <div class="panel">
+          <h2>排队中 <span class="n">按顺序</span><span class="grow"></span><span class="note">扫码 / 纸质 / 店员 = 取号方式</span></h2>
+          <div class="grp-h"><span class="l">A</span>小桌 1–2 人<em>· 5 桌在等</em></div>
+          <div class="qrow called"><span class="no num">A012</span><span class="pp">2 位</span><span class="wt r">已叫 2 次</span><span class="info"><span class="pill gold">叫到 05 号桌 · 4 分钟前</span><span class="src">扫码</span>尾号 6612</span><span class="ops"><span class="btn sm">重叫</span><span class="btn sm o">过号</span><span class="btn sm g">入座</span></span></div>
+          <div class="qrow"><span class="no num">A013</span><span class="pp">2 位</span><span class="wt r">32 分</span><span class="info"><span class="src">纸质</span><span class="pill gray">婴儿椅</span></span><span class="ops"><span class="btn sm">⋯</span><span class="btn sm p">叫号</span></span></div>
+          <div class="qrow"><span class="no num">A014</span><span class="pp">1 位</span><span class="wt y">22 分</span><span class="info"><span class="src">扫码</span>尾号 0821</span><span class="ops"><span class="btn sm">⋯</span><span class="btn sm p">叫号</span></span></div>
+          <div class="qrow"><span class="no num">A015</span><span class="pp">2 位</span><span class="wt">9 分</span><span class="info"><span class="src">扫码</span>尾号 3390</span><span class="ops"><span class="btn sm">⋯</span><span class="btn sm p">叫号</span></span></div>
+          <div class="grp-h"><span class="l">B</span>中桌 3–4 人<em>· 4 桌在等</em></div>
+          <div class="qrow jump"><span class="no num">B013</span><span class="pp">4 位</span><span class="wt">3 分</span><span class="info"><span class="pill blue">插队 · 预约到店 · 店长 owner1</span><span class="src">店员</span></span><span class="ops"><span class="btn sm">⋯</span><span class="btn sm p">叫号</span></span></div>
+          <div class="qrow"><span class="no num">B010</span><span class="pp">3 位</span><span class="wt y">24 分</span><span class="info"><span class="src">扫码</span>尾号 7765</span><span class="ops"><span class="btn sm">⋯</span><span class="btn sm p">叫号</span></span></div>
+          <div class="qrow"><span class="no num">B011</span><span class="pp">4 位</span><span class="wt">18 分</span><span class="info"><span class="src">纸质</span><span class="pill gray">轮椅</span></span><span class="ops"><span class="btn sm">⋯</span><span class="btn sm p">叫号</span></span></div>
+          <div class="note" style="margin-top:6px">“⋯” 里：重叫、过号、复号、插队、改人数、取消。插队要选原因，写进排队记录。</div>
+        </div>
+        <div class="panel">
+          <h2>空桌 <span class="n">3 张空 · 1 张快空</span></h2>
+          <div class="tcard free">
+            <div class="th"><b>08</b><small>大厅 · 2 人桌 · A 组</small><span class="pill ok">空闲</span></div>
+            <div class="sug"><span class="no num">A013</span><span class="why">本组排头 · 2 位 · 等了 32 分钟</span><span class="btn sm p">叫号到这桌</span></div>
+          </div>
+          <div class="tcard free">
+            <div class="th"><b>11</b><small>大厅 · 4 人桌 · B 组</small><span class="pill ok">空闲</span></div>
+            <div class="sug"><span class="no num">B013</span><span class="why">本组排头（插队）· 4 位</span><span class="btn sm p">叫号到这桌</span></div>
+          </div>
+          <div class="tcard free">
+            <div class="th"><b>07</b><small>大厅 · 6 人桌 · C 组</small><span class="pill ok">空闲</span></div>
+            <div class="sug up"><span class="no num">B010</span><span class="why"><b style="color:#1d4ed8">升桌</b> · C 组现在没人在等；B010（3 位）已等 24 分钟，超过升桌时间 15 分钟</span><span class="btn sm p">叫号到这桌</span></div>
+          </div>
+          <div class="tcard soon">
+            <div class="th"><b>06</b><small>包间 · 10 人桌 · D 组</small><span class="pill gold">结账中</span></div>
+            <div class="note" style="margin-top:6px">快空了 · D 组排头 D002（10 位）可以考虑并桌，由店员决定</div>
+          </div>
+          <div class="note">推荐只是建议：点“入座”可以选任何空桌。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 04 取号、纸质号码条、入座 ================= -->
+<section id="s4">
+  <div class="pc" style="position:relative">
+    <div class="nav">
+      <div class="brand">河马火锅 · 中山店</div>
+      <div class="role"><b>店主</b>店长 owner1</div>
+      <a>点单</a><a class="sub">堂食下单</a><a class="sub">外卖下单</a><a class="sub on">排队叫号</a><a>订单</a><a>客户管理</a><a>桌台</a>
+    </div>
+    <div class="page"><div class="ohead"><div><h1>排队叫号</h1></div></div></div>
+    <div class="shade"></div>
+    <div class="sheets">
+      <div class="sheet" style="width:470px">
+        <h3>取号</h3>
+        <div class="sub">点人数，系统自动分桌型；只有手机号要打字，而且可以不填</div>
+        <div class="lab2">几位</div>
+        <div class="pgrid"><span>1</span><span>2</span><span>3</span><span class="on">4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span class="more">更多</span></div>
+        <div class="grpbar"><b>B 中桌</b>· 3–4 人 · 前面 3 桌 · 约 20–25 分钟</div>
+        <div class="lab2">手机号 <small>选填，到号发提醒（短信要在设置里开）</small></div>
+        <div class="inp"><b>+63 ▾</b>9xx xxx xxxx</div>
+        <div class="lab2">标签</div>
+        <div class="chips"><span>婴儿椅</span><span class="on">轮椅</span><span>会员</span><span>靠窗</span><span>＋ 自定义</span></div>
+        <div class="lab2"><span class="sw"></span>优先（插到最前） <small>要选原因</small></div>
+        <div class="foot"><span class="btn">取号不打印</span><span class="btn p big">取号并打印</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+        <div class="ticket">
+          <div class="s">河马火锅（中山店）</div>
+          <div class="n">B 013</div>
+          <div class="s">中桌 · 4 位 · 轮椅</div>
+          <hr>
+          <div class="s">前面 3 桌 · 约 20–25 分钟</div>
+          <small>取号 2026-11-25 18:42</small>
+          <div class="qr"></div>
+          <small>扫码看排队进度，叫到号手机会提醒</small>
+          <hr>
+          <small>过号请到前台，顺延 3 位<br>当天有效</small>
+        </div>
+        <div style="color:#fff;font-weight:700">纸质号码条（58 / 80 毫米热敏打印）</div>
+      </div>
+      <div class="sheet" style="width:430px">
+        <h3>A013 入座</h3>
+        <div class="sub">2 位 · 等了 32 分钟 · 纸质 · 婴儿椅</div>
+        <div class="lab2">选桌 <small>推荐的在前；灰色是有人在用</small></div>
+        <div class="tmini">
+          <span class="rec"><i>推荐</i>08<small>大厅 · 2 人</small></span>
+          <span>02<small>大厅 · 2 人</small></span>
+          <span>15<small>露台 · 4 人</small></span>
+          <span class="hold">05<small>留座 A012</small></span>
+          <span class="busy">03<small>用餐中</small></span>
+          <span class="busy">06<small>结账中</small></span>
+          <span>11<small>大厅 · 4 人</small></span>
+          <span class="busy">12<small>用餐中</small></span>
+          <span>20<small>包间 · 10 人</small></span>
+        </div>
+        <div class="warnline">选 20 号包间：这桌 10 个座位，只坐 2 位，确定吗？（只提示，不拦）</div>
+        <div class="foot"><span class="btn">只入座</span><span class="btn p big">入座并去点菜</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 05 顾客手机 ================= -->
+<section id="s5">
+  <div class="phones">
+    <div class="wrapph"><div class="phcap">① 扫门口二维码取号</div>
+    <div class="phone">
+      <div class="ptop"><div class="row"><div class="av">河</div><div><h4>河马火锅 · 中山店</h4><small>营业中 · 正在取号</small></div></div></div>
+      <div class="pbody">
+        <div class="pcard"><h5>现在排队</h5>
+          <div class="gl"><span class="l">A</span>小桌 1–2 人<em>等 <b>5</b> 桌 · 约 15 分</em></div>
+          <div class="gl"><span class="l">B</span>中桌 3–4 人<em>等 <b>4</b> 桌 · 约 20 分</em></div>
+          <div class="gl"><span class="l">C</span>大桌 5–8 人<em>等 <b>2</b> 桌 · 约 30 分</em></div>
+          <div class="gl"><span class="l">D</span>包间 9 人以上<em>等 <b>1</b> 桌 · 约 40 分</em></div>
+        </div>
+        <div class="pcard"><h5>几位用餐</h5>
+          <div class="ppg"><span>1</span><span>2</span><span>3</span><span class="on">4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span></div>
+          <div style="font-size:13px;color:#7b6657;margin-top:8px">→ <b style="color:#a02c20">B 中桌</b>，前面 4 桌，约 20–25 分钟</div>
+        </div>
+        <div class="pin"><b>+63 ▾</b>手机号（选填，到号提醒）</div>
+        <div class="agree"><i></i>我已了解：叫号后 5 分钟未到算过号，过号顺延 3 位</div>
+        <div style="margin-top:auto" class="pbtn">立即取号</div>
+      </div>
+    </div></div>
+
+    <div class="wrapph"><div class="phcap">② 排队中（实时刷新）</div>
+    <div class="phone">
+      <div class="ptop"><div class="row"><div class="av">河</div><div><h4>河马火锅 · 中山店</h4><small>我的排队号</small></div></div></div>
+      <div class="pbody">
+        <div class="bigt">
+          <small>您的号码</small><b class="num">B014</b>
+          <div class="meta">中桌 · 4 位 · 扫码取号 18:42</div>
+          <div class="ahead"><div><b class="num">3</b><small>前面还有（桌）</small></div><div><b class="num">B010</b><small>当前叫到</small></div><div><b>约 20</b><small>预计等待（分）</small></div></div>
+          <div class="prog"><i></i></div>
+        </div>
+        <div class="pcard" style="font-size:13px;color:#7b6657;line-height:1.6">🔔 已打开提醒：叫到号时这个页面会变红并震动，也会收到浏览器推送。可以先去附近逛逛，关掉页面再扫纸条或重新打开也能回来。</div>
+        <div class="row2"><span class="pbtn ghost">先看看菜单</span><span class="pbtn ghost" style="color:#7b6657;border-color:#d9c9b3">取消排队</span></div>
+        <div style="margin-top:auto;text-align:center;font-size:12px;color:#7b6657">过号请到前台找店员复号</div>
+      </div>
+    </div></div>
+
+    <div class="wrapph"><div class="phcap">③ 叫到我了</div>
+    <div class="phone">
+      <div class="callme">
+        <div class="ring">🔔</div>
+        <h2>到你了！</h2>
+        <div class="no num">B014</div>
+        <div class="to">请到 11 号桌</div>
+        <p>中桌 · 4 位 · 请到门口找店员带位</p>
+        <div class="cd">请在 4:32 内到店，超时算过号</div>
+      </div>
+    </div></div>
+
+    <div class="wrapph"><div class="phcap">④ 过号 / 奶茶店订单页</div>
+    <div class="phone">
+      <div class="ptop"><div class="row"><div class="av">河</div><div><h4>河马火锅 · 中山店</h4><small>我的排队号</small></div></div></div>
+      <div class="pbody">
+        <div class="missedp"><b class="num">A010</b>已过号<br><span style="font-size:13px">请到前台找店员复号，会排在当前第 3 位之后</span></div>
+        <div style="text-align:center;color:#7b6657;font-size:12.5px;margin:4px 0">—— 奶茶店模式：顾客自己的订单页顶部 ——</div>
+        <div class="ord"><small style="color:#7b6657">取餐号</small><b class="num">036</b><span class="pill" style="background:#a02c20;color:#fff;font-size:14px;padding:4px 14px">请取餐</span>
+          <div style="display:flex;justify-content:space-between;margin-top:14px;font-size:12px;color:#7b6657"><span>✓ 已下单</span><span>✓ 制作中</span><span style="color:#a02c20;font-weight:700">● 请取餐</span><span>已取</span></div>
+        </div>
+        <div class="pcard" style="font-size:13px;color:#7b6657">杨枝甘露 ×1 · 大杯 · 少冰<br>珍珠奶茶 ×1 · 中杯 · 三分糖</div>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<!-- ================= 06 设置 ================= -->
+<section id="s6">
+  <div class="pc" style="height:1010px">
+    <div class="nav">
+      <div class="brand">河马火锅 · 中山店</div>
+      <div class="role"><b>店主</b>店长 owner1</div>
+      <a>点单</a><a class="sub">堂食下单</a><a class="sub">外卖下单</a><a class="sub on">排队叫号</a><a>订单</a><a>客户管理</a><a>桌台</a><a>消息</a><a>菜单</a><a>店铺装修</a><a>优惠</a><a>财务</a><a>员工</a><a>设置</a>
+    </div>
+    <div class="page">
+      <div class="ohead"><div><h1>排队叫号</h1><p>设置只有店主和有“排队设置”权限的人能改</p></div><div class="acts"><span class="btn p">保存</span></div></div>
+      <div class="tabs"><span>排队叫号</span><span>取餐叫号</span><span>排队记录</span><span class="on">设置</span></div>
+      <div class="setg">
+        <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
+          <div class="panel">
+            <h2>模式</h2>
+            <div class="srow"><div class="t"><b>饭店模式（排队取号）</b><small>扫码取号、纸质号码条、按桌型排队叫号</small></div><span class="sw on"></span></div>
+            <div class="srow" style="border:0"><div class="t"><b>奶茶店模式（取餐叫号）</b><small>屏幕显示等待制作 / 制作中 / 请取餐的取餐号，状态来自后厨屏</small></div><span class="sw on"></span></div>
+          </div>
+          <div class="panel">
+            <h2>桌型分组 <span class="n">按桌台座位数自动生成，可以改</span><span class="grow"></span><span class="btn sm">＋ 加一组</span></h2>
+            <table class="stbl">
+              <tr><th>组</th><th>名称</th><th>人数</th><th>用哪些桌</th><th>平均用餐</th></tr>
+              <tr><td><span class="l">A</span></td><td>小桌</td><td><span class="fld">1</span> – <span class="fld">2</span> 人</td><td><span class="tb">01</span><span class="tb">02</span><span class="tb">08</span> 按座位数（2 人桌）</td><td>38 分钟</td></tr>
+              <tr><td><span class="l">B</span></td><td>中桌</td><td><span class="fld">3</span> – <span class="fld">4</span> 人</td><td><span class="tb">03</span><span class="tb">04</span><span class="tb">05</span><span class="tb">11</span><span class="tb">15</span> 按座位数</td><td>46 分钟</td></tr>
+              <tr><td><span class="l">C</span></td><td>大桌</td><td><span class="fld">5</span> – <span class="fld">8</span> 人</td><td><span class="tb">06</span><span class="tb">07</span><span class="tb">12</span> 按座位数</td><td>58 分钟</td></tr>
+              <tr><td><span class="l">D</span></td><td>包间</td><td><span class="fld">9</span> 人以上</td><td><span class="tb">20</span><span class="tb">21</span> 包间区域</td><td>数据不够，用默认 45</td></tr>
+            </table>
+            <div class="note" style="margin-top:8px">名称可翻译成 12 种语言（和店铺信息一样）。号码每组每天从 001 开始。</div>
+          </div>
+          <div class="panel">
+            <h2>排队规则</h2>
+            <div class="srow"><div class="t"><b>升桌等待时间</b><small>大一级的组没人在等时，小组等了超过这个时间才推荐升桌</small></div><span class="fld">15 分钟</span></div>
+            <div class="srow"><div class="t"><b>过号提醒</b><small>叫号后超过这个时间没入座，标红提醒店员点过号</small></div><span class="fld">5 分钟</span></div>
+            <div class="srow"><div class="t"><b>复号顺延</b><small>过号回来插到本组排头后第几位</small></div><span class="fld">3 位</span></div>
+            <div class="srow" style="border:0"><div class="t"><b>到号发短信</b><small>有手机号的才发，按条计费；不开也有网页提醒和浏览器推送</small></div><span class="sw"></span></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
+          <div class="panel">
+            <h2>叫号屏 <span class="n">电视、显示器、旧平板</span><span class="grow"></span><span class="btn sm p">＋ 添加屏幕</span></h2>
+            <div class="scr"><span class="ic"></span><div class="t"><b>门口电视</b><small>饭店模式 · 横屏 · 简体中文 + English · 在线</small></div><span class="btn sm">试播声音</span><span class="btn sm">解除绑定</span></div>
+            <div class="scr"><span class="ic v"></span><div class="t"><b>取餐台</b><small>奶茶店模式 · 竖屏 · 简体中文 · 3 分钟前在线</small></div><span class="btn sm">试播声音</span><span class="btn sm">解除绑定</span></div>
+            <div class="scr" style="background:#fbf4ea;border-style:dashed"><div class="t"><b>新屏幕“包间走廊”的配对码</b><small>在电视浏览器打开 order.河马点餐.com/screen 输入，10 分钟内有效</small></div><span class="paircode num">482 951</span></div>
+            <div class="srow"><div class="t"><b>屏幕下方放宣传物料</b><small>用“店铺装修 → 宣传物料”里的图片和视频</small></div><span class="sw on"></span></div>
+            <div class="srow" style="border:0"><div class="t"><b>取餐屏显示外卖单</b><small>默认只显示自取和堂食柜台单；“请取餐”停留 <span class="fld">15 分钟</span></small></div><span class="sw"></span></div>
+          </div>
+          <div class="panel">
+            <h2>权限 <span class="n">员工 → 角色权限 里新增三行</span></h2>
+            <table class="stbl ptbl">
+              <tr><th>权限</th><th>店主</th><th>经理</th><th>接单员</th></tr>
+              <tr><td><b>排队叫号</b><br><small class="note">取号、叫号、入座、过号、复号、取消、取餐重叫</small></td><td class="ck">✓</td><td class="ck">✓</td><td class="ck">✓</td></tr>
+              <tr><td><b>插队</b><br><small class="note">插队、优先，要选原因并留记录</small></td><td class="ck">✓</td><td class="ck">✓</td><td class="x">默认关</td></tr>
+              <tr><td><b>排队设置</b><br><small class="note">桌型、规则、叫号屏配对</small></td><td class="ck">✓</td><td class="ck">✓</td><td class="x">✗</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 07 奶茶店竖屏 + 店员取餐叫号 ================= -->
+<section id="s7">
+  <div class="s7">
+    <div class="portrait"><div class="inner">
+      <div class="tvtop" style="height:130px"><div class="logo">河</div><div><h1>河马奶茶 · 中山店</h1><div class="sub">请留意您的取餐号</div></div><div class="clock num">14:32</div></div>
+      <div class="pready">
+        <h2>请取餐 <small>请到取餐台出示取餐号</small></h2>
+        <div class="hero"><b class="num">036</b><em>🔔 请 036 号取餐</em></div>
+        <div class="g num"><span>031</span><span>033</span><span>035</span></div>
+      </div>
+      <div class="p2">
+        <div class="tcol cook"><h2>制作中<span class="cnt num">5</span></h2><div class="nums num"><span>034</span><span>037</span><span>038</span><span>039</span><span>040</span></div></div>
+        <div class="tcol wait"><h2>等待制作<span class="cnt num">14</span></h2><div class="nums num"><span>041</span><span>042</span><span>043</span><span>044</span><span>045</span><span>046</span><span>047</span><span>048</span></div><div class="more">还有 6 单</div></div>
+      </div>
+      <div class="promo pfoot"><div class="cup" style="width:140px;height:180px"></div><div><h3 style="font-size:56px">新品 · 杨枝甘露</h3><p style="font-size:32px">今天第二杯半价</p></div></div>
+    </div></div>
+    <div class="pc">
+      <div class="nav">
+        <div class="brand">河马奶茶</div>
+        <div class="role"><b>店主</b>owner1</div>
+        <a>点单</a><a class="sub">堂食下单</a><a class="sub">外卖下单</a><a class="sub on">排队叫号</a><a>订单</a><a class="sub">烹饪进度</a><a>菜单</a><a>设置</a>
+      </div>
+      <div class="page">
+        <div class="ohead"><div><h1>排队叫号</h1><p>取餐号来自订单，做好了由后厨屏点“备好”</p></div><div class="acts"><span class="btn">打开叫号屏 ↗</span></div></div>
+        <div class="tabs"><span>排队叫号</span><span class="on">取餐叫号</span><span>设置</span></div>
+        <div class="panel">
+          <h2>请取餐 <span class="n">4</span><span class="grow"></span><span class="note">顾客取走后点“已取餐”，号码从屏幕消失</span></h2>
+          <div class="rd new"><span class="no num">036</span><div class="t"><b>自取 · 杨枝甘露 ×1、珍珠奶茶 ×1</b>刚做好 · 已自动叫号 1 次</div><span class="btn">重叫</span><span class="btn g big">已取餐</span></div>
+          <div class="rd"><span class="no num">035</span><div class="t"><b>堂食柜台 · 芋泥波波 ×2</b>做好 3 分钟 · 叫了 1 次</div><span class="btn">重叫</span><span class="btn g big">已取餐</span></div>
+          <div class="rd"><span class="no num">033</span><div class="t"><b>自取 · 柠檬茶 ×1</b>做好 9 分钟 · 叫了 2 次</div><span class="btn">重叫</span><span class="btn g big">已取餐</span></div>
+          <div class="rd"><span class="no num">031</span><div class="t"><b>自取 · 美式 ×2</b><span style="color:#b42318">做好 14 分钟 · 再过 1 分钟从屏幕撤下</span></div><span class="btn">重叫</span><span class="btn g big">已取餐</span></div>
+        </div>
+        <div class="panel">
+          <h2>制作中 <span class="n">5</span></h2>
+          <div class="smallnums cook num"><span>034</span><span>037</span><span>038</span><span>039</span><span>040</span></div>
+          <h2 style="margin-top:14px">等待制作 <span class="n">14</span></h2>
+          <div class="smallnums num"><span>041</span><span>042</span><span>043</span><span>044</span><span>045</span><span>046</span><span>047</span><span>048</span><span>049</span><span>050</span><span>051</span><span>052</span><span>053</span><span>054</span></div>
+          <div class="note" style="margin-top:10px">这里只看不改。要改菜品状态去后厨屏；要看每道菜进度去“烹饪进度”。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  function show() { const id = (location.hash || '#s1').slice(1); document.querySelectorAll('section').forEach(s => s.classList.toggle('show', s.id === id)); }
+  window.addEventListener('hashchange', show); show();
+  // a made-up QR-looking pattern (not a real code)
+  (function () {
+    const n = 25; let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    const finder = (x, y) => { for (const [fx, fy] of [[0,0],[n-7,0],[0,n-7]]) { const dx = x - fx, dy = y - fy; if (dx >= -1 && dx <= 7 && dy >= -1 && dy <= 7) { if (dx < 0 || dy < 0 || dx > 6 || dy > 6) return 0; return (dx === 0 || dy === 0 || dx === 6 || dy === 6 || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4)) ? 1 : 0; } } return -1; };
+    let r = '';
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const f = finder(x, y); if (f === 1 || (f === -1 && rnd() < .5)) r += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }
+    const svg = `<svg viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges"><g fill="#2b160e">${r}</g></svg>`;
+    document.querySelectorAll('.qr').forEach(e => e.innerHTML = svg);
+  })();
+</script>
+</body>
+</html>
