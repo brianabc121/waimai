@@ -581,6 +581,8 @@ type ScreenView struct {
 	Tea    *TeaBoard    `json:"tea,omitempty"`
 	Queue  *QueuePublic `json:"queue,omitempty"`
 	Media  []Media      `json:"media"`
+	// ReadyStay: how long a ready number stays on a pickup screen (minutes).
+	ReadyStay int `json:"ready_stay_minutes"`
 }
 
 // ScreenView loads what a screen shows in its mode.
@@ -589,7 +591,7 @@ func (a *App) ScreenView(ctx context.Context, acc *ScreenAccess) (*ScreenView, e
 	if err != nil {
 		return nil, err
 	}
-	out := &ScreenView{Access: acc, Paused: set.Paused, Media: []Media{}}
+	out := &ScreenView{Access: acc, Paused: set.Paused, Media: []Media{}, ReadyStay: set.ReadyStayMinutes}
 	if acc.Screen.Mode == "tea" {
 		if out.Tea, err = a.TeaBoard(ctx, acc.BranchID, false); err != nil {
 			return nil, err

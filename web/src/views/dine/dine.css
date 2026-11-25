@@ -46,6 +46,7 @@
 .dd-tc .g { margin-inline-start: auto; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .dd-tc .cap { font-size: 12.5px; color: var(--muted); }
 .dd-tc .free { margin-top: auto; color: #a8968a; font-size: 13px; }
+.dd-tc .held { margin-top: auto; color: #8a5a00; background: #fdf0cf; border-radius: 6px; padding: 1px 6px; font-size: 12.5px; font-weight: 700; align-self: flex-start; }
 .dd-tc .amt { margin-top: auto; font-size: 17px; font-weight: 800; color: var(--red); }
 .dd-tc .amt.none { color: var(--muted); font-size: 14px; font-weight: 600; }
 .dd-tc .tm { font-size: 12.5px; color: var(--muted); }

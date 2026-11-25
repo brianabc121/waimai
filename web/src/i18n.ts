@@ -333,7 +333,15 @@ export function fixTexts(l: Locale, m: Record<string, string>) { fixes[l] = m; f
 export const has = (key: string) => key in dict
 
 export function t(key: string, vars: Record<string, string | number> = {}): string {
-  const l = shown.value
+  return tIn(shown.value, key, vars)
+}
+
+// tIn is a text in a given language, for a screen that shows two at once
+// (the queue screen's second language); loadLocale fetches its texts first.
+export async function loadLocale(l: Locale) { await load(l).catch(() => {}); textsVer.value++ }
+const textsVer = ref(0)
+export function tIn(l: Locale, key: string, vars: Record<string, string | number> = {}): string {
+  void textsVer.value
   const e = dict[key]
   void fixVer.value
   let s = fixes[l]?.[key] ?? (l === 'zh' ? e?.[0] : l === 'en' ? e?.[1] : texts[l]?.[key] ?? e?.[1]) ?? key

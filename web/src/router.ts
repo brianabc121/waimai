@@ -12,6 +12,9 @@ export const router = createRouter({
     { path: '/o/:token', component: () => import('./views/OrderView.vue'), props: true },
     { path: '/o/:token/append', component: () => import('./views/AddonCheckout.vue'), props: true },
     { path: '/t/:code', component: () => import('./views/TableView.vue'), props: true },
+    { path: '/screen', component: () => import('./views/queue/ScreenView.vue') },
+    { path: '/q/t/:token', component: () => import('./views/queue/GuestTicket.vue'), props: true },
+    { path: '/q/:slug', component: () => import('./views/queue/GuestTake.vue'), props: true },
     { path: '/ipad', component: () => import('./views/TableView.vue') },
     { path: '/login', component: () => import('./views/LoginView.vue') },
     { path: '/login/pick', component: () => import('./views/LoginPick.vue'), meta: { staff: true } },
@@ -41,6 +44,7 @@ export const router = createRouter({
         // who send their order. The old /merchant/orders/new is sent on below.
         { path: 'order/dine', component: () => import('./views/DineOrderView.vue') },
         { path: 'order/delivery', component: () => import('./views/ManualOrderView.vue') },
+        { path: 'queue', component: () => import('./views/queue/QueueView.vue') },
         { path: 'orders/new', component: () => import('./views/NotFound.vue') },
         { path: 'progress', component: () => import('./views/ProgressView.vue') },
         { path: 'voids', component: () => import('./views/VoidsView.vue') },

@@ -30,6 +30,8 @@ const manager = can('table.manage')
 const tables = ref<DiningTable[]>([])
 const presets = ref<DinePresets | null>(null)
 const top = ref<number[]>([])
+// free tables kept for a called queue number (docs/QUEUE_DISPLAY_DESIGN.md §6.4)
+const holds = ref<Record<string, string>>({})
 const loaded = ref(false)
 const error = ref('')
 const toast = ref('')
@@ -71,8 +73,8 @@ const { online, refreshNow } = useLive(() => `${base}/events`, async () => {
 })
 async function loadDesk() {
   try {
-    const r = await get<{ presets: DinePresets; top: number[] }>(`${base}/dine-desk`)
-    presets.value = r.presets; top.value = r.top
+    const r = await get<{ presets: DinePresets; top: number[]; holds?: Record<string, string> }>(`${base}/dine-desk`)
+    presets.value = r.presets; top.value = r.top; holds.value = r.holds ?? {}
   } catch (e) { error.value = (e as Error).message }
 }
 onMounted(loadDesk)
@@ -246,7 +248,8 @@ function stText(it: { prep_status: string; served_at: string | null; batch_at?: 
               </template>
               <template v-else>
                 <span class="cap">{{ t('dd.seats', { n: tb.seats }) }}</span>
-                <span class="free">{{ phone ? t('dd.open_only') : t('dd.tap_open') }}</span>
+                <span v-if="holds[tb.id]" class="held" :data-testid="`dd-held-${tb.name}`">{{ t('qu.held', { no: holds[tb.id] }) }}</span>
+                <span v-else class="free">{{ phone ? t('dd.open_only') : t('dd.tap_open') }}</span>
               </template>
             </button>
           </div>

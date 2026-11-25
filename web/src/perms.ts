@@ -7,6 +7,7 @@ import { extend } from './i18n'
 const pages: [string, string[]][] = [
   ['/merchant/order/dine', ['table.use']],
   ['/merchant/order/delivery', ['order.manual']],
+  ['/merchant/queue', ['queue.use']],
   ['/merchant/progress', ['order.progress']],
   ['/merchant/voids', ['order.void']],
   ['/merchant/orders', ['order.view']],
@@ -141,6 +142,13 @@ extend({
   'rp.d.staff.reports': ['店内和骑手工作汇总、路线、导出 Excel', 'Kitchen and rider summaries, routes, Excel export'],
   'rp.p.settings': ['门店设置', 'Store settings'],
   'rp.d.settings': ['营业时间、开关店、接单设置、工作台设置、店铺图片', 'Hours, open and close, order settings, stations, store pictures'],
+  'rp.g.queue': ['排队叫号', 'Queue'],
+  'rp.p.queue.use': ['排队叫号', 'Run the queue'],
+  'rp.d.queue.use': ['发号、叫号、入座、过号、取餐叫号，暂停取号', 'Give numbers, call, seat, skip, call pickups, pause the queue'],
+  'rp.p.queue.jump': ['插队', 'Let guests jump the queue'],
+  'rp.d.queue.jump': ['把号排到前面、发优先号，要写原因', 'Move a number forward or give a priority number, with a reason'],
+  'rp.p.queue.manage': ['排队设置和叫号屏', 'Queue settings and screens'],
+  'rp.d.queue.manage': ['桌型分组、升桌规则、绑定和停用叫号屏', 'Table-size groups, upgrade rules, pairing and revoking screens'],
   'rp.p.kitchen.screen': ['后厨大屏', 'Kitchen screen'],
   'rp.d.kitchen.screen': ['打开后厨大屏', 'Open the kitchen screen'],
 })
