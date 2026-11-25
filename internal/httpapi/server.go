@@ -568,6 +568,7 @@ func (s *Server) Router() *gin.Engine {
 	s.noteTemplateRoutes(auth, admin)
 	s.toppingTemplateRoutes(auth)
 	s.permRoutes(auth)
+	s.queueRoutes(api, auth)
 	s.uiTextRoutes(api, admin)
 	s.chatAdminRoutes(auth, admin)
 	s.memberRoutes(auth)

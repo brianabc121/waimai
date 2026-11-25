@@ -418,7 +418,13 @@ func (s *Server) dineDesk(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"presets": p, "top": top})
+	// Tables held for a called queue number (docs/QUEUE_DISPLAY_DESIGN.md §6.4).
+	holds, err := s.App.TableHolds(c, bid)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"presets": p, "top": top, "holds": holds})
 }
 
 func (s *Server) saveDinePresets(c *gin.Context) {
