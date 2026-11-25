@@ -48,4 +48,35 @@ extend({
   'ox.sp.k.other': ['投诉和其他问题', 'Complaints and anything else'],
   'ox.sp.tip_h': ['小提示', 'Tip'],
   'ox.sp.tip': ['问订单的事时，点输入框旁的订单按钮把订单发过来，客服能直接看到。', 'Asking about an order? Send it with the order button by the input box so support sees it right away.'],
+  // promo media
+  'ox.pm.sub': ['点餐页最上方的图片、动图和短视频', 'Pictures, GIFs and short videos at the top of the ordering page'],
+  'ox.pm.total': ['已上传', 'Uploaded'],
+  'ox.pm.left': ['还能上传', 'Room for'],
+  'ox.pm.kinds': ['类型', 'Kinds'],
+  'ox.pm.all': ['全部物料', 'All media'],
+  'ox.pm.order': ['按顾客看到的顺序排列', 'In the order customers see them'],
+  'ox.pm.no_match': ['没有符合条件的物料', 'No media match'],
+  // promotions
+  'ox.pr.sub': ['外卖和堂食活动、优惠券，发布前可以试算', 'Delivery and dine-in deals and coupons; try them before publishing'],
+  'ox.pr.state': ['状态', 'State'],
+  'ox.pr.all': ['全部活动', 'All deals'],
+  // settings
+  'ox.set.sub': ['门店资料、费用、接单出餐、付款方式和商城展示', 'Store details, fees, order timing, payments and the marketplace'],
+  'ox.set.open_store': ['打开顾客点餐页', 'Open the ordering page'],
+  'ox.set.sections': ['设置项', 'Sections'],
+  'ox.set.basic': ['基本信息', 'Basics'],
+  'ox.set.fees': ['税费和起送', 'Tax, fees and minimum'],
+  'ox.set.timing': ['接单和出餐', 'Accepting and cooking'],
+  'ox.set.switches': ['服务开关', 'Services'],
+  'ox.set.pay': ['付款方式', 'Payments'],
+  'ox.set.texts': ['店铺多语言', 'Store texts'],
+  // rider cash (核款)
+  'ox.cs.sub': ['骑手代收的现金，交回店里后在这里核款', 'Cash riders collected; check it in here when they hand it back'],
+  'ox.cs.all': ['全部记录', 'All'],
+  'ox.cs.pending_due': ['骑手手上 {m}', 'Riders hold {m}'],
+  'ox.cs.listed': ['最近 {n} 笔', 'Last {n}'],
+  'ox.cs.tip': ['填骑手实际交回的金额，再点“确认核款”；和代收不一致会记为有差异。', 'Enter what the rider handed back and confirm; a different amount is marked as a discrepancy.'],
+  // bills, reconciling
+  'ox.bl.sub': ['外卖和自取订单的金额明细、优惠分摊和平台结算', 'Delivery and pickup orders: amounts, who paid for each discount, platform payouts'],
+  'ox.rc.sub': ['按付款方式核对收款，核对在线支付，查看打折和抹零', 'Check takings by payment method, tick off online payments, review discounts'],
 })

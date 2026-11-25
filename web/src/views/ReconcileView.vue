@@ -3,6 +3,7 @@
 // method, the owner's check of each online payment against the wallet or bank
 // app, the cash counted in the drawer, and who gave which discounts.
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import '../officeStrings'
 import { useRoute, useRouter } from 'vue-router'
 import { api, get } from '../api'
 import '../bills'
@@ -113,19 +114,20 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
 </script>
 
 <template>
-  <div class="page stack rc" style="max-width:1280px" data-testid="reconcile">
-    <div class="row between wrap" style="gap:8px">
-      <h1>{{ t('rc.nav') }}</h1>
-      <a class="btn" data-testid="rc-export" :href="exportHref" download>{{ t('rc.export') }}</a>
+  <div class="ox warm">
+  <div class="page ox-page rc" data-testid="reconcile">
+    <div class="ox-head">
+      <div><h1>{{ t('rc.nav') }}</h1><p class="ox-sub">{{ t('ox.rc.sub') }}</p></div>
+      <div class="ox-acts"><router-link class="btn" to="/merchant/cash">{{ t('cash') }}</router-link><a class="btn" data-testid="rc-export" :href="exportHref" download>{{ t('rc.export') }}</a></div>
     </div>
-    <div class="subtabs" role="tablist">
+    <div class="ox-tabs" role="tablist">
       <button type="button" role="tab" :class="{ on: tab === 'sum' }" data-testid="rc-tab-sum" @click="setTab('sum')">{{ t('rc.tab_sum') }}</button>
       <button type="button" role="tab" :class="{ on: tab === 'online' }" data-testid="rc-tab-online" @click="setTab('online')">{{ t('rc.tab_online') }}
         <span v-if="sum?.problems" class="badge bad">{{ sum.problems }}</span></button>
       <button type="button" role="tab" :class="{ on: tab === 'disc' }" data-testid="rc-tab-disc" @click="setTab('disc')">{{ t('rc.tab_disc') }}</button>
     </div>
-    <div class="row wrap" style="gap:6px">
-      <button v-for="p in (['today', 'yesterday', 'week', 'month', 'last_month', 'custom'] as Preset[])" :key="p" class="btn small" :class="{ primary: preset === p }"
+    <div class="ox-tools ox-chips" style="margin:0">
+      <button v-for="p in (['today', 'yesterday', 'week', 'month', 'last_month', 'custom'] as Preset[])" :key="p" :class="{ on: preset === p }"
         :data-preset="p" @click="p === 'custom' ? preset = 'custom' : choose(p)">{{ t('bl.p.' + p) }}</button>
       <span v-if="preset === 'custom'" class="custom"><input v-model="from" type="date" :max="to"> ~ <input v-model="to" type="date" :min="from" :max="today"></span>
     </div>
@@ -136,17 +138,17 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
     <!-- takings -->
     <template v-if="tab === 'sum' && sum">
       <p class="muted small" style="margin:0">{{ t('rc.hint') }}</p>
-      <div class="cards" data-testid="rc-cards">
-        <div class="card"><span>{{ t('rc.c.total') }}</span><b data-testid="rc-total">{{ m(sum.total) }}</b><small>{{ t('rc.c.count', { n: sum.count }) }}</small></div>
-        <div v-for="r in sum.rows" :key="r.pay_type + r.channel_id" class="card"><span>{{ rowName(r) }}</span><b>{{ m(r.amount) }}</b>
-          <small>{{ t('rc.c.count', { n: r.count }) }}</small></div>
-        <div class="card"><span>{{ t('rc.c.discount') }}</span><b class="neg">{{ m(sum.discounts.total) }}</b>
-          <small>{{ t('rc.d.promo') }} {{ m(sum.discounts.promotion) }} · {{ t('rc.d.staff') }} {{ m(sum.discounts.staff) }} · {{ t('rc.d.round') }} {{ m(sum.discounts.round_off) }}</small></div>
-        <div v-if="sum.refunds.count" class="card" data-testid="rc-refunds"><span>{{ t('rc.c.refunds') }}</span><b class="neg">-{{ m(sum.refunds.total) }}</b>
-          <small>{{ t('rc.c.count', { n: sum.refunds.count }) }} · {{ t('rc.c.net', { v: m(sum.net) }) }}</small></div>
+      <div class="ox-stats" data-testid="rc-cards">
+        <div class="ox-stat"><span class="l">{{ t('rc.c.total') }}</span><b class="v red" data-testid="rc-total">{{ m(sum.total) }}</b><small class="s">{{ t('rc.c.count', { n: sum.count }) }}</small></div>
+        <div v-for="r in sum.rows" :key="r.pay_type + r.channel_id" class="ox-stat"><span class="l">{{ rowName(r) }}</span><b class="v">{{ m(r.amount) }}</b>
+          <small class="s">{{ t('rc.c.count', { n: r.count }) }}</small></div>
+        <div class="ox-stat"><span class="l">{{ t('rc.c.discount') }}</span><b class="v neg">{{ m(sum.discounts.total) }}</b>
+          <small class="s">{{ t('rc.d.promo') }} {{ m(sum.discounts.promotion) }} · {{ t('rc.d.staff') }} {{ m(sum.discounts.staff) }} · {{ t('rc.d.round') }} {{ m(sum.discounts.round_off) }}</small></div>
+        <div v-if="sum.refunds.count" class="ox-stat" data-testid="rc-refunds"><span class="l">{{ t('rc.c.refunds') }}</span><b class="v neg">-{{ m(sum.refunds.total) }}</b>
+          <small class="s">{{ t('rc.c.count', { n: sum.refunds.count }) }} · {{ t('rc.c.net', { v: m(sum.net) }) }}</small></div>
       </div>
       <div class="cols">
-        <div class="card flush" style="overflow:auto">
+        <div class="ox-panel ox-scroll">
           <table class="data" data-testid="rc-rows">
             <thead><tr><th>{{ t('rc.col.method') }}</th><th class="r">{{ t('rc.col.count') }}</th><th class="r">{{ t('rc.col.amount') }}</th>
               <th class="r">{{ t('rc.col.dine') }}</th><th class="r">{{ t('rc.col.takeaway') }}</th><th>{{ t('rc.col.check') }}</th></tr></thead>
@@ -161,7 +163,7 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
             </tbody>
           </table>
         </div>
-        <div class="card stack">
+        <div class="ox-panel stack">
           <h2>{{ t('rc.cash') }}</h2>
           <div class="kv"><span>{{ t('rc.cash_counter') }}</span><b>{{ m(sum.cash.counter) }}</b></div>
           <div class="kv"><span>{{ t('rc.cash_rider') }}</span><b>{{ m(sum.cash.rider_collected) }}</b></div>
@@ -189,15 +191,16 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
 
     <!-- online payments -->
     <template v-if="tab === 'online' && pays">
-      <div class="row wrap" style="gap:8px">
-        <select v-model.number="filt.channel" style="width:auto" data-testid="rc-f-channel">
+      <div class="ox-panel">
+      <div class="ox-tools">
+        <select v-model.number="filt.channel" data-testid="rc-f-channel">
           <option :value="0">{{ t('rc.f.all_methods') }}</option>
           <option v-for="r in onlineRows" :key="r.channel_id" :value="r.channel_id">{{ asChannel(r) }}</option></select>
-        <button v-for="s in ['', 'unchecked', 'ok', 'problem']" :key="s" class="btn small" :class="{ primary: filt.status === s }" :data-status="s" @click="filt.status = s">{{ t('rc.f.' + (s || 'all')) }}</button>
+        <span class="ox-chips"><button v-for="s in ['', 'unchecked', 'ok', 'problem']" :key="s" :class="{ on: filt.status === s }" :data-status="s" @click="filt.status = s">{{ t('rc.f.' + (s || 'all')) }}</button></span>
         <span class="grow"></span>
         <button v-if="unchecked.length" class="btn" data-testid="rc-mark-all" @click="mark(unchecked, 'ok')">{{ t('rc.mark_all', { n: unchecked.length }) }}</button>
       </div>
-      <div class="card flush" style="overflow:auto">
+      <div class="ox-scroll">
         <table class="data" data-testid="rc-online">
           <thead><tr><th>{{ t('rc.col.time') }}</th><th>{{ t('rc.col.order') }}</th><th>{{ t('rc.col.method') }}</th><th class="r">{{ t('rc.col.amount') }}</th>
             <th>{{ t('rc.col.staff') }}</th><th>{{ t('rc.col.check') }}</th><th></th></tr></thead>
@@ -209,7 +212,7 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
                 <td>{{ asChannel({ name: p.method, names: p.names }) }}</td>
                 <td class="r"><b>{{ m(p.amount) }}</b></td>
                 <td>{{ p.staff }}</td>
-                <td><span class="tag" :class="p.status === 'ok' ? 'ok' : p.status === 'problem' ? 'bad' : ''" data-testid="rc-status">{{ t('rc.st.' + (p.status || 'none')) }}</span>
+                <td><span class="tag ox-pill" :class="p.status === 'ok' ? 'ok' : p.status === 'problem' ? 'bad' : ''" data-testid="rc-status">{{ t('rc.st.' + (p.status || 'none')) }}</span>
                   <div v-if="p.note" class="small neg">{{ p.note }}</div>
                   <div v-if="p.checked_by" class="small muted">{{ t('rc.checked_by', { name: p.checked_by, at: when(p.checked_at!) }) }}</div></td>
                 <td class="nowrap r">
@@ -227,16 +230,17 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
                   <button type="button" class="btn" @click="writing = null">{{ t('ck.cancel') }}</button>
                 </form></td></tr>
             </template>
-            <tr v-if="!pays.length"><td colspan="7" class="muted">{{ t('rc.no_online') }}</td></tr>
+            <tr v-if="!pays.length"><td colspan="7" class="ox-empty">{{ t('rc.no_online') }}</td></tr>
           </tbody>
         </table>
+      </div>
       </div>
     </template>
 
     <!-- discounts -->
     <template v-if="tab === 'disc' && disc">
       <div class="cols">
-        <div class="card flush" style="overflow:auto">
+        <div class="ox-panel ox-scroll">
           <table class="data" data-testid="rc-disc">
             <thead><tr><th>{{ t('rc.col.time') }}</th><th>{{ t('rc.col.order') }}</th><th>{{ t('rc.col.kind') }}</th><th class="r">{{ t('rc.col.off') }}</th>
               <th class="r">{{ t('rc.col.paid') }}</th><th>{{ t('rc.col.reason') }}</th><th>{{ t('rc.col.by') }}</th><th>{{ t('rc.col.approved') }}</th></tr></thead>
@@ -252,12 +256,12 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
           </table>
         </div>
         <div class="stack">
-          <div class="card stack" data-testid="rc-by-staff">
+          <div class="ox-panel stack" data-testid="rc-by-staff">
             <h2>{{ t('rc.by_staff') }}</h2>
             <div v-for="s in disc.by_staff" :key="s.name" class="kv"><span>{{ s.name || t('rc.someone') }}</span><b>{{ t('rc.staff_line', { n: s.count, amt: m(s.amount) }) }}</b></div>
             <div v-if="!disc.by_staff.length" class="muted small">—</div>
           </div>
-          <div class="card stack" data-testid="rc-by-promo">
+          <div class="ox-panel stack" data-testid="rc-by-promo">
             <h2>{{ t('rc.by_promo') }}</h2>
             <div v-for="p in disc.by_promo" :key="p.id" class="kv"><span><span class="tag">{{ t(p.scope === 'dine_in' ? 'ck.tab_dine' : 'ck.tab_delivery') }}</span> {{ pick(p.name, p.name_en) }}</span>
               <b>{{ t('rc.staff_line', { n: p.count, amt: m(p.amount) }) }}</b></div>
@@ -267,9 +271,12 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
       </div>
     </template>
   </div>
+  </div>
 </template>
 
 <style scoped>
+.rc .cols h2 { color: #2f1810; }
+.ox-stat .v.neg { color: #b8392a; }
 .custom input { width: auto; }
 .r { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .nowrap { white-space: nowrap; }
