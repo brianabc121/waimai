@@ -1,9 +1,20 @@
-.PHONY: test build web run migrate seed e2e
+.PHONY: test build web run migrate seed e2e pricing-check pricing-check-db
 
 # Tests need a real PostgreSQL: TEST_DATABASE_URL=postgres://.../waimai_test
 test:
 	go vet ./...
 	go test -count=1 -p 1 ./...
+
+# 金额验算（docs/PRICING_CHECK.md）：凡是改动商品价格、订单金额都必须跑通。
+# 需要 TEST_DATABASE_URL；app 包要整包跑，最后的重放验算会检查前面所有测试建的订单。
+pricing-check:
+	go test -count=1 -v -run 'TestPricingCheck|TestPriceMatchesLegacy|TestItemDiscount|TestShare' ./internal/pricing/
+	go test -count=1 -p 1 ./internal/app/
+	cd web && node --test tests/dishpromo.test.mjs
+
+# 对一个真实数据库（DATABASE_URL）做只读的逐单重放验算，默认最近 30 天，DAYS=0 为全部。
+pricing-check-db:
+	go run ./cmd/pricecheck -days $(or $(DAYS),30)
 
 build:
 	go build -o bin/ ./cmd/...
