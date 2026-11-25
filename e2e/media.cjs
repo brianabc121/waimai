@@ -161,8 +161,9 @@ step('the customer swipes through the media, and they move on by themselves')
 const pc = await open({ width: 1440, height: 900 })
 await pc.goto(BASE + '/s/bgc')
 await pc.waitForSelector(tid('promo'))
-const wide = await pc.locator(tid('promo')).boundingBox(), card = await pc.locator('.shophead').boundingBox()
-if (!(wide.x + wide.width <= card.x && wide.width <= 460)) throw new Error(`on a computer the media should sit beside the store card: ${JSON.stringify([wide, card])}`)
+// the store card on a computer: the name and offers on the left, the media on the right
+const wide = await pc.locator(tid('promo')).boundingBox(), card = await pc.locator('.idwrap').boundingBox()
+if (!(card.x + card.width <= wide.x && wide.width <= 460)) throw new Error(`on a computer the media should sit beside the store card: ${JSON.stringify([wide, card])}`)
 await shot(pc, 'pm5-customer-pc')
 step('on a computer the media sit beside the store card')
 

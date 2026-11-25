@@ -161,3 +161,34 @@ func TestAdminSettings(t *testing.T) {
 		t.Fatal("pages do not get the new public key")
 	}
 }
+
+// Setting up a translation service in the back office translates the mall's
+// own texts, also where the jobs run in the same process as the page.
+func TestAdminSettingsQueuePlatformTranslation(t *testing.T) {
+	need(t)
+	ctx := context.Background()
+	actor := adminActor(t)
+	clear := func() {
+		_, _ = testApp.DB.Exec(ctx, `DELETE FROM platform_settings`)
+		_, _ = testApp.DB.Exec(ctx, `DELETE FROM jobs WHERE kind='translate_platform' AND status='pending'`)
+	}
+	clear()
+	t.Cleanup(clear)
+	pending := func() (n int) {
+		noErr(t, testApp.DB.QueryRow(ctx, `SELECT count(*) FROM jobs WHERE kind='translate_platform' AND status='pending'`).Scan(&n))
+		return n
+	}
+
+	a := settingsApp(t, config.Config{})
+	_, err := a.AdminSaveSettings(ctx, actor, map[string]string{"TRANSLATE_PROVIDER": "stub"})
+	noErr(t, err)
+	if n := pending(); n != 1 {
+		t.Fatalf("translation jobs queued for the mall: %d", n)
+	}
+	// the worker of this process sees nothing new, and saving the same again queues nothing more
+	_, err = a.AdminSaveSettings(ctx, actor, map[string]string{"TRANSLATE_PROVIDER": "stub"})
+	noErr(t, err)
+	if changed, err := a.SettingsChanged(ctx); err != nil || changed || pending() != 1 {
+		t.Fatalf("after saving again: changed=%v err=%v pending=%d", changed, err, pending())
+	}
+}

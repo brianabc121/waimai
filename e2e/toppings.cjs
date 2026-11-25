@@ -53,9 +53,20 @@ async function writeTemplate(page, name, rows) {
   await page.locator(tid(`tp-item-${name}`)).waitFor()
 }
 
+// The rice with toppings opens a sheet on the storefront instead of a plain "+",
+// which the tests after this one do not expect: the templates go again at the
+// end (and from a run that stopped half way, at the start). Their option
+// groups leave the dishes with them.
+const MINE = ['麻辣烫', '羊肉泡馍加料', '重复']
+async function dropTemplates(page) {
+  for (const x of (await api(page, 'GET', '/merchant/branches/1/topping-templates')).templates)
+    if (MINE.includes(x.name)) await api(page, 'DELETE', `/merchant/branches/1/topping-templates/${x.id}`)
+}
+
 // ---------- the owner on a PC ----------
 const owner = await open({ width: 1366, height: 860 })
 await login(owner, 'owner1')
+await dropTemplates(owner)
 await owner.goto(BASE + '/merchant/menu')
 await owner.click(tid('tab-toppings'))
 await owner.waitForSelector(tid('topping-templates'))
@@ -164,6 +175,7 @@ await desk.click(tid('dd-sheet-add'))
 await expectText(desk.locator(tid('dd-round')), /油麦菜/, 'round line')
 step('at a table, tapping the rice opens the sheet with AC02 上海青 / AC03 油麦菜')
 
+await dropTemplates(owner)
 if (errors.length) throw new Error('page errors:\n' + errors.join('\n'))
 await browser.close()
 console.log('toppings e2e passed')
