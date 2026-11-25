@@ -161,8 +161,15 @@ func TestStaffOrderOptionQuantities(t *testing.T) {
 	_, err = a.CreateQuote(ctx, s.slug, app.QuoteInput{ServiceType: "pickup",
 		Items: []app.QuoteLineInput{{ItemID: id, Qty: 1, OptionIDs: []int64{kelp, kelp}}}}, "")
 	wantCode(t, err, "VALIDATION")
-	// Too many in a group is still too many.
+	// A group's limit counts kinds, not portions: three of each of two is fine...
 	in.Items[0].OptionIDs = []int64{kelp, kelp, kelp, egg, egg, egg}
+	_, err = a.StaffQuote(ctx, s.branchID, in)
+	noErr(t, err)
+	// ...but one option has at most 20 portions.
+	in.Items[0].OptionIDs = nil
+	for range 21 {
+		in.Items[0].OptionIDs = append(in.Items[0].OptionIDs, kelp)
+	}
 	_, err = a.StaffQuote(ctx, s.branchID, in)
 	wantCode(t, err, "OPTIONS_INVALID")
 }
