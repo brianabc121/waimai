@@ -180,6 +180,7 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
 .staffbar a { color: #c9ced6; padding: 9px 10px; border-radius: 8px; font-weight: 600; }
 .staffbar a:hover { background: #262c34; }
 .staffbar a.navsub { padding-inline-start: 24px; font-weight: 500; }
+.staffbar .navgrp { color: #8b949e; font-size: 12px; font-weight: 600; letter-spacing: .04em; padding: 8px 10px 2px; }
 .staffbar a.router-link-active { background: #2d333b; color: #fff; box-shadow: inset 3px 0 0 var(--brand); }
 .staffbar select { background: #2d333b; color: #fff; border-color: #444c56; padding: 6px 8px; }
 .staffbar .btn.link { color: #c9ced6; justify-content: flex-start; padding: 6px 0; }
@@ -189,6 +190,7 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
 .shell.drawer .staffbar, .adm.drawer .adm-side { position: fixed; inset-inline-start: 0; top: 0; bottom: 0; height: auto; width: 264px; max-width: 86vw; z-index: 50; transform: translateX(-100%); transition: transform .18s ease; visibility: hidden; }
 .shell.drawer.open .staffbar, .adm.drawer.open .adm-side { transform: none; visibility: visible; box-shadow: 8px 0 24px rgba(0,0,0,.3); }
 .shell.drawer .staffbar a, .adm.drawer .adm-side a { padding: 11px 12px; }
+.shell.drawer .staffbar a.navsub { padding-inline-start: 26px; }
 .page { padding: 16px; max-width: 1400px; margin: 0 auto; }
 .cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; align-items: start; }
 .lang { border: 1px solid currentColor; border-radius: 6px; background: transparent; color: inherit; padding: 2px 8px; cursor: pointer; font-size: 12px; opacity: .85; }

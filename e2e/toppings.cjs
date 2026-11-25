@@ -136,7 +136,7 @@ step('the toppings tab fits a phone')
 // ---------- the cashier orders for a customer: toppings by code ----------
 const desk = await open({ width: 1440, height: 900 })
 await login(desk, 'cashier1')
-await desk.goto(BASE + '/merchant/orders/new')
+await desk.goto(BASE + '/merchant/order/delivery')
 await desk.waitForSelector(tid('manual-order'))
 const pick = desk.locator(tid('mo-pick'))
 await pick.fill('b1')
@@ -157,7 +157,7 @@ await desk.screenshot({ path: `${SHOTS}/tp06-manual.png` })
 step('typing AC02 / AC03 under the rice adds 上海青 and 油麦菜; the line is 209')
 
 // ---------- dine-in: the sheet opens for a dish with toppings ----------
-await desk.click(tid('mode-dine'))
+await desk.goto(BASE + '/merchant/order/dine')
 await desk.waitForSelector(tid('dine-desk'))
 const free = (await api(desk, 'GET', '/merchant/branches/1/tables')).tables.filter(x => x.active && !x.session)
 if (!free.length) throw new Error('needs a free table; reseed the database')

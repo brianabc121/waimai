@@ -51,7 +51,7 @@ async function tableWithFood(desk, kitchen) {
   return { table: t.name, session: bill.session_id }
 }
 async function toBill(page, table) {
-  await page.goto(BASE + '/merchant/orders/new?mode=dine')
+  await page.goto(BASE + '/merchant/order/dine')
   await page.waitForSelector(tid('dine-desk'))
   await page.click(tid(`dd-table-${table}`))
   await page.click(tid('dd-pay')).catch(() => null)
@@ -133,7 +133,7 @@ await desk.click(tid('dd-done'))
 step(`order taker set the amount to pay to ₱100 with ${c2.adj_approved_by}'s code; cash with change`)
 
 // ---------- a delivery order paid online before it was placed ----------
-await desk.goto(BASE + '/merchant/orders/new')
+await desk.goto(BASE + '/merchant/order/delivery')
 await desk.waitForSelector(tid('manual-order'))
 await desk.fill(tid('mo-pick'), 'b1')
 await desk.waitForSelector(`${tid('mo-pick-drop')} .it.on:has-text("卤肉饭")`)

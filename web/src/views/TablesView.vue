@@ -60,7 +60,7 @@ function fail(e: unknown) {
 const router = useRouter()
 function click(tb: DiningTable) {
   if (!tb.active && !tb.session) return
-  void router.push({ path: '/merchant/orders/new', query: { mode: 'dine', table: String(tb.id), ...(tb.session ? { view: 'bill' } : {}) } })
+  void router.push({ path: '/merchant/order/dine', query: { table: String(tb.id), ...(tb.session ? { view: 'bill' } : {}) } })
 }
 const bill = ref<Bill | null>(null) // a closed bill from the list below, read only
 
@@ -115,7 +115,7 @@ async function setActive(tb: DiningTable, active: boolean) {
       <div><h1>{{ t('tables') }}</h1><p class="ox-sub">{{ t('ox.tb.sub') }}</p></div>
       <div class="ox-acts">
         <button v-if="manager" class="btn" data-test="new-table" @click="startEdit(null)">＋ {{ t('new_table') }}</button>
-        <router-link class="btn primary" to="/merchant/orders/new?mode=dine" data-test="to-desk">{{ t('dd.go_desk') }}</router-link>
+        <router-link class="btn primary" to="/merchant/order/dine" data-test="to-desk">{{ t('dd.go_desk') }}</router-link>
       </div>
     </div>
     <div v-if="!online" class="banner warn">{{ t('offline') }}</div>

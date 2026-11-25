@@ -3377,5 +3377,10 @@
  "ox.cs.listed": "{n} gần nhất",
  "ox.cs.tip": "Nhập số tiền shipper nộp lại rồi xác nhận; khác số thu sẽ ghi là chênh lệch.",
  "ox.bl.sub": "Chi tiết đơn giao và tự lấy, ai chịu giảm giá, thanh toán nền tảng",
- "ox.rc.sub": "Đối chiếu thu theo phương thức, kiểm tra thanh toán online, xem giảm giá"
+ "ox.rc.sub": "Đối chiếu thu theo phương thức, kiểm tra thanh toán online, xem giảm giá",
+ "pos.nav": "Gọi món",
+ "pos.dine": "Gọi món tại quán",
+ "pos.delivery": "Đơn giao hàng",
+ "pos.new_delivery": "＋ Đơn giao hàng",
+ "pos.delivery_hint": "Giao hàng và tự lấy"
 }

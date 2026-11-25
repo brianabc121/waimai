@@ -94,6 +94,11 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
       </div>
       <div v-if="role && !viewing" class="shell-role" data-testid="nav-role"><span class="rtag" :class="role">{{ t('role.' + role) }}</span><span class="who">{{ session.user?.display_name }}</span></div>
       <div class="shell-links">
+        <template v-if="show('/merchant/order/dine') || show('/merchant/order/delivery')">
+          <div class="navgrp" data-testid="nav-pos">{{ t('pos.nav') }}</div>
+          <router-link v-if="show('/merchant/order/dine')" to="/merchant/order/dine" class="navsub" data-testid="nav-pos-dine">{{ t('pos.dine') }}</router-link>
+          <router-link v-if="show('/merchant/order/delivery')" to="/merchant/order/delivery" class="navsub" data-testid="nav-pos-delivery" :title="t('pos.delivery_hint')">{{ t('pos.delivery') }}</router-link>
+        </template>
         <router-link v-if="show('/merchant/orders')" to="/merchant/orders">{{ t('orders') }}</router-link>
         <router-link v-if="show('/merchant/progress')" to="/merchant/progress" class="navsub" data-testid="nav-progress">{{ t('kp.nav') }}</router-link>
         <router-link v-if="show('/merchant/voids')" to="/merchant/voids" class="navsub" data-testid="nav-voids">{{ t('vd.log.title') }}</router-link>

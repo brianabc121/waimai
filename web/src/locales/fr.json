@@ -3377,5 +3377,10 @@
  "ox.cs.listed": "{n} derniers",
  "ox.cs.tip": "Saisissez le montant rendu puis confirmez ; un écart est signalé.",
  "ox.bl.sub": "Commandes livraison et à emporter : montants, financement des remises, versements",
- "ox.rc.sub": "Vérifiez les encaissements par mode, pointez les paiements en ligne, voyez les remises"
+ "ox.rc.sub": "Vérifiez les encaissements par mode, pointez les paiements en ligne, voyez les remises",
+ "pos.nav": "Commandes",
+ "pos.dine": "Commande sur place",
+ "pos.delivery": "Commande à livrer",
+ "pos.new_delivery": "＋ Commande à livrer",
+ "pos.delivery_hint": "Livraison et à emporter"
 }

@@ -59,9 +59,7 @@ await owner.context().close()
 
 const pad = await open({ width: 1180, height: 820 })
 await login(pad, 'cashier1')
-await pad.goto(BASE + '/merchant/orders/new')
-await pad.waitForSelector(tid('manual-order'))
-await pad.click(tid('mode-dine'))
+await pad.goto(BASE + '/merchant/order/dine')
 await pad.waitForSelector(tid('dine-desk'))
 await pad.locator(tid('dd-area')).first().waitFor()
 await pad.locator('[data-testid^="dd-table-"]').first().waitFor()
@@ -206,8 +204,8 @@ step(`paid in cash with change and closed table ${B}; the iPad never focused a t
 
 // ---------- phone ----------
 const phone = await open({ width: 390, height: 844 })
-await login(phone, 'cashier1', '/login?next=' + encodeURIComponent('/merchant/orders/new?mode=dine'))
-await phone.goto(BASE + '/merchant/orders/new?mode=dine')
+await login(phone, 'cashier1', '/login?next=' + encodeURIComponent('/merchant/order/dine'))
+await phone.goto(BASE + '/merchant/order/dine')
 await phone.waitForSelector(tid('dine-desk'))
 await phone.click(tid(`dd-table-${P}`))
 await phone.waitForSelector(tid('dd-open'))

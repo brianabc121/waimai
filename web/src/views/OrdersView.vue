@@ -259,7 +259,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
       </div>
       <div class="row wrap">
         <label class="check" style="margin:0"><input type="checkbox" :checked="sound" @change="toggleSound" />{{ t('new_order_sound') }}</label>
-        <router-link v-if="can('order.manual')" class="btn primary small" to="/merchant/orders/new" data-testid="manual-order-new">{{ t('vo.new') }}</router-link>
+        <router-link v-if="can('order.manual')" class="btn primary small" to="/merchant/order/delivery" data-testid="manual-order-new">{{ t('pos.new_delivery') }}</router-link>
       </div>
     </div>
     <div v-if="textsPending" class="banner warn" style="margin-bottom:12px" data-testid="store-texts-banner">{{ t('mtr.store_banner', { n: textsPending }) }}
@@ -368,7 +368,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
           </div>
           <div v-if="selected.addon && can('order.manual') && (selected.addon.open || addons(selected).length)" class="addonbar" data-testid="addon-box">
             <template v-if="selected.addon.open">
-              <router-link class="btn primary small" data-testid="addon-new" :to="{ path: '/merchant/orders/new', query: { append: selected.id } }">{{ t('ao.btn') }}</router-link>
+              <router-link class="btn primary small" data-testid="addon-new" :to="{ path: '/merchant/order/delivery', query: { append: selected.id } }">{{ t('ao.btn') }}</router-link>
               <span class="small muted">{{ selected.addon.repack ? t('ao.repack') : t(selected.service_type === 'pickup' ? 'ao.until_pickup' : 'ao.until_delivery') }}</span>
             </template>
             <span v-else class="small muted" data-testid="addon-closed">{{ t('ao.closed') }}</span>
