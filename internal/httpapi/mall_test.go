@@ -60,8 +60,23 @@ func TestMallOverHTTP(t *testing.T) {
 
 	// A spot inside the near store's area: it delivers; the far one does not
 	// and comes after it, marked, with no delivery terms.
+	// A running delivery offer shows on the card; a dine-in one does not.
+	// (A store with any offer once made the whole list fail: the offers query
+	// read one column fewer than it selected.)
+	promo := func(name, scope string) {
+		pb := fmt.Sprintf("/merchant/branches/%d/promotions", near.branchID)
+		p := owner.want(200, "", "POST", pb, map[string]any{"name": name, "kind": "amount_off", "threshold": 5000, "value": 1000,
+			"applies_delivery": true, "applies_pickup": true, "scope": scope})
+		owner.want(200, "", "POST", fmt.Sprintf("%s/%d/status", pb, int64(p["id"].(float64))), map[string]any{"status": "active"})
+	}
+	promo("dine-in only", "dine_in")
+	promo("delivery offer", "delivery")
+
 	stores, out := list(anon, here)
 	s := stores[near.slug]
+	if ps, _ := s["promos"].([]any); len(ps) != 1 || ps[0].(map[string]any)["name"] != "delivery offer" {
+		t.Fatalf("offers on the card: %v", s["promos"])
+	}
 	if s == nil || len(stores) != 2 || stores[far.slug] == nil || s["no_delivery"] != false {
 		t.Fatalf("stores at the spot: %v", out)
 	}

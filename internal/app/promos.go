@@ -123,6 +123,15 @@ const promoCols = `p.id, p.name, p.name_en, p.kind, p.threshold, p.value, p.max_
 	p.applies_pickup, p.starts_at, p.ends_at, p.daily_start, p.daily_end, p.total_quota, p.per_phone_limit,
 	p.used_count, p.status, p.scope, ARRAY(SELECT pi.item_id FROM promotion_items pi WHERE pi.promotion_id = p.id ORDER BY pi.item_id)`
 
+// scanDest is where a row of promoCols followed by the phone-use count goes.
+// Every query built on promoCols scans through it, so adding a column to
+// promoCols means adding it here too and nowhere else.
+func (p *Promotion) scanDest(before ...any) []any {
+	return append(before, &p.ID, &p.Name, &p.NameEn, &p.Kind, &p.Threshold, &p.Value, &p.MaxDiscount,
+		&p.AppliesDelivery, &p.AppliesPickup, &p.StartsAt, &p.EndsAt, &p.DailyStart, &p.DailyEnd,
+		&p.TotalQuota, &p.PerPhoneLimit, &p.UsedCount, &p.Status, &p.Scope, &p.ItemIDs, &p.phoneUsed)
+}
+
 // loadPromotions returns a branch's promotions, oldest first. With a phone,
 // each one also carries how often that customer has used it.
 func loadPromotions(ctx context.Context, q Querier, branchID int64, where, phone string) ([]Promotion, error) {
@@ -137,9 +146,7 @@ func loadPromotions(ctx context.Context, q Querier, branchID int64, where, phone
 	out := []Promotion{}
 	for rows.Next() {
 		var p Promotion
-		if err := rows.Scan(&p.ID, &p.Name, &p.NameEn, &p.Kind, &p.Threshold, &p.Value, &p.MaxDiscount,
-			&p.AppliesDelivery, &p.AppliesPickup, &p.StartsAt, &p.EndsAt, &p.DailyStart, &p.DailyEnd,
-			&p.TotalQuota, &p.PerPhoneLimit, &p.UsedCount, &p.Status, &p.Scope, &p.ItemIDs, &p.phoneUsed); err != nil {
+		if err := rows.Scan(p.scanDest()...); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
