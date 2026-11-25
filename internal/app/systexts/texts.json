@@ -362,5 +362,19 @@
   "ja": "開いて確認してください",
   "my": "ဖွင့်၍ ဖတ်ပါ",
   "km": "បើកដើម្បីអាន"
+ },
+ "sys.sms.queue_called": {
+  "zh": "【{store}】到您了！排队号 {no}，请尽快到店找店员入座。",
+  "en": "[{store}] It's your turn! Number {no}, please come in and see our staff.",
+  "zh-Hant": "【{store}】到您了！排隊號 {no}，請盡快到店找店員入座。",
+  "th": "[{store}] ถึงคิวของคุณแล้ว! หมายเลข {no} กรุณาติดต่อพนักงาน",
+  "vi": "[{store}] Đến lượt bạn! Số {no}, vui lòng vào gặp nhân viên.",
+  "fr": "[{store}] C'est votre tour ! Numéro {no}, présentez-vous à notre équipe.",
+  "ar": "[{store}] حان دورك! الرقم {no}، يرجى التوجه إلى الموظفين.",
+  "es": "[{store}] ¡Es su turno! Número {no}, acérquese a nuestro personal.",
+  "ru": "[{store}] Ваша очередь! Номер {no}, пожалуйста, подойдите к персоналу.",
+  "ja": "【{store}】お待たせしました！番号 {no} のお客様、スタッフまでお越しください。",
+  "my": "[{store}] သင့်အလှည့်ရောက်ပါပြီ! နံပါတ် {no}၊ ဝန်ထမ်းထံ လာရောက်ပါ။",
+  "km": "[{store}] ដល់វេនអ្នកហើយ! លេខ {no} សូមមកជួបបុគ្គលិក។"
  }
 }

@@ -25,28 +25,32 @@ const (
 	PermOrderVoid        = "order.void"
 	PermTableUse         = "table.use"
 	PermTableManage      = "table.manage"
-	PermMemberView       = "member.view"
-	PermMemberEdit       = "member.edit"
-	PermChatReply        = "chat.reply"
-	PermChatSettings     = "chat.settings"
-	PermSupport          = "support"
-	PermMenuSoldOut      = "menu.soldout"
-	PermMenuEdit         = "menu.edit"
-	PermMenuTranslate    = "menu.translate"
-	PermStoreDesign      = "store.design"
-	PermPromo            = "promo"
-	PermMall             = "mall"
-	PermCash             = "cash"
-	PermBills            = "bills"
-	PermReconcile        = "reconcile"
-	PermRiderView        = "rider.view"
-	PermDeliveryMap      = "delivery.map"
-	PermStaffView        = "staff.view"
-	PermStaffManage      = "staff.manage"
-	PermStaffAttend      = "staff.attendance"
-	PermStaffReports     = "staff.reports"
-	PermSettings         = "settings"
-	PermKitchenScreen    = "kitchen.screen"
+	// The queue display (docs/QUEUE_DISPLAY_DESIGN.md §10).
+	PermQueueUse      = "queue.use"
+	PermQueueJump     = "queue.jump"
+	PermQueueManage   = "queue.manage"
+	PermMemberView    = "member.view"
+	PermMemberEdit    = "member.edit"
+	PermChatReply     = "chat.reply"
+	PermChatSettings  = "chat.settings"
+	PermSupport       = "support"
+	PermMenuSoldOut   = "menu.soldout"
+	PermMenuEdit      = "menu.edit"
+	PermMenuTranslate = "menu.translate"
+	PermStoreDesign   = "store.design"
+	PermPromo         = "promo"
+	PermMall          = "mall"
+	PermCash          = "cash"
+	PermBills         = "bills"
+	PermReconcile     = "reconcile"
+	PermRiderView     = "rider.view"
+	PermDeliveryMap   = "delivery.map"
+	PermStaffView     = "staff.view"
+	PermStaffManage   = "staff.manage"
+	PermStaffAttend   = "staff.attendance"
+	PermStaffReports  = "staff.reports"
+	PermSettings      = "settings"
+	PermKitchenScreen = "kitchen.screen"
 )
 
 // PermDef is one line of the role permissions table.
@@ -75,6 +79,9 @@ var PermCatalog = []PermDef{
 	{Code: PermCheckoutDiscount, Group: "order", Cashier: false, Manager: true},
 	{Code: PermTableUse, Group: "table", Cashier: true, Manager: true},
 	{Code: PermTableManage, Group: "table", Cashier: false, Manager: true, Requires: []string{PermTableUse}},
+	{Code: PermQueueUse, Group: "queue", Cashier: true, Manager: true},
+	{Code: PermQueueJump, Group: "queue", Cashier: false, Manager: true, Requires: []string{PermQueueUse}},
+	{Code: PermQueueManage, Group: "queue", Cashier: false, Manager: true, Requires: []string{PermQueueUse}},
 	{Code: PermMemberView, Group: "customer", Cashier: true, Manager: true},
 	{Code: PermMemberEdit, Group: "customer", Cashier: true, Manager: true, Requires: []string{PermMemberView}},
 	{Code: PermChatReply, Group: "customer", Cashier: true, Manager: true},
