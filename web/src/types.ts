@@ -92,7 +92,7 @@ export interface PayChannel { id: number; country: string; name: string; names: 
 export interface PayOptions { cash: boolean; card: boolean; channels: PayChannel[]; all: PayChannel[]; off: number[]; reasons: string[] | null; country: string }
 export interface Adjust { percent_bp: number; mode: '' | 'round' | 'set_total'; amount: number; reason: string }
 export interface PayChoice { type: 'cash' | 'card' | 'online'; channel_id: number }
-export interface LineOption { option_id?: number; group: string; group_en: string; name: string; name_en: string; price_delta: number; group_tr?: string; name_tr?: string; qty?: number }
+export interface LineOption { option_id?: number; group: string; group_en: string; name: string; name_en: string; price_delta: number; group_tr?: string; name_tr?: string; qty?: number; topping?: boolean }
 export interface OrderItem {
   id: number; item_id: number; name: string; name_en: string; name_tr?: string; unit_price: number; qty: number; line_total: number
   options: LineOption[]; note: string; needs_prep: boolean; prep_status: string

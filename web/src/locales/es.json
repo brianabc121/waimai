@@ -3213,5 +3213,8 @@
  "tp.form_hint": "Las plantillas marcadas se ofrecen con este plato. Los precios se cambian en Menú > Extras.",
  "tp.manage": "Gestionar plantillas de extras",
  "tp.on": "Extras: {names}",
- "tp.preview": "Así se ve al pedir"
+ "tp.preview": "Así se ve al pedir",
+ "tp.c.topping": "Extras",
+ "tp.c.flavor": "Sabor",
+ "tp.c.note": "Nota"
 }

@@ -6,6 +6,8 @@ import { cart, linePrice, MAX_BASKETS, moveLine, type CartLine } from '../cart'
 import { money, pick, t, mn } from '../i18n'
 import type { Item, Storefront } from '../types'
 import { cartTags } from '../notes'
+import { fromCart } from '../extras'
+import LineExtras from './LineExtras.vue'
 
 const props = defineProps<{ store: Storefront; items: Map<number, Item>; currency: string; orderable: (it: Item) => boolean }>()
 const emit = defineEmits<{ empty: [] }>()
@@ -21,12 +23,7 @@ const sum = (ls: CartLine[]) => ls.reduce((s, l) => s + (linePrice(l, props.item
 const used = computed(() => new Set(cart.lines.map(l => l.basket)).size)
 const bad = (l: CartLine) => { const it = props.items.get(l.item_id); return !it || !props.orderable(it) || linePrice(l, props.items) === null }
 const name = (l: CartLine) => { const it = props.items.get(l.item_id); return it ? mn(it) : '—' }
-function optionNames(l: CartLine) {
-  const it = props.items.get(l.item_id)
-  if (!it) return ''
-  const all = new Map(it.groups.flatMap(g => g.options).map(o => [o.id, o]))
-  return l.option_ids.map(id => all.get(id)).filter(Boolean).map(o => mn(o!)).join(' · ')
-}
+const extras = (l: CartLine) => fromCart(props.items.get(l.item_id), l.option_ids)
 
 function change(l: CartLine, d: number) {
   l.qty = Math.min(99, l.qty + d)
@@ -67,8 +64,7 @@ function moveTo(l: CartLine, b: number) { moving.value = ''; moveLine(l, b) }
         <div v-else class="ph">{{ name(l).slice(0, 1) }}</div>
         <div class="grow">
           <div class="nm">{{ name(l) }}</div>
-          <div class="muted small" v-if="optionNames(l)">{{ optionNames(l) }}</div>
-          <div class="note-line" v-if="l.note || l.note_tags?.length" data-testid="cart-notes">{{ [...cartTags(items.get(l.item_id), l.note_tags), l.note].filter(Boolean).join(' · ') }}</div>
+          <LineExtras v-bind="extras(l)" :flavors="cartTags(items.get(l.item_id), l.note_tags)" :note="l.note?.trim() ?? ''" :cur="currency" tid="cart" />
           <div v-if="bad(l)" class="small" style="color:var(--bad)">{{ t('unavailable') }}</div>
           <div v-else class="pr">{{ money(linePrice(l, items)!, currency) }}</div>
         </div>
