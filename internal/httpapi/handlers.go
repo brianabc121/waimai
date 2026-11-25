@@ -686,6 +686,25 @@ func (s *Server) deleteZone(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true})
 }
 
+// reorderMenu stores the order of the categories and dishes dragged on the menu page.
+func (s *Server) reorderMenu(c *gin.Context) {
+	bid, ok := branchScope(c, pMenuEdit)
+	if !ok {
+		return
+	}
+	var in struct {
+		Categories []app.MenuOrderCategory `json:"categories"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	if err := s.App.ReorderMenu(c, bid, in.Categories); err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
 func (s *Server) reorderZones(c *gin.Context) {
 	bid, ok := branchScope(c, pMap)
 	if !ok {

@@ -43,7 +43,7 @@ const api = async (method, path, data) => {
   if (!r.ok()) throw new Error(`${method} ${path}: ${r.status()} ${await r.text()}`)
   return r.json()
 }
-const drinks = owner.locator('.card:has(h2:has-text("饮品"))')
+const drinks = owner.locator('tbody:has(h2:has-text("饮品"))')
 let madeRequired = false
 
 try {

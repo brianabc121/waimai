@@ -36,6 +36,7 @@ type ToppingOption struct {
 type ToppingTemplate struct {
 	ID        int64           `json:"id"`
 	Name      string          `json:"name"`
+	Icon      string          `json:"icon"`
 	Title     string          `json:"title"`
 	MaxSelect int             `json:"max_select"`
 	Options   []ToppingOption `json:"options"`
@@ -54,13 +55,14 @@ type ToppingOptionInput struct {
 
 type ToppingTemplateInput struct {
 	Name      string               `json:"name"`
+	Icon      string               `json:"icon"`
 	Title     string               `json:"title"`
 	MaxSelect int                  `json:"max_select"`
 	Options   []ToppingOptionInput `json:"options"`
 }
 
 func (a *App) ToppingTemplates(ctx context.Context, branchID int64) ([]ToppingTemplate, error) {
-	rows, err := a.DB.Query(ctx, `SELECT id, name, title, max_select, to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SSOF')
+	rows, err := a.DB.Query(ctx, `SELECT id, name, icon, title, max_select, to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SSOF')
 		FROM topping_templates WHERE branch_id=$1 ORDER BY sort, id`, branchID)
 	if err != nil {
 		return nil, err
@@ -69,7 +71,7 @@ func (a *App) ToppingTemplates(ctx context.Context, branchID int64) ([]ToppingTe
 	byID := map[int64]int{}
 	for rows.Next() {
 		t := ToppingTemplate{Options: []ToppingOption{}, ItemIDs: []int64{}}
-		if err := rows.Scan(&t.ID, &t.Name, &t.Title, &t.MaxSelect, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.Icon, &t.Title, &t.MaxSelect, &t.UpdatedAt); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -121,6 +123,10 @@ func (a *App) ToppingTemplates(ctx context.Context, branchID int64) ([]ToppingTe
 func (in *ToppingTemplateInput) clean() error {
 	in.Name = strings.TrimSpace(in.Name)
 	in.Title = strings.TrimSpace(in.Title)
+	in.Icon = strings.TrimSpace(in.Icon)
+	if len([]rune(in.Icon)) > 8 {
+		return ErrValidation("the icon is at most 8 characters")
+	}
 	if in.Name == "" || len([]rune(in.Name)) > 30 {
 		return ErrValidation("the template needs a name of at most 30 characters")
 	}
@@ -178,12 +184,12 @@ func (a *App) SaveToppingTemplate(ctx context.Context, branchID, id int64, in To
 			return err
 		}
 		if id == 0 {
-			err = tx.QueryRow(ctx, `INSERT INTO topping_templates (branch_id, name, title, max_select, sort)
-				VALUES ($1,$2,$3,$4,(SELECT count(*) FROM topping_templates WHERE branch_id=$1)) RETURNING id`,
-				branchID, in.Name, in.Title, in.MaxSelect).Scan(&id)
+			err = tx.QueryRow(ctx, `INSERT INTO topping_templates (branch_id, name, title, max_select, icon, sort)
+				VALUES ($1,$2,$3,$4,$5,(SELECT count(*) FROM topping_templates WHERE branch_id=$1)) RETURNING id`,
+				branchID, in.Name, in.Title, in.MaxSelect, in.Icon).Scan(&id)
 		} else {
-			err = tx.QueryRow(ctx, `UPDATE topping_templates SET name=$3, title=$4, max_select=$5, updated_at=now()
-				WHERE id=$1 AND branch_id=$2 RETURNING id`, id, branchID, in.Name, in.Title, in.MaxSelect).Scan(&id)
+			err = tx.QueryRow(ctx, `UPDATE topping_templates SET name=$3, title=$4, max_select=$5, icon=$6, updated_at=now()
+				WHERE id=$1 AND branch_id=$2 RETURNING id`, id, branchID, in.Name, in.Title, in.MaxSelect, in.Icon).Scan(&id)
 		}
 		if isNoRows(err) {
 			return ErrNotFound
