@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import './dine/strings'
+import '../officeStrings'
 import KitchenNote from './KitchenNote.vue'
 import { computed, reactive, ref } from 'vue'
 import { ApiError, get, post } from '../api'
@@ -118,19 +119,21 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
 </script>
 
 <template>
-  <div class="page">
-    <div class="row between wrap" style="margin-bottom:12px">
-      <div class="seg light">
-        <button :class="{ on: tab === 'cook' }" @click="tab = 'cook'">{{ t('to_cook') }} · {{ cooking.length }}</button>
-        <button :class="{ on: tab === 'pack' }" @click="tab = 'pack'">{{ t('to_pack') }} · {{ packing.length }}</button>
-        <button :class="{ on: tab === 'serve' }" data-test="tab-serve" @click="tab = 'serve'">{{ t('to_serve') }} · {{ serveCount }}</button>
-      </div>
-      <span class="muted small" v-if="lastSync">{{ t('synced') }} {{ lastSync.toLocaleTimeString() }}</span>
+  <div class="ox warm">
+  <div class="page ox-page kpage">
+    <div class="ox-head">
+      <div><h1>{{ t('kitchen') }}</h1><p class="ox-sub">{{ t('ox.kt.sub') }}</p></div>
+      <span v-if="lastSync" class="ksync"><i :class="{ off: !online }"></i>{{ t('synced') }} {{ lastSync.toLocaleTimeString() }}</span>
     </div>
-    <div v-if="!online" class="banner warn" style="margin-bottom:12px">{{ t('offline') }}</div>
-    <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
+    <nav class="ox-tabs seg">
+      <button :class="{ on: tab === 'cook' }" @click="tab = 'cook'">{{ t('to_cook') }} <span class="kn">{{ cooking.length }}</span></button>
+      <button :class="{ on: tab === 'pack' }" @click="tab = 'pack'">{{ t('to_pack') }} <span class="kn">{{ packing.length }}</span></button>
+      <button :class="{ on: tab === 'serve' }" data-test="tab-serve" @click="tab = 'serve'">{{ t('to_serve') }} <span class="kn">{{ serveCount }}</span></button>
+    </nav>
+    <div v-if="!online" class="banner warn">{{ t('offline') }}</div>
+    <div v-if="error" class="banner bad">{{ error }}</div>
 
-    <div v-if="unacked.length" class="stack" style="margin-bottom:14px" data-testid="k-voids">
+    <div v-if="unacked.length" class="stack" data-testid="k-voids">
       <div v-for="x in unacked" :key="x.v.id" class="kvoidalert" data-testid="k-void-alert">
         <span class="grow"><b>{{ t('vd.k.alert', { n: x.v.qty, name: x.v.name, r: x.v.reason }) }}</b>
           <span class="small"> · {{ dine(x.o) ? t('table') + ' ' + x.o.table_name : x.o.public_no }} · {{ whenText(x.v.at, x.o.timezone).split(' ').pop() }}</span></span>
@@ -138,7 +141,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
       </div>
     </div>
 
-    <div class="cols" v-if="cancelled.length" style="margin-bottom:14px">
+    <div class="cols" v-if="cancelled.length">
       <div v-for="o in cancelled" :key="o.id" class="card" style="border-color:var(--bad);background:var(--bad-soft)">
         <h2>{{ o.public_no }}</h2>
         <p class="bold" style="color:var(--bad)">{{ t('cancelled_notice') }}</p>
@@ -147,15 +150,20 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
     </div>
 
     <!-- cooking: per-item progress, grouped by order (K01) -->
-    <template v-if="tab === 'cook'">
-      <div class="row wrap" v-if="stations.length" style="margin-bottom:12px;gap:6px">
-        <button class="btn small" :class="{ primary: station === 'all' }" @click="setStation('all')">{{ t('all_stations') }}</button>
-        <button v-for="s in tabs" :key="s.id" class="btn small" :class="{ primary: station === s.id }" @click="setStation(s.id)">
-          {{ both(s.name, s.name_en) }} · {{ openCount(s.id) }}<span v-if="!s.active"> ({{ t('disabled') }})</span></button>
-        <button class="btn small" :class="{ primary: station === 'none', danger: unassigned > 0 && station !== 'none' }" @click="setStation('none')">{{ t('unassigned') }} · {{ unassigned }}</button>
-      </div>
-      <div v-if="unassigned > 0" class="banner warn" style="margin-bottom:12px">{{ t('unassigned_warn', { n: unassigned }) }}</div>
-      <div v-if="shown.length === 0" class="card muted">{{ t('kitchen_empty') }}</div>
+    <div v-if="tab === 'cook'" class="ox-body" :class="{ nostations: !stations.length }">
+      <aside v-if="stations.length" class="ox-rail">
+        <div class="ox-rail-h">{{ t('ox.kt.stations') }}</div>
+        <div class="ox-rail-list">
+          <button class="ox-cat" :class="{ on: station === 'all' }" @click="setStation('all')"><span class="nm">{{ t('all_stations') }}</span><span class="n">{{ cooking.length }}</span></button>
+          <button v-for="s in tabs" :key="s.id" class="ox-cat" :class="{ on: station === s.id }" @click="setStation(s.id)">
+            <span class="nm">{{ both(s.name, s.name_en) }}<span v-if="!s.active"> ({{ t('disabled') }})</span></span><span class="n">{{ openCount(s.id) }}</span></button>
+          <button class="ox-cat" :class="{ on: station === 'none', warnc: unassigned > 0 }" @click="setStation('none')"><span class="nm">{{ t('unassigned') }}</span><span class="n">{{ unassigned }}</span></button>
+        </div>
+        <p class="ox-rail-tip">{{ t('ox.kt.tip') }}</p>
+      </aside>
+      <section class="kmain">
+      <div v-if="unassigned > 0" class="banner warn">{{ t('unassigned_warn', { n: unassigned }) }}</div>
+      <div v-if="shown.length === 0" class="card muted ox-empty">{{ t('kitchen_empty') }}</div>
       <div class="cols">
         <div v-for="o in shown" :key="o.id" class="card stack" :class="{ kfresh: freshAdd(o), kvoid: hasUnacked(o) }">
           <div class="row between">
@@ -191,11 +199,12 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
           <div v-for="v in recentVoids(o)" :key="'v' + v.id" class="kline" data-testid="k-voided"><span class="grow kname strike">{{ v.qty }} × {{ v.name }}</span><span class="tag bad">{{ t('vd.k.voided') }}</span></div>
         </div>
       </div>
-    </template>
+      </section>
+    </div>
 
     <!-- serving: dine-in dishes ready for the table -->
     <template v-else-if="tab === 'serve'">
-      <div v-if="serving.length === 0" class="card muted">{{ t('kitchen_empty') }}</div>
+      <div v-if="serving.length === 0" class="card muted ox-empty">{{ t('kitchen_empty') }}</div>
       <div class="cols">
         <div v-for="o in serving" :key="o.id" class="card stack">
           <div class="row between"><h2>{{ t('table') }} {{ o.table_name }}</h2><span class="small muted">{{ o.public_no }}</span></div>
@@ -213,7 +222,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
 
     <!-- packing: whole-order check and handoff (K03/K04) -->
     <template v-else>
-      <div v-if="packing.length === 0" class="card muted">{{ t('kitchen_empty') }}</div>
+      <div v-if="packing.length === 0" class="card muted ox-empty">{{ t('kitchen_empty') }}</div>
       <div class="cols">
         <div v-for="o in packing" :key="o.id" class="card stack">
           <div class="row between">
@@ -259,6 +268,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
       </div>
     </template>
   </div>
+  </div>
 </template>
 
 <style scoped>
@@ -269,7 +279,19 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
 .kfresh { border: 2px solid #f59e0b; }
 .kaddtag { background: #fff1e0; color: #b45309; border-color: #f5c48a; }
 .kadd { color: #b45309; font-weight: 600; }
-.kline { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: #f6f6f4; border-inline-start: 5px solid var(--line); }
+.kpage .cols > .card { background: #fff; }
+.kpage .cols > .card h2 { font-size: 18px; color: #2f1810; }
+.kline { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: #f7f1e7; border-inline-start: 5px solid var(--line); }
+.kpage .ox-tabs.seg { display: flex; background: none; border-radius: 0; padding: 0; }
+.kpage .ox-tabs.seg button { border-radius: 0; color: #5b4636; padding: 10px 18px; }
+.kpage .ox-tabs.seg button.on { background: none; box-shadow: none; color: var(--brand); }
+.kmain { display: grid; gap: 12px; min-width: 0; }
+.ox-body.nostations { grid-template-columns: minmax(0, 1fr); }
+.ox-cat.warnc:not(.on) .n { color: var(--bad); font-weight: 700; }
+.kn { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: #efe5d6; font-size: 13px; color: #5b4636; }
+.ox-tabs > .on .kn { background: var(--brand); color: #fff; }
+.ksync { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; align-self: center; }
+.ksync i { width: 8px; height: 8px; border-radius: 50%; background: #2f7a2a; } .ksync i.off { background: var(--bad); }
 .kline.preparing { border-inline-start-color: var(--warn); background: var(--warn-soft); }
 .kline.ready { border-inline-start-color: var(--ok); background: var(--ok-soft); }
 .kname { font-size: 17px; font-weight: 700; }

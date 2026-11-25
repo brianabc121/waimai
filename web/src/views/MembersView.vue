@@ -4,5 +4,5 @@ import MemberBook from './members/MemberBook.vue'
 </script>
 
 <template>
-  <div class="page"><MemberBook /></div>
+  <div class="ox warm"><div class="page ox-page"><MemberBook /></div></div>
 </template>

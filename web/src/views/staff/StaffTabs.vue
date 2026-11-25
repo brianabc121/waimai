@@ -4,10 +4,15 @@ import { t } from '../../i18n'
 import { can, isOwner } from '../../session'
 import '../../perms'
 import './strings'
+import '../../officeStrings'
 </script>
 
 <template>
-  <nav class="stafftabs no-print" data-testid="staff-tabs">
+  <div class="ox-head st-head no-print">
+    <div><h1>{{ t('staff') }}</h1><p class="ox-sub">{{ t('ox.st.sub') }}</p></div>
+    <div class="ox-acts"><slot /></div>
+  </div>
+  <nav class="ox-tabs stafftabs no-print" data-testid="staff-tabs">
     <router-link v-if="can('staff.view')" to="/merchant/staff" exact-active-class="on" data-tab="list">{{ t('sr.tab.list') }}</router-link>
     <router-link v-if="can('staff.attendance')" to="/merchant/staff/attendance" active-class="on" data-tab="attendance">{{ t('sr.tab.attendance') }}</router-link>
     <router-link v-if="can('staff.reports')" to="/merchant/staff/kitchen" active-class="on" data-tab="kitchen">{{ t('sr.tab.kitchen') }}</router-link>
@@ -17,7 +22,6 @@ import './strings'
 </template>
 
 <style scoped>
-.stafftabs { display: flex; gap: 4px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; border-bottom: 1px solid var(--line); margin: -4px 0 16px; }
-.stafftabs a { padding: 9px 14px; font-weight: 600; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; text-decoration: none; }
-.stafftabs a.on { color: var(--brand-dark); border-bottom-color: var(--brand); }
+.st-head { margin-bottom: 14px; }
+.stafftabs { margin-bottom: 16px; }
 </style>

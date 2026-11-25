@@ -1,16 +1,16 @@
 /* Shared by the work-summary pages under "Staff". Everything hangs off .srp. */
-.srp .datepick { display: inline-flex; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.srp .datepick { display: inline-flex; align-items: center; background: var(--card, #fff); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .srp .datepick b { padding: 7px 12px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); min-width: 128px; text-align: center; }
 .srp .datepick button { border: 0; background: none; padding: 7px 12px; cursor: pointer; font-size: 15px; }
-.srp .pills { display: inline-flex; background: #eceef0; border-radius: 8px; padding: 3px; flex-wrap: wrap; }
+.srp .pills { display: inline-flex; background: #efe5d6; border-radius: 8px; padding: 3px; flex-wrap: wrap; }
 .srp .pills button { border: 0; background: none; padding: 5px 13px; border-radius: 6px; font-weight: 600; font-size: 13px; color: var(--muted); cursor: pointer; }
 .srp .pills button.on { background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.12); color: var(--brand-dark); }
 .srp .custom { display: inline-flex; align-items: center; gap: 6px; }
 .srp .custom input { font: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
 .srp .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 14px; }
-.srp .kpi { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.srp .kpi { background: var(--card, #fff); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
 .srp .kpi .l, .srp .kpi .d { font-size: 12.5px; color: var(--muted); }
-.srp .kpi .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.srp .kpi .v { font-size: 24px; font-weight: 800; color: #2f1810; font-variant-numeric: tabular-nums; }
 .srp .kpi .v small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 4px; }
 .srp .kpi.warn .v { color: var(--bad); }
 .srp .av { width: 36px; height: 36px; flex: none; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; }
@@ -19,11 +19,11 @@
 .srp .split { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; align-items: start; }
 @media (max-width: 900px) { .srp .split { grid-template-columns: 1fr; } }
 .srp .people { padding: 0; overflow: hidden; }
-.srp .people .head { padding: 9px 14px; font-size: 12.5px; color: var(--muted); border-bottom: 1px solid var(--line); background: #fafafa; }
+.srp .people .head { padding: 9px 14px; font-size: 13px; color: #3b2418; font-weight: 600; border-bottom: 1px solid var(--line); background: var(--head-bg, #fafafa); }
 .srp .people button.p { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-left: 3px solid transparent;
-  background: #fff; padding: 11px 14px 11px 11px; cursor: pointer; font: inherit; color: inherit; }
+  background: var(--card, #fff); padding: 11px 14px 11px 11px; cursor: pointer; font: inherit; color: inherit; }
 .srp .people button.p:last-child { border-bottom: 0; }
-.srp .people button.p.on { background: var(--brand-soft); border-left-color: var(--brand); }
+.srp .people button.p.on { background: var(--pink, var(--brand-soft)); border-left-color: var(--brand); }
 .srp .people .n { margin-left: auto; text-align: right; white-space: nowrap; }
 .srp .people .n b { font-size: 19px; font-variant-numeric: tabular-nums; display: block; line-height: 1.15; }
 .srp h3 { margin: 0 0 10px; font-size: 15px; } .srp h3 small { font-weight: 400; color: var(--muted); font-size: 12.5px; margin-left: 6px; }
@@ -32,7 +32,7 @@
 .srp .bars { display: flex; align-items: flex-end; gap: 6px; height: 170px; padding-top: 18px; }
 .srp .bars button { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; border: 0; background: none; padding: 0; cursor: pointer; font: inherit; color: inherit; }
 .srp .bars .q { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.srp .bars i { display: block; width: 100%; background: #f3c3a8; border-radius: 4px 4px 0 0; min-height: 2px; }
+.srp .bars i { display: block; width: 100%; background: #e9c3a8; border-radius: 4px 4px 0 0; min-height: 2px; }
 .srp .bars button.on i { background: var(--brand); }
 .srp .bars .d { font-size: 11.5px; color: var(--muted); padding-top: 5px; white-space: nowrap; }
 .srp .hbar { display: grid; grid-template-columns: minmax(70px, 130px) minmax(0, 1fr) 36px; gap: 10px; align-items: center; padding: 4px 0; font-size: 14px; }

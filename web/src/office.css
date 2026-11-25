@@ -1,0 +1,185 @@
+/* The store back office's page kit, taken from the redrawn menu page
+   (MenuView.vue, PR #127): a cream page, title + subtitle with the actions
+   on the right, tabs, a rail of groups with counts, a tool bar with search
+   and filters, a table with a beige header, round status pills, a pager,
+   and cream cards with round corners. A page puts "ox warm" on its root and
+   "page ox-page" inside; the pieces are below, all named ox-*. */
+.ox { --pink: #fbeae3; --pink-line: #efb9a8; --card: #fffdf9; --line: #eadfce; --bg: #f7f1e7; --head-bg: #f4ebde;
+  min-height: calc(100vh - var(--shell-top, 0px)); background: var(--bg); }
+/* older parts of a page inside the kit pick up the cream look */
+.ox .card { background: var(--card); border-color: var(--line); border-radius: 12px; }
+.ox .banner.info { background: #f3ebdf; color: #5b4636; }
+.ox-page { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+.ox-page > * { min-width: 0; }
+
+/* title row */
+.ox-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.ox-head h1 { font-size: 26px; letter-spacing: .5px; color: #2f1810; margin: 0; }
+.ox-sub { color: var(--muted); font-size: 13.5px; margin: 2px 0 0; }
+.ox-acts { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.ox .btn { background: var(--card); border-color: var(--line); }
+.ox .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.ox .btn.danger { color: var(--bad); border-color: #efc2bb; }
+.ox .btn.link { background: none; border: 0; }
+.ox .btn.ok { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+/* tabs under the title */
+.ox-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.ox-tabs > button, .ox-tabs > a { border: 0; background: none; padding: 10px 18px; font: inherit; font-size: 16px; font-weight: 600; color: #5b4636;
+  border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.ox-tabs > .on, .ox-tabs > a.router-link-exact-active { color: var(--brand); border-bottom-color: var(--brand); }
+.ox-tabs .n { font-variant-numeric: tabular-nums; }
+.ox-tabs .end { margin-inline-start: auto; align-self: center; }
+
+/* a rail of groups beside the main panel */
+.ox-body { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 14px; align-items: start; }
+.ox-body > * { min-width: 0; }
+.ox-body.wide-rail { grid-template-columns: 320px minmax(0, 1fr); }
+.ox-rail { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 0; position: sticky; top: 12px; }
+.ox-rail-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 14px 10px; font-size: 16px; font-weight: 700; color: #2f1810; }
+.ox-rail-h .n { font-weight: 500; color: var(--muted); font-size: 13.5px; }
+.ox-rail-list { display: grid; }
+.ox-cat { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; font: inherit; color: var(--ink); text-align: start;
+  padding: 10px 14px; cursor: pointer; border-inline-start: 3px solid transparent; text-decoration: none; }
+.ox-cat:hover { background: #fbf4ea; }
+.ox-cat.on { background: var(--pink); border-inline-start-color: var(--brand); color: var(--brand); font-weight: 700; }
+.ox-cat .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ox-cat .n { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 500; } .ox-cat.on .n { color: var(--brand); }
+.ox-cat .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; opacity: .6; }
+.ox-rail-tip { margin: 8px 14px 0; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+
+/* a cream panel; ox-panel-h is its title row */
+.ox-panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+.ox-panel.flush { padding: 0; overflow: hidden; }
+.ox-panel-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.ox-panel-h h2 { font-size: 18px; color: #2f1810; margin: 0; display: flex; align-items: center; gap: 8px; }
+.ox-panel-h h2 .n { font-weight: 500; color: var(--muted); font-size: 14px; }
+.ox-panel-h .grow { flex: 1; }
+.ox-panel h3 { font-size: 15.5px; color: #2f1810; margin: 4px 0 8px; }
+.ox-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.ox-split.wide { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.ox-split > * { min-width: 0; }
+.ox-stack { display: grid; gap: 14px; }
+.ox-stack > * { min-width: 0; }
+
+/* tool bar: search, filters, and a choice of views */
+.ox-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+.ox-tools select { width: auto; min-width: 150px; max-width: 100%; background: #fff; }
+.ox-tools input[type=date] { width: auto; background: #fff; }
+.ox-tools .grow { flex: 1; }
+.ox-search { position: relative; flex: 1 1 260px; max-width: 440px; min-width: 0; }
+.ox-search::before { content: ''; position: absolute; inset-inline-start: 12px; top: 50%; width: 11px; height: 11px; margin-top: -8px; border: 2px solid #8a7464; border-radius: 50%; pointer-events: none; }
+.ox-search::after { content: ''; position: absolute; inset-inline-start: 24px; top: 50%; width: 2px; height: 7px; margin-top: 2px; background: #8a7464; transform: rotate(-45deg); pointer-events: none; }
+.ox-search input { padding-inline-start: 36px; background: #fff; width: 100%; }
+.ox-views { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+.ox-views button { border: 0; background: none; min-width: 42px; height: 38px; padding: 0 10px; cursor: pointer; color: #5b4636; display: inline-grid; place-items: center; font: inherit; }
+.ox-views button.on { background: var(--pink); color: var(--brand); font-weight: 700; }
+
+/* round choices in a row (statuses, dates) */
+.ox-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ox-chips > button { padding: 6px 14px; border-radius: 999px; background: #fff; border: 1px solid var(--line); font: inherit; font-size: 13.5px; color: #5b4636; cursor: pointer; white-space: nowrap; }
+.ox-chips > button.on { background: var(--pink); border-color: var(--brand); color: var(--brand); font-weight: 700; }
+.ox-chips > button .n { margin-inline-start: 4px; font-variant-numeric: tabular-nums; }
+
+/* a data table with a beige header (phones still get one card per row from styles.css) */
+.ox-scroll { overflow-x: auto; min-width: 0; }
+.ox table.data { background: transparent; border-collapse: separate; border-spacing: 0; }
+.ox table.data tbody tr:hover td { background: #fdf8f1; }
+.ox table.data tr.picked td { background: #fdf1ec; }
+@media (min-width: 768px) {
+  .ox table.data td { border-bottom: 1px solid #f0e6d8; padding: 11px 10px; }
+  .ox table.data thead th { background: var(--head-bg); color: #3b2418; font-weight: 600; font-size: 13.5px; padding: 11px 10px; border: 0; white-space: nowrap; }
+  .ox table.data thead th:first-child { border-start-start-radius: 8px; border-end-start-radius: 8px; }
+  .ox table.data thead th:last-child { border-start-end-radius: 8px; border-end-end-radius: 8px; }
+}
+@media (max-width: 767px) {
+  .ox table.data tr { padding: 10px 2px; border-bottom: 1px solid #f0e6d8; }
+  .ox table.data td { border: 0; }
+}
+.ox table.data .num, .ox .num, .ox table.data th.right, .ox table.data td.right { text-align: end; font-variant-numeric: tabular-nums; }
+.ox .nowrap { white-space: nowrap; }
+.ox-code { color: var(--brand); font-weight: 700; font-variant-numeric: tabular-nums; }
+.ox-strong { color: #2f1810; font-weight: 700; }
+.ox-money { font-weight: 700; color: #2f1810; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ox-empty { text-align: center; padding: 28px 12px !important; color: var(--muted); }
+
+/* round status pills with a dot */
+.ox-pill.ox-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 11px; font-size: 13px; font-weight: 700; white-space: nowrap;
+  background: #efe9e1; color: #7b6657; margin: 1px 4px 1px 0; }
+.ox-pill.ox-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.ox-pill.ox-pill.ok { background: #e6f2e2; color: #2f7a2a; } .ox-pill.ox-pill.bad { background: #fbe3df; color: #b42318; }
+.ox-pill.ox-pill.warn { background: #fdf0d5; color: #a15c07; } .ox-pill.ox-pill.info { background: #e4ecf8; color: #2556a8; }
+.ox-pill.ox-pill.brand { background: var(--pink); color: var(--brand); }
+.ox-pill.ox-pill.plain::before { display: none; }
+/* small square labels (roles, stations, kinds) */
+.ox-tag { display: inline-block; border-radius: 6px; padding: 1px 8px; font-size: 12.5px; font-weight: 600; background: #f3ebdf; color: #5b4636; white-space: nowrap; margin: 1px 4px 1px 0; }
+.ox-tag.brand { background: var(--pink); color: var(--brand); } .ox-tag.gold { background: #fbecc8; color: #8a5a00; }
+.ox-tag.blue { background: #e7eefb; color: #2556a8; }
+
+/* row actions: words with a thin line between, the main one red */
+.ox-ops { display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.ox-ops > .op { border: 0; background: none; font: inherit; font-weight: 600; color: #6f5a4b; padding: 4px 10px; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.ox-ops > .op + .op { border-inline-start: 1px solid var(--line); }
+.ox-ops > .op.red { color: var(--brand); } .ox-ops > .op.bad { color: var(--bad); }
+.ox-ops > .op:disabled { opacity: .4; cursor: default; }
+
+/* number tiles */
+.ox-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.ox-stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0; }
+.ox-stat .l { color: #6f5a4b; font-size: 13.5px; }
+.ox-stat .v { font-size: 24px; font-weight: 800; color: #2f1810; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.2; }
+.ox-stat .v.red { color: var(--brand); }
+.ox-stat .s { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+
+/* a grid of cards */
+.ox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.ox-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.ox-card.on { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+
+/* a gold tip box, like the menu page's "模板同步" */
+.ox-tip { background: #fdf3df; border: 1px solid #f1d9a6; border-radius: 12px; padding: 12px 14px; color: #6b4a12; font-size: 13.5px; }
+.ox-tip b { display: block; color: #4a3008; margin-bottom: 2px; }
+
+/* label + value lines */
+.ox-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; margin: 0; font-size: 14px; }
+.ox-kv dt { color: var(--muted); } .ox-kv dd { margin: 0; overflow-wrap: anywhere; }
+
+/* pager under a list */
+.ox-foot { display: flex; align-items: center; gap: 10px; padding: 14px 6px 4px; flex-wrap: wrap; color: var(--muted); font-size: 13.5px; }
+.ox-foot .grow { flex: 1; }
+.ox-pager { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ox-pager button { min-width: 38px; height: 36px; border: 1px solid var(--line); background: #fff; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; color: #3b2418; padding: 0 8px; }
+.ox-pager button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.ox-pager button:disabled { opacity: .4; cursor: default; }
+.ox-pager .gap { color: var(--muted); }
+
+/* sheets opened from these pages get the same cream */
+.ox .sheet, .ox-sheet { background: var(--card, #fffdf9); }
+.ox .sheet-head h2 { font-size: 18px; color: #2f1810; }
+
+@media (max-width: 1180px) {
+  .ox-body { grid-template-columns: 200px minmax(0, 1fr); }
+  .ox-body.wide-rail { grid-template-columns: 280px minmax(0, 1fr); }
+  .ox-split.wide { grid-template-columns: minmax(0, 1fr); }
+}
+/* phone and narrow iPad: the rail turns into a row of chips, panels stack */
+@media (max-width: 860px) {
+  .ox-head h1 { font-size: 22px; }
+  .ox-acts { width: 100%; }
+  .ox-acts > .btn { flex: 1 1 auto; }
+  .ox-body, .ox-body.wide-rail { grid-template-columns: minmax(0, 1fr); }
+  .ox-rail { position: static; padding: 8px; }
+  .ox-rail-h, .ox-rail-tip { display: none; }
+  .ox-rail-list { display: flex; overflow-x: auto; gap: 6px; scrollbar-width: none; }
+  .ox-cat { width: auto; flex: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; white-space: nowrap; }
+  .ox-cat.on { border-color: var(--brand); }
+  .ox-cat .nm { flex: none; }
+  .ox-split, .ox-split.wide { grid-template-columns: minmax(0, 1fr); }
+  .ox-panel { padding: 12px; }
+  .ox-tools select { flex: 1 1 140px; min-width: 0; }
+  .ox-search { flex-basis: 100%; max-width: none; }
+  .ox-tabs > button, .ox-tabs > a { padding: 10px 12px; font-size: 15px; }
+  .ox-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .ox-stat .v { font-size: 20px; }
+  .ox-foot { justify-content: center; }
+}
