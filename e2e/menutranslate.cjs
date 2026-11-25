@@ -80,6 +80,7 @@ await own.click(tid('tr-kind-option'))
 await own.locator(tid('tr-cell-group-') + ', [data-testid^=tr-cell-group-]').first().waitFor()
 await own.click(tid('tr-close'))
 // one dish at a time
+await own.click(tid('item-more-11'))
 await own.click(tid('item-langs-11'))
 await own.waitForSelector(tid('tr-row-item-11-description'))
 await own.screenshot({ path: `${SHOTS}/tr-02-merchant-dish.png` })

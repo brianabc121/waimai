@@ -27,7 +27,7 @@ export interface OptionGroup { id: number; name: string; name_en: string; min_se
   // set when the group comes from a topping template (加料模板)
   topping_template_id?: number }
 export interface ToppingOption { id: number; code: string; name: string; name_en: string; price: number; sold_out: boolean }
-export interface ToppingTemplate { id: number; name: string; title: string; max_select: number; options: ToppingOption[]; item_ids: number[]; updated_at: string }
+export interface ToppingTemplate { id: number; name: string; icon?: string; title: string; max_select: number; options: ToppingOption[]; item_ids: number[]; updated_at: string }
 export interface Item {
   id: number; category_id: number; name: string; name_en: string; description: string; image_url: string
   price: number; published: boolean; sold_out: boolean; stock_qty: number | null; needs_prep: boolean

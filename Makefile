@@ -45,6 +45,7 @@ e2e:
 	$(E2E_NODE) e2e/dinedesk.cjs
 	$(E2E_NODE) e2e/void.cjs
 	$(E2E_NODE) e2e/toppings.cjs
+	$(E2E_NODE) e2e/menupage.cjs
 	$(E2E_NODE) e2e/mapzones.cjs
 	$(E2E_NODE) e2e/mapgoogle.cjs
 	$(E2E_NODE) e2e/staff.cjs

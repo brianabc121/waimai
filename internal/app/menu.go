@@ -779,3 +779,60 @@ func (a *App) Cleanup(ctx context.Context) error {
 	}
 	return a.endLongShifts(ctx)
 }
+
+// MenuOrderCategory is one category of the menu as the menu page arranged it:
+// its dishes in order. A dish listed under another category moves there.
+type MenuOrderCategory struct {
+	ID      int64   `json:"id"`
+	ItemIDs []int64 `json:"item_ids"`
+}
+
+// ReorderMenu stores the order of the store's categories and of the dishes in
+// each, as dragged on the menu page. Every category and dish of the store
+// (removed ones aside) is listed exactly once.
+func (a *App) ReorderMenu(ctx context.Context, branchID int64, cats []MenuOrderCategory) error {
+	bad := ErrValidation("the order must list every category and dish of the store exactly once")
+	return a.inTx(ctx, func(tx pgx.Tx) error {
+		var nCats, nItems int
+		if err := tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM menu_categories WHERE branch_id=$1 AND NOT archived),
+			(SELECT count(*) FROM menu_items i JOIN menu_categories c ON c.id = i.category_id
+			 WHERE i.branch_id=$1 AND NOT i.archived AND NOT c.archived)`, branchID).Scan(&nCats, &nItems); err != nil {
+			return err
+		}
+		seenCat, seenItem := map[int64]bool{}, map[int64]bool{}
+		for _, c := range cats {
+			if seenCat[c.ID] {
+				return bad
+			}
+			seenCat[c.ID] = true
+			for _, id := range c.ItemIDs {
+				if seenItem[id] {
+					return bad
+				}
+				seenItem[id] = true
+			}
+		}
+		if len(seenCat) != nCats || len(seenItem) != nItems {
+			return bad
+		}
+		for ci, c := range cats {
+			tag, err := tx.Exec(ctx, `UPDATE menu_categories SET sort=$3 WHERE id=$1 AND branch_id=$2 AND NOT archived`, c.ID, branchID, ci)
+			if err != nil {
+				return err
+			}
+			if tag.RowsAffected() == 0 {
+				return bad
+			}
+			for ii, id := range c.ItemIDs {
+				tag, err := tx.Exec(ctx, `UPDATE menu_items SET sort=$4, category_id=$3 WHERE id=$1 AND branch_id=$2 AND NOT archived`, id, branchID, c.ID, ii)
+				if err != nil {
+					return err
+				}
+				if tag.RowsAffected() == 0 {
+					return bad
+				}
+			}
+		}
+		return branchChanged(ctx, tx, branchID)
+	})
+}
