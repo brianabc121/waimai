@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The dine-in mode of "order for a customer" (docs/DINE_IN_ORDER_DESIGN.md):
+// 点单 · 堂食下单, the dine-in desk (docs/DINE_IN_ORDER_DESIGN.md):
 // staff at a table or the counter, on a tablet or a phone, open tables and
 // take orders by tapping only. This is the table map (§5), opening a table
 // (§6), moving it and changing the guests; the order screen and the bill are
@@ -17,8 +17,7 @@ import DineSettings from './DineSettings.vue'
 import { longMinutes, presetList, sinceText } from './strings'
 import './dine.css'
 
-const props = defineProps<{ store: Storefront | null; canDelivery: boolean }>()
-const emit = defineEmits<{ switch: [] }>()
+const props = defineProps<{ store: Storefront | null }>()
 const router = useRouter()
 const route = useRoute()
 
@@ -214,11 +213,7 @@ function stText(it: { prep_status: string; served_at: string | null; batch_at?: 
     <template v-if="screen === 'tables'">
       <div class="dd-top">
         <button class="dd-back" @click="router.push('/merchant/orders')"><span class="rtl-flip">‹</span> {{ t('vo.back') }}</button>
-        <h1 v-if="!phone">{{ t('vo.title') }}</h1>
-        <div class="dd-seg" role="tablist">
-          <button v-if="canDelivery" role="tab" data-testid="mode-delivery" @click="emit('switch')">{{ phone ? t('vo.delivery') : t('dd.mode_delivery') }}</button>
-          <button role="tab" class="on" aria-selected="true">{{ t('dd.mode_dine') }}</button>
-        </div>
+        <h1 data-testid="dd-title">{{ t('pos.dine') }}</h1>
         <span class="sp"></span>
         <button v-if="manager" class="dd-gear" :title="t('dd.settings')" data-testid="dd-settings" @click="settingsOpen = true">⚙</button>
         <span v-if="!phone" class="dd-shop">{{ store?.branch.name }}</span>

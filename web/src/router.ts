@@ -1,5 +1,5 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import { homeFor, loadSession, officeRoles, scopeFor, useScope } from './session'
+import { createRouter, createWebHistory, type LocationQuery } from 'vue-router'
+import { can, homeFor, loadSession, officeRoles, scopeFor, useScope } from './session'
 import { adminScope } from './i18n'
 
 export const router = createRouter({
@@ -37,7 +37,11 @@ export const router = createRouter({
       children: [
         { path: '', redirect: '/merchant/orders' },
         { path: 'orders', component: () => import('./views/OrdersView.vue') },
-        { path: 'orders/new', component: () => import('./views/ManualOrderView.vue') },
+        // 点单 (ordering): dine-in at the tables, delivery and pickup for customers
+        // who send their order. The old /merchant/orders/new is sent on below.
+        { path: 'order/dine', component: () => import('./views/DineOrderView.vue') },
+        { path: 'order/delivery', component: () => import('./views/ManualOrderView.vue') },
+        { path: 'orders/new', component: () => import('./views/NotFound.vue') },
         { path: 'progress', component: () => import('./views/ProgressView.vue') },
         { path: 'voids', component: () => import('./views/VoidsView.vue') },
         { path: 'members', component: () => import('./views/MembersView.vue') },
@@ -121,6 +125,7 @@ router.beforeEach(async to => {
       if (!officeRoles(u).length) return '/work'
       if (u.entry === 'work') return { path: '/login/pick', query: { next: to.fullPath } }
     }
+    if (to.path === '/merchant/orders/new') return oldOrderPage(to.query)
   }
   if (to.path === '/login') {
     const u = await loadSession()
@@ -128,6 +133,19 @@ router.beforeEach(async to => {
   }
   return true
 })
+
+// "Order for a customer" used to be one page with a delivery | dine-in switch
+// at /merchant/orders/new. Old links and bookmarks go to the page they meant:
+// ?mode=dine or ?table= to dine-in, ?append= to delivery, otherwise the one this
+// device last used, and someone who may use only one of them gets that one.
+function oldOrderPage(q: LocationQuery) {
+  const dine = { path: '/merchant/order/dine', query: { ...q, mode: undefined } }
+  const delivery = { path: '/merchant/order/delivery', query: { ...q, mode: undefined } }
+  if (!can('order.manual')) return dine
+  if (!can('table.use') || q.append || q.mode === 'delivery') return delivery
+  if (q.mode === 'dine' || q.table) return dine
+  try { return localStorage.getItem('mo-mode') === 'dine' ? dine : delivery } catch { return delivery }
+}
 
 // The platform back office is in Chinese or English only (see i18n.ts).
 router.afterEach(to => { adminScope.value = to.path === '/admin' || to.path.startsWith('/admin/') })

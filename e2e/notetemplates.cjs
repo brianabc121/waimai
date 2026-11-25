@@ -131,7 +131,7 @@ step('the template opens its own translations')
 
 // ---- an order taken by staff: the note cell offers the tags ----
 async function staffNote(page, name) {
-  await page.goto(BASE + '/merchant/orders/new')
+  await page.goto(BASE + '/merchant/order/delivery')
   await page.waitForSelector(tid('mo-pick'))
   await page.fill(tid('mo-pick'), 'd2')
   await page.press(tid('mo-pick'), 'Enter')

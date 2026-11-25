@@ -42,7 +42,7 @@ await page.goto(BASE + '/merchant/delivery-map')
 await page.waitForTimeout(2500)
 
 async function newOrder(phone) {
-  await page.goto(BASE + '/merchant/orders/new')
+  await page.goto(BASE + '/merchant/order/delivery')
   await page.waitForSelector(tid('manual-order'))
   await page.locator(tid('mo-pick')).fill('b1')
   await page.waitForSelector(`${tid('mo-pick-drop')} .it.on`)

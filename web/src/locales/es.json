@@ -3377,5 +3377,10 @@
  "ox.cs.listed": "Últimos {n}",
  "ox.cs.tip": "Introduce lo entregado y confirma; si difiere, se marca como diferencia.",
  "ox.bl.sub": "Pedidos a domicilio y para llevar: importes, quién paga cada descuento, liquidaciones",
- "ox.rc.sub": "Revisa cobros por método, marca pagos en línea, revisa descuentos"
+ "ox.rc.sub": "Revisa cobros por método, marca pagos en línea, revisa descuentos",
+ "pos.nav": "Pedidos",
+ "pos.dine": "Pedido en mesa",
+ "pos.delivery": "Pedido a domicilio",
+ "pos.new_delivery": "＋ Pedido a domicilio",
+ "pos.delivery_hint": "Domicilio y para recoger"
 }

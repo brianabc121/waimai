@@ -184,7 +184,7 @@ async function rush(i: OrderItem) {
   await refreshNow()
 }
 function openOrder(o: Order) {
-  void router.push(o.service_type === 'dine_in' ? '/merchant/orders/new?mode=dine' : `/merchant/orders?order=${o.id}`)
+  void router.push(o.service_type === 'dine_in' ? '/merchant/order/dine' : `/merchant/orders?order=${o.id}`)
 }
 
 // ---- by dish ----
