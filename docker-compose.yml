@@ -76,6 +76,22 @@ services:
       - api
     restart: unless-stopped
 
+  # The company website (docs/WEBSITE_DESIGN.md §9), on its own domain.
+  site:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.site
+      args:
+        SITE_URL: ${SITE_URL:-https://example.com}
+        ORDER_URL: ${PUBLIC_BASE_URL:-https://order.example.com}
+        PUBLIC_UMAMI_SRC: ${UMAMI_SRC:-}
+        PUBLIC_UMAMI_ID: ${UMAMI_ID:-}
+    ports:
+      - "${SITE_PORT:-8001}:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
   # Optional demo data: docker compose run --rm seed
   seed:
     build: .

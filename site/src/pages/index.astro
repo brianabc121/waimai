@@ -1,0 +1,34 @@
+---
+// The bare address: Caddy sends visitors to their language by Accept-Language
+// (deploy/Caddyfile.site). Without it (another host, a crawler) this page does
+// the same in the browser and otherwise shows the default language's links.
+import { LANGS, TAG, DEFAULT_LANG, copy, href, brandName } from '../i18n'
+const site = Astro.site!
+---
+<!doctype html>
+<html lang={TAG[DEFAULT_LANG]}>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{brandName(DEFAULT_LANG)} · {brandName('en')}</title>
+  <link rel="canonical" href={new URL(href(DEFAULT_LANG), site).href} />
+  {LANGS.map(l => <link rel="alternate" hreflang={TAG[l]} href={new URL(href(l), site).href} />)}
+  <link rel="alternate" hreflang="x-default" href={new URL(href(DEFAULT_LANG), site).href} />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <script is:inline define:vars={{ langs: LANGS, fallback: DEFAULT_LANG }}>
+    var m = document.cookie.match(/(?:^|;\s*)lang=([^;]+)/), pick = m && decodeURIComponent(m[1])
+    if (langs.indexOf(pick) < 0) {
+      pick = fallback
+      for (var t of navigator.languages || [navigator.language]) {
+        t = String(t).toLowerCase()
+        if (t.indexOf('zh') === 0) { pick = /hant|tw|hk|mo/.test(t) ? 'zh-Hant' : 'zh'; break }
+        if (t.indexOf('en') === 0) { pick = 'en'; break }
+      }
+    }
+    location.replace('/' + pick + '/')
+  </script>
+</head>
+<body style="font-family:sans-serif;padding:40px;text-align:center">
+  {LANGS.map(l => <p><a href={href(l)}>{brandName(l)} · {copy(l).langName}</a></p>)}
+</body>
+</html>

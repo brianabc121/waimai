@@ -1,0 +1,137 @@
+---
+// Every page: head (title, description, canonical, hreflang, Open Graph,
+// structured data), the top bar, the footer and the phone's bottom buttons.
+import '../styles/site.css'
+import { BRAND } from '../brand'
+import { LANGS, TAG, DEFAULT_LANG, copy, fill, href, brandName, brandShort, type Lang } from '../i18n'
+import Wechat from '../components/Wechat.astro'
+
+interface Props { lang: Lang; title: string; description: string; path?: string; page?: string; jsonld?: object[]; noindex?: boolean }
+const { lang, title, description, path = '', page = '', jsonld = [], noindex = false } = Astro.props
+const c = copy(lang)
+const f = (s: string) => fill(lang, s)
+const site = Astro.site!
+const url = (l: Lang) => new URL(href(l, path), site).href
+const umami = import.meta.env.PUBLIC_UMAMI_SRC as string | undefined
+const umamiId = import.meta.env.PUBLIC_UMAMI_ID as string | undefined
+const ld = [{ '@context': 'https://schema.org', '@type': 'Organization', name: brandName(lang), url: new URL(href(lang), site).href,
+  logo: new URL('/favicon.svg', site).href }, ...jsonld]
+const on = (p: string) => (p === page ? 'on' : undefined)
+---
+<!doctype html>
+<html lang={TAG[lang]} data-lang={lang}>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{f(title)}</title>
+  <meta name="description" content={f(description)} />
+  {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={url(lang)} />}
+  {!noindex && LANGS.map(l => <link rel="alternate" hreflang={TAG[l]} href={url(l)} />)}
+  {!noindex && <link rel="alternate" hreflang="x-default" href={url(DEFAULT_LANG)} />}
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <meta name="theme-color" content="#a02c20" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content={brandName(lang)} />
+  <meta property="og:title" content={f(title)} />
+  <meta property="og:description" content={f(description)} />
+  <meta property="og:url" content={url(lang)} />
+  <meta property="og:image" content={new URL('/og.jpg', site).href} />
+  <meta property="og:locale" content={TAG[lang].replace('-', '_')} />
+  <meta name="twitter:card" content="summary_large_image" />
+  {ld.map(x => <script type="application/ld+json" set:html={JSON.stringify(x)} />)}
+  {umami && umamiId && <script defer src={umami} data-website-id={umamiId} />}
+</head>
+<body data-page={page}>
+  <header class="nav"><div class="wrap">
+    <a class="logo" href={href(lang)}><i aria-hidden="true">河</i>{brandShort(lang)}{lang !== 'en' && <small>{brandName(lang).replace(brandShort(lang), '')}</small>}</a>
+    <nav class="menu" aria-label={c.nav.menu}>
+      <div class="drop"><button type="button" class={on('features')} aria-haspopup="true">{c.nav.features}</button>
+        <div class="panel">
+          <a href={href(lang, 'features')}>{c.nav.allFeatures}</a>
+          <a href={href(lang, 'features/online-ordering')}>{c.nav.onlineOrdering}</a>
+          <a href={href(lang, 'features/dine-in')}>{c.nav.dineIn}</a>
+        </div></div>
+      <a href={href(lang, 'pricing')} class={on('pricing')}>{c.nav.pricing}</a>
+      <a href={href(lang, 'about')} class={on('about')}>{c.nav.about}</a>
+    </nav>
+    <div class="right">
+      <label class="lang"><span class="skip">{c.nav.language}</span>
+        <select data-langs={JSON.stringify(Object.fromEntries(LANGS.map(l => [l, href(l, path)])))} aria-label={c.nav.language}>
+          {LANGS.map(l => <option value={l} selected={l === lang}>{copy(l).langName}</option>)}
+        </select></label>
+      <a class="login" href={new URL('/login', BRAND.orderUrl).href}>{c.nav.login}</a>
+      <a class="btn main sm" href={href(lang, 'demo')}>{c.nav.demo}</a>
+      <button class="burger" type="button" aria-label={c.nav.menu} aria-expanded="false" aria-controls="mnav">☰</button>
+    </div>
+  </div></header>
+  <nav class="mnav" id="mnav" aria-label={c.nav.menu}>
+    <a href={href(lang, 'features')}>{c.nav.allFeatures}</a>
+    <a class="sub" href={href(lang, 'features/online-ordering')}>{c.nav.onlineOrdering}</a>
+    <a class="sub" href={href(lang, 'features/dine-in')}>{c.nav.dineIn}</a>
+    <a href={href(lang, 'pricing')}>{c.nav.pricing}</a>
+    <a href={href(lang, 'about')}>{c.nav.about}</a>
+    <a href={new URL('/login', BRAND.orderUrl).href}>{c.nav.login}</a>
+    <label class="lang"><select data-langs={JSON.stringify(Object.fromEntries(LANGS.map(l => [l, href(l, path)])))} aria-label={c.nav.language}>
+      {LANGS.map(l => <option value={l} selected={l === lang}>{copy(l).langName}</option>)}
+    </select></label>
+    <a class="btn main" href={href(lang, 'demo')}>{c.nav.demo}</a>
+  </nav>
+
+  <main id="main"><slot /></main>
+
+  <footer><div class="wrap">
+    <div class="cols">
+      <div><a class="logo" href={href(lang)}><i aria-hidden="true">河</i>{brandName(lang)}</a>
+        <div>{c.footer.tagline}</div>
+        <a class="eater" href={BRAND.orderUrl}>{c.footer.eater}</a></div>
+      <div><h4>{c.footer.product}</h4>
+        <a href={href(lang, 'features')}>{c.nav.allFeatures}</a>
+        <a href={href(lang, 'features/online-ordering')}>{c.nav.onlineOrdering}</a>
+        <a href={href(lang, 'features/dine-in')}>{c.nav.dineIn}</a>
+        <a href={href(lang, 'pricing')}>{c.nav.pricing}</a></div>
+      <div><h4>{c.footer.company}</h4>
+        <a href={href(lang, 'about')}>{c.nav.about}</a>
+        <a href={href(lang, 'demo')}>{c.nav.demo}</a>
+        <a href={href(lang, 'privacy')}>{c.footer.privacy}</a>
+        <a href={href(lang, 'terms')}>{c.footer.terms}</a></div>
+      <div><h4>{c.footer.contact}</h4>
+        <span>{c.footer.wechat}　{BRAND.wechat}</span></div>
+      <div></div>
+    </div>
+    <div class="base"><span>© {new Date().getFullYear()} {brandName(lang)} · {c.footer.rights}</span>
+      <span>{LANGS.map((l, i) => <>{i > 0 && ' · '}<a href={href(l, path)} hreflang={TAG[l]} style="display:inline">{copy(l).langName}</a></>)}</span></div>
+  </div></footer>
+  {page !== 'demo' && <div class="sticky-cta"><Wechat lang={lang} compact /><a class="btn main" href={href(lang, 'demo')}>{c.nav.demo}</a></div>}
+
+  <script>
+    // Language: remember the choice in the same cookie the ordering system reads.
+    for (const s of document.querySelectorAll<HTMLSelectElement>('select[data-langs]')) {
+      s.addEventListener('change', () => {
+        const to = JSON.parse(s.dataset.langs!)[s.value]
+        document.cookie = `lang=${encodeURIComponent(s.value)}; path=/; max-age=31536000; SameSite=Lax`
+        location.href = to
+      })
+    }
+    for (const a of document.querySelectorAll<HTMLAnchorElement>('a[hreflang]')) {
+      a.addEventListener('click', () => { document.cookie = `lang=${encodeURIComponent(a.pathname.split('/')[1])}; path=/; max-age=31536000; SameSite=Lax` })
+    }
+    // The phone's menu.
+    const burger = document.querySelector<HTMLButtonElement>('.burger')!, mnav = document.getElementById('mnav')!
+    burger.addEventListener('click', () => {
+      const open = mnav.classList.toggle('open')
+      burger.setAttribute('aria-expanded', String(open)); burger.textContent = open ? '✕' : '☰'
+    })
+    // Features menu on touch screens: a tap opens it.
+    for (const d of document.querySelectorAll('.menu .drop')) {
+      d.querySelector('button')!.addEventListener('click', () => d.classList.toggle('open'))
+    }
+    // Copy the WeChat ID.
+    for (const b of document.querySelectorAll<HTMLButtonElement>('button[data-copy]')) {
+      b.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(b.dataset.copy!) } catch { return }
+        const was = b.textContent; b.textContent = b.dataset.done!; setTimeout(() => { b.textContent = was }, 1500)
+      })
+    }
+  </script>
+</body>
+</html>

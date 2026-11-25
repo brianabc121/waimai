@@ -1,0 +1,12 @@
+---
+// The red band at the bottom of most pages: book a demo, or WeChat.
+import Wechat from './Wechat.astro'
+import { copy, href, type Lang } from '../i18n'
+interface Props { lang: Lang }
+const { lang } = Astro.props
+const c = copy(lang)
+---
+<div class="cta"><div class="wrap">
+  <div><h2>{c.common.ctaTitle}</h2><p>{c.common.ctaText}</p></div>
+  <div class="actions"><a class="btn gold" href={href(lang, 'demo')}>{c.common.ctaButton}</a><Wechat lang={lang} /></div>
+</div></div>

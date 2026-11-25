@@ -1,0 +1,19 @@
+---
+import Base from '../../../layouts/Base.astro'
+import Rows from '../../../components/Rows.astro'
+import Cta from '../../../components/Cta.astro'
+import { copy, href, langPaths, type Lang } from '../../../i18n'
+export const getStaticPaths = langPaths
+const lang = Astro.params.lang as Lang
+const c = copy(lang), p = c.features
+---
+<Base lang={lang} title={p.title} description={p.description} path="features" page="features">
+  <div class="phead"><div class="wrap center">
+    <h1>{p.h1}</h1><p class="lead">{p.lead}</p>
+  </div></div>
+  <section><div class="wrap">
+    <Rows rows={p.groups.map(g => ({ ...g, more: g.link ? href(lang, 'features/' + g.link) : undefined }))} moreText={c.common.more} />
+    <p class="shotnote">{c.common.shotNote}</p>
+  </div></section>
+  <Cta lang={lang} />
+</Base>

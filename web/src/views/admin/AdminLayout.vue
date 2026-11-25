@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { computed, onMounted, onUnmounted } from 'vue'
 import { locale, setLocale, t } from '../../i18n'
 import { logout, session } from '../../session'
-import { loadSupportUnread, loadWorkerStatus, monitor, poll } from './monitor'
+import { loadNewApplications, loadSupportUnread, loadWorkerStatus, monitor, poll } from './monitor'
 import { useShell } from '../../shell'
 
 const router = useRouter()
@@ -19,7 +19,7 @@ let stop = () => {}, stopSupport = () => {}
 onMounted(() => {
   if (!session.user?.is_platform_admin) return
   stop = poll(() => loadWorkerStatus().catch(() => {}), 60)
-  stopSupport = poll(() => loadSupportUnread().catch(() => {}), 20)
+  stopSupport = poll(() => Promise.all([loadSupportUnread(), loadNewApplications()]).catch(() => {}), 20)
 })
 onUnmounted(() => { stop(); stopSupport() })
 async function out() { await logout(); session.loaded = true; router.replace('/admin/login') }
@@ -39,7 +39,7 @@ async function out() { await logout(); session.loaded = true; router.replace('/a
       <div class="grp">{{ t('ad.g_merchants') }}</div>
       <router-link to="/admin/merchants">{{ t('ad.merchants') }}</router-link>
       <router-link to="/admin/items">{{ t('ad.items') }}</router-link>
-      <router-link to="/admin/customers">{{ t('ad.customers') }}</router-link>
+      <router-link to="/admin/customers">{{ t('ad.customers') }}<span v-if="monitor.newApplications" class="badge" data-testid="applications-badge">{{ monitor.newApplications }}</span></router-link>
       <router-link to="/admin/members" data-testid="nav-members">{{ t('ad.members') }}</router-link>
       <router-link to="/admin/addresses" data-testid="nav-addresses">{{ t('ad.addresses') }}</router-link>
       <router-link to="/admin/delivery-addresses" data-testid="nav-delivery-addresses">{{ t('ad.delivery') }}</router-link>

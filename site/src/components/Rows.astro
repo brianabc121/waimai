@@ -1,0 +1,19 @@
+---
+// Picture and text side by side, swapping sides row by row.
+import Shot from './Shot.astro'
+interface Row { eyebrow?: string; title: string; text?: string; points: string[]; img: string; alt?: string; phone?: boolean; more?: string }
+interface Props { rows: Row[]; moreText?: string }
+const { rows, moreText } = Astro.props
+---
+{rows.map((r, i) => (
+  <div class={i % 2 ? 'row flip' : 'row'}>
+    <div>
+      {r.eyebrow && <span class="eyebrow">{r.eyebrow}</span>}
+      <h2>{r.title}</h2>
+      {r.text && <p class="lead" style="font-size:17px">{r.text}</p>}
+      <ul>{r.points.map(p => <li>{p}</li>)}</ul>
+      {r.more && moreText && <a class="more" href={r.more}>{moreText} →</a>}
+    </div>
+    <Shot img={r.img} alt={r.alt ?? r.title} phone={r.phone} />
+  </div>
+))}

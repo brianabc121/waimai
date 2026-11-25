@@ -1,0 +1,9 @@
+---
+// A screen of the real system: in a browser frame, or in a phone.
+interface Props { img: string; alt: string; phone?: boolean; eager?: boolean }
+const { img, alt, phone = false, eager = false } = Astro.props
+const loading = eager ? 'eager' : 'lazy'
+---
+{phone
+  ? <div class="pphone"><div class="phone"><img src={`/shots/${img}.jpg`} alt={alt} loading={loading} decoding="async" /></div></div>
+  : <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src={`/shots/${img}.jpg`} alt={alt} loading={loading} decoding="async" /></div>}

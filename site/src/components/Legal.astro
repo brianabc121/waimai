@@ -1,0 +1,15 @@
+---
+import Base from '../layouts/Base.astro'
+import { copy, fill, type Lang } from '../i18n'
+interface Props { lang: Lang; which: 'privacy' | 'terms' }
+const { lang, which } = Astro.props
+const p = copy(lang)[which]
+const f = (s: string) => fill(lang, s)
+---
+<Base lang={lang} title={p.title} description={p.description} path={which} page={which}>
+  <article class="wrap prose">
+    <h1>{p.h1}</h1>
+    <p class="updated">{p.updated}</p>
+    {p.sections.map(([h, ps]) => <><h2>{h}</h2>{(ps as string[]).map(x => <p>{f(x)}</p>)}</>)}
+  </article>
+</Base>

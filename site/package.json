@@ -1,0 +1,19 @@
+{
+  "name": "waimai-site",
+  "private": true,
+  "license": "GPL-3.0-only",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build && node scripts/check.mjs",
+    "preview": "astro preview",
+    "hant": "node scripts/hant.mjs"
+  },
+  "dependencies": {
+    "astro": "5.18.2"
+  },
+  "devDependencies": {
+    "opencc-js": "1.0.5"
+  }
+}

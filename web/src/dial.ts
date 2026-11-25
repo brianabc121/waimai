@@ -2,7 +2,7 @@
 // the store is in; the customer can pick another for a number from abroad.
 
 // ISO 3166-1 alpha-2 → country calling code
-const CODES: Record<string, string> = {
+export const CODES: Record<string, string> = {
   AD: '376', AE: '971', AF: '93', AG: '1', AI: '1', AL: '355', AM: '374', AO: '244', AR: '54', AS: '1', AT: '43', AU: '61', AW: '297', AZ: '994',
   BA: '387', BB: '1', BD: '880', BE: '32', BF: '226', BG: '359', BH: '973', BI: '257', BJ: '229', BM: '1', BN: '673', BO: '591', BR: '55', BS: '1',
   BT: '975', BW: '267', BY: '375', BZ: '501', CA: '1', CD: '243', CF: '236', CG: '242', CH: '41', CI: '225', CK: '682', CL: '56', CM: '237', CN: '86',

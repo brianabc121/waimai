@@ -86,29 +86,52 @@ type ApplicationList struct {
 	Items   []Application `json:"items"`
 	Total   int           `json:"total"`
 	Pending int           `json:"pending"`
+	// New counts the pending applications nobody has followed up yet.
+	New int `json:"new"`
 }
 
-func (a *App) AdminApplications(ctx context.Context, status string, p Page) (*ApplicationList, error) {
-	if status != "" && status != "pending" && status != "approved" && status != "rejected" {
+type ApplicationFilter struct {
+	Status   string
+	Source   string
+	FollowUp string
+}
+
+func (a *App) AdminApplications(ctx context.Context, f ApplicationFilter, p Page) (*ApplicationList, error) {
+	if f.Status != "" && f.Status != "pending" && f.Status != "approved" && f.Status != "rejected" {
 		return nil, ErrValidation("status must be pending, approved or rejected")
 	}
+	if f.Source != "" && f.Source != "app" && f.Source != "website" {
+		return nil, ErrValidation("source must be app or website")
+	}
+	if f.FollowUp != "" && !followUps[f.FollowUp] {
+		return nil, ErrValidation("follow_up must be new, contacted, demoed or invalid")
+	}
+	const where = `($1 = '' OR p.status = $1) AND ($2 = '' OR p.source = $2) AND ($3 = '' OR p.follow_up = $3)`
 	out := &ApplicationList{}
-	if err := a.DB.QueryRow(ctx, `SELECT count(*) FILTER (WHERE $1 = '' OR status = $1), count(*) FILTER (WHERE status = 'pending')
-		FROM merchant_applications`, status).Scan(&out.Total, &out.Pending); err != nil {
+	if err := a.DB.QueryRow(ctx, `SELECT count(*) FILTER (WHERE `+where+`), count(*) FILTER (WHERE p.status = 'pending'),
+		count(*) FILTER (WHERE p.status = 'pending' AND p.follow_up = 'new')
+		FROM merchant_applications p`, f.Status, f.Source, f.FollowUp).Scan(&out.Total, &out.Pending, &out.New); err != nil {
 		return nil, err
 	}
 	limit, offset := p.limitOffset()
-	rows, err := a.DB.Query(ctx, `SELECT `+applicationCols+`, c.id, c.phone FROM merchant_applications p
-		JOIN customers c ON c.id = p.customer_id WHERE ($1 = '' OR p.status = $1) ORDER BY p.id DESC LIMIT $2 OFFSET $3`,
-		status, limit, offset)
+	rows, err := a.DB.Query(ctx, `SELECT `+applicationCols+`, c.id, c.phone, `+leadCols+` FROM merchant_applications p
+		LEFT JOIN customers c ON c.id = p.customer_id WHERE `+where+` ORDER BY p.id DESC LIMIT $4 OFFSET $5`,
+		f.Status, f.Source, f.FollowUp, limit, offset)
 	if err != nil {
 		return nil, err
 	}
 	out.Items, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (Application, error) {
-		var id int64
-		var phone string
-		p, err := scanApplication(r, &id, &phone)
-		p.CustomerID, p.AccountPhone = id, phone
+		var id *int64
+		var phone *string
+		l := &ApplicationLead{}
+		p, err := scanApplication(r, append([]any{&id, &phone}, l.dest()...)...)
+		if id != nil {
+			p.CustomerID = *id
+		}
+		if phone != nil {
+			p.AccountPhone = *phone
+		}
+		p.Lead = l
 		return p, err
 	})
 	if out.Items == nil {
@@ -128,7 +151,7 @@ func (a *App) AdminDecideApplication(ctx context.Context, actor AdminActor, id i
 		return ErrValidation("say why, in up to 1000 characters")
 	}
 	return a.inTx(ctx, func(tx pgx.Tx) error {
-		var customerID int64
+		var customerID *int64
 		var store string
 		err := tx.QueryRow(ctx, `UPDATE merchant_applications SET status=$2, reply=$3, decided_at=now()
 			WHERE id=$1 AND status='pending' RETURNING customer_id, store_name`, id, status, reply).Scan(&customerID, &store)
@@ -143,8 +166,12 @@ func (a *App) AdminDecideApplication(ctx context.Context, actor AdminActor, id i
 		if status == "rejected" {
 			m.Title, m.TitleEn = "商家入驻申请未通过："+store, "Your application was not approved: "+store
 		}
-		if err := tell(ctx, tx, customerID, m); err != nil {
-			return err
+		// From the website there is no customer account to tell: the platform
+		// gets in touch by the phone or chat app the applicant left.
+		if customerID != nil {
+			if err := tell(ctx, tx, *customerID, m); err != nil {
+				return err
+			}
 		}
 		return adminAudit(ctx, tx, actor, "application."+status, "application", id, map[string]any{"store": store})
 	})

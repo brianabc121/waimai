@@ -1,4 +1,4 @@
-.PHONY: test build web run migrate seed e2e pricing-check pricing-check-db
+.PHONY: test build web site run migrate seed e2e pricing-check pricing-check-db
 
 # Tests need a real PostgreSQL: TEST_DATABASE_URL=postgres://.../waimai_test
 test:
@@ -21,6 +21,10 @@ build:
 
 web:
 	cd web && npm ci --no-audit --no-fund && npm run build
+
+# The company website (docs/WEBSITE_DESIGN.md): static pages in site/dist.
+site:
+	cd site && npm ci --no-audit --no-fund && npm run build
 
 migrate:
 	go run ./cmd/migrate

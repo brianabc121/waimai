@@ -1,0 +1,150 @@
+---
+// Book a demo / join: the form goes to POST /api/v1/public/leads, which the
+// website's own domain passes on to the ordering system (docs/WEBSITE_DESIGN.md §8).
+import Base from '../../layouts/Base.astro'
+import Wechat from '../../components/Wechat.astro'
+import { copy, href, langPaths, TAG, type Lang } from '../../i18n'
+export const getStaticPaths = langPaths
+const lang = Astro.params.lang as Lang
+const c = copy(lang), p = c.demo, f = p.f
+const [agreeA, agreeB] = f.agree.split('{privacy}')
+// Countries are named in the page's language by the browser (Intl.DisplayNames);
+// these come first, where most Chinese restaurants abroad are.
+const TOP = ['PH', 'MY', 'SG', 'TH', 'ID', 'VN', 'KH', 'MM', 'LA', 'US', 'CA', 'GB', 'AU', 'NZ', 'JP', 'KR', 'AE', 'FR', 'DE', 'IT', 'ES', 'NL']
+---
+<Base lang={lang} title={p.title} description={p.description} path="demo" page="demo">
+  <div class="wrap formpage">
+    <div>
+      <span class="eyebrow">{p.eyebrow}</span>
+      <h1 style="font-size:40px">{p.h1}</h1>
+      <p class="lead" style="font-size:17px">{p.lead}</p>
+      <ul class="gets">
+        {p.gets.map(([ic, b, s]) => <li><i aria-hidden="true">{ic}</i><div><b>{b}</b><span>{s}</span></div></li>)}
+      </ul>
+      <p style="font-weight:700;margin-bottom:10px">{p.direct}</p>
+      <Wechat lang={lang} />
+    </div>
+
+    <div>
+      <form class="form" id="lead" novalidate data-lang={lang} data-tag={TAG[lang]} data-top={TOP.join(',')} data-err={JSON.stringify(p.err)}
+        data-choose={f.choose}>
+        <h2>{p.formTitle}</h2>
+        <div class="fgrid">
+          <div data-f="store_name"><label class="fl" for="store_name">{f.store} <em>*</em></label>
+            <input id="store_name" name="store_name" maxlength="100" required autocomplete="organization" /><div class="err"></div></div>
+          <div data-f="contact_name"><label class="fl" for="contact_name">{f.contact} <em>*</em></label>
+            <input id="contact_name" name="contact_name" maxlength="80" required autocomplete="name" placeholder={f.contactPh} /><div class="err"></div></div>
+          <div data-f="country_code"><label class="fl" for="country_code">{f.country} <em>*</em></label>
+            <select id="country_code" name="country_code" required autocomplete="country"><option value="">{f.choose}</option></select><div class="err"></div></div>
+          <div data-f="phone"><label class="fl" for="phone">{f.phone} <em>*</em></label>
+            <div class="ph"><span class="dial" id="dial">+</span><input id="phone" name="phone" type="tel" inputmode="tel" maxlength="30" required autocomplete="tel-national" placeholder={f.phonePh} /></div><div class="err"></div></div>
+          <div><label class="fl" for="im_kind">{f.im} <small>（{f.optional}）</small></label>
+            <select id="im_kind" name="im_kind">
+              {Object.entries(p.imKinds).map(([k, v]) => <option value={k} selected={k === 'wechat'}>{v}</option>)}
+            </select></div>
+          <div><label class="fl" for="im_handle">{f.handle} <small>（{f.optional}）</small></label>
+            <input id="im_handle" name="im_handle" maxlength="100" placeholder={f.handlePh} /></div>
+          <div><label class="fl" for="city">{f.city} <small>（{f.optional}）</small></label>
+            <input id="city" name="city" maxlength="100" autocomplete="address-level2" /></div>
+          <div data-f="email"><label class="fl" for="email">{f.email} <small>（{f.optional}）</small></label>
+            <input id="email" name="email" type="email" maxlength="200" autocomplete="email" /><div class="err"></div></div>
+          <div class="full"><span class="fl">{f.storeType}</span>
+            <div class="pills">{Object.entries(p.storeTypes).map(([k, v]) => <label class="chk"><input type="radio" name="store_type" value={k} /><span>{v}</span></label>)}</div></div>
+          <div class="full"><span class="fl">{f.storeCount}</span>
+            <div class="pills">{Object.entries(p.storeCounts).map(([k, v]) => <label class="chk"><input type="radio" name="store_count" value={k} /><span>{v}</span></label>)}</div></div>
+          <div class="full"><span class="fl">{f.wants} <small>（{f.multi}）</small></span>
+            <div class="pills">{Object.entries(p.wants).map(([k, v]) => <label class="chk"><input type="checkbox" name="wants" value={k} /><span>{v}</span></label>)}</div></div>
+          <div class="full"><label class="fl" for="note">{f.note} <small>（{f.optional}）</small></label>
+            <textarea id="note" name="note" maxlength="1000" placeholder={f.notePh}></textarea></div>
+          <div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off" /></div>
+          <div class="full" data-f="agree"><label class="agree"><input type="checkbox" name="agree" />
+            <span>{agreeA}<a href={href(lang, 'privacy')} target="_blank">{c.footer.privacy}</a>{agreeB}</span></label><div class="err"></div></div>
+          <div class="full formerr" id="formerr" hidden></div>
+          <button class="btn main full" type="submit" data-sending={f.sending}>{f.submit}</button>
+        </div>
+      </form>
+      <div class="form done" id="done" hidden>
+        <div class="big" aria-hidden="true">🎉</div>
+        <h2>{p.doneTitle}</h2>
+        <p>{p.doneText}</p>
+        <Wechat lang={lang} />
+      </div>
+    </div>
+  </div>
+</Base>
+
+<script>
+  import { CODES, localDigits } from '../../../../web/src/dial'
+
+  const form = document.getElementById('lead') as HTMLFormElement
+  const opened = Date.now()
+  const err = JSON.parse(form.dataset.err!) as Record<string, string>
+  const country = form.querySelector<HTMLSelectElement>('#country_code')!
+  const dial = document.getElementById('dial')!
+
+  // Countries, named in the page's language, the usual ones first.
+  const names = new Intl.DisplayNames([form.dataset.tag!, 'en'], { type: 'region' })
+  const name = (cc: string) => { try { return names.of(cc) ?? cc } catch { return cc } }
+  const top = form.dataset.top!.split(',')
+  const rest = Object.keys(CODES).filter(cc => !top.includes(cc)).sort((a, b) => name(a).localeCompare(name(b), form.dataset.tag))
+  const add = (cc: string) => country.add(new Option(`${name(cc)} +${CODES[cc]}`, cc))
+  top.forEach(add)
+  const sep = new Option('──────────', ''); sep.disabled = true; country.add(sep)
+  rest.forEach(add)
+  // A guess from the browser's language region (zh-SG, en-MY…); the visitor can change it.
+  // en-US and zh-CN are many devices' default rather than where the restaurant is, so they suggest nothing.
+  const guess = navigator.languages.filter(l => !/^(en-US|zh-CN)$/i.test(l)).map(l => l.split('-').pop()!.toUpperCase()).find(r => r.length === 2 && CODES[r])
+  if (guess) country.value = guess
+  const showDial = () => { dial.textContent = country.value ? '+' + CODES[country.value] : '+' }
+  country.addEventListener('change', showDial); showDial()
+
+  const field = (k: string) => form.querySelector<HTMLElement>(`[data-f="${k}"]`)
+  function mark(k: string, msg: string) {
+    const f = field(k); if (!f) return
+    f.classList.toggle('bad', !!msg); f.querySelector('.err')!.textContent = msg
+  }
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault()
+    const d = new FormData(form)
+    const v = (k: string) => String(d.get(k) ?? '').trim()
+    const cc = v('country_code'), code = CODES[cc] ?? ''
+    const local = code ? localDigits(code, v('phone')) : ''
+    const checks: [string, boolean, string][] = [
+      ['store_name', !!v('store_name'), err.store], ['contact_name', !!v('contact_name'), err.contact],
+      ['country_code', !!code, err.country], ['phone', local.length >= 5 && code.length + local.length <= 15, err.phone],
+      ['email', !v('email') || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v('email')), err.email], ['agree', d.get('agree') === 'on', err.agree],
+    ]
+    let first = ''
+    for (const [k, ok, msg] of checks) { mark(k, ok ? '' : msg); if (!ok && !first) first = k }
+    if (first) { field(first)?.querySelector<HTMLElement>('input,select')?.focus(); return }
+
+    const btn = form.querySelector<HTMLButtonElement>('button[type=submit]')!
+    const label = btn.textContent
+    const box = document.getElementById('formerr')!
+    btn.disabled = true; btn.textContent = btn.dataset.sending!; box.hidden = true
+    const params = new URLSearchParams(location.search)
+    const body = {
+      store_name: v('store_name'), contact_name: v('contact_name'), country_code: cc, country: name(cc),
+      phone: `+${code} ${local}`, city: v('city'), email: v('email'), note: v('note'),
+      store_type: v('store_type'), store_count: v('store_count'), wants: d.getAll('wants').map(String),
+      im_kind: v('im_kind'), im_handle: v('im_handle'), agree: true,
+      lang: form.dataset.lang, page: location.pathname + (params.get('utm_source') ? `?utm_source=${params.get('utm_source')}` : ''),
+      referrer: document.referrer, website: v('website'), elapsed_ms: Date.now() - opened,
+    }
+    try {
+      const r = await fetch('/api/v1/public/leads', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'waimai-site' }, body: JSON.stringify(body) })
+      if (r.ok) {
+        form.hidden = true
+        const done = document.getElementById('done')!; done.hidden = false; done.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        return
+      }
+      const j = await r.json().catch(() => ({}))
+      const code = j?.error?.code
+      box.textContent = code === 'BUSY' || code === 'RATE_LIMITED' ? err.busy : code === 'VALIDATION' ? (j.error.message as string) : err.network
+    } catch {
+      box.textContent = err.network
+    }
+    box.hidden = false; btn.disabled = false; btn.textContent = label
+  })
+</script>
