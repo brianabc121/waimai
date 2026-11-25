@@ -102,8 +102,11 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
         <router-link v-if="show('/merchant/orders')" to="/merchant/orders">{{ t('orders') }}</router-link>
         <router-link v-if="show('/merchant/progress')" to="/merchant/progress" class="navsub" data-testid="nav-progress">{{ t('kp.nav') }}</router-link>
         <router-link v-if="show('/merchant/voids')" to="/merchant/voids" class="navsub" data-testid="nav-voids">{{ t('vd.log.title') }}</router-link>
-        <router-link v-if="show('/merchant/members')" to="/merchant/members" data-testid="nav-members">{{ t('sm.title') }}</router-link>
-        <router-link v-if="show('/merchant/addresses')" to="/merchant/addresses" data-testid="nav-addresses">{{ t('da.title') }}</router-link>
+        <template v-if="show('/merchant/members') || show('/merchant/addresses')">
+          <div class="navgrp" data-testid="nav-cm">{{ t('cm.nav') }}</div>
+          <router-link v-if="show('/merchant/members')" to="/merchant/members" class="navsub" data-testid="nav-members">{{ t('cm.members') }}</router-link>
+          <router-link v-if="show('/merchant/addresses')" to="/merchant/addresses" class="navsub" data-testid="nav-addresses">{{ t('cm.addresses') }}</router-link>
+        </template>
         <router-link v-if="show('/merchant/tables')" to="/merchant/tables">{{ t('tables') }}</router-link>
         <router-link v-if="show('/kitchen')" to="/kitchen">{{ t('kitchen') }}</router-link>
         <template v-if="show('/merchant/messages') || show('/merchant/support')">
@@ -112,12 +115,18 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
           <router-link v-if="show('/merchant/support')" to="/merchant/support" class="navsub" data-testid="nav-support" @click="countChats">{{ t('msg.platform') }}<span v-if="supportUnread" class="navnum" data-testid="nav-support-unread">{{ supportUnread > 99 ? '99+' : supportUnread }}</span></router-link>
         </template>
         <router-link v-if="show('/merchant/menu')" to="/merchant/menu">{{ t('menu_admin') }}</router-link>
-        <router-link v-if="show('/merchant/templates')" to="/merchant/templates">{{ t('templates') }}</router-link>
-        <router-link v-if="show('/merchant/media')" to="/merchant/media">{{ t('promo_media') }}</router-link>
+        <template v-if="show('/merchant/media') || show('/merchant/templates')">
+          <div class="navgrp" data-testid="nav-deco">{{ t('deco.nav') }}</div>
+          <router-link v-if="show('/merchant/media')" to="/merchant/media" class="navsub" data-testid="nav-media">{{ t('promo_media') }}</router-link>
+          <router-link v-if="show('/merchant/templates')" to="/merchant/templates" class="navsub" data-testid="nav-templates">{{ t('templates') }}</router-link>
+        </template>
         <router-link v-if="show('/merchant/promos')" to="/merchant/promos">{{ t('promos') }}</router-link>
-        <router-link v-if="show('/merchant/cash')" to="/merchant/cash">{{ t('cash') }}</router-link>
-        <router-link v-if="show('/merchant/bills')" to="/merchant/bills" data-testid="nav-bills">{{ t('bl.nav') }}</router-link>
-        <router-link v-if="show('/merchant/reconcile')" to="/merchant/reconcile" data-testid="nav-reconcile">{{ t('rc.nav') }}</router-link>
+        <template v-if="show('/merchant/cash') || show('/merchant/bills') || show('/merchant/reconcile')">
+          <div class="navgrp" data-testid="nav-fin">{{ t('fin.nav') }}</div>
+          <router-link v-if="show('/merchant/cash')" to="/merchant/cash" class="navsub" data-testid="nav-cash">{{ t('cash') }}</router-link>
+          <router-link v-if="show('/merchant/bills')" to="/merchant/bills" class="navsub" data-testid="nav-bills">{{ t('bl.nav') }}</router-link>
+          <router-link v-if="show('/merchant/reconcile')" to="/merchant/reconcile" class="navsub" data-testid="nav-reconcile">{{ t('rc.nav') }}</router-link>
+        </template>
         <router-link v-if="show('/merchant/riders')" to="/merchant/riders">{{ t('riders') }}</router-link>
         <router-link v-if="show('/merchant/delivery-map')" to="/merchant/delivery-map">{{ t('delivery_map') }}</router-link>
         <router-link v-if="show('/merchant/staff')" to="/merchant/staff" data-testid="nav-staff">{{ t('staff') }}</router-link>

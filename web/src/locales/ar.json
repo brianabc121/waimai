@@ -3385,5 +3385,10 @@
  "pos.delivery_hint": "التوصيل والاستلام",
  "msg.nav": "الرسائل",
  "msg.customer": "رسائل العملاء",
- "msg.platform": "رسائل المنصة"
+ "msg.platform": "رسائل المنصة",
+ "cm.nav": "إدارة العملاء",
+ "cm.members": "قائمة الأعضاء",
+ "cm.addresses": "عناوين التوصيل",
+ "deco.nav": "تصميم المتجر",
+ "fin.nav": "المالية"
 }

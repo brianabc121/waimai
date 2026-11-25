@@ -3385,5 +3385,10 @@
  "pos.delivery_hint": "デリバリーと持ち帰り",
  "msg.nav": "メッセージ",
  "msg.customer": "お客様メッセージ",
- "msg.platform": "プラットフォームメッセージ"
+ "msg.platform": "プラットフォームメッセージ",
+ "cm.nav": "顧客管理",
+ "cm.members": "会員一覧",
+ "cm.addresses": "配達先住所",
+ "deco.nav": "店舗デザイン",
+ "fin.nav": "財務"
 }

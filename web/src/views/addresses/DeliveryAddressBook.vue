@@ -214,7 +214,7 @@ const filtered = computed(() => !!(f.q || f.source))
 <template>
   <div class="dab" data-testid="delivery-book">
     <div class="ox-head dab-head">
-      <div><h1 v-if="!admin">{{ t('da.title') }}</h1><p class="ox-sub">{{ t('ox.da.sub') }}</p></div>
+      <div><h1 v-if="!admin">{{ t('cm.addresses') }}</h1><p class="ox-sub">{{ t('ox.da.sub') }}</p></div>
       <span v-if="list.loaded" class="dab-count" data-testid="dab-count">{{ t('da.count', { a: list.addresses, c: list.customers }) }}</span>
     </div>
 

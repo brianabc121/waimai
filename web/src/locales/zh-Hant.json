@@ -3385,5 +3385,10 @@
  "pos.delivery_hint": "外賣和自取",
  "msg.nav": "消息",
  "msg.customer": "客戶消息",
- "msg.platform": "平台消息"
+ "msg.platform": "平台消息",
+ "cm.nav": "客戶管理",
+ "cm.members": "會員列表",
+ "cm.addresses": "送餐地址",
+ "deco.nav": "店鋪裝修",
+ "fin.nav": "財務"
 }

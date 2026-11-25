@@ -71,6 +71,12 @@ for (const [name, opts] of sizes) {
   expect(msgs.slice(at, at + 3).join(','), 'nav-msg,nav-messages,nav-support', `${name}: messages group order`)
   expect((await page.locator(tid('nav-messages')).innerText()).trim(), '客户消息', `${name}: customer messages link`)
   expect((await page.locator(tid('nav-support')).innerText()).trim(), '平台消息', `${name}: platform messages link`)
+  // 客户管理, 店铺装修, 财务: more groups, each followed by its pages
+  const links = await page.locator('.shell-links > *').evaluateAll(els => els.map(e => [e.getAttribute('data-testid'), e.textContent.trim()]))
+  for (const [grp, want] of [['nav-cm', '客户管理,会员列表,送餐地址'], ['nav-deco', '店铺装修,宣传物料,模板'], ['nav-fin', '财务,核款,账单,对账']]) {
+    const i = links.findIndex(l => l[0] === grp), n = want.split(',').length
+    expect(links.slice(i, i + n).map(l => l[1]).join(','), want, `${name}: ${grp} group`)
+  }
   await page.waitForTimeout(300)   // the drawer slides in
   await page.screenshot({ path: `${SHOTS}/pos-${name}-menu.png` })
 
@@ -92,6 +98,12 @@ for (const [name, opts] of sizes) {
   await page.press(tid('mo-pick'), 'Enter')
   await page.locator(tid('mo-line')).first().waitFor()
   await page.screenshot({ path: `${SHOTS}/pos-${name}-delivery.png` })
+  await nav(page, 'nav-members')
+  await page.waitForURL(u => u.pathname === '/merchant/members')
+  expect((await page.locator('.ox-head h1').innerText()).trim(), '会员列表', `${name}: member list title`)
+  await nav(page, 'nav-addresses')
+  await page.waitForURL(u => u.pathname === '/merchant/addresses')
+  expect((await page.locator('.ox-head h1').innerText()).trim(), '送餐地址', `${name}: delivery addresses title`)
   await nav(page, 'nav-messages')
   await page.waitForURL(u => u.pathname === '/merchant/messages')
   expect((await page.locator('.ox-head h1').innerText()).trim(), '客户消息', `${name}: customer messages title`)

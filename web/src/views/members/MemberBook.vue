@@ -157,7 +157,7 @@ async function save() {
 <template>
   <div class="mbook" data-testid="members-page">
     <div v-if="!admin" class="ox-head">
-      <div><h1>{{ t('sm.title') }}</h1><p class="ox-sub">{{ t('ox.sm.sub') }}</p></div>
+      <div><h1>{{ t('cm.members') }}</h1><p class="ox-sub">{{ t('ox.sm.sub') }}</p></div>
     </div>
 
     <div class="ox-stats" data-testid="members-stats">
