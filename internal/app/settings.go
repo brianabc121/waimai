@@ -550,7 +550,15 @@ func (a *App) AdminSaveSettings(ctx context.Context, actor AdminActor, values ma
 	if err != nil {
 		return nil, wrap("save settings", err)
 	}
+	before := translatorName(a.translator())
 	a.install(in, sig)
+	// The keys are in use here already, so a worker in this process sees no
+	// change: queue the mall's own texts for a new translation service now.
+	if now := translatorName(a.translator()); now != "" && now != before {
+		if err := a.QueueTranslatePlatform(ctx); err != nil {
+			return nil, err
+		}
+	}
 	return a.settingsView(saved), nil
 }
 

@@ -81,7 +81,7 @@ step(`order ${orderNo} placed and accepted`)
 const cook = await open({ width: 390, height: 844 })
 await login(cook, 'zhang1')
 await cook.waitForURL('**/work')
-const fries = cook.locator('[data-task="无盐地瓜条"]').last()
+const fries = cook.locator(`[data-task="无盐地瓜条"]:has-text("${orderNo}")`)   // other tests leave fries waiting too
 await fries.locator('[data-act=start]').click()
 await fries.locator('[data-act=ready]').click()
 await fries.waitFor({ state: 'detached' })
