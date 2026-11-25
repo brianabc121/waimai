@@ -66,16 +66,16 @@ for (const [name, opts] of sizes) {
   await page.locator(tid('nav-pos')).waitFor({ state: 'visible' })
   const menu = () => page.locator('.shell-links > *').evaluateAll(els => els.map(e => e.getAttribute('data-testid') || e.textContent.trim()))
   // every group with pages under it starts folded (the orders page is in none of them)
-  expect((await menu()).slice(0, 8).join(','), 'nav-pos,订单,nav-cm,桌台,后厨,nav-msg,菜单,nav-deco', `${name}: folded menu`)
-  for (const id of ['nav-pos-dine', 'nav-progress', 'nav-members', 'nav-messages', 'nav-media', 'nav-cash'])
+  expect((await menu()).slice(0, 11).join(','), 'nav-pos,订单,nav-cm,桌台,后厨,nav-msg,菜单,nav-deco,优惠,nav-fin,nav-dlv', `${name}: folded menu`)
+  for (const id of ['nav-pos-dine', 'nav-progress', 'nav-members', 'nav-messages', 'nav-media', 'nav-cash', 'nav-riders'])
     expect(await page.locator(tid(id)).count(), 0, `${name}: ${id} folded away`)
   await page.waitForTimeout(300)   // the drawer slides in
   await page.screenshot({ path: `${SHOTS}/fold-${name}-folded.png` })
-  for (const id of ['nav-pos', 'nav-orders-fold', 'nav-cm', 'nav-msg', 'nav-deco', 'nav-fin']) await page.click(tid(id))
+  for (const id of ['nav-pos', 'nav-orders-fold', 'nav-cm', 'nav-msg', 'nav-deco', 'nav-fin', 'nav-dlv']) await page.click(tid(id))
   expect(await page.locator(tid('nav-pos')).getAttribute('aria-expanded'), 'true', `${name}: 点单 opened`)
   const opened = await menu()
   for (const want of ['nav-pos,nav-pos-dine,nav-pos-delivery,订单,nav-progress,nav-voids,nav-cm,nav-members,nav-addresses',
-    'nav-msg,nav-messages,nav-support', 'nav-deco,nav-media,nav-templates', 'nav-fin,nav-cash,nav-bills,nav-reconcile']) {
+    'nav-msg,nav-messages,nav-support', 'nav-deco,nav-media,nav-templates', 'nav-fin,nav-cash,nav-bills,nav-reconcile', 'nav-dlv,nav-riders,nav-delivery-map']) {
     const first = want.split(',')[0], i = opened.indexOf(first)
     expect(opened.slice(i, i + want.split(',').length).join(','), want, `${name}: ${first} opened`)
   }
@@ -85,6 +85,7 @@ for (const [name, opts] of sizes) {
   expect([await label('nav-cm'), await label('nav-members'), await label('nav-addresses')].join(','), '客户管理,会员列表,送餐地址', `${name}: 客户管理 names`)
   expect([await label('nav-deco'), await label('nav-media'), await label('nav-templates')].join(','), '店铺装修,宣传物料,模板', `${name}: 店铺装修 names`)
   expect([await label('nav-fin'), await label('nav-cash'), await label('nav-bills'), await label('nav-reconcile')].join(','), '财务,核款,账单,对账', `${name}: 财务 names`)
+  expect([await label('nav-dlv'), await label('nav-riders'), await label('nav-delivery-map')].join(','), '配送管理,骑手,配送地图', `${name}: 配送管理 names`)
   await page.waitForTimeout(300)   // the drawer slides in
   await page.screenshot({ path: `${SHOTS}/fold-${name}-open.png` })
   await page.click(tid('nav-deco'))

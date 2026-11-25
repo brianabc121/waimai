@@ -30,6 +30,7 @@ const groupPages: Record<string, string[]> = {
   pos: ['/merchant/order/'], orders: ['/merchant/progress', '/merchant/voids'],
   cm: ['/merchant/members', '/merchant/addresses'], msg: ['/merchant/messages', '/merchant/support'],
   deco: ['/merchant/media', '/merchant/templates'], fin: ['/merchant/cash', '/merchant/bills', '/merchant/reconcile'],
+  dlv: ['/merchant/riders', '/merchant/delivery-map'],
 }
 const openGrps = ref<Record<string, boolean>>({})
 const isOpen = (g: string) => !!openGrps.value[g]
@@ -157,8 +158,13 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
             <router-link v-if="show('/merchant/reconcile')" to="/merchant/reconcile" class="navsub" data-testid="nav-reconcile">{{ t('rc.nav') }}</router-link>
           </template>
         </template>
-        <router-link v-if="show('/merchant/riders')" to="/merchant/riders">{{ t('riders') }}</router-link>
-        <router-link v-if="show('/merchant/delivery-map')" to="/merchant/delivery-map">{{ t('delivery_map') }}</router-link>
+        <template v-if="show('/merchant/riders') || show('/merchant/delivery-map')">
+          <button class="navgrp" :class="{ open: isOpen('dlv') }" :aria-expanded="isOpen('dlv')" data-testid="nav-dlv" @click="toggleGrp('dlv')"><span class="grow">{{ t('dlv.nav') }}</span><i class="caret"></i></button>
+          <template v-if="isOpen('dlv')">
+            <router-link v-if="show('/merchant/riders')" to="/merchant/riders" class="navsub" data-testid="nav-riders">{{ t('riders') }}</router-link>
+            <router-link v-if="show('/merchant/delivery-map')" to="/merchant/delivery-map" class="navsub" data-testid="nav-delivery-map">{{ t('delivery_map') }}</router-link>
+          </template>
+        </template>
         <router-link v-if="show('/merchant/staff')" to="/merchant/staff" data-testid="nav-staff">{{ t('staff') }}</router-link>
         <router-link v-if="show('/merchant/settings')" to="/merchant/settings">{{ t('settings') }}</router-link>
         <router-link v-if="posts.length" to="/work">{{ t('my_workbench') }}</router-link>
