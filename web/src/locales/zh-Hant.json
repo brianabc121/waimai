@@ -3216,5 +3216,6 @@
 "tp.preview":"點餐時的樣子",
 "tp.c.topping":"加料",
 "tp.c.flavor":"口味",
-"tp.c.note":"備註"
+"tp.c.note":"備註",
+"tp.c.unit":"單價 {p}"
 }

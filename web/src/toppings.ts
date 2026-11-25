@@ -42,5 +42,6 @@ extend({
   'tp.c.topping': ['加料', 'Toppings'],
   'tp.c.flavor': ['口味', 'Flavour'],
   'tp.c.note': ['备注', 'Note'],
+  'tp.c.unit': ['单价 {p}', 'Unit price {p}'],
   'tp.preview': ['点餐时的样子', 'How it looks when ordering'],
 })

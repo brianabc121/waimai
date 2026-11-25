@@ -3216,5 +3216,6 @@
  "tp.preview": "Aperçu à la commande",
  "tp.c.topping": "Suppléments",
  "tp.c.flavor": "Goût",
- "tp.c.note": "Note"
+ "tp.c.note": "Note",
+ "tp.c.unit": "Prix unitaire {p}"
 }

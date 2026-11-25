@@ -3216,5 +3216,6 @@
  "tp.preview": "Khi gọi món sẽ trông thế này",
  "tp.c.topping": "Món thêm",
  "tp.c.flavor": "Khẩu vị",
- "tp.c.note": "Ghi chú"
+ "tp.c.note": "Ghi chú",
+ "tp.c.unit": "Đơn giá {p}"
 }

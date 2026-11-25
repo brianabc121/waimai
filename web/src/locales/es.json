@@ -3216,5 +3216,6 @@
  "tp.preview": "Así se ve al pedir",
  "tp.c.topping": "Extras",
  "tp.c.flavor": "Sabor",
- "tp.c.note": "Nota"
+ "tp.c.note": "Nota",
+ "tp.c.unit": "Precio unitario {p}"
 }
