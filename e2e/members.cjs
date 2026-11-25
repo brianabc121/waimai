@@ -48,6 +48,7 @@ if (!lina.no) throw new Error('could not make a member: ' + JSON.stringify(lina)
 const temp = await call('POST', `/merchant/branches/${bid}/members`)
 
 await page.goto(BASE + '/merchant/orders')
+await page.click(tid('nav-cm'))   // 客户管理 starts folded
 await page.click(tid('nav-members'))
 await page.waitForURL(u => u.pathname === '/merchant/members')
 await page.waitForSelector(tid('member-row'))

@@ -3389,5 +3389,16 @@
  "pos.dine": "堂食下單",
  "pos.delivery": "外賣下單",
  "pos.new_delivery": "＋ 外賣下單",
- "pos.delivery_hint": "外賣和自取"
+ "pos.delivery_hint": "外賣和自取",
+ "msg.nav": "消息",
+ "msg.customer": "客戶消息",
+ "msg.platform": "平台消息",
+ "cm.nav": "客戶管理",
+ "cm.members": "會員列表",
+ "cm.addresses": "送餐地址",
+ "deco.nav": "店鋪裝修",
+ "fin.nav": "財務",
+ "nav.expand": "展開",
+ "nav.collapse": "收起",
+ "dlv.nav": "配送管理"
 }

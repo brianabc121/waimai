@@ -3389,5 +3389,16 @@
  "pos.dine": "Pedido en mesa",
  "pos.delivery": "Pedido a domicilio",
  "pos.new_delivery": "＋ Pedido a domicilio",
- "pos.delivery_hint": "Domicilio y para recoger"
+ "pos.delivery_hint": "Domicilio y para recoger",
+ "msg.nav": "Mensajes",
+ "msg.customer": "Mensajes de clientes",
+ "msg.platform": "Mensajes de la plataforma",
+ "cm.nav": "Clientes",
+ "cm.members": "Lista de socios",
+ "cm.addresses": "Direcciones de entrega",
+ "deco.nav": "Diseño de la tienda",
+ "fin.nav": "Finanzas",
+ "nav.expand": "Desplegar",
+ "nav.collapse": "Plegar",
+ "dlv.nav": "Gestión de entregas"
 }

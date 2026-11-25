@@ -110,6 +110,7 @@ await shot(owner, 'd03-staff-on-duty')
 step('clocked on: position reached the server, the staff page shows who is on duty')
 
 // ---- the desk's rider page: the list in picking order and a pin on the map ----
+await owner.click('[data-testid=nav-dlv]')   // 配送管理 starts folded
 await owner.click('.staffbar a:has-text("骑手")')
 await owner.waitForURL('**/merchant/riders')
 await owner.locator('[data-rider=wang1]:has-text("上班中")').waitFor()

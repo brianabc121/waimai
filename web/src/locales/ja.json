@@ -3389,5 +3389,16 @@
  "pos.dine": "店内注文",
  "pos.delivery": "デリバリー注文",
  "pos.new_delivery": "＋ デリバリー注文",
- "pos.delivery_hint": "デリバリーと持ち帰り"
+ "pos.delivery_hint": "デリバリーと持ち帰り",
+ "msg.nav": "メッセージ",
+ "msg.customer": "お客様メッセージ",
+ "msg.platform": "プラットフォームメッセージ",
+ "cm.nav": "顧客管理",
+ "cm.members": "会員一覧",
+ "cm.addresses": "配達先住所",
+ "deco.nav": "店舗デザイン",
+ "fin.nav": "財務",
+ "nav.expand": "展開",
+ "nav.collapse": "折りたたむ",
+ "dlv.nav": "配達管理"
 }

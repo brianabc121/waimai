@@ -60,6 +60,7 @@ step('three deliveries to one building, written two ways')
 
 // ---- the store: the address list ----
 await page.goto(BASE + '/merchant/orders')
+await page.click(tid('nav-cm'))   // 客户管理 starts folded
 await page.click(tid('nav-addresses'))
 await page.waitForURL(u => u.pathname === '/merchant/addresses')
 await page.waitForSelector(tid('dab-row'))

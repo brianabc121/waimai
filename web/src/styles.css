@@ -180,7 +180,17 @@ table.data th { font-size: 12px; color: var(--muted); font-weight: 600; backgrou
 .staffbar a { color: #c9ced6; padding: 9px 10px; border-radius: 8px; font-weight: 600; }
 .staffbar a:hover { background: #262c34; }
 .staffbar a.navsub { padding-inline-start: 24px; font-weight: 500; }
-.staffbar .navgrp { color: #8b949e; font-size: 12px; font-weight: 600; letter-spacing: .04em; padding: 8px 10px 2px; }
+.staffbar .navgrp { display: flex; align-items: center; width: 100%; background: none; border: 0; border-radius: 8px; color: #c9ced6; font: inherit; font-weight: 600; text-align: start; padding: 9px 10px; cursor: pointer; }
+.staffbar .navgrp .grow { flex: 1; }
+.staffbar .navgrp:hover, .staffbar .navfold:hover { background: #262c34; color: #fff; }
+.staffbar .caret { width: 7px; height: 7px; border: solid currentColor; border-width: 0 1.6px 1.6px 0; transform: rotate(45deg); margin: -3px 4px 0 10px; opacity: .7; transition: transform .15s; flex: none; }
+.staffbar .open > .caret, .staffbar .navgrp.open .caret { transform: rotate(-135deg); margin-top: 3px; }
+.staffbar .navrow { display: flex; align-items: center; gap: 2px; }
+.staffbar .navrow > a { flex: 1; min-width: 0; }
+.staffbar .navfold { background: none; border: 0; border-radius: 8px; color: #c9ced6; width: 34px; align-self: stretch; display: grid; place-items: center; cursor: pointer; flex: none; }
+.staffbar .navfold .caret { margin: -3px 0 0; }
+.staffbar .navfold.open .caret { margin: 3px 0 0; }
+.shell.drawer .staffbar .navgrp { padding: 11px 12px; }
 .staffbar a.router-link-active { background: #2d333b; color: #fff; box-shadow: inset 3px 0 0 var(--brand); }
 .staffbar select { background: #2d333b; color: #fff; border-color: #444c56; padding: 6px 8px; }
 .staffbar .btn.link { color: #c9ced6; justify-content: flex-start; padding: 6px 0; }

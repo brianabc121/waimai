@@ -141,6 +141,13 @@ const dict: Record<string, [string, string]> = {
   // 点单: the two ordering pages of the back office (dine-in, delivery and pickup)
   'pos.nav': ['点单', 'Ordering'], 'pos.dine': ['堂食下单', 'Dine-in order'], 'pos.delivery': ['外卖下单', 'Delivery order'],
   'pos.new_delivery': ['＋ 外卖下单', '+ Delivery order'], 'pos.delivery_hint': ['外卖和自取', 'Delivery and pickup'],
+  // 消息: customers' chats and the platform's support, two pages under one group
+  'msg.nav': ['消息', 'Messages'], 'msg.customer': ['客户消息', 'Customer messages'], 'msg.platform': ['平台消息', 'Platform messages'],
+  // more groups of the back office menu
+  'cm.nav': ['客户管理', 'Customers'], 'cm.members': ['会员列表', 'Member list'], 'cm.addresses': ['送餐地址', 'Delivery addresses'],
+  'deco.nav': ['店铺装修', 'Store design'], 'fin.nav': ['财务', 'Finance'],
+  'nav.expand': ['展开', 'Expand'], 'nav.collapse': ['收起', 'Collapse'],
+  'dlv.nav': ['配送管理', 'Delivery'],
   active: ['进行中', 'Active'], history: ['历史', 'History'], no_orders: ['暂无订单', 'No orders'],
   accept: ['接单', 'Accept'], reject: ['拒单', 'Reject'], cancel: ['取消', 'Cancel'], reason: ['原因', 'Reason'],
   reason_required: ['请填写原因', 'Please give a reason'], assign_rider: ['指派骑手', 'Assign rider'], reassign: ['改派', 'Reassign'],

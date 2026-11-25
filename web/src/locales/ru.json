@@ -3389,5 +3389,16 @@
  "pos.dine": "Заказ в зале",
  "pos.delivery": "Заказ на доставку",
  "pos.new_delivery": "＋ Заказ на доставку",
- "pos.delivery_hint": "Доставка и самовывоз"
+ "pos.delivery_hint": "Доставка и самовывоз",
+ "msg.nav": "Сообщения",
+ "msg.customer": "Сообщения клиентов",
+ "msg.platform": "Сообщения платформы",
+ "cm.nav": "Клиенты",
+ "cm.members": "Список участников",
+ "cm.addresses": "Адреса доставки",
+ "deco.nav": "Оформление магазина",
+ "fin.nav": "Финансы",
+ "nav.expand": "Развернуть",
+ "nav.collapse": "Свернуть",
+ "dlv.nav": "Доставка"
 }

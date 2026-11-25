@@ -3389,5 +3389,16 @@
  "pos.dine": "طلب في المطعم",
  "pos.delivery": "طلب توصيل",
  "pos.new_delivery": "＋ طلب توصيل",
- "pos.delivery_hint": "التوصيل والاستلام"
+ "pos.delivery_hint": "التوصيل والاستلام",
+ "msg.nav": "الرسائل",
+ "msg.customer": "رسائل العملاء",
+ "msg.platform": "رسائل المنصة",
+ "cm.nav": "إدارة العملاء",
+ "cm.members": "قائمة الأعضاء",
+ "cm.addresses": "عناوين التوصيل",
+ "deco.nav": "تصميم المتجر",
+ "fin.nav": "المالية",
+ "nav.expand": "توسيع",
+ "nav.collapse": "طي",
+ "dlv.nav": "إدارة التوصيل"
 }

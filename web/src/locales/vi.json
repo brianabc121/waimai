@@ -3389,5 +3389,16 @@
  "pos.dine": "Gọi món tại quán",
  "pos.delivery": "Đơn giao hàng",
  "pos.new_delivery": "＋ Đơn giao hàng",
- "pos.delivery_hint": "Giao hàng và tự lấy"
+ "pos.delivery_hint": "Giao hàng và tự lấy",
+ "msg.nav": "Tin nhắn",
+ "msg.customer": "Tin nhắn khách hàng",
+ "msg.platform": "Tin nhắn nền tảng",
+ "cm.nav": "Quản lý khách hàng",
+ "cm.members": "Danh sách hội viên",
+ "cm.addresses": "Địa chỉ giao hàng",
+ "deco.nav": "Trang trí cửa hàng",
+ "fin.nav": "Tài chính",
+ "nav.expand": "Mở rộng",
+ "nav.collapse": "Thu gọn",
+ "dlv.nav": "Quản lý giao hàng"
 }

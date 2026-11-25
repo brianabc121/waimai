@@ -62,6 +62,7 @@ await desk.waitForSelector('.detail select')
 step(`order ${orderNo} placed and accepted`)
 
 // ---- the desk opens cooking progress: the order has not started ----
+await desk.click('[data-testid=nav-orders-fold]')   // the pages under 订单 start folded
 await desk.click('[data-testid=nav-progress]')
 await desk.waitForURL('**/merchant/progress')
 const card = desk.locator(`.cp-card[data-order="${orderNo}"]`)

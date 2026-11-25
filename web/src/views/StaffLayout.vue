@@ -24,6 +24,21 @@ const role = computed(() => currentRole()?.role ?? '')
 // a page the person's role may not open (docs/STAFF_ACCESS_DESIGN.md §6.4)
 const blocked = computed(() => { const p = pagePerms(route.path); return !!p && !can(...p) })
 const show = (path: string) => { const p = pagePerms(path); return !p || can(...p) }
+// Menu groups with pages under them fold; all start folded except the one the
+// open page is in, which opens by itself.
+const groupPages: Record<string, string[]> = {
+  pos: ['/merchant/order/'], orders: ['/merchant/progress', '/merchant/voids'],
+  cm: ['/merchant/members', '/merchant/addresses'], msg: ['/merchant/messages', '/merchant/support'],
+  deco: ['/merchant/media', '/merchant/templates'], fin: ['/merchant/cash', '/merchant/bills', '/merchant/reconcile'],
+  dlv: ['/merchant/riders', '/merchant/delivery-map'],
+}
+const openGrps = ref<Record<string, boolean>>({})
+const isOpen = (g: string) => !!openGrps.value[g]
+function toggleGrp(g: string) { openGrps.value = { ...openGrps.value, [g]: !openGrps.value[g] } }
+watch(() => route.path, p => {
+  for (const [g, pages] of Object.entries(groupPages))
+    if (pages.some(x => p === x || p.startsWith(x.endsWith('/') ? x : x + '/'))) openGrps.value = { ...openGrps.value, [g]: true }
+}, { immediate: true })
 const posts = computed(() => currentRole()?.posts ?? [])
 const inStore = computed(() => posts.value.some(p => p.kind !== 'rider'))
 
@@ -95,30 +110,63 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
       <div v-if="role && !viewing" class="shell-role" data-testid="nav-role"><span class="rtag" :class="role">{{ t('role.' + role) }}</span><span class="who">{{ session.user?.display_name }}</span></div>
       <div class="shell-links">
         <template v-if="show('/merchant/order/dine') || show('/merchant/order/delivery')">
-          <div class="navgrp" data-testid="nav-pos">{{ t('pos.nav') }}</div>
-          <router-link v-if="show('/merchant/order/dine')" to="/merchant/order/dine" class="navsub" data-testid="nav-pos-dine">{{ t('pos.dine') }}</router-link>
-          <router-link v-if="show('/merchant/order/delivery')" to="/merchant/order/delivery" class="navsub" data-testid="nav-pos-delivery" :title="t('pos.delivery_hint')">{{ t('pos.delivery') }}</router-link>
+          <button class="navgrp" :class="{ open: isOpen('pos') }" :aria-expanded="isOpen('pos')" data-testid="nav-pos" @click="toggleGrp('pos')"><span class="grow">{{ t('pos.nav') }}</span><i class="caret"></i></button>
+          <template v-if="isOpen('pos')">
+            <router-link v-if="show('/merchant/order/dine')" to="/merchant/order/dine" class="navsub" data-testid="nav-pos-dine">{{ t('pos.dine') }}</router-link>
+            <router-link v-if="show('/merchant/order/delivery')" to="/merchant/order/delivery" class="navsub" data-testid="nav-pos-delivery" :title="t('pos.delivery_hint')">{{ t('pos.delivery') }}</router-link>
+          </template>
         </template>
-        <router-link v-if="show('/merchant/orders')" to="/merchant/orders">{{ t('orders') }}</router-link>
-        <router-link v-if="show('/merchant/progress')" to="/merchant/progress" class="navsub" data-testid="nav-progress">{{ t('kp.nav') }}</router-link>
-        <router-link v-if="show('/merchant/voids')" to="/merchant/voids" class="navsub" data-testid="nav-voids">{{ t('vd.log.title') }}</router-link>
-        <router-link v-if="show('/merchant/members')" to="/merchant/members" data-testid="nav-members">{{ t('sm.title') }}</router-link>
-        <router-link v-if="show('/merchant/addresses')" to="/merchant/addresses" data-testid="nav-addresses">{{ t('da.title') }}</router-link>
+        <div v-if="show('/merchant/orders')" class="navrow">
+          <router-link to="/merchant/orders" data-testid="nav-orders">{{ t('orders') }}</router-link>
+          <button v-if="show('/merchant/progress') || show('/merchant/voids')" class="navfold" :class="{ open: isOpen('orders') }" :aria-expanded="isOpen('orders')"
+            :aria-label="t(isOpen('orders') ? 'nav.collapse' : 'nav.expand')" data-testid="nav-orders-fold" @click="toggleGrp('orders')"><i class="caret"></i></button>
+        </div>
+        <template v-if="isOpen('orders') || !show('/merchant/orders')">
+          <router-link v-if="show('/merchant/progress')" to="/merchant/progress" class="navsub" data-testid="nav-progress">{{ t('kp.nav') }}</router-link>
+          <router-link v-if="show('/merchant/voids')" to="/merchant/voids" class="navsub" data-testid="nav-voids">{{ t('vd.log.title') }}</router-link>
+        </template>
+        <template v-if="show('/merchant/members') || show('/merchant/addresses')">
+          <button class="navgrp" :class="{ open: isOpen('cm') }" :aria-expanded="isOpen('cm')" data-testid="nav-cm" @click="toggleGrp('cm')"><span class="grow">{{ t('cm.nav') }}</span><i class="caret"></i></button>
+          <template v-if="isOpen('cm')">
+            <router-link v-if="show('/merchant/members')" to="/merchant/members" class="navsub" data-testid="nav-members">{{ t('cm.members') }}</router-link>
+            <router-link v-if="show('/merchant/addresses')" to="/merchant/addresses" class="navsub" data-testid="nav-addresses">{{ t('cm.addresses') }}</router-link>
+          </template>
+        </template>
         <router-link v-if="show('/merchant/tables')" to="/merchant/tables">{{ t('tables') }}</router-link>
         <router-link v-if="show('/kitchen')" to="/kitchen">{{ t('kitchen') }}</router-link>
-        <router-link v-if="show('/merchant/messages')" to="/merchant/messages" data-testid="nav-messages" @click="countChats">{{ t('ch.nav') }}<span v-if="chatUnread" class="navnum" data-testid="nav-chat-unread">{{ chatUnread > 99 ? '99+' : chatUnread }}</span></router-link>
+        <template v-if="show('/merchant/messages') || show('/merchant/support')">
+          <button class="navgrp" :class="{ open: isOpen('msg') }" :aria-expanded="isOpen('msg')" data-testid="nav-msg" @click="toggleGrp('msg')"><span class="grow">{{ t('msg.nav') }}</span><span v-if="!isOpen('msg') && chatUnread + supportUnread" class="navnum" data-testid="nav-msg-unread">{{ chatUnread + supportUnread > 99 ? '99+' : chatUnread + supportUnread }}</span><i class="caret"></i></button>
+          <template v-if="isOpen('msg')">
+            <router-link v-if="show('/merchant/messages')" to="/merchant/messages" class="navsub" data-testid="nav-messages" @click="countChats">{{ t('msg.customer') }}<span v-if="chatUnread" class="navnum" data-testid="nav-chat-unread">{{ chatUnread > 99 ? '99+' : chatUnread }}</span></router-link>
+            <router-link v-if="show('/merchant/support')" to="/merchant/support" class="navsub" data-testid="nav-support" @click="countChats">{{ t('msg.platform') }}<span v-if="supportUnread" class="navnum" data-testid="nav-support-unread">{{ supportUnread > 99 ? '99+' : supportUnread }}</span></router-link>
+          </template>
+        </template>
         <router-link v-if="show('/merchant/menu')" to="/merchant/menu">{{ t('menu_admin') }}</router-link>
-        <router-link v-if="show('/merchant/templates')" to="/merchant/templates">{{ t('templates') }}</router-link>
-        <router-link v-if="show('/merchant/media')" to="/merchant/media">{{ t('promo_media') }}</router-link>
+        <template v-if="show('/merchant/media') || show('/merchant/templates')">
+          <button class="navgrp" :class="{ open: isOpen('deco') }" :aria-expanded="isOpen('deco')" data-testid="nav-deco" @click="toggleGrp('deco')"><span class="grow">{{ t('deco.nav') }}</span><i class="caret"></i></button>
+          <template v-if="isOpen('deco')">
+            <router-link v-if="show('/merchant/media')" to="/merchant/media" class="navsub" data-testid="nav-media">{{ t('promo_media') }}</router-link>
+            <router-link v-if="show('/merchant/templates')" to="/merchant/templates" class="navsub" data-testid="nav-templates">{{ t('templates') }}</router-link>
+          </template>
+        </template>
         <router-link v-if="show('/merchant/promos')" to="/merchant/promos">{{ t('promos') }}</router-link>
-        <router-link v-if="show('/merchant/cash')" to="/merchant/cash">{{ t('cash') }}</router-link>
-        <router-link v-if="show('/merchant/bills')" to="/merchant/bills" data-testid="nav-bills">{{ t('bl.nav') }}</router-link>
-        <router-link v-if="show('/merchant/reconcile')" to="/merchant/reconcile" data-testid="nav-reconcile">{{ t('rc.nav') }}</router-link>
-        <router-link v-if="show('/merchant/riders')" to="/merchant/riders">{{ t('riders') }}</router-link>
-        <router-link v-if="show('/merchant/delivery-map')" to="/merchant/delivery-map">{{ t('delivery_map') }}</router-link>
+        <template v-if="show('/merchant/cash') || show('/merchant/bills') || show('/merchant/reconcile')">
+          <button class="navgrp" :class="{ open: isOpen('fin') }" :aria-expanded="isOpen('fin')" data-testid="nav-fin" @click="toggleGrp('fin')"><span class="grow">{{ t('fin.nav') }}</span><i class="caret"></i></button>
+          <template v-if="isOpen('fin')">
+            <router-link v-if="show('/merchant/cash')" to="/merchant/cash" class="navsub" data-testid="nav-cash">{{ t('cash') }}</router-link>
+            <router-link v-if="show('/merchant/bills')" to="/merchant/bills" class="navsub" data-testid="nav-bills">{{ t('bl.nav') }}</router-link>
+            <router-link v-if="show('/merchant/reconcile')" to="/merchant/reconcile" class="navsub" data-testid="nav-reconcile">{{ t('rc.nav') }}</router-link>
+          </template>
+        </template>
+        <template v-if="show('/merchant/riders') || show('/merchant/delivery-map')">
+          <button class="navgrp" :class="{ open: isOpen('dlv') }" :aria-expanded="isOpen('dlv')" data-testid="nav-dlv" @click="toggleGrp('dlv')"><span class="grow">{{ t('dlv.nav') }}</span><i class="caret"></i></button>
+          <template v-if="isOpen('dlv')">
+            <router-link v-if="show('/merchant/riders')" to="/merchant/riders" class="navsub" data-testid="nav-riders">{{ t('riders') }}</router-link>
+            <router-link v-if="show('/merchant/delivery-map')" to="/merchant/delivery-map" class="navsub" data-testid="nav-delivery-map">{{ t('delivery_map') }}</router-link>
+          </template>
+        </template>
         <router-link v-if="show('/merchant/staff')" to="/merchant/staff" data-testid="nav-staff">{{ t('staff') }}</router-link>
         <router-link v-if="show('/merchant/settings')" to="/merchant/settings">{{ t('settings') }}</router-link>
-        <router-link v-if="show('/merchant/support')" to="/merchant/support" data-testid="nav-support" @click="countChats">{{ t('sp.title') }}<span v-if="supportUnread" class="navnum" data-testid="nav-support-unread">{{ supportUnread > 99 ? '99+' : supportUnread }}</span></router-link>
         <router-link v-if="posts.length" to="/work">{{ t('my_workbench') }}</router-link>
       </div>
       <div class="shell-foot">

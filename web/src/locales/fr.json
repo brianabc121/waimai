@@ -3389,5 +3389,16 @@
  "pos.dine": "Commande sur place",
  "pos.delivery": "Commande à livrer",
  "pos.new_delivery": "＋ Commande à livrer",
- "pos.delivery_hint": "Livraison et à emporter"
+ "pos.delivery_hint": "Livraison et à emporter",
+ "msg.nav": "Messages",
+ "msg.customer": "Messages clients",
+ "msg.platform": "Messages de la plateforme",
+ "cm.nav": "Clients",
+ "cm.members": "Liste des membres",
+ "cm.addresses": "Adresses de livraison",
+ "deco.nav": "Habillage de la boutique",
+ "fin.nav": "Finances",
+ "nav.expand": "Déplier",
+ "nav.collapse": "Replier",
+ "dlv.nav": "Livraisons"
 }
