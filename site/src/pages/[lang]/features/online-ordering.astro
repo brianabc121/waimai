@@ -1,0 +1,6 @@
+---
+import FeaturePage from '../../../components/FeaturePage.astro'
+import { langPaths, type Lang } from '../../../i18n'
+export const getStaticPaths = langPaths
+---
+<FeaturePage lang={Astro.params.lang as Lang} which="online" path="features/online-ordering" related={['dine-in', 'features']} />

@@ -587,3 +587,33 @@ BASE_URL=http://localhost:8000 node e2e/chat.cjs
 
 没开聊天的环境会直接提示跳过。
 
+
+## 20. 企业官网（主域名）
+
+企业官网（`site/`，方案见 `docs/WEBSITE_DESIGN.md`）是纯静态页面，用单独的 `site` 容器提供，放在主域名上；点餐系统（商城、商家后台、员工工作台、接口）照旧在 `order.` 子域名上。
+
+1. 两个域名的 A 记录都指向这台服务器，例如 `example.com`、`www.example.com` 和 `order.example.com`。
+2. `.env` 里填好：
+   - `PUBLIC_BASE_URL=https://order.example.com`（点餐系统，官网的“登录”和“我是顾客，去点餐”链接到这里）
+   - `SITE_URL=https://example.com`（官网自己的地址，用于规范链接、多语言链接和站点地图）
+   - `SITE_PORT=127.0.0.1:8001`
+3. `/etc/caddy/Caddyfile` 再加两段，然后 `sudo systemctl reload caddy`：
+
+   ```
+   example.com {
+       reverse_proxy 127.0.0.1:8001
+   }
+   www.example.com {
+       redir https://example.com{uri} permanent
+   }
+   ```
+
+4. `docker compose up -d --build site`。改了官网文案或 `.env` 里的这两个地址后，也要重新执行这一条（地址是构建时写进页面的）。
+
+说明：
+
+- 打开主域名会按浏览器语言跳到 `/zh/`、`/zh-Hant/` 或 `/en/`，用户切换过语言就按他选的（和点餐系统共用 `lang` cookie）。
+- 官网上的“预约演示”表单提交到官网自己的 `/api/v1/public/leads`，由 `site` 容器转给 `api`，不需要跨域设置。提交的申请出现在平台后台“顾客服务 → 入驻申请”，来源标为“官网”，侧栏“顾客服务”上的数字是还没联系的申请数。同一个手机号一天内重复提交只更新原来那条；每个 IP 连续提交 5 次后每分钟只能再提交 1 次；全站每小时最多收 60 条新申请。
+- 访问统计可选：自建 Umami 后在 `.env` 填 `UMAMI_SRC`、`UMAMI_ID` 再重新构建 `site`。不填就不加载任何统计脚本。
+- 上线后到 Google Search Console 添加主域名，提交 `https://example.com/sitemap.xml`。
+- 本地预览：`cd site && npm ci && npm run dev`（表单需要本机 `make run` 起着接口，或设 `API_URL`）。

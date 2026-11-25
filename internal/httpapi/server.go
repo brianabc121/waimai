@@ -34,6 +34,7 @@ type Server struct {
 
 	publicWrites *limiter // quotes, orders
 	reportLimit  *limiter // reports against a store
+	leadLimit    *limiter // the website's form to join
 	mallLimit    *limiter // marketplace listings
 	otpLimit     *limiter
 	loginLimit   *limiter
@@ -48,7 +49,9 @@ func NewServer(a *app.App, cfg config.Config, hub *Hub) *Server {
 	return &Server{App: a, Cfg: cfg, Hub: hub,
 		publicWrites: newLimiter(60, 30),
 		reportLimit:  newLimiter(3, 3),
-		mallLimit:    newLimiter(120, 60),
+		// a few sends of the website's form, then one a minute
+		leadLimit: newLimiter(1, 5),
+		mallLimit: newLimiter(120, 60),
 		// Everyone who orders logs in, and many customers can share one
 		// address; the daily caps in RequestOTP are what limit the cost.
 		otpLimit:     newLimiter(20, 20),

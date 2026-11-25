@@ -7,6 +7,7 @@ import { get, post, put } from '../../api'
 import { extend, money, t } from '../../i18n'
 import Pager from './Pager.vue'
 import { fmtDateTime, qs } from './util'
+import { monitor } from './monitor'
 
 extend({
   'ac.feedback': ['意见反馈', 'Feedback'], 'ac.applications': ['入驻申请', 'Applications'], 'ac.customers': ['顾客和钱包', 'Customers & wallets'], 'ac.info': ['平台信息', 'Platform info'],
@@ -15,7 +16,7 @@ extend({
   'ac.reply_ph': ['回复会出现在顾客的“我的消息”里', 'The reply shows up in the customer\'s messages'],
   'ac.p.country': ['国家/地区', 'Country'], 'ac.p.province': ['省份', 'Province'], 'ac.p.area': ['地区', 'Area'],
   'ac.p.address': ['详细地址', 'Address'], 'ac.p.point': ['经纬度', 'Coordinates'], 'ac.p.map': ['在谷歌地图查看', 'Open in Google Maps'],
-  'ac.p.city': ['城市（手填）', 'City (typed)'], 'ac.p.postal': ['邮编', 'Postal code'], 'ac.p.cuisine': ['经营品类', 'What they sell'],
+  'ac.p.city': ['城市（手填）', 'City (typed)'], 'ac.p.city_w': ['城市', 'City'], 'ac.p.postal': ['邮编', 'Postal code'], 'ac.p.cuisine': ['经营品类', 'What they sell'],
   'ac.store': ['店铺', 'Store'], 'ac.who': ['联系人', 'Contact'], 'ac.city': ['城市 / 品类', 'City / food'], 'ac.approve': ['通过', 'Approve'], 'ac.reject': ['不通过', 'Turn down'],
   'ac.decide_ph': ['给申请人的话（不通过时必填）', 'A word to the applicant (required when turning down)'],
   'ac.approve_hint': ['通过只是通知申请人，商户账号还要到“商户”里新建。', 'Approving only tells the applicant. Create the merchant under Merchants.'],
@@ -29,12 +30,22 @@ extend({
   'ac.i.support_chat': ['在线客服（链接或账号，例如 WhatsApp、Telegram、微信号）', 'Chat (a link or a handle: WhatsApp, Telegram, WeChat…)'],
   'ac.info_hint': ['显示在顾客“我的”页面的“我的客服”和“关于我们”里。没填的项目不显示。', 'Shown under Support and About us on the customer\'s pages. Empty fields are left out.'],
   'ac.saved': ['已保存', 'Saved'], 'ac.none': ['暂无', 'Nothing here'], 'ac.go': ['搜索', 'Search'],
+  'ac.src.app': ['App', 'App'], 'ac.src.website': ['官网', 'Website'], 'ac.src.all': ['全部来源', 'All sources'],
+  'ac.fu.all': ['全部跟进', 'Any follow-up'], 'ac.fu.new': ['待联系', 'To contact'], 'ac.fu.contacted': ['已联系', 'Contacted'], 'ac.fu.demoed': ['已演示', 'Demo given'], 'ac.fu.invalid': ['无效', 'Not real'],
+  'ac.fu.note_ph': ['跟进备注（只有平台能看到）', 'Follow-up note (only the platform sees it)'], 'ac.fu.save': ['保存跟进', 'Save follow-up'],
+  'ac.st.quick': ['快餐小吃', 'Quick service'], 'ac.st.full': ['中餐正餐', 'Full service'], 'ac.st.tea': ['茶饮咖啡', 'Tea & coffee'], 'ac.st.other': ['其他', 'Other'],
+  'ac.w.delivery': ['外卖', 'Delivery'], 'ac.w.pickup': ['自取', 'Pickup'], 'ac.w.dine_in': ['堂食', 'Dine-in'], 'ac.w.phone': ['代客下单', 'Phone orders'],
+  'ac.stores': ['{n} 家店', '{n} stores'], 'ac.from_page': ['来自页面', 'Sent from'], 'ac.email': ['邮箱', 'Email'],
+  'ac.website_hint': ['官网来的申请没有顾客账号：通过或不通过都不会发站内消息，请用对方留的电话或聊天账号联系。', 'Applications from the website have no customer account: deciding sends no message, so reach them by the phone or chat account they left.'],
   'mk.suggestion': ['功能建议', 'Suggestion'], 'mk.problem': ['使用问题', 'A problem'], 'mk.complaint': ['投诉', 'Complaint'], 'mk.account': ['账号问题', 'My account'], 'mk.other': ['其他', 'Other'],
 })
 
 interface Fb { id: number; kind: string; content: string; contact: string; reply: string; replied_at: string | null; created_at: string; phone: string; member_no: string }
 interface App { id: number; store_name: string; contact_name: string; phone: string; city: string; cuisine: string; note: string; status: string; reply: string; created_at: string; account_phone: string
-  country_code: string; country: string; province: string; district: string; postal_code: string; place_name: string; place_address: string; unit: string; lat: number | null; lng: number | null }
+  country_code: string; country: string; province: string; district: string; postal_code: string; place_name: string; place_address: string; unit: string; lat: number | null; lng: number | null
+  lead: Lead }
+interface Lead { source: 'app' | 'website'; store_type: string; store_count: string; wants: string[]; im_kind: string; im_handle: string; email: string
+  lang: string; page: string; referrer: string; follow_up: string; follow_note: string }
 interface Wallet { currency: string; balance: number; bonus: number }
 interface Cust { id: number; member_no: string; phone: string; nickname: string; orders: number; created_at: string; wallets: Wallet[] }
 
@@ -54,13 +65,38 @@ async function sendReply(x: Fb) {
 }
 
 // ---- applications ----
-const ap = reactive({ items: [] as App[], total: 0, pending: 0, status: 'pending', page: 1 })
+const ap = reactive({ items: [] as App[], total: 0, pending: 0, new: 0, status: 'pending', source: '', follow_up: '', page: 1 })
+const follow = reactive<Record<number, { follow_up: string; note: string }>>({})
 async function loadAp() {
-  try { Object.assign(ap, await get('/admin/applications' + qs({ status: ap.status, page: ap.page, page_size: SIZE }))); error.value = '' } catch (e) { fail(e) }
+  try {
+    Object.assign(ap, await get('/admin/applications' + qs({ status: ap.status, source: ap.source, follow_up: ap.follow_up, page: ap.page, page_size: SIZE })))
+    for (const x of ap.items) follow[x.id] = { follow_up: x.lead.follow_up, note: x.lead.follow_note }
+    monitor.newApplications = ap.new
+    error.value = ''
+  } catch (e) { fail(e) }
 }
+async function saveFollow(x: App) {
+  try { await post(`/admin/applications/${x.id}/follow-up`, follow[x.id]); await loadAp() } catch (e) { fail(e) }
+}
+// Where to open a chat with the applicant, by the app they chose (WeChat has no link: copy the ID).
+function chatLink(x: App): string {
+  const h = x.lead.im_handle.trim(), digits = (h || x.phone).replace(/\D/g, '')
+  switch (x.lead.im_kind) {
+    case 'whatsapp': return digits ? `https://wa.me/${digits}` : ''
+    case 'telegram': return h ? `https://t.me/${h.replace(/^@/, '')}` : ''
+    case 'line': return h ? `https://line.me/ti/p/~${encodeURIComponent(h)}` : ''
+    case 'viber': return digits ? `viber://chat?number=%2B${digits}` : ''
+  }
+  return ''
+}
+const IM_NAMES: Record<string, string> = { wechat: '微信 WeChat', whatsapp: 'WhatsApp', telegram: 'Telegram', line: 'LINE', viber: 'Viber' }
 // Where the store is, one line per part; an application from before the map shows the city typed by hand.
 function placeRows(x: App): [string, string][] {
-  if (x.lat == null || x.lng == null) return [['ac.p.city', x.city]].filter(r => r[1]) as [string, string][]
+  if (x.lat == null || x.lng == null) {
+    // from the website: the country chosen and the city typed
+    const country = x.country ? `${x.country}${x.country_code ? ` (${x.country_code})` : ''}` : x.country_code
+    return ([['ac.p.country', country], [x.lead?.source === 'website' ? 'ac.p.city_w' : 'ac.p.city', x.city]] as [string, string][]).filter(r => r[1])
+  }
   const street = [x.place_name, x.place_address !== x.place_name ? x.place_address : '', x.unit].filter(Boolean).join(' · ')
   const rows: [string, string][] = [
     ['ac.p.country', x.country ? `${x.country}${x.country_code ? ` (${x.country_code})` : ''}` : x.country_code],
@@ -138,13 +174,32 @@ onMounted(() => { void loadFb(); void loadAp() })
     <template v-else-if="tab === 'applications'">
       <div class="row wrap"><select v-model="ap.status" style="width:160px" @change="ap.page = 1; loadAp()">
         <option value="pending">{{ t('ac.pending') }}</option><option value="approved">{{ t('ac.approved') }}</option><option value="rejected">{{ t('ac.rejected') }}</option><option value="">{{ t('ad.all') }}</option>
-      </select><span class="small muted">{{ t('ac.approve_hint') }}</span></div>
+      </select>
+      <select v-model="ap.source" style="width:140px" data-testid="ac-source" @change="ap.page = 1; loadAp()">
+        <option value="">{{ t('ac.src.all') }}</option><option value="website">{{ t('ac.src.website') }}</option><option value="app">{{ t('ac.src.app') }}</option>
+      </select>
+      <select v-model="ap.follow_up" style="width:140px" data-testid="ac-follow-filter" @change="ap.page = 1; loadAp()">
+        <option value="">{{ t('ac.fu.all') }}</option><option v-for="f in ['new', 'contacted', 'demoed', 'invalid']" :key="f" :value="f">{{ t('ac.fu.' + f) }}</option>
+      </select>
+      <span class="small muted">{{ t('ac.approve_hint') }}</span></div>
       <div v-if="!ap.items.length" class="card muted">{{ t('ac.none') }}</div>
       <div v-for="x in ap.items" :key="x.id" class="card stack" data-testid="ac-application">
-        <div class="row wrap"><b>{{ x.store_name }}</b><span class="tag" :class="{ ok: x.status === 'approved', bad: x.status === 'rejected', warn: x.status === 'pending' }">{{ t('ac.' + x.status) }}</span>
+        <div class="row wrap"><b>{{ x.store_name }}</b>
+          <span class="tag" :class="x.lead.source === 'website' ? 'info' : ''" data-testid="ac-source-tag">{{ t('ac.src.' + x.lead.source) }}</span>
+          <span class="tag" :class="{ ok: x.status === 'approved', bad: x.status === 'rejected', warn: x.status === 'pending' }">{{ t('ac.' + x.status) }}</span>
+          <span v-if="x.status === 'pending'" class="tag" :class="{ warn: x.lead.follow_up === 'new' }">{{ t('ac.fu.' + x.lead.follow_up) }}</span>
           <span class="grow"></span><span class="small muted">{{ fmtDateTime(x.created_at) }}</span></div>
         <div class="small">{{ t('ac.who') }}: {{ x.contact_name }} · {{ x.phone }}<template v-if="x.cuisine"> · {{ x.cuisine }}</template>
-          <span class="muted"> · {{ t('ac.customer') }} {{ x.account_phone }}</span></div>
+          <span v-if="x.account_phone" class="muted"> · {{ t('ac.customer') }} {{ x.account_phone }}</span></div>
+        <div v-if="x.lead.source === 'website'" class="ac-lead small" data-testid="ac-lead">
+          <span v-if="x.lead.store_type" class="tag">{{ t('ac.st.' + x.lead.store_type) }}</span>
+          <span v-if="x.lead.store_count" class="tag">{{ t('ac.stores', { n: x.lead.store_count }) }}</span>
+          <span v-for="w in x.lead.wants" :key="w" class="tag warn">{{ t('ac.w.' + w) }}</span>
+          <span v-if="x.lead.im_kind" data-testid="ac-im"><b>{{ IM_NAMES[x.lead.im_kind] }}</b>:
+            <a v-if="chatLink(x)" :href="chatLink(x)" target="_blank" rel="noopener">{{ x.lead.im_handle || x.phone }}</a><span v-else>{{ x.lead.im_handle || x.phone }}</span></span>
+          <span v-if="x.lead.email">{{ t('ac.email') }}: <a :href="'mailto:' + x.lead.email">{{ x.lead.email }}</a></span>
+          <span v-if="x.lead.page" class="muted">{{ t('ac.from_page') }}: {{ x.lead.page }}<template v-if="x.lead.referrer"> ← {{ x.lead.referrer }}</template></span>
+        </div>
         <dl class="ac-place" data-testid="ac-place">
           <template v-for="[k, v] in placeRows(x)" :key="k"><dt>{{ t(k) }}</dt><dd :data-testid="k.replace(/\./g, '-')">{{ v }}</dd></template>
           <template v-if="x.lat != null && x.lng != null"><dt>{{ t('ac.p.point') }}</dt>
@@ -152,6 +207,13 @@ onMounted(() => { void loadFb(); void loadAp() })
               <a :href="mapLink(x)" target="_blank" rel="noopener" class="small">{{ t('ac.p.map') }}</a></dd></template>
         </dl>
         <p v-if="x.note" style="white-space:pre-wrap">{{ x.note }}</p>
+        <form v-if="follow[x.id]" class="row wrap top" data-testid="ac-follow" @submit.prevent="saveFollow(x)">
+          <select v-model="follow[x.id].follow_up" style="width:130px" data-testid="ac-follow-up">
+            <option v-for="f in ['new', 'contacted', 'demoed', 'invalid']" :key="f" :value="f">{{ t('ac.fu.' + f) }}</option></select>
+          <input v-model="follow[x.id].note" maxlength="1000" class="grow" style="min-width:200px" :placeholder="t('ac.fu.note_ph')" data-testid="ac-follow-note" />
+          <button class="btn" data-testid="ac-follow-save">{{ t('ac.fu.save') }}</button>
+        </form>
+        <div v-if="x.lead.source === 'website' && x.status === 'pending'" class="small muted">{{ t('ac.website_hint') }}</div>
         <div v-if="x.status !== 'pending'" class="reply" v-show="x.reply">{{ x.reply }}</div>
         <div v-else class="row top wrap">
           <textarea v-model="replies[-x.id]" rows="2" maxlength="1000" :placeholder="t('ac.decide_ph')" class="grow" style="min-width:220px" data-testid="ac-decide-note"></textarea>
@@ -216,5 +278,6 @@ onMounted(() => { void loadFb(); void loadAp() })
 .ac-place dt { color: var(--muted); }
 .ac-place dd { margin: 0; overflow-wrap: anywhere; }
 .ac-place dd a { margin-inline-start: 8px; }
+.ac-lead { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
 .reply { background: #f6f7f8; border-radius: 10px; padding: 10px 12px; font-size: 14px; white-space: pre-wrap; }
 </style>

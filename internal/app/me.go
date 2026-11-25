@@ -475,8 +475,9 @@ type Application struct {
 	DecidedAt *time.Time `json:"decided_at"`
 	CreatedAt time.Time  `json:"created_at"`
 	// set for the platform only
-	CustomerID   int64  `json:"customer_id,omitempty"`
-	AccountPhone string `json:"account_phone,omitempty"`
+	CustomerID   int64            `json:"customer_id,omitempty"`
+	AccountPhone string           `json:"account_phone,omitempty"`
+	Lead         *ApplicationLead `json:"lead,omitempty"`
 }
 
 // ApplicationPlace is where the store is: a point picked on the map, the

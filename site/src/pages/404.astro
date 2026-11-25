@@ -1,0 +1,12 @@
+---
+import Base from '../layouts/Base.astro'
+import { copy, href, DEFAULT_LANG } from '../i18n'
+const lang = DEFAULT_LANG
+const n = copy(lang).notFound, e = copy('en').notFound
+---
+<Base lang={lang} title={n.title} description={n.text} noindex>
+  <div class="wrap prose center">
+    <h1>{n.title}</h1><p>{n.text}</p><p class="lead" style="margin:0 auto">{e.text}</p>
+    <p style="margin-top:24px"><a class="btn main" href={href(lang)}>{n.home}</a> <a class="btn line" href={href('en')}>{e.home}</a></p>
+  </div>
+</Base>

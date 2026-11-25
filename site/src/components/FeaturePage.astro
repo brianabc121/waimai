@@ -1,0 +1,45 @@
+---
+// A feature's own page: head, three benefits, picture rows, related features.
+import Base from '../layouts/Base.astro'
+import Rows from './Rows.astro'
+import Cta from './Cta.astro'
+import Shot from './Shot.astro'
+import { copy, href, type Lang } from '../i18n'
+interface Props { lang: Lang; which: 'online' | 'dineIn'; path: string; related: string[] }
+const { lang, which, path, related } = Astro.props
+const c = copy(lang), p = c[which]
+// the picture at the top, not repeated below
+const hero = which === 'online' ? { img: 'mall-phone', phone: true, alt: c.online.rows[0].alt } : { img: 'dine-desk', phone: false, alt: c.dineIn.rows[0].alt }
+const links: Record<string, [string, string, string]> = {
+  'online-ordering': ['🛵', c.nav.onlineOrdering, c.online.trio.map(t => t[0]).join(' · ')],
+  'dine-in': ['🍽️', c.nav.dineIn, c.dineIn.trio.map(t => t[0]).join(' · ')],
+  features: ['📋', c.nav.allFeatures, c.features.groups.map(g => g.title).slice(1, 4).join(' · ')],
+}
+---
+<Base lang={lang} title={p.title} description={p.description} path={path} page="features">
+  <div class="phead" style="padding-bottom:90px"><div class="wrap">
+    <div class="crumb">{p.crumb}</div>
+    <div class="row" style="padding:0">
+      <div>
+        <h1>{p.h1}</h1>
+        <p class="lead">{p.lead}</p>
+        <div class="hero" style="background:none;padding:0"><div class="ctas"><a class="btn gold" href={href(lang, 'demo')}>{c.nav.demo}</a><a class="btn ghost" href={href(lang, 'pricing')}>{c.nav.pricing}</a></div></div>
+      </div>
+      <Shot img={hero.img} alt={hero.alt} phone={hero.phone} eager />
+    </div>
+  </div></div>
+  <div class="wrap"><div class="trio" style="margin-top:-50px">
+    {p.trio.map(([b, s]) => <div class="card"><b>{b}</b><p>{s}</p></div>)}
+  </div></div>
+  <section><div class="wrap">
+    <Rows rows={p.rows} />
+    <p class="shotnote">{c.common.shotNote}</p>
+  </div></section>
+  <section class="band"><div class="wrap center">
+    <h2>{c.related}</h2>
+    <div class="cards4" style="text-align:start;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      {related.map(k => <a class="card" href={href(lang, k === 'features' ? 'features' : 'features/' + k)}><div class="ic" aria-hidden="true">{links[k][0]}</div><h3>{links[k][1]}</h3><p>{links[k][2]}</p></a>)}
+    </div>
+  </div></section>
+  <Cta lang={lang} />
+</Base>

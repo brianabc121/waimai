@@ -4,7 +4,13 @@ import { reactive } from 'vue'
 import { get } from '../../api'
 import type { WorkerStatus } from './types'
 
-export const monitor = reactive({ failedJobs: 0, supportUnread: 0 })
+export const monitor = reactive({ failedJobs: 0, supportUnread: 0, newApplications: 0 })
+
+// loadNewApplications counts the applications to join nobody has contacted
+// yet (most come from the company website), for the "Customers" link.
+export async function loadNewApplications() {
+  monitor.newApplications = (await get<{ new: number }>('/admin/applications?status=pending&page_size=1')).new
+}
 
 // loadSupportUnread keeps the number on "platform support" current.
 export async function loadSupportUnread() {

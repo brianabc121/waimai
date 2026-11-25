@@ -57,6 +57,7 @@ func (s *Server) meRoutes(api *gin.RouterGroup) {
 	api.POST("/customer/feedback", w, s.submitFeedback)
 	api.GET("/customer/applications", s.myApplications)
 	api.POST("/customer/applications", w, s.submitApplication)
+	api.POST("/public/leads", s.limit(s.leadLimit), s.submitLead)
 	api.GET("/customer/wallet/:account", s.myWallet)
 }
 
@@ -65,6 +66,7 @@ func (s *Server) meAdminRoutes(admin *gin.RouterGroup) {
 	admin.POST("/feedback/:id/reply", s.adminReplyFeedback)
 	admin.GET("/applications", s.adminApplications)
 	admin.POST("/applications/:id/decide", s.adminDecideApplication)
+	admin.POST("/applications/:id/follow-up", s.adminFollowUpApplication)
 	admin.GET("/customers", s.adminCustomers)
 	admin.POST("/customers/:id/wallet", s.adminAdjustWallet)
 	admin.GET("/platform-info", s.platformInfo)
@@ -248,8 +250,42 @@ func (s *Server) adminReplyFeedback(c *gin.Context) {
 }
 
 func (s *Server) adminApplications(c *gin.Context) {
-	l, err := s.App.AdminApplications(c, c.Query("status"), queryPage(c))
+	l, err := s.App.AdminApplications(c, app.ApplicationFilter{Status: c.Query("status"), Source: c.Query("source"),
+		FollowUp: c.Query("follow_up")}, queryPage(c))
 	reply(c, l, err)
+}
+
+func (s *Server) adminFollowUpApplication(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	var in struct {
+		FollowUp string `json:"follow_up"`
+		Note     string `json:"note"`
+	}
+	if !ok || !bind(c, &in) {
+		return
+	}
+	reply(c, gin.H{"ok": true}, s.App.AdminFollowUp(c, adminActor(c), id, in.FollowUp, in.Note))
+}
+
+// submitLead takes the form on the company website (docs/WEBSITE_DESIGN.md §8).
+// Anyone may send it. A filled-in hidden field ("website", which people do not
+// see) or a form sent within three seconds of opening it is a robot: it is
+// told all went well and nothing is saved.
+func (s *Server) submitLead(c *gin.Context) {
+	var in struct {
+		app.LeadInput
+		Website   string `json:"website"`
+		ElapsedMs int64  `json:"elapsed_ms"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	if in.Website != "" || in.ElapsedMs < 3000 {
+		c.JSON(200, gin.H{"ok": true})
+		return
+	}
+	id, err := s.App.SubmitLead(c, in.LeadInput)
+	reply(c, gin.H{"ok": true, "id": id}, err)
 }
 
 func (s *Server) adminDecideApplication(c *gin.Context) {

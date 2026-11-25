@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>平台后台 · 入驻申请（官网线索）</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.5 -apple-system, "PingFang SC", "Noto Sans SC", sans-serif; color: #1f2328; background: #f6f6f4; display: flex; min-height: 100vh; }
+.side { width: 210px; background: #22272e; color: #adbac7; padding: 18px 10px; flex: none; }
+.side b { color: #fff; display: block; padding: 0 10px 16px; font-size: 16px; }
+.side a { display: block; padding: 8px 12px; border-radius: 8px; margin: 2px 0; }
+.side a.on { background: #2d333b; color: #fff; box-shadow: inset 3px 0 0 #d9480f; }
+.side a em { float: right; font-style: normal; background: #d9480f; color: #fff; border-radius: 999px; font-size: 12px; padding: 0 7px; }
+main { flex: 1; padding: 24px 28px; min-width: 0; }
+h1 { font-size: 22px; margin: 0 0 4px; } .sub { color: #6b7280; margin-bottom: 18px; }
+.tabs { display: flex; gap: 22px; border-bottom: 1px solid #e5e7eb; margin-bottom: 16px; }
+.tabs span { padding: 8px 0; font-weight: 600; color: #6b7280; } .tabs span.on { color: #b93a08; box-shadow: inset 0 -2px 0 #d9480f; }
+.tabs em { font-style: normal; background: #fdecea; color: #b42318; border-radius: 999px; font-size: 12px; padding: 0 7px; margin-left: 4px; }
+.filters { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.filters span { border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; padding: 6px 12px; font-weight: 600; }
+.filters span.on { border-color: #d9480f; color: #b93a08; background: #fff1e8; }
+.item { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; display: grid; grid-template-columns: 1.4fr 1.1fr 1fr 210px; gap: 18px; }
+.item.new { border-left: 4px solid #d9480f; }
+.nm { font-size: 16px; font-weight: 700; } .muted { color: #6b7280; font-size: 13px; }
+.tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; margin-right: 4px; }
+.web { background: #e8efff; color: #1d4ed8; } .app { background: #eef0f2; color: #57606a; }
+.want { background: #fff4d6; color: #b45309; }
+.k { color: #6b7280; font-size: 12.5px; } .v { font-weight: 600; margin-bottom: 6px; }
+.im { color: #18794e; font-weight: 700; } .im::after { content: " ↗"; }
+.act select, .act .b { display: block; width: 100%; margin-bottom: 8px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 7px 10px; background: #fff; font: inherit; font-weight: 600; }
+.act .row { display: flex; gap: 8px; } .act .b { text-align: center; }
+.b.ok { background: #18794e; color: #fff; border-color: #18794e; } .b.no { color: #b42318; }
+.newnote { margin-top: 18px; padding: 10px 14px; border-radius: 10px; background: #fff4d6; color: #8a4b08; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav class="side"><b>平台管理</b>
+  <a>总览</a><a>商户</a><a>商品</a><a>商城</a><a class="on">顾客服务 <em>3</em></a><a>平台客服</a><a>API 监控</a><a>Worker</a><a>密钥设置</a>
+</nav>
+<main>
+  <h1>顾客服务</h1><div class="sub">意见反馈、入驻申请、顾客和钱包</div>
+  <div class="tabs"><span>意见反馈</span><span class="on">入驻申请<em>3</em></span><span>顾客和钱包</span><span>平台信息</span></div>
+  <div class="filters"><span class="on">全部来源</span><span>官网</span><span>App</span><span style="margin-left:12px" class="on">待联系 3</span><span>已联系</span><span>已演示</span><span>已批准</span><span>无效</span></div>
+
+  <div class="item new">
+    <div><div class="nm">马卡蒂小馆</div>
+      <div style="margin:4px 0"><span class="tag web">官网</span><span class="tag want">外卖</span><span class="tag want">自取</span><span class="tag want">代客下单</span></div>
+      <div class="muted">快餐小吃 · 1 家店 · 2026-11-25 18:42 · 简体中文页</div>
+      <div class="muted" style="margin-top:6px">“现在用纸单和微信接单，想 12 月开始用。”</div></div>
+    <div><div class="k">联系人</div><div class="v">陈先生　+63 917 123 4567</div>
+      <div class="k">常用联系方式</div><div class="v"><span class="im">WhatsApp 同手机号</span></div></div>
+    <div><div class="k">地区</div><div class="v">菲律宾 · Makati</div>
+      <div class="k">来自</div><div class="v">google / 首页底部表单</div></div>
+    <div class="act"><select><option>待联系</option></select><div class="b">写跟进备注</div><div class="row"><span class="b ok">批准开店</span><span class="b no">拒绝</span></div></div>
+  </div>
+
+  <div class="item new">
+    <div><div class="nm">Golden Bowl 金碗茶餐厅</div>
+      <div style="margin:4px 0"><span class="tag web">官网</span><span class="tag want">堂食</span><span class="tag want">外卖</span></div>
+      <div class="muted">中餐正餐 · 2–5 家店 · 2026-11-25 16:10 · English 页</div></div>
+    <div><div class="k">联系人</div><div class="v">Mr. Lim　+63 918 555 0101</div>
+      <div class="k">常用联系方式</div><div class="v"><span class="im">Telegram @goldenbowl</span></div></div>
+    <div><div class="k">地区</div><div class="v">菲律宾 · Quezon City</div>
+      <div class="k">来自</div><div class="v">价格页</div></div>
+    <div class="act"><select><option>待联系</option></select><div class="b">写跟进备注</div><div class="row"><span class="b ok">批准开店</span><span class="b no">拒绝</span></div></div>
+  </div>
+
+  <div class="item">
+    <div><div class="nm">茶屿奶茶 BGC 店</div>
+      <div style="margin:4px 0"><span class="tag app">App</span></div>
+      <div class="muted">顾客在“我的 → 申请入驻”提交（地图选址）· 2026-11-24 11:05</div></div>
+    <div><div class="k">联系人</div><div class="v">Anna　+63 905 222 3344</div></div>
+    <div><div class="k">地址</div><div class="v">Philippines · Metro Manila · Taguig<br><span class="muted">26th St, BGC（地图位置）</span></div></div>
+    <div class="act"><select><option>待联系</option></select><div class="b">写跟进备注</div><div class="row"><span class="b ok">批准开店</span><span class="b no">拒绝</span></div></div>
+  </div>
+  <div class="newnote">官网来的申请没有顾客账号：批准后不发站内消息，页面提示“请通过 WhatsApp / Telegram 联系对方开通”。</div>
+</main>
+</body>
+</html>

@@ -1,0 +1,18 @@
+---
+import Base from '../../layouts/Base.astro'
+import Wechat from '../../components/Wechat.astro'
+import { copy, fill, langPaths, type Lang } from '../../i18n'
+export const getStaticPaths = langPaths
+const lang = Astro.params.lang as Lang
+const p = copy(lang).about
+const f = (s: string) => fill(lang, s)
+---
+<Base lang={lang} title={p.title} description={p.description} path="about" page="about">
+  <div class="wrap prose">
+    <h1>{f(p.h1)}</h1>
+    {p.paras.map(x => <p class="lead" style="max-width:none">{f(x)}</p>)}
+    <h2>{p.contactTitle}</h2>
+    <p>{p.contactText}</p>
+    <Wechat lang={lang} />
+  </div>
+</Base>

@@ -1,0 +1,83 @@
+---
+import Base from '../../layouts/Base.astro'
+import Rows from '../../components/Rows.astro'
+import Faq from '../../components/Faq.astro'
+import Cta from '../../components/Cta.astro'
+import { copy, fill, href, langPaths, brandName, type Lang } from '../../i18n'
+export const getStaticPaths = langPaths
+const lang = Astro.params.lang as Lang
+const c = copy(lang), h = c.home
+const more: Record<string, string> = { kitchen: 'features', 'phone-order': 'features/online-ordering', promos: 'features', reconcile: 'features/dine-in' }
+const jsonld = [
+  { '@context': 'https://schema.org', '@type': 'SoftwareApplication', name: brandName(lang), applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Web, Android, iOS', description: fill(lang, h.description),
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' } },
+  { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: h.faq.map(([q, a]) => ({ '@type': 'Question', name: q,
+    acceptedAnswer: { '@type': 'Answer', text: a } })) },
+]
+---
+<Base lang={lang} title={h.title} description={h.description} page="home" jsonld={jsonld}>
+  <div class="hero"><div class="wrap grid">
+    <div>
+      <span class="eyebrow">{h.eyebrow}</span>
+      <h1>{h.h1a}<br /><em>{h.h1b}</em><br />{h.h1c}</h1>
+      <p class="lead">{h.lead}</p>
+      <div class="ctas"><a class="btn gold" href={href(lang, 'demo')}>{c.nav.demo}</a><a class="btn ghost" href={href(lang, 'features')}>{h.cta2}</a></div>
+      <div class="ticks">{h.ticks.map(t => <span>{t}</span>)}</div>
+    </div>
+    <div class="devices">
+      <div class="laptop"><img src="/shots/menu.jpg" alt={c.features.groups[2].title} width="1440" height="960" fetchpriority="high" /></div>
+      <div class="phone"><img src="/shots/mall-phone.jpg" alt={c.online.rows[0].alt} width="520" height="1125" /></div>
+    </div>
+  </div></div>
+
+  <div class="facts"><div class="wrap">
+    {h.facts.map(([b, s]) => <div class="fact"><b>{b}</b><span>{s}</span></div>)}
+  </div></div>
+
+  <section><div class="wrap center">
+    <span class="eyebrow">{h.waysEyebrow}</span>
+    <h2>{h.waysTitle}</h2>
+    <p class="lead">{h.waysLead}</p>
+    <div class="cards4" style="text-align:start">
+      {h.ways.map(([ic, t, p]) => <div class="card"><div class="ic" aria-hidden="true">{ic}</div><h3>{t}</h3><p>{p}</p></div>)}
+    </div>
+    <p class="note">{h.waysNote}</p>
+  </div></section>
+
+  <section style="padding-top:0"><div class="wrap">
+    <Rows rows={h.rows.map(r => ({ ...r, more: href(lang, more[r.img]) }))} moreText={c.common.more} />
+    <p class="shotnote">{c.common.shotNote}</p>
+  </div></section>
+
+  <section class="band"><div class="wrap">
+    <div class="row" style="padding:0">
+      <div>
+        <span class="eyebrow">{h.langsEyebrow}</span>
+        <h2>{h.langsTitle}</h2>
+        <p class="lead" style="font-size:17px">{h.langsText}</p>
+        <div class="chips">{['简体中文', 'English', '繁體中文', 'ไทย', 'Tiếng Việt', 'မြန်မာ', 'ខ្មែរ', 'العربية', '日本語', 'Français', 'Español', 'Русский'].map(x => <span>{x}</span>)}</div>
+      </div>
+      <div style="max-width:470px;margin:0 auto"><img src="/shots/i18n.jpg" alt={h.langsAlt} style="border-radius:16px" loading="lazy" /></div>
+    </div>
+  </div></section>
+
+  <section><div class="wrap center">
+    <span class="eyebrow">{h.typesEyebrow}</span>
+    <h2>{h.typesTitle}</h2>
+    <div class="types" style="text-align:start">
+      {h.types.map(([ic, t, p]) => <div class="type"><div class="pic" aria-hidden="true">{ic}</div><div><h3>{t}</h3><p>{p}</p></div></div>)}
+    </div>
+  </div></section>
+
+  <section style="padding-top:0"><div class="wrap center">
+    <span class="eyebrow">{h.stepsEyebrow}</span>
+    <h2>{h.stepsTitle}</h2>
+    <div class="steps" style="text-align:start">
+      {h.steps.map(([t, p]) => <div class="step"><h3>{t}</h3><p>{p}</p></div>)}
+    </div>
+  </div></section>
+
+  <Faq title={h.faqTitle} items={h.faq} />
+  <Cta lang={lang} />
+</Base>
