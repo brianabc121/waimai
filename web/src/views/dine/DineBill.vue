@@ -223,6 +223,10 @@ const done = ref(false)
       </section>
     </div>
 
+    <AdjustSheet v-if="adjOpen" :currency="currency" :reasons="payOpts?.reasons" :initial="adjust" :bottom="phone" :preview="previewAdj"
+      @close="adjOpen = false" @apply="setAdjust" />
+    <ApproveDialog v-if="approving" :branch-id="o.branch_id" perm="checkout.discount" :what="t('ck.approve_what')" @approved="approved" @close="approving = false" />
+
     <!-- void: how many, why, and what the bill comes to -->
     <VoidSheet v-if="voiding" :item="voiding" :branch-id="session.branchId!" :currency="currency" bill :reasons="reasons" :bottom="phone" @done="voided" @close="voiding = null" />
 
