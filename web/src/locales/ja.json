@@ -3382,5 +3382,8 @@
  "pos.dine": "店内注文",
  "pos.delivery": "デリバリー注文",
  "pos.new_delivery": "＋ デリバリー注文",
- "pos.delivery_hint": "デリバリーと持ち帰り"
+ "pos.delivery_hint": "デリバリーと持ち帰り",
+ "msg.nav": "メッセージ",
+ "msg.customer": "お客様メッセージ",
+ "msg.platform": "プラットフォームメッセージ"
 }

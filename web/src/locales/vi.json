@@ -3382,5 +3382,8 @@
  "pos.dine": "Gọi món tại quán",
  "pos.delivery": "Đơn giao hàng",
  "pos.new_delivery": "＋ Đơn giao hàng",
- "pos.delivery_hint": "Giao hàng và tự lấy"
+ "pos.delivery_hint": "Giao hàng và tự lấy",
+ "msg.nav": "Tin nhắn",
+ "msg.customer": "Tin nhắn khách hàng",
+ "msg.platform": "Tin nhắn nền tảng"
 }

@@ -3382,5 +3382,8 @@
  "pos.dine": "Pedido en mesa",
  "pos.delivery": "Pedido a domicilio",
  "pos.new_delivery": "＋ Pedido a domicilio",
- "pos.delivery_hint": "Domicilio y para recoger"
+ "pos.delivery_hint": "Domicilio y para recoger",
+ "msg.nav": "Mensajes",
+ "msg.customer": "Mensajes de clientes",
+ "msg.platform": "Mensajes de la plataforma"
 }

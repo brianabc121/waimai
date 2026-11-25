@@ -3382,5 +3382,8 @@
  "pos.dine": "Заказ в зале",
  "pos.delivery": "Заказ на доставку",
  "pos.new_delivery": "＋ Заказ на доставку",
- "pos.delivery_hint": "Доставка и самовывоз"
+ "pos.delivery_hint": "Доставка и самовывоз",
+ "msg.nav": "Сообщения",
+ "msg.customer": "Сообщения клиентов",
+ "msg.platform": "Сообщения платформы"
 }

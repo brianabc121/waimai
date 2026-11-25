@@ -3382,5 +3382,8 @@
  "pos.dine": "สั่งทานที่ร้าน",
  "pos.delivery": "สั่งเดลิเวอรี่",
  "pos.new_delivery": "＋ สั่งเดลิเวอรี่",
- "pos.delivery_hint": "เดลิเวอรี่และรับเอง"
+ "pos.delivery_hint": "เดลิเวอรี่และรับเอง",
+ "msg.nav": "ข้อความ",
+ "msg.customer": "ข้อความลูกค้า",
+ "msg.platform": "ข้อความแพลตฟอร์ม"
 }

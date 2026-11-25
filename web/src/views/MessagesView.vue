@@ -114,7 +114,7 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
   <div class="ox warm">
   <div class="page ox-page msg-page" :class="{ picked: !!selectedId }">
     <div class="ox-head ms-pagehead">
-      <div><h1>{{ t('ch.nav') }}</h1><p class="ox-sub">{{ t('ox.ch.sub') }}</p></div>
+      <div><h1>{{ t('msg.customer') }}</h1><p class="ox-sub">{{ t('ox.ch.sub') }}</p></div>
       <div class="ox-acts"><span v-if="unread" class="ox-pill brand">{{ t('ox.ch.unread', { n: unread }) }}</span></div>
     </div>
   <div class="msgs" :class="{ picked: !!selectedId, info: !!current }" data-testid="messages-page">

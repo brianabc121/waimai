@@ -36,7 +36,7 @@ function openOrder(o: ChatOrder) { void router.push({ path: '/merchant/orders', 
   <div class="ox warm">
   <div class="page ox-page spd-page">
     <div class="ox-head">
-      <div><h1>{{ t('sp.title') }}</h1><p class="ox-sub">{{ t('ox.sp.sub') }}</p></div>
+      <div><h1>{{ t('msg.platform') }}</h1><p class="ox-sub">{{ t('ox.sp.sub') }}</p></div>
     </div>
   <div class="spd-body">
   <div class="spd" data-testid="store-support">

@@ -3382,5 +3382,8 @@
  "pos.dine": "កុម្ម៉ង់ញ៉ាំនៅហាង",
  "pos.delivery": "កុម្ម៉ង់ដឹកជញ្ជូន",
  "pos.new_delivery": "＋ កុម្ម៉ង់ដឹកជញ្ជូន",
- "pos.delivery_hint": "ដឹកជញ្ជូន និងមកយកផ្ទាល់"
+ "pos.delivery_hint": "ដឹកជញ្ជូន និងមកយកផ្ទាល់",
+ "msg.nav": "សារ",
+ "msg.customer": "សារអតិថិជន",
+ "msg.platform": "សារវេទិកា"
 }

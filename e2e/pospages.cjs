@@ -1,8 +1,8 @@
-// 点单: the back office has a "点单" group with two pages, 堂食下单 (the
+// 点单 and 消息: the back office has a "点单" group with two pages, 堂食下单 (the
 // dine-in desk) and 外卖下单 (delivery and pickup). Each is its own page with
 // no switch between them; old /merchant/orders/new links land on the page they
 // meant; each page follows its own permission. Run on a computer, a tablet and
-// a phone.
+// a phone. 消息 groups 客户消息 (customers' chats) and 平台消息 (platform support).
 // Usage: BASE_URL=http://localhost:8080 node e2e/pospages.cjs   (needs seed data)
 const { chromium, devices } = require('playwright')
 const { mkdirSync } = require('node:fs')
@@ -64,6 +64,13 @@ for (const [name, opts] of sizes) {
   // the group comes first, above "orders"
   const order = await page.locator('.shell-links > *').evaluateAll(els => els.map(e => e.getAttribute('data-testid') || e.textContent.trim()))
   expect(order.slice(0, 4).join(','), 'nav-pos,nav-pos-dine,nav-pos-delivery,订单', `${name}: menu order`)
+  // 消息: customer messages and platform messages under one group
+  expect((await page.locator(tid('nav-msg')).innerText()).trim(), '消息', `${name}: messages group`)
+  const msgs = await page.locator('.shell-links > *').evaluateAll(els => els.map(e => e.getAttribute('data-testid')))
+  const at = msgs.indexOf('nav-msg')
+  expect(msgs.slice(at, at + 3).join(','), 'nav-msg,nav-messages,nav-support', `${name}: messages group order`)
+  expect((await page.locator(tid('nav-messages')).innerText()).trim(), '客户消息', `${name}: customer messages link`)
+  expect((await page.locator(tid('nav-support')).innerText()).trim(), '平台消息', `${name}: platform messages link`)
   await page.waitForTimeout(300)   // the drawer slides in
   await page.screenshot({ path: `${SHOTS}/pos-${name}-menu.png` })
 
@@ -85,6 +92,14 @@ for (const [name, opts] of sizes) {
   await page.press(tid('mo-pick'), 'Enter')
   await page.locator(tid('mo-line')).first().waitFor()
   await page.screenshot({ path: `${SHOTS}/pos-${name}-delivery.png` })
+  await nav(page, 'nav-messages')
+  await page.waitForURL(u => u.pathname === '/merchant/messages')
+  expect((await page.locator('.ox-head h1').innerText()).trim(), '客户消息', `${name}: customer messages title`)
+  await page.screenshot({ path: `${SHOTS}/msg-${name}-customer.png` })
+  await nav(page, 'nav-support')
+  await page.waitForURL(u => u.pathname === '/merchant/support')
+  expect((await page.locator('.ox-head h1').innerText()).trim(), '平台消息', `${name}: platform messages title`)
+  await page.screenshot({ path: `${SHOTS}/msg-${name}-platform.png` })
   if (name !== 'pc') await page.context().close()
   step(`${name}: 点单 > 堂食下单 and 外卖下单 are separate pages without a switch`)
 }

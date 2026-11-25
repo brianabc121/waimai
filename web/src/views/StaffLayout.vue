@@ -106,7 +106,11 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
         <router-link v-if="show('/merchant/addresses')" to="/merchant/addresses" data-testid="nav-addresses">{{ t('da.title') }}</router-link>
         <router-link v-if="show('/merchant/tables')" to="/merchant/tables">{{ t('tables') }}</router-link>
         <router-link v-if="show('/kitchen')" to="/kitchen">{{ t('kitchen') }}</router-link>
-        <router-link v-if="show('/merchant/messages')" to="/merchant/messages" data-testid="nav-messages" @click="countChats">{{ t('ch.nav') }}<span v-if="chatUnread" class="navnum" data-testid="nav-chat-unread">{{ chatUnread > 99 ? '99+' : chatUnread }}</span></router-link>
+        <template v-if="show('/merchant/messages') || show('/merchant/support')">
+          <div class="navgrp" data-testid="nav-msg">{{ t('msg.nav') }}</div>
+          <router-link v-if="show('/merchant/messages')" to="/merchant/messages" class="navsub" data-testid="nav-messages" @click="countChats">{{ t('msg.customer') }}<span v-if="chatUnread" class="navnum" data-testid="nav-chat-unread">{{ chatUnread > 99 ? '99+' : chatUnread }}</span></router-link>
+          <router-link v-if="show('/merchant/support')" to="/merchant/support" class="navsub" data-testid="nav-support" @click="countChats">{{ t('msg.platform') }}<span v-if="supportUnread" class="navnum" data-testid="nav-support-unread">{{ supportUnread > 99 ? '99+' : supportUnread }}</span></router-link>
+        </template>
         <router-link v-if="show('/merchant/menu')" to="/merchant/menu">{{ t('menu_admin') }}</router-link>
         <router-link v-if="show('/merchant/templates')" to="/merchant/templates">{{ t('templates') }}</router-link>
         <router-link v-if="show('/merchant/media')" to="/merchant/media">{{ t('promo_media') }}</router-link>
@@ -118,7 +122,6 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
         <router-link v-if="show('/merchant/delivery-map')" to="/merchant/delivery-map">{{ t('delivery_map') }}</router-link>
         <router-link v-if="show('/merchant/staff')" to="/merchant/staff" data-testid="nav-staff">{{ t('staff') }}</router-link>
         <router-link v-if="show('/merchant/settings')" to="/merchant/settings">{{ t('settings') }}</router-link>
-        <router-link v-if="show('/merchant/support')" to="/merchant/support" data-testid="nav-support" @click="countChats">{{ t('sp.title') }}<span v-if="supportUnread" class="navnum" data-testid="nav-support-unread">{{ supportUnread > 99 ? '99+' : supportUnread }}</span></router-link>
         <router-link v-if="posts.length" to="/work">{{ t('my_workbench') }}</router-link>
       </div>
       <div class="shell-foot">
