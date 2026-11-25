@@ -3216,5 +3216,6 @@
  "tp.preview": "注文時の表示",
  "tp.c.topping": "トッピング",
  "tp.c.flavor": "味の好み",
- "tp.c.note": "メモ"
+ "tp.c.note": "メモ",
+ "tp.c.unit": "単価 {p}"
 }

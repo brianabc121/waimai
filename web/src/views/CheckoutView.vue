@@ -167,7 +167,7 @@ interface Shown extends Extras { item_id: number; name: string; flavors: string[
 // The dishes as priced by the server; before there is a price (no address
 // yet), as the menu has them.
 const lines = computed<Shown[]>(() => {
-  if (quote.value) return quote.value.lines.map(l => ({ item_id: l.item_id, name: mn(l), ...fromLineOptions(l.options),
+  if (quote.value) return quote.value.lines.map(l => ({ item_id: l.item_id, name: mn(l), ...fromLineOptions(l.options, l.unit_price),
     flavors: tagNames(l.note_tags, true), note: l.note?.trim() ?? '', qty: l.qty, total: l.line_total, basket: l.basket || 1 }))
   const sent = quoteItems()
   return cart.lines.map((l, i) => {
@@ -323,11 +323,10 @@ async function submit() {
             <img v-if="image(l.item_id)" :src="image(l.item_id)" alt="" class="co-thumb" loading="lazy" />
             <span v-else class="co-thumb none">{{ l.name.slice(0, 1) }}</span>
             <div class="grow">
-              <div class="n clamp2">{{ l.name }}</div>
-              <LineExtras :specs="l.specs" :toppings="l.toppings" :flavors="l.flavors" :note="l.note" :cur="cur ?? ''" tid="co" />
+              <div class="co-nrow"><span class="n clamp2">{{ l.name }}</span><b class="price" v-if="l.total != null">{{ money(l.total, cur) }}</b></div>
+              <LineExtras :specs="l.specs" :toppings="l.toppings" :base="l.base" :flavors="l.flavors" :note="l.note" :cur="cur ?? ''" tid="co" />
+              <div class="qty">×{{ l.qty }}</div>
             </div>
-            <span class="qty">×{{ l.qty }}</span>
-            <b class="price" v-if="l.total != null">{{ money(l.total, cur) }}</b>
           </div>
           <div v-if="baskets.length > 1" class="co-row"><span>{{ t('co.basket_subtotal') }}</span><b>{{ money(b.subtotal, cur) }}</b></div>
         </div>
@@ -445,9 +444,10 @@ async function submit() {
 /* several baskets: a line between one and the next */
 .co-basket + .co-basket { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
 .co-bhead { color: var(--muted); font-size: 12px; margin: 6px 0; }
-.co-line { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.co-line { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
 .co-line .grow { flex: 1; min-width: 0; } .co-line .n { font-size: 15px; font-weight: 600; }
-.co-line .qty { flex: none; color: var(--muted); font-size: 14px; min-width: 32px; text-align: end; }
+.co-nrow { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.co-line .qty { color: var(--muted); font-size: 13px; margin-top: 3px; }
 .co-line .price { flex: none; min-width: 56px; text-align: end; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .co-thumb { width: 64px; height: 56px; border-radius: 8px; object-fit: cover; flex: none; }
 .co-thumb.none { display: grid; place-items: center; background: var(--gold-soft); color: var(--red); font-size: 20px; font-weight: 600; }

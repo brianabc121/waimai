@@ -321,12 +321,11 @@ async function copyNo() {
               <div class="od-item" :class="{ voided: it.prep_status === 'cancelled' }">
                 <img v-if="it.image_url" :src="it.image_url" alt="" loading="lazy" /><span v-else class="ph">{{ mn(it).slice(0, 1) }}</span>
                 <div class="grow">
-                  <div class="od-iname">{{ mn(it) }}</div>
-                  <LineExtras v-bind="fromLineOptions(it.options)" :flavors="tagNames(it.note_tags, true)" :note="it.note?.trim() ?? ''" :cur="order.currency" tid="od" />
+                  <div class="od-nrow"><span class="od-iname">{{ mn(it) }}</span><span class="price">{{ money(it.line_total, order.currency) }}</span></div>
+                  <LineExtras v-bind="fromLineOptions(it.options, it.unit_price)" :flavors="tagNames(it.note_tags, true)" :note="it.note?.trim() ?? ''" :cur="order.currency" tid="od" />
                   <div v-if="it.prep_status === 'cancelled'" class="voidtag" data-testid="od-voided">{{ t('vd.c.struck') }}<template v-if="it.void_reason"> · {{ it.void_reason }}</template></div>
+                  <div class="qty">×{{ it.qty }}</div>
                 </div>
-                <span class="qty">×{{ it.qty }}</span>
-                <span class="price">{{ money(it.line_total, order.currency) }}</span>
               </div>
             </template>
           </div>
@@ -478,7 +477,8 @@ async function copyNo() {
 .od-receipt > h2 { padding: 14px 0 12px; border-bottom: 1px solid var(--line); }
 .od-items { display: grid; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .od-basket { font-size: 12px; font-weight: 600; color: var(--muted); padding-top: 2px; }
-.od-item { display: flex; gap: 12px; align-items: center; }
+.od-item { display: flex; gap: 12px; align-items: flex-start; }
+.od-nrow { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .od-item.voided .od-iname, .od-item.voided .qty, .od-item.voided .price { text-decoration: line-through; color: var(--muted); }
 .od-item.voided img { opacity: .5; }
 .od-item .voidtag { font-size: 12px; color: #b42318; margin-top: 2px; }
@@ -487,7 +487,7 @@ async function copyNo() {
 .od-item .ph { background: #c2401c; color: #fff3da; font-weight: 600; font-size: 18px; display: grid; place-items: center; }
 .od-item .grow { flex: 1; min-width: 0; }
 .od-iname { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; line-height: 1.4; }
-.od-item .qty { flex: none; min-width: 40px; text-align: center; color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; }
+.od-item .qty { color: var(--muted); font-size: 13px; margin-top: 3px; font-variant-numeric: tabular-nums; }
 .od-item .price { flex: none; min-width: 56px; text-align: end; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 /* the sums: the discounts on a gold band, the total big and red */
 .od-sums { padding: 8px 0 14px; }
