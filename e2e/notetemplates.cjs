@@ -98,7 +98,9 @@ await cust.click('.sheet-foot .btn.primary')   // all optional: nothing picked i
 await cust.click('.bottombar .btn.primary')
 await customerLogin(cust, null, { pickup: true })
 await cust.fill('input[autocomplete=name]', '陈小姐')
-await cust.locator(`${tid('co-notes')}:has-text("半糖 · 去冰 · 珍珠多一点")`).waitFor()
+// the flavour notes and the written note are on rows of their own
+await cust.locator(`${tid('co-notes')}:has-text("半糖 · 去冰")`).waitFor()
+await cust.locator(`${tid('co-memo')}:has-text("珍珠多一点")`).waitFor()
 await shot(cust, 'nt-06-checkout')
 await cust.click('.bottombar .btn.primary')
 await cust.waitForURL('**/o/**')

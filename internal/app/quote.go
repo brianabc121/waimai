@@ -64,6 +64,15 @@ type LineOption struct {
 	// In the customer's language, when it differs.
 	GroupTr string `json:"group_tr,omitempty"`
 	NameTr  string `json:"name_tr,omitempty"`
+	// Topping marks an extra the customer pays for on top of the dish (加料):
+	// one from a topping template, or a priced choice in an optional group.
+	// Receipts and the customer's pages list toppings apart from the specs.
+	Topping bool `json:"topping,omitempty"`
+}
+
+// isTopping says whether a chosen option is an extra (加料), as LineOption.Topping.
+func isTopping(g OptionGroup, o Option) bool {
+	return g.ToppingTemplateID != nil || (g.MinSelect == 0 && o.PriceDelta > 0)
 }
 
 type QuoteLine struct {
@@ -398,7 +407,8 @@ func priceLines(ctx context.Context, q Querier, branchID int64, service string, 
 					optionGone = true
 				}
 				unit += o.PriceDelta * int64(k)
-				lo := LineOption{OptionID: o.ID, Group: g.Name, GroupEn: g.NameEn, Name: o.Name, NameEn: o.NameEn, PriceDelta: o.PriceDelta}
+				lo := LineOption{OptionID: o.ID, Group: g.Name, GroupEn: g.NameEn, Name: o.Name, NameEn: o.NameEn, PriceDelta: o.PriceDelta,
+					Topping: isTopping(g, o)}
 				if k > 1 {
 					lo.Qty, lo.PriceDelta = k, o.PriceDelta*int64(k)
 					lo.Name, lo.NameEn = fmt.Sprintf("%s ×%d", o.Name, k), ""

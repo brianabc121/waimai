@@ -3213,5 +3213,8 @@
  "tp.form_hint": "Les modèles cochés sont proposés avec ce plat. Les prix se règlent dans Menu > Suppléments.",
  "tp.manage": "Gérer les modèles de suppléments",
  "tp.on": "Suppléments : {names}",
- "tp.preview": "Aperçu à la commande"
+ "tp.preview": "Aperçu à la commande",
+ "tp.c.topping": "Suppléments",
+ "tp.c.flavor": "Goût",
+ "tp.c.note": "Note"
 }

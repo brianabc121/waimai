@@ -3213,5 +3213,8 @@
 "tp.form_hint":"勾選後，點這道菜時可以加這些料。加料在“選單 > 加料模板”裡統一改價。",
 "tp.manage":"管理加料模板",
 "tp.on":"加料：{names}",
-"tp.preview":"點餐時的樣子"
+"tp.preview":"點餐時的樣子",
+"tp.c.topping":"加料",
+"tp.c.flavor":"口味",
+"tp.c.note":"備註"
 }

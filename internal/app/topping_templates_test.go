@@ -56,6 +56,12 @@ func TestToppingTemplates(t *testing.T) {
 	if want := 2 * (findItem(sf, s.tea).Price + 5000); q.Totals.Subtotal != want {
 		t.Fatalf("subtotal %d, want %d", q.Totals.Subtotal, want)
 	}
+	// the line marks them as toppings, so the customer's pages list them apart
+	for _, o := range q.Lines[0].Options {
+		if !o.Topping {
+			t.Fatalf("option %s is not marked as a topping", o.Name)
+		}
+	}
 
 	// editing the template follows on the dish; kept toppings keep their ids
 	l, err := a.ToppingTemplates(ctx, s.branchID)

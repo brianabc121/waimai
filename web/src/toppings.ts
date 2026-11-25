@@ -39,5 +39,8 @@ extend({
   'tp.form_hint': ['勾选后，点这道菜时可以加这些料。加料在“菜单 > 加料模板”里统一改价。', 'Checked templates are offered with this dish. Their prices are set under Menu > Toppings.'],
   'tp.manage': ['管理加料模板', 'Manage topping templates'],
   'tp.on': ['加料：{names}', 'Toppings: {names}'],
+  'tp.c.topping': ['加料', 'Toppings'],
+  'tp.c.flavor': ['口味', 'Flavour'],
+  'tp.c.note': ['备注', 'Note'],
   'tp.preview': ['点餐时的样子', 'How it looks when ordering'],
 })

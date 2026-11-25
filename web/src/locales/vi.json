@@ -3213,5 +3213,8 @@
  "tp.form_hint": "Khi chọn, gọi món này có thể thêm các món này. Giá sửa chung ở \"Thực đơn > Món thêm\".",
  "tp.manage": "Quản lý mẫu món thêm",
  "tp.on": "Món thêm: {names}",
- "tp.preview": "Khi gọi món sẽ trông thế này"
+ "tp.preview": "Khi gọi món sẽ trông thế này",
+ "tp.c.topping": "Món thêm",
+ "tp.c.flavor": "Khẩu vị",
+ "tp.c.note": "Ghi chú"
 }
