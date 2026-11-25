@@ -4,5 +4,5 @@ import DeliveryAddressBook from './addresses/DeliveryAddressBook.vue'
 </script>
 
 <template>
-  <div class="page"><DeliveryAddressBook /></div>
+  <div class="ox warm"><div class="page ox-page"><DeliveryAddressBook /></div></div>
 </template>

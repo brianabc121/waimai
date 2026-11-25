@@ -13,6 +13,7 @@ import type { Bill, DiningTable } from '../types'
 import BillLines from './BillLines.vue'
 import TotalsTable from './TotalsTable.vue'
 import './dine/strings'
+import '../officeStrings'
 
 const bid = session.branchId!
 const role = currentRole()!
@@ -31,6 +32,23 @@ const { online, refreshNow } = useLive(() => `/merchant/branches/${bid}/events`,
 })
 
 const shown = computed(() => tables.value.filter(x => x.active || x.session || manager))
+const area = ref('')
+const state = ref<'' | 'free' | 'busy' | 'off'>('')
+const areaList = computed(() => {
+  const m = new Map<string, number>()
+  for (const x of shown.value) m.set(x.area || '', (m.get(x.area || '') ?? 0) + 1)
+  return [...m.entries()].map(([name, n]) => ({ name, n }))
+})
+const stateOf = (x: DiningTable) => x.session ? 'busy' : x.active ? 'free' : 'off'
+const picked = computed(() => shown.value.filter(x => (!area.value || (x.area || '') === area.value) && (!state.value || stateOf(x) === state.value)))
+const counts = computed(() => {
+  const inArea = shown.value.filter(x => !area.value || (x.area || '') === area.value)
+  const busy = inArea.filter(x => x.session)
+  return {
+    free: inArea.filter(x => stateOf(x) === 'free').length, busy: busy.length, off: inArea.filter(x => stateOf(x) === 'off').length,
+    guests: busy.reduce((n, x) => n + (x.session?.guests ?? 0), 0), total: busy.reduce((n, x) => n + (x.session?.total ?? 0), 0),
+  }
+})
 const waited = (iso: string) => { void now.value; return minutesSince(iso) }
 
 function fail(e: unknown) {
@@ -91,46 +109,81 @@ async function setActive(tb: DiningTable, active: boolean) {
 </script>
 
 <template>
-  <div class="page">
-    <div class="row between wrap" style="margin-bottom:12px">
-      <h1>{{ t('tables') }}</h1>
-      <div class="row" style="gap:8px">
+  <div class="ox warm">
+  <div class="page ox-page">
+    <div class="ox-head">
+      <div><h1>{{ t('tables') }}</h1><p class="ox-sub">{{ t('ox.tb.sub') }}</p></div>
+      <div class="ox-acts">
+        <button v-if="manager" class="btn" data-test="new-table" @click="startEdit(null)">＋ {{ t('new_table') }}</button>
         <router-link class="btn primary" to="/merchant/orders/new?mode=dine" data-test="to-desk">{{ t('dd.go_desk') }}</router-link>
-        <button v-if="manager" class="btn" data-test="new-table" @click="startEdit(null)">{{ t('new_table') }}</button>
       </div>
     </div>
-    <div v-if="!online" class="banner warn" style="margin-bottom:12px">{{ t('offline') }}</div>
-    <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
+    <div v-if="!online" class="banner warn">{{ t('offline') }}</div>
+    <div v-if="error" class="banner bad">{{ error }}</div>
 
-    <div v-if="shown.length === 0" class="card muted">{{ t('no_tables') }}</div>
-    <div class="tgrid">
-      <div v-for="tb in shown" :key="tb.id" class="card tcard" :class="{ busy: tb.session, off: !tb.active }" :data-table="tb.name" @click="click(tb)">
-        <div class="row between">
-          <b class="tname">{{ tb.name }}</b>
-          <span class="tag" :class="tb.session ? 'brand' : tb.active ? 'ok' : ''">{{ tb.session ? t('occupied') : tb.active ? t('free') : t('disabled') }}</span>
+    <div class="ox-stats" data-testid="tables-stats">
+      <div class="ox-stat"><span class="l">{{ t('ox.tb.all') }}</span><b class="v">{{ shown.length }}</b></div>
+      <div class="ox-stat"><span class="l">{{ t('free') }}</span><b class="v">{{ counts.free }}</b></div>
+      <div class="ox-stat"><span class="l">{{ t('occupied') }}</span><b class="v" :class="{ red: counts.busy > 0 }">{{ counts.busy }}</b>
+        <span class="s">{{ t('n_guests', { n: counts.guests }) }}</span></div>
+      <div class="ox-stat"><span class="l">{{ t('ox.tb.open_total') }}</span><b class="v">{{ money(counts.total, cur) }}</b></div>
+    </div>
+
+    <div class="ox-body">
+      <aside class="ox-rail">
+        <div class="ox-rail-h">{{ t('dd.area') }}</div>
+        <div class="ox-rail-list">
+          <button class="ox-cat" :class="{ on: area === '' }" @click="area = ''"><span class="nm">{{ t('ox.tb.all_areas') }}</span><span class="n">{{ shown.length }}</span></button>
+          <button v-for="a in areaList" :key="a.name" class="ox-cat" :class="{ on: area === a.name }" :data-area="a.name" @click="area = a.name"><span class="nm">{{ a.name || t('ox.tb.no_area') }}</span><span class="n">{{ a.n }}</span></button>
         </div>
-        <div class="small muted">{{ [tb.area, t('dd.seats', { n: tb.seats || 4 })].filter(Boolean).join(' · ') }}</div>
-        <template v-if="tb.session">
-          <div class="price bold" style="font-size:18px">{{ money(tb.session.total, cur) }}</div>
-          <div class="small muted">{{ t('n_guests', { n: tb.session.guests }) }} · {{ waited(tb.session.opened_at) }} {{ t('min') }}</div>
-          <div class="small"><span v-if="tb.session.unserved" class="tag warn">{{ t('not_served_n', { n: tb.session.unserved }) }}</span></div>
-        </template>
-        <button class="btn link small gear" @click.stop="openSetup(tb)">{{ t('qr_code') }}</button>
-      </div>
+        <p class="ox-rail-tip">{{ t('ox.tb.tip') }}</p>
+      </aside>
+
+      <section class="ox-panel">
+        <div class="ox-tools">
+          <div class="ox-chips">
+            <button :class="{ on: state === '' }" @click="state = ''">{{ t('ox.tb.all_states') }}</button>
+            <button :class="{ on: state === 'free' }" @click="state = 'free'">{{ t('free') }}<span class="n">{{ counts.free }}</span></button>
+            <button :class="{ on: state === 'busy' }" @click="state = 'busy'">{{ t('occupied') }}<span class="n">{{ counts.busy }}</span></button>
+            <button v-if="counts.off" :class="{ on: state === 'off' }" @click="state = 'off'">{{ t('disabled') }}<span class="n">{{ counts.off }}</span></button>
+          </div>
+        </div>
+        <div v-if="shown.length === 0" class="ox-empty">{{ t('no_tables') }}</div>
+        <div v-else-if="!picked.length" class="ox-empty">{{ t('ox.tb.none') }}</div>
+        <div class="tgrid">
+          <div v-for="tb in picked" :key="tb.id" class="tcard" :class="{ busy: tb.session, off: !tb.active }" :data-table="tb.name" @click="click(tb)">
+            <div class="tc-top">
+              <b class="tname">{{ tb.name }}</b>
+              <span class="tag ox-pill" :class="tb.session ? 'brand' : tb.active ? 'ok' : ''">{{ tb.session ? t('occupied') : tb.active ? t('free') : t('disabled') }}</span>
+            </div>
+            <div class="small muted">{{ [tb.area, t('dd.seats', { n: tb.seats || 4 })].filter(Boolean).join(' · ') }}</div>
+            <template v-if="tb.session">
+              <div class="price ox-money tc-sum">{{ money(tb.session.total, cur) }}</div>
+              <div class="small muted">{{ t('n_guests', { n: tb.session.guests }) }} · {{ waited(tb.session.opened_at) }} {{ t('min') }}</div>
+              <div class="small"><span v-if="tb.session.unserved" class="tag warn">{{ t('not_served_n', { n: tb.session.unserved }) }}</span></div>
+            </template>
+            <div class="tc-foot"><button class="op red gear" @click.stop="openSetup(tb)">{{ t('qr_code') }}</button></div>
+          </div>
+        </div>
+      </section>
     </div>
 
-    <h2 style="margin:22px 0 10px" v-if="recent.length">{{ t('recent_bills') }}</h2>
-    <table class="data" v-if="recent.length">
-      <thead><tr><th>{{ t('table') }}</th><th>{{ t('order_no') }}</th><th>{{ t('total') }}</th><th>{{ t('amount_received') }}</th><th>{{ t('closed_at') }}</th><th></th></tr></thead>
-      <tbody>
-        <tr v-for="b in recent" :key="b.session_id">
-          <td>{{ b.table_name }}</td><td>{{ b.order.public_no }}</td><td>{{ money(b.order.totals.total, cur) }}</td>
-          <td>{{ b.order.amount_received != null ? money(b.order.amount_received, cur) : '—' }}<span v-if="b.order.pay_method" class="muted"> · {{ b.order.pay_method }}</span></td>
-          <td>{{ b.closed_at ? new Date(b.closed_at).toLocaleString() : '' }}</td>
-          <td><button class="btn small" @click="bill = b">{{ t('bill') }}</button></td>
-        </tr>
-      </tbody>
-    </table>
+    <section v-if="recent.length" class="ox-panel">
+      <div class="ox-panel-h"><h2>{{ t('recent_bills') }} <span class="n">{{ recent.length }}</span></h2></div>
+      <div class="ox-scroll">
+        <table class="data">
+          <thead><tr><th>{{ t('table') }}</th><th>{{ t('order_no') }}</th><th class="num">{{ t('total') }}</th><th class="num">{{ t('amount_received') }}</th><th>{{ t('closed_at') }}</th><th class="right">{{ t('ox.ops') }}</th></tr></thead>
+          <tbody>
+            <tr v-for="b in recent" :key="b.session_id">
+              <td><b class="ox-strong">{{ b.table_name }}</b></td><td><span class="ox-code">{{ b.order.public_no }}</span></td><td class="num"><span class="ox-money">{{ money(b.order.totals.total, cur) }}</span></td>
+              <td class="num">{{ b.order.amount_received != null ? money(b.order.amount_received, cur) : '—' }}<span v-if="b.order.pay_method" class="muted"> · {{ b.order.pay_method }}</span></td>
+              <td>{{ b.closed_at ? new Date(b.closed_at).toLocaleString() : '' }}</td>
+              <td class="right"><span class="ox-ops"><button class="op red" @click="bill = b">{{ t('bill') }}</button></span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <!-- a closed bill -->
     <div class="sheet-mask" v-if="bill" @click.self="bill = null">
@@ -201,13 +254,20 @@ async function setActive(tb: DiningTable, active: boolean) {
       </div>
     </div>
   </div>
+  </div>
 </template>
 
 <style scoped>
-.tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
-.tcard { cursor: pointer; min-height: 118px; display: flex; flex-direction: column; gap: 4px; position: relative; }
-.tcard.busy { border-color: var(--brand); background: var(--brand-soft); }
-.tcard.off { opacity: .55; }
-.tname { font-size: 22px; }
-.gear { position: absolute; inset-inline-end: 8px; bottom: 6px; }
+.tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.tcard { cursor: pointer; min-height: 132px; display: flex; flex-direction: column; gap: 4px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  border-top: 4px solid #cfe3c9; }
+.tcard:hover { box-shadow: 0 4px 14px rgba(60, 30, 10, .08); }
+.tcard.busy { border-color: var(--pink-line); border-top-color: var(--brand); background: #fdf3ee; }
+.tcard.off { opacity: .55; border-top-color: var(--line); }
+.tc-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.tname { font-size: 24px; color: #2f1810; }
+.tc-sum { font-size: 19px; }
+.tc-foot { margin-top: auto; display: flex; justify-content: flex-end; }
+.gear { border: 0; background: none; font: inherit; font-weight: 600; color: var(--brand); cursor: pointer; padding: 2px 0; }
+@media (max-width: 860px) { .tgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }
 </style>

@@ -5,6 +5,7 @@ import { pick, t } from '../i18n'
 import { currentRole, isOwner, session } from '../session'
 import '../perms'
 import type { Post, StaffMember, Station } from '../types'
+import '../officeStrings'
 import StaffTabs from './staff/StaffTabs.vue'
 import './work/strings'
 
@@ -59,7 +60,8 @@ const nowText = (m: StaffMember) => {
   const clocks = m.posts.length > 0 || m.on_duty
   return (clocks ? t(m.on_duty ? 'st.now.on_duty' : 'st.now.off_duty') + ' · ' : '') + (parts.join(' / ') || t('st.now.idle'))
 }
-const colors = ['#d9480f', '#1d4ed8', '#18794e', '#7c3aed', '#b45309', '#0e7490', '#be185d']
+const colors = ['#a02c20', '#2556a8', '#2f7a2a', '#8a5a00', '#c8641e', '#0e7490', '#7b3f8c']
+const busy = (m: StaffMember) => m.open_tasks > 0 || m.active_deliveries > 0 || m.on_duty
 // Owners and managers are managed by owners only (docs/STAFF_ACCESS_DESIGN.md §6.3).
 const editable = (m: StaffMember) => !['owner', 'manager'].includes(m.role) || myRole.value === 'owner' || m.id === session.user?.id
 
@@ -115,50 +117,56 @@ const resetPw = () => act(() => post(`/merchant/branches/${bid}/staff/${f.id}/pa
 </script>
 
 <template>
+  <div class="ox warm">
   <div class="page staffpage">
-    <StaffTabs />
-    <div class="row between wrap" style="margin-bottom:12px">
-      <h1 style="font-size:20px">{{ t('staff') }} <span class="muted small" style="font-weight:400">{{ t('st.count', { a: active.length, d: counts.off }) }}</span></h1>
-      <span class="row wrap" style="max-width:100%">
-        <input v-model="q" type="search" :placeholder="t('st.search')" style="width:220px;max-width:100%" data-testid="staff-search" />
-        <button class="btn primary" data-testid="staff-new" @click="edit(null)">＋ {{ t('st.new') }}</button>
-      </span>
-    </div>
+    <StaffTabs><button class="btn primary" data-testid="staff-new" @click="edit(null)">＋ {{ t('st.new') }}</button></StaffTabs>
     <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
     <div v-if="notice" class="banner ok" style="margin-bottom:12px" data-testid="staff-notice">{{ notice }}</div>
 
-    <div class="chips">
-      <button :class="{ on: filter === 'all' }" @click="filter = 'all'">{{ t('st.all') }} {{ counts.all }}</button>
-      <button v-for="s in stations" :key="s.id" :class="{ on: filter === s.id }" @click="filter = s.id">{{ pick(s.name, s.name_en) }} {{ stationCount(s.id) }}</button>
-      <button :class="{ on: filter === 'packing' }" @click="filter = 'packing'">{{ t('wk.packing') }} {{ counts.packing }}</button>
-      <button :class="{ on: filter === 'rider' }" data-testid="filter-rider" @click="filter = 'rider'">{{ t('rider') }} {{ counts.rider }}</button>
-      <button :class="{ on: filter === 'office' }" @click="filter = 'office'">{{ t('st.backoffice') }} {{ counts.office }}</button>
-      <button v-if="counts.off" :class="{ on: filter === 'off' }" @click="filter = 'off'">{{ t('st.disabled') }} {{ counts.off }}</button>
-    </div>
+    <div class="ox-body">
+      <aside class="ox-rail">
+        <div class="ox-rail-h">{{ t('st.col.posts') }}<span class="n">{{ t('st.count', { a: active.length, d: counts.off }) }}</span></div>
+        <div class="ox-rail-list chips">
+          <button class="ox-cat" :class="{ on: filter === 'all' }" @click="filter = 'all'"><span class="nm">{{ t('st.all') }}</span><span class="n">{{ counts.all }}</span></button>
+          <button v-for="s in stations" :key="s.id" class="ox-cat" :class="{ on: filter === s.id }" @click="filter = s.id"><span class="nm">{{ pick(s.name, s.name_en) }}</span><span class="n">{{ stationCount(s.id) }}</span></button>
+          <button class="ox-cat" :class="{ on: filter === 'packing' }" @click="filter = 'packing'"><span class="nm">{{ t('wk.packing') }}</span><span class="n">{{ counts.packing }}</span></button>
+          <button class="ox-cat" :class="{ on: filter === 'rider' }" data-testid="filter-rider" @click="filter = 'rider'"><span class="nm">{{ t('rider') }}</span><span class="n">{{ counts.rider }}</span></button>
+          <button class="ox-cat" :class="{ on: filter === 'office' }" @click="filter = 'office'"><span class="nm">{{ t('st.backoffice') }}</span><span class="n">{{ counts.office }}</span></button>
+          <button v-if="counts.off" class="ox-cat" :class="{ on: filter === 'off' }" @click="filter = 'off'"><span class="nm">{{ t('st.disabled') }}</span><span class="n">{{ counts.off }}</span></button>
+        </div>
+        <p class="ox-rail-tip">{{ t('st.hint') }}</p>
+      </aside>
 
-    <div class="card" style="padding:0;overflow-x:auto">
-      <table class="data stafftable">
-        <thead><tr><th>{{ t('st.col.staff') }}</th><th>{{ t('phone') }}</th><th>{{ t('st.col.posts') }}</th><th>{{ t('st.col.role') }}</th><th>{{ t('st.col.now') }}</th><th></th></tr></thead>
-        <tbody>
-          <tr v-for="m in shown" :key="m.id" :class="{ off: !m.active }" :data-staff="m.username">
-            <td><span class="av" :style="{ background: m.active ? colors[m.id % colors.length] : '#9ca3af' }">{{ m.display_name.slice(0, 1) }}</span>
-              <b>{{ m.display_name }}</b> <span class="muted small">{{ m.username }}<template v-if="m.id === session.user?.id"> · {{ t('st.you') }}</template></span></td>
-            <td>{{ m.phone }}</td>
-            <td data-col="posts">
-              <span v-for="p in m.posts" :key="p.kind + (p.station_id ?? '')" class="post" :class="p.kind">{{ postName(p) }}</span>
-              <span v-if="!m.posts.length" class="post none">{{ t('st.no_posts') }}</span></td>
-            <td><span class="rtag" :class="m.role" :data-role="m.role">{{ m.role === 'staff' ? t('st.role.none') : t('role.' + m.role) }}</span></td>
-            <td class="small"><i class="dot" :class="{ on: m.active && (m.open_tasks > 0 || m.active_deliveries > 0 || m.on_duty) }"></i>{{ nowText(m) }}</td>
-            <td class="right">
-              <button v-if="!m.active && editable(m)" class="btn small" @click="restore(m)">{{ t('st.restore') }}</button>
-              <button v-if="editable(m)" class="btn small" style="margin-inline-start:6px" @click="edit(m)">{{ t('edit') }}</button></td>
-          </tr>
-          <tr v-if="!shown.length"><td colspan="6" class="muted" style="text-align:center;padding:24px">{{ t('st.empty') }}</td></tr>
-        </tbody>
-      </table>
+      <section class="ox-panel">
+        <div class="ox-tools">
+          <label class="ox-search"><input v-model="q" type="search" :placeholder="t('st.search')" data-testid="staff-search" /></label>
+          <span class="grow"></span>
+          <span class="muted small">{{ t('ox.st.shown', { n: shown.length }) }}</span>
+        </div>
+        <div v-if="unstaffed.length" class="ox-tip" style="margin-bottom:12px" data-testid="unstaffed">{{ t('st.unstaffed', { names: unstaffed.map(s => pick(s.name, s.name_en)).join('、') }) }}</div>
+        <div class="ox-scroll">
+          <table class="data stafftable">
+            <thead><tr><th>{{ t('st.col.staff') }}</th><th>{{ t('phone') }}</th><th>{{ t('st.col.posts') }}</th><th>{{ t('st.col.role') }}</th><th>{{ t('st.col.now') }}</th><th class="right">{{ t('ox.ops') }}</th></tr></thead>
+            <tbody>
+              <tr v-for="m in shown" :key="m.id" :class="{ off: !m.active }" :data-staff="m.username">
+                <td><span class="who"><span class="av" :style="{ background: m.active ? colors[m.id % colors.length] : '#b9aa9a' }">{{ m.display_name.slice(0, 1) }}</span>
+                  <span><b class="ox-strong">{{ m.display_name }}</b><span class="muted small uname">{{ m.username }}<template v-if="m.id === session.user?.id"> · {{ t('st.you') }}</template></span></span></span></td>
+                <td>{{ m.phone || '—' }}</td>
+                <td data-col="posts">
+                  <span v-for="p in m.posts" :key="p.kind + (p.station_id ?? '')" class="post" :class="p.kind">{{ postName(p) }}</span>
+                  <span v-if="!m.posts.length" class="post none">{{ t('st.no_posts') }}</span></td>
+                <td><span class="rtag" :class="m.role" :data-role="m.role">{{ m.role === 'staff' ? t('st.role.none') : t('role.' + m.role) }}</span></td>
+                <td><span class="ox-pill" :class="!m.active ? 'bad' : busy(m) ? 'ok' : ''">{{ nowText(m) }}</span></td>
+                <td class="right"><span class="ox-ops">
+                  <button v-if="!m.active && editable(m)" class="op red" @click="restore(m)">{{ t('st.restore') }}</button>
+                  <button v-if="editable(m)" class="op" :class="{ red: m.active }" @click="edit(m)">{{ t('edit') }}</button></span></td>
+              </tr>
+              <tr v-if="!shown.length"><td colspan="6" class="ox-empty">{{ t('st.empty') }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
-    <p class="muted small" style="margin-top:12px">{{ t('st.hint') }}
-      <span v-if="unstaffed.length" style="color:var(--warn)" data-testid="unstaffed">{{ t('st.unstaffed', { names: unstaffed.map(s => pick(s.name, s.name_en)).join('、') }) }}</span></p>
 
     <template v-if="f.open">
       <div class="drawer-mask" @click="f.open = false"></div>
@@ -218,21 +226,21 @@ const resetPw = () => act(() => post(`/merchant/branches/${bid}/staff/${f.id}/pa
       </form>
     </template>
   </div>
+  </div>
 </template>
 
 <style scoped>
-.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.chips button { padding: 5px 12px; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: 13px; cursor: pointer; }
-.chips button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.who { display: inline-flex; align-items: center; gap: 10px; }
+.who > span:last-child { display: grid; }
+.uname { font-weight: 400; }
 .stafftable td { white-space: nowrap; } .stafftable td[data-col=posts] { white-space: normal; }
 .stafftable tr.off td { color: var(--muted); }
-.av { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; margin-inline-end: 10px; }
+.av { width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; flex: none; }
 .post { display: inline-block; padding: 2px 9px; border-radius: 6px; font-size: 12.5px; font-weight: 600; margin: 1px 4px 1px 0; }
-.post.station { background: var(--info-soft); color: var(--info); } .post.packing { background: #f1e9ff; color: #6d28d9; }
-.post.rider { background: var(--brand-soft); color: var(--brand-dark); } .post.none { background: #eef0f2; color: var(--muted); font-weight: 500; }
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #c4c9d0; margin-inline-end: 6px; } .dot.on { background: var(--ok); }
+.post.station { background: #e7eefb; color: #2556a8; } .post.packing { background: #fbecc8; color: #8a5a00; }
+.post.rider { background: var(--pink, var(--brand-soft)); color: var(--brand); } .post.none { background: #f3ebdf; color: var(--muted); font-weight: 500; }
 .drawer-mask { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 40; }
-.drawer { position: fixed; top: 0; inset-inline-end: 0; bottom: 0; width: min(460px, 100vw); background: #fff; z-index: 41; box-shadow: -8px 0 24px rgba(0,0,0,.15);
+.drawer { position: fixed; top: 0; inset-inline-end: 0; bottom: 0; width: min(460px, 100vw); background: var(--card, #fff); z-index: 41; box-shadow: -8px 0 24px rgba(0,0,0,.15);
   padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; } .two .field { margin-bottom: 8px; }
 .grp { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 12px; display: grid; gap: 8px; }

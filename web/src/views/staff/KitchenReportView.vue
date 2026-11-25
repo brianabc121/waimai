@@ -117,7 +117,7 @@ const pages = computed(() => detail.value ? Math.max(1, Math.ceil(detail.value.i
 </script>
 
 <template>
-  <div class="page srp" data-testid="kitchen-report">
+  <div class="ox warm"><div class="page srp" data-testid="kitchen-report">
     <StaffTabs />
     <div class="row wrap" style="margin-bottom:14px">
       <span class="datepick"><button data-act="prev" @click="step(-1)"><span class="rtl-flip">‹</span></button><b data-testid="kr-title">{{ title }}</b><button data-act="next" :disabled="to >= today" @click="step(1)"><span class="rtl-flip">›</span></button></span>
@@ -215,5 +215,6 @@ const pages = computed(() => detail.value ? Math.max(1, Math.ceil(detail.value.i
         </div>
       </div>
     </div>
+  </div>
   </div>
 </template>

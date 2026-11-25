@@ -143,7 +143,7 @@ function voidShift() {
 </script>
 
 <template>
-  <div class="page att">
+  <div class="ox warm"><div class="page att">
     <StaffTabs />
     <div class="row wrap" style="margin-bottom:14px">
       <span class="datepick"><button data-act="prev" @click="step(-1)"><span class="rtl-flip">‹</span></button><b data-testid="att-title">{{ title }}</b><button data-act="next" @click="step(1)"><span class="rtl-flip">›</span></button></span>
@@ -269,6 +269,7 @@ function voidShift() {
         </div>
       </form>
     </template>
+  </div>
   </div>
 </template>
 

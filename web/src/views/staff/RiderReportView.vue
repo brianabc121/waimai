@@ -76,7 +76,7 @@ const dayText = (d: string) => `${d.slice(5)} ${t('weekday.' + weekday(d))}`
 </script>
 
 <template>
-  <div class="page srp" data-testid="rider-report">
+  <div class="ox warm"><div class="page srp" data-testid="rider-report">
     <StaffTabs />
     <div class="row wrap" style="margin-bottom:14px"><PeriodBar ref="period" v-model:from="from" v-model:to="to" :tz="tz" /><span class="grow"></span><ExportLink list="reports/riders" :from="from" :to="to" /></div>
     <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
@@ -141,6 +141,7 @@ const dayText = (d: string) => `${d.slice(5)} ${t('weekday.' + weekday(d))}`
         </template>
       </div>
     </template>
+  </div>
   </div>
 </template>
 

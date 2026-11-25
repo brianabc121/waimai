@@ -14,6 +14,8 @@ import DeliveryMap, { type MapData } from './DeliveryMap.vue'
 import { addDays, isoDay, lastMonth, spanDays } from './heat'
 import '../members/memberStrings'
 import './deliveryStrings'
+import OxPager from '../OxPager.vue'
+import '../../officeStrings'
 
 const props = defineProps<{ admin?: boolean }>()
 const route = useRoute(), router = useRouter()
@@ -211,16 +213,16 @@ const filtered = computed(() => !!(f.q || f.source))
 
 <template>
   <div class="dab" data-testid="delivery-book">
-    <div class="row between wrap dab-head">
-      <h1 v-if="!admin">{{ t('da.title') }}</h1>
-      <span v-if="list.loaded" class="small muted" data-testid="dab-count">{{ t('da.count', { a: list.addresses, c: list.customers }) }}</span>
+    <div class="ox-head dab-head">
+      <div><h1 v-if="!admin">{{ t('da.title') }}</h1><p class="ox-sub">{{ t('ox.da.sub') }}</p></div>
+      <span v-if="list.loaded" class="dab-count" data-testid="dab-count">{{ t('da.count', { a: list.addresses, c: list.customers }) }}</span>
     </div>
 
-    <div class="subtabs">
+    <div class="ox-tabs">
       <button v-for="x in (['list', 'top', 'map'] as const)" :key="x" type="button" :class="{ on: tab === x }" :data-testid="'tab-' + x" @click="tab = x">{{ t('da.tab.' + x) }}</button>
     </div>
 
-    <div v-if="admin" class="dab-filters" data-testid="dab-scope">
+    <div v-if="admin" class="ox-tools dab-filters" data-testid="dab-scope">
       <select v-model.number="sc.merchant" data-testid="dab-merchant">
         <option :value="0">{{ t('da.merchant_all') }}</option>
         <option v-for="[id, name] in merchants" :key="id" :value="id">{{ name }}</option>
@@ -239,19 +241,19 @@ const filtered = computed(() => !!(f.q || f.source))
       </select>
     </div>
 
-    <div v-if="tab !== 'list'" class="dab-range" data-testid="dab-range">
+    <div v-if="tab !== 'list'" class="ox-tools ox-chips dab-range" data-testid="dab-range">
       <input v-model="range.from" type="date" :max="range.to" data-testid="dab-from" />
       <span class="muted">{{ t('da.to') }}</span>
       <input v-model="range.to" type="date" :min="range.from" :max="today" data-testid="dab-to" />
-      <button v-for="p in ['today', 'd7', 'd30', 'last_month']" :key="p" type="button" class="chip" :class="{ on: preset === p }" :data-testid="'preset-' + p" @click="setPreset(p)">{{ t('da.' + p) }}</button>
+      <button v-for="p in ['today', 'd7', 'd30', 'last_month']" :key="p" type="button" :class="{ on: preset === p }" :data-testid="'preset-' + p" @click="setPreset(p)">{{ t('da.' + p) }}</button>
       <span v-if="!rangeOk && days > 0" class="dab-bad small" data-testid="dab-too-long">{{ t('da.too_long', { n: MAX_DAYS, d: days }) }}</span>
       <span v-else class="small muted">{{ t('da.max', { n: MAX_DAYS }) }}</span>
     </div>
 
     <!-- the address list -->
-    <template v-if="tab === 'list'">
-      <form class="dab-filters" @submit.prevent="search">
-        <input v-model="f.q" type="search" class="dab-q" :placeholder="t('da.search_ph')" data-testid="dab-search" />
+    <div v-if="tab === 'list'" class="ox-panel">
+      <form class="ox-tools dab-filters" @submit.prevent="search">
+        <label class="ox-search"><input v-model="f.q" type="search" :placeholder="t('da.search_ph')" data-testid="dab-search" /></label>
         <select v-model="f.source" data-testid="dab-source" @change="search">
           <option value="">{{ t('da.src.all') }}</option>
           <option value="staff">{{ t('da.src.staff') }}</option><option value="customer">{{ t('da.src.customer') }}</option>
@@ -259,55 +261,54 @@ const filtered = computed(() => !!(f.q || f.source))
         <select v-model="f.sort" data-testid="dab-sort" @change="search">
           <option v-for="s in ['recent', 'orders', 'first']" :key="s" :value="s">{{ t('da.sort.' + s) }}</option>
         </select>
-        <button class="btn">{{ t('da.search') }}</button>
+        <button class="btn primary">{{ t('da.search') }}</button>
       </form>
       <div v-if="list.error" class="banner bad">{{ list.error }}</div>
-      <div class="card dab-table">
+      <div class="ox-scroll">
         <table class="data manycols">
           <thead><tr>
             <th>{{ t('da.col.address') }}</th><th>{{ t('da.col.unit') }}</th><th>{{ t('da.col.customer') }}</th><th>{{ t('da.col.source') }}</th>
             <th v-if="admin">{{ t('da.col.store') }}</th><th class="num">{{ t('da.col.orders') }}</th>
-            <th>{{ t('da.col.first') }}</th><th>{{ t('da.col.last') }}</th><th></th>
+            <th>{{ t('da.col.first') }}</th><th>{{ t('da.col.last') }}</th><th class="right">{{ t('ox.ops') }}</th>
           </tr></thead>
           <tbody>
             <tr v-for="r in list.items" :key="r.branch_id + r.cust + r.key + r.unit_key" data-testid="dab-row">
-              <td class="dab-addr"><b>{{ r.line }}</b> <span v-if="r.lat == null" class="tag warn">{{ t('da.no_pin') }}</span></td>
+              <td class="dab-addr"><b class="ox-strong">{{ r.line }}</b> <span v-if="r.lat == null" class="tag warn">{{ t('da.no_pin') }}</span></td>
               <td :data-label="t('da.col.unit')">{{ r.unit || '—' }}</td>
               <td :data-label="t('da.col.customer')">{{ r.name || '—' }}<div class="small muted nowrap">{{ r.phone }}<template v-if="r.member_no != null"> · <span class="mono dab-no">{{ String(r.member_no).padStart(6, '0') }}</span></template></div></td>
-              <td :data-label="t('da.col.source')"><span v-if="r.by_staff" class="tag brand">{{ t('da.src.staff') }}</span> <span v-if="r.by_customer" class="tag">{{ t('da.src.customer') }}</span></td>
+              <td :data-label="t('da.col.source')"><span v-if="r.by_staff" class="ox-tag brand">{{ t('da.src.staff') }}</span> <span v-if="r.by_customer" class="ox-tag gold">{{ t('da.src.customer') }}</span></td>
               <td v-if="admin" :data-label="t('da.col.store')">{{ r.branch_name }}<div v-if="r.merchant_name !== r.branch_name" class="small muted">{{ r.merchant_name }}</div></td>
               <td class="num" :data-label="t('da.col.orders')"><b>{{ r.orders }}</b></td>
               <td class="nowrap muted" :data-label="t('da.col.first')">{{ day(r.first_at) }}</td>
               <td class="nowrap" :data-label="t('da.col.last')">{{ when(r.last_at) }}</td>
-              <td class="right nowrap"><span class="row acts">
-                <a v-if="r.lat != null" class="btn small" :href="gmaps(r)" target="_blank" rel="noopener" data-testid="dab-view">{{ t('da.view') }}</a>
-                <button class="btn small" data-testid="dab-orders" @click="showOrders(r)">{{ t('da.orders') }}</button></span></td>
+              <td class="right nowrap"><span class="ox-ops acts">
+                <button class="op red" data-testid="dab-orders" @click="showOrders(r)">{{ t('da.orders') }}</button>
+                <a v-if="r.lat != null" class="op" :href="gmaps(r)" target="_blank" rel="noopener" data-testid="dab-view">{{ t('da.view') }}</a></span></td>
             </tr>
-            <tr v-if="list.loaded && !list.items.length"><td :colspan="admin ? 9 : 8" class="muted dab-empty">{{ t(filtered ? 'da.no_match' : 'da.empty') }}</td></tr>
+            <tr v-if="list.loaded && !list.items.length"><td :colspan="admin ? 9 : 8" class="ox-empty dab-empty">{{ t(filtered ? 'da.no_match' : 'da.empty') }}</td></tr>
           </tbody>
         </table>
       </div>
-      <div v-if="pages > 1" class="row small muted dab-pager">
-        <span class="grow"></span><span>{{ t('da.page', { p: f.page, t: pages }) }}</span>
-        <button class="btn small" :disabled="f.page <= 1" @click="go(f.page - 1)">{{ t('da.prev') }}</button>
-        <button class="btn small" :disabled="f.page >= pages" data-testid="dab-next" @click="go(f.page + 1)">{{ t('da.next') }}</button>
+      <div v-if="pages > 1" class="ox-foot dab-pager">
+        <span>{{ t('da.page', { p: f.page, t: pages }) }}</span><span class="grow"></span>
+        <OxPager :page="f.page" :pages="pages" testid="dab-pager" @go="go" />
       </div>
-    </template>
+    </div>
 
     <!-- the ranking -->
     <template v-if="tab === 'top'">
       <div v-if="top.error" class="banner bad">{{ top.error }}</div>
-      <div v-if="top.loaded" class="dab-kpis" data-testid="dab-kpis">
-        <div class="card"><b>{{ top.orders.toLocaleString() }}</b><span>{{ t('da.k.orders') }}</span></div>
-        <div class="card"><b>{{ top.addresses.toLocaleString() }}</b><span>{{ t('da.k.addresses') }}</span></div>
-        <div class="card"><b>{{ avg }}</b><span>{{ t('da.k.avg') }}</span></div>
-        <div class="card"><b>{{ top.unpinned }}</b><span>{{ t('da.k.unpinned') }}</span></div>
+      <div v-if="top.loaded" class="ox-stats dab-kpis" data-testid="dab-kpis">
+        <div class="ox-stat"><span class="l">{{ t('da.k.orders') }}</span><b class="v">{{ top.orders.toLocaleString() }}</b></div>
+        <div class="ox-stat"><span class="l">{{ t('da.k.addresses') }}</span><b class="v">{{ top.addresses.toLocaleString() }}</b></div>
+        <div class="ox-stat"><span class="l">{{ t('da.k.avg') }}</span><b class="v">{{ avg }}</b></div>
+        <div class="ox-stat"><span class="l">{{ t('da.k.unpinned') }}</span><b class="v" :class="{ red: top.unpinned > 0 }">{{ top.unpinned }}</b></div>
       </div>
-      <div class="card dab-table">
+      <div class="ox-panel ox-scroll">
         <table class="data dab-top">
           <thead><tr>
             <th>#</th><th>{{ t('da.col.address') }}</th><th class="num">{{ t('da.col.orders') }}</th><th>{{ t('da.col.share') }}</th>
-            <th class="num">{{ t('da.col.customers') }}</th><th class="num">{{ t('da.col.amount') }}</th><th>{{ t('da.col.last_once') }}</th><th></th>
+            <th class="num">{{ t('da.col.customers') }}</th><th class="num">{{ t('da.col.amount') }}</th><th>{{ t('da.col.last_once') }}</th><th class="right">{{ t('ox.ops') }}</th>
           </tr></thead>
           <tbody>
             <template v-for="(x, i) in top.items" :key="x.key">
@@ -323,9 +324,9 @@ const filtered = computed(() => !!(f.q || f.source))
                 <td class="num dab-d">{{ x.customers }}</td>
                 <td class="num nowrap dab-d">{{ x.amount != null ? money(x.amount, x.currency) : t('da.mixed') }}</td>
                 <td class="nowrap dab-d">{{ short(x.last_at) }}</td>
-                <td class="right nowrap"><span class="row acts">
-                  <button v-if="x.lat != null" class="btn small" data-testid="top-on-map" @click="onMap(x.key)">{{ t('da.on_map') }}</button>
-                  <button class="btn small" data-testid="top-detail" @click="toggle(x)">{{ openKey === x.key ? t('da.hide') + ' ▴' : t('da.detail') + ' ▾' }}</button></span></td>
+                <td class="right nowrap"><span class="ox-ops acts">
+                  <button v-if="x.lat != null" class="op red" data-testid="top-on-map" @click="onMap(x.key)">{{ t('da.on_map') }}</button>
+                  <button class="op" data-testid="top-detail" @click="toggle(x)">{{ openKey === x.key ? t('da.hide') + ' ▴' : t('da.detail') + ' ▾' }}</button></span></td>
               </tr>
               <tr v-if="openKey === x.key" class="open sub" data-testid="top-units">
                 <td></td>
@@ -335,7 +336,7 @@ const filtered = computed(() => !!(f.q || f.source))
                 </div></td>
               </tr>
             </template>
-            <tr v-if="top.loaded && !top.items.length"><td colspan="8" class="muted dab-empty">{{ t('da.empty') }}</td></tr>
+            <tr v-if="top.loaded && !top.items.length"><td colspan="8" class="ox-empty dab-empty">{{ t('da.empty') }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -347,7 +348,7 @@ const filtered = computed(() => !!(f.q || f.source))
       <div v-if="mapError" class="banner bad">{{ mapError }}</div>
       <div v-if="key === ''" class="banner info" data-testid="dab-no-key">{{ t('da.no_key') }}</div>
       <div v-else-if="mapData?.too_many" class="banner warn" data-testid="dab-too-many">{{ t('da.too_many', { n: '20,000' }) }}</div>
-      <DeliveryMap v-else-if="key && mapData" :maps-key="key" :data="mapData" :focus="focus" :admin="admin && !sc.branch" @rank="onRank" />
+      <DeliveryMap v-else-if="key && mapData" class="dab-map" :maps-key="key" :data="mapData" :focus="focus" :admin="admin && !sc.branch" @rank="onRank" />
     </template>
 
     <!-- orders at one address -->
@@ -378,15 +379,10 @@ const filtered = computed(() => !!(f.q || f.source))
 </template>
 
 <style scoped>
-.dab { display: grid; gap: 12px; min-width: 0; }
-.dab-head h1 { font-size: 20px; }
-.dab-filters, .dab-range { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.dab-filters .dab-q { flex: 1 1 260px; min-width: 0; max-width: 460px; }
-.dab-filters select, .dab-range input { width: auto; max-width: 100%; }
-.chip { padding: 6px 14px; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: 13px; color: var(--muted); cursor: pointer; }
-.chip.on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
+.dab { display: grid; gap: 14px; min-width: 0; }
+.dab-count { color: var(--muted); font-size: 13.5px; align-self: flex-end; }
+.dab-range { margin-bottom: 0; }
 .dab-bad { color: var(--bad); font-weight: 600; }
-.dab-table { overflow-x: auto; padding: 0; }
 .dab-addr { max-width: 320px; overflow-wrap: anywhere; }
 .dab-addr .tag { white-space: nowrap; }
 .dab-empty { text-align: center; padding: 24px !important; }
@@ -394,16 +390,13 @@ const filtered = computed(() => !!(f.q || f.source))
 .num { text-align: end; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .dab-no { color: var(--brand); font-weight: 700; }
+.dab-map { border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
 td .tag { white-space: nowrap; }
 @media (min-width: 768px) { .acts { flex-wrap: nowrap; } }
-.dab-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-.dab-kpis .card { padding: 10px 14px; display: grid; gap: 2px; }
-.dab-kpis b { font-size: 22px; font-variant-numeric: tabular-nums; }
-.dab-kpis span { font-size: 12px; color: var(--muted); }
-.rank { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; background: #f1f2f4; color: var(--muted); }
-.rank.r1 { background: var(--brand); color: #fff; } .rank.r2 { background: #e8590c; color: #fff; } .rank.r3 { background: #f08c00; color: #fff; }
-.meter { height: 6px; border-radius: 3px; background: #f1f2f4; overflow: hidden; margin-top: 6px; max-width: 260px; }
-.meter i { display: block; height: 100%; background: linear-gradient(90deg, #f08c00, var(--brand)); border-radius: 3px; }
+.rank { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; background: #f3ebdf; color: #6f5a4b; }
+.rank.r1 { background: var(--brand); color: #fff; } .rank.r2 { background: #c8641e; color: #fff; } .rank.r3 { background: #d9a03a; color: #fff; }
+.meter { height: 6px; border-radius: 3px; background: #f3ebdf; overflow: hidden; margin-top: 6px; max-width: 260px; }
+.meter i { display: block; height: 100%; background: linear-gradient(90deg, #e0a53c, var(--brand)); border-radius: 3px; }
 tr.open td { background: #fffaf5; }
 .dab-unit { gap: 12px; padding: 3px 0; }
 .dab-u { min-width: 120px; }
@@ -413,8 +406,6 @@ tr.open td { background: #fffaf5; }
 .dab-items { color: #3f4650; overflow-wrap: anywhere; }
 .dab-m { display: none; color: var(--muted); margin-top: 4px; }
 @media (max-width: 767px) {
-  .dab-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dab-filters .dab-q { flex-basis: 100%; max-width: none; }
   .dab-filters select { flex: 1 1 40%; }
   .dab-range input { flex: 1 1 38%; }
   .dab-addr { max-width: none; }

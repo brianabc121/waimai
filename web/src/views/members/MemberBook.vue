@@ -6,6 +6,8 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ApiError, del, get, put } from '../../api'
 import { has, money, t } from '../../i18n'
 import { session } from '../../session'
+import OxPager from '../OxPager.vue'
+import '../../officeStrings'
 import '../manualStrings'
 import './memberStrings'
 
@@ -48,6 +50,13 @@ const srcText = (s: string) => s ? (has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s) :
 const minutesLeft = (m: Member) => Math.max(1, Math.ceil((new Date(m.expires_at ?? 0).getTime() - Date.now()) / 60000))
 const address = (m: Member) => [m.address_line, m.address_unit].filter(Boolean).join(' · ')
 const pages = computed(() => Math.max(1, Math.ceil(list.total / SIZE)))
+const pageOrders = computed(() => list.items.reduce((n, m) => n + m.orders, 0))
+const pageSpent = computed(() => {
+  const cur = list.items[0]?.currency
+  if (!cur || list.items.some(m => m.currency !== cur)) return '—'
+  return money(list.items.reduce((n, m) => n + m.spent, 0), cur)
+})
+const srcTone = (s: string) => ({ wechat: 'gold', line: 'blue', whatsapp: 'blue', phone: 'brand' } as Record<string, string>)[s] ?? ''
 const filtered = computed(() => !!(f.q || f.status || f.source || f.branch))
 
 function errText(e: unknown): string {
@@ -147,69 +156,81 @@ async function save() {
 
 <template>
   <div class="mbook" data-testid="members-page">
-    <div class="row between wrap mb-head">
-      <h1 v-if="!admin">{{ t('sm.title') }}</h1>
-      <span class="small muted" data-testid="members-count">{{ t('sm.count', { n: list.total }) }}<template v-if="list.temp"> · {{ t('sm.count_temp', { n: list.temp }) }}</template></span>
+    <div v-if="!admin" class="ox-head">
+      <div><h1>{{ t('sm.title') }}</h1><p class="ox-sub">{{ t('ox.sm.sub') }}</p></div>
     </div>
 
-    <form class="mb-filters" @submit.prevent="search">
-      <input v-model="f.q" type="search" class="mb-q" :placeholder="t('sm.search_ph')" data-testid="members-search" />
-      <select v-if="admin" v-model.number="f.branch" data-testid="members-store" @change="search">
-        <option :value="0">{{ t('sm.store_all') }}</option>
-        <optgroup v-for="[name, bs] in merchants" :key="name" :label="name">
-          <option v-for="b in bs" :key="b.id" :value="b.id">{{ b.name }}</option>
-        </optgroup>
-      </select>
-      <select v-model="f.source" data-testid="members-source" @change="search">
-        <option value="">{{ t('sm.any_source') }}</option>
-        <option v-for="s in SOURCES" :key="s" :value="s">{{ srcText(s) }}</option>
-      </select>
-      <select v-model="f.sort" data-testid="members-sort" @change="search">
-        <option v-for="s in SORTS" :key="s" :value="s">{{ t('sm.sort.' + s) }}</option>
-      </select>
-      <button class="btn">{{ t('sm.search') }}</button>
-    </form>
-
-    <div class="chips">
-      <button :class="{ on: f.status === '' }" @click="f.status = ''; search()">{{ t('sm.all') }}</button>
-      <button :class="{ on: f.status === 'active' }" @click="f.status = 'active'; search()">{{ t('sm.active') }}</button>
-      <button :class="{ on: f.status === 'temp' }" data-testid="members-temp" @click="f.status = 'temp'; search()">{{ t('sm.temp') }}<b v-if="list.temp" class="chip-n">{{ list.temp }}</b></button>
+    <div class="ox-stats" data-testid="members-stats">
+      <div class="ox-stat"><span class="l">{{ t('ox.sm.total') }}</span><b class="v" data-testid="members-count" :data-n="list.total">{{ list.total }}</b>
+        <span class="s">{{ t('sm.count', { n: list.total }) }}</span></div>
+      <div class="ox-stat"><span class="l">{{ t('sm.temp') }}</span><b class="v" :class="{ red: list.temp > 0 }">{{ list.temp }}</b>
+        <span class="s">{{ t('ox.sm.temp_s') }}</span></div>
+      <div class="ox-stat"><span class="l">{{ t('ox.sm.page_orders') }}</span><b class="v">{{ pageOrders }}</b>
+        <span class="s">{{ t('ox.sm.page_note') }}</span></div>
+      <div class="ox-stat"><span class="l">{{ t('ox.sm.page_spent') }}</span><b class="v">{{ pageSpent }}</b>
+        <span class="s">{{ t('ox.sm.page_note') }}</span></div>
     </div>
 
-    <div v-if="error" class="banner bad" data-testid="members-error">{{ error }}</div>
+    <div class="ox-panel">
+      <form class="ox-tools" @submit.prevent="search">
+        <label class="ox-search"><input v-model="f.q" type="search" :placeholder="t('sm.search_ph')" data-testid="members-search" /></label>
+        <select v-if="admin" v-model.number="f.branch" data-testid="members-store" @change="search">
+          <option :value="0">{{ t('sm.store_all') }}</option>
+          <optgroup v-for="[name, bs] in merchants" :key="name" :label="name">
+            <option v-for="b in bs" :key="b.id" :value="b.id">{{ b.name }}</option>
+          </optgroup>
+        </select>
+        <select v-model="f.source" data-testid="members-source" @change="search">
+          <option value="">{{ t('sm.any_source') }}</option>
+          <option v-for="s in SOURCES" :key="s" :value="s">{{ srcText(s) }}</option>
+        </select>
+        <select v-model="f.sort" data-testid="members-sort" @change="search">
+          <option v-for="s in SORTS" :key="s" :value="s">{{ t('sm.sort.' + s) }}</option>
+        </select>
+        <button class="btn primary">{{ t('sm.search') }}</button>
+      </form>
 
-    <div class="card mb-table">
-      <table class="data manycols">
-        <thead><tr>
-          <th>{{ t('sm.col.no') }}</th><th>{{ t('sm.col.name') }}</th><th>{{ t('sm.col.phone') }}</th><th>{{ t('sm.col.source') }}</th>
-          <th v-if="admin">{{ t('sm.col.store') }}</th><th>{{ t('sm.col.address') }}</th>
-          <th class="num">{{ t('sm.col.orders') }}</th><th class="num">{{ t('sm.col.spent') }}</th><th>{{ t('sm.col.last') }}</th><th></th>
-        </tr></thead>
-        <tbody>
-          <tr v-for="m in list.items" :key="m.id" :data-member="m.no" :class="{ temp: m.status === 'temp' }" data-testid="member-row">
-            <td><a href="#" class="mono mb-no" @click.prevent="show(m)">{{ pad(m.no) }}</a>
-              <span v-if="m.status === 'temp'" class="tag warn" :title="t('sm.temp_hint')">{{ t('sm.temp') }} · {{ t('sm.temp_left', { n: minutesLeft(m) }) }}</span></td>
-            <td>{{ m.name || '—' }}</td>
-            <td class="nowrap">{{ m.phone || '—' }}</td>
-            <td>{{ srcText(m.source) }}<span v-if="m.contact" class="muted small"> · {{ m.contact }}</span></td>
-            <td v-if="admin"><a href="#" @click.prevent="onlyStore(m.branch_id)">{{ m.branch_name }}</a><div v-if="m.merchant_name !== m.branch_name" class="muted small">{{ m.merchant_name }}</div></td>
-            <td class="mb-addr">{{ address(m) || '—' }}<span v-if="m.address_count > 1" class="tag" :title="t('sm.a.more_title')">{{ t('sm.a.more', { n: m.address_count - 1 }) }}</span></td>
-            <td class="num">{{ m.orders }}</td>
-            <td class="num nowrap">{{ money(m.spent, m.currency) }}</td>
-            <td class="nowrap">{{ m.last_at ? when(m.last_at) : t('sm.never') }}</td>
-            <td class="right nowrap"><span class="row acts">
-              <button class="btn small" data-testid="member-view" @click="show(m)">{{ t('sm.view') }}</button>
-              <button class="btn small" data-testid="member-edit" @click="edit(m)">{{ t('sm.edit') }}</button></span></td>
-          </tr>
-          <tr v-if="list.loaded && !list.items.length"><td :colspan="admin ? 10 : 9" class="muted mb-empty">{{ t(filtered ? 'sm.no_match' : 'sm.empty') }}</td></tr>
-        </tbody>
-      </table>
-    </div>
+      <div class="ox-chips chips mb-chips">
+        <button :class="{ on: f.status === '' }" @click="f.status = ''; search()">{{ t('sm.all') }}</button>
+        <button :class="{ on: f.status === 'active' }" @click="f.status = 'active'; search()">{{ t('sm.active') }}</button>
+        <button :class="{ on: f.status === 'temp' }" data-testid="members-temp" @click="f.status = 'temp'; search()">{{ t('sm.temp') }}<b v-if="list.temp" class="n">{{ list.temp }}</b></button>
+      </div>
 
-    <div v-if="pages > 1" class="row small muted mb-pager">
-      <span class="grow"></span><span>{{ t('sm.page', { p: f.page, t: pages }) }}</span>
-      <button class="btn small" :disabled="f.page <= 1" @click="go(f.page - 1)">{{ t('sm.prev') }}</button>
-      <button class="btn small" :disabled="f.page >= pages" data-testid="members-next" @click="go(f.page + 1)">{{ t('sm.next') }}</button>
+      <div v-if="error" class="banner bad" data-testid="members-error">{{ error }}</div>
+
+      <div class="ox-scroll">
+        <table class="data manycols">
+          <thead><tr>
+            <th>{{ t('sm.col.no') }}</th><th>{{ t('sm.col.name') }}</th><th>{{ t('sm.col.phone') }}</th><th>{{ t('sm.col.source') }}</th>
+            <th v-if="admin">{{ t('sm.col.store') }}</th><th>{{ t('sm.col.address') }}</th>
+            <th class="num">{{ t('sm.col.orders') }}</th><th class="num">{{ t('sm.col.spent') }}</th><th>{{ t('sm.col.last') }}</th><th class="right">{{ t('ox.ops') }}</th>
+          </tr></thead>
+          <tbody>
+            <tr v-for="m in list.items" :key="m.id" :data-member="m.no" :class="{ temp: m.status === 'temp' }" data-testid="member-row">
+              <td><a href="#" class="mono mb-no ox-code" @click.prevent="show(m)">{{ pad(m.no) }}</a>
+                <span v-if="m.status === 'temp'" class="tag warn ox-pill" :title="t('sm.temp_hint')">{{ t('sm.temp') }} · {{ t('sm.temp_left', { n: minutesLeft(m) }) }}</span></td>
+              <td><span class="ox-strong">{{ m.name || '—' }}</span></td>
+              <td class="nowrap">{{ m.phone || '—' }}</td>
+              <td><span v-if="m.source" class="ox-tag" :class="srcTone(m.source)">{{ srcText(m.source) }}</span><span v-else>—</span><span v-if="m.contact" class="muted small"> {{ m.contact }}</span></td>
+              <td v-if="admin"><a href="#" @click.prevent="onlyStore(m.branch_id)">{{ m.branch_name }}</a><div v-if="m.merchant_name !== m.branch_name" class="muted small">{{ m.merchant_name }}</div></td>
+              <td class="mb-addr">{{ address(m) || '—' }}<span v-if="m.address_count > 1" class="tag" :title="t('sm.a.more_title')">{{ t('sm.a.more', { n: m.address_count - 1 }) }}</span></td>
+              <td class="num">{{ m.orders }}</td>
+              <td class="num"><span class="ox-money">{{ money(m.spent, m.currency) }}</span></td>
+              <td class="nowrap">{{ m.last_at ? when(m.last_at) : t('sm.never') }}</td>
+              <td class="right nowrap"><span class="ox-ops acts">
+                <button class="op red" data-testid="member-view" @click="show(m)">{{ t('sm.view') }}</button>
+                <button class="op" data-testid="member-edit" @click="edit(m)">{{ t('sm.edit') }}</button></span></td>
+            </tr>
+            <tr v-if="list.loaded && !list.items.length"><td :colspan="admin ? 10 : 9" class="ox-empty mb-empty">{{ t(filtered ? 'sm.no_match' : 'sm.empty') }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-if="list.total" class="ox-foot">
+        <span>{{ t('ox.range', { a: (f.page - 1) * SIZE + 1, b: Math.min(f.page * SIZE, list.total), n: list.total }) }}</span>
+        <span class="grow"></span>
+        <OxPager :page="f.page" :pages="pages" testid="members-pager" @go="go" />
+      </div>
     </div>
 
     <!-- one member -->
@@ -325,22 +346,15 @@ async function save() {
 </template>
 
 <style scoped>
-.mbook { display: grid; gap: 12px; min-width: 0; }
-.mb-head h1 { font-size: 20px; }
-.mb-filters { display: flex; flex-wrap: wrap; gap: 8px; }
-.mb-filters .mb-q { flex: 1 1 260px; min-width: 0; max-width: 420px; }
-.mb-filters select { width: auto; max-width: 100%; }
-.mb-table { overflow-x: auto; padding: 0; }
-.chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.chips button { padding: 6px 14px; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: 13px; color: var(--muted); cursor: pointer; }
-.chips button.on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
+.mbook { display: grid; gap: 14px; min-width: 0; }
+.mb-chips { margin-bottom: 10px; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .mb-no { font-weight: 700; margin-inline-end: 6px; }
 .mb-addr { max-width: 260px; overflow-wrap: anywhere; }
 .mb-empty { text-align: center; padding: 24px !important; }
 tr.temp td { background: #fffaf0; }
+.mb-no { text-decoration: none; }
 .nowrap { white-space: nowrap; }
-.chip-n { margin-inline-start: 4px; }
 td .tag { white-space: nowrap; }
 @media (min-width: 768px) { .acts { flex-wrap: nowrap; } }
 .num { text-align: end; }
@@ -366,7 +380,6 @@ td .tag { white-space: nowrap; }
 @media (max-width: 767px) {
   .mb-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .mb-two { grid-template-columns: 1fr; }
-  .mb-filters .mb-q { flex-basis: 100%; max-width: none; }
   .mb-addr { max-width: none; }
 }
 </style>

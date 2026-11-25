@@ -123,7 +123,7 @@ await login(kitchen, 'kitchen1', '/login?next=/work')
 await kitchen.goto(BASE + '/kitchen')
 const card = kitchen.locator(`.card:has-text("桌 ${A}")`).first()
 await card.waitFor()
-const stationBtns = kitchen.locator('.btn.small').filter({ hasText: '·' })
+const stationBtns = kitchen.locator('.ox-rail .ox-cat')
 let sawRush = false, sawRound = false, sawTableNote = false
 for (let i = 0; i < await stationBtns.count(); i++) {
   await stationBtns.nth(i).click()

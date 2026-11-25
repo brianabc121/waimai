@@ -74,7 +74,7 @@ async function doCopy() {
 </script>
 
 <template>
-  <div class="page">
+  <div class="ox warm"><div class="page">
     <StaffTabs />
     <div class="row between wrap" style="margin-bottom:12px">
       <h1 style="font-size:20px">{{ t('rp.nav') }}</h1>
@@ -132,6 +132,7 @@ async function doCopy() {
         </div>
       </div>
     </template>
+  </div>
   </div>
 </template>
 
