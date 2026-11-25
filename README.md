@@ -48,6 +48,8 @@ docker compose run --rm seed    # 可选：载入演示数据
 | 门店点餐页 | `/s/门店标识`，例如 `/s/makati`、`/s/bgc` | 顾客 | 看菜单、加购物车不用登录；点“去结算”时没登录会跳到 `/account/login`，用手机短信验证码登录（只有验证码，没有密码），登录后回到原页面 | 同上 |
 | 顾客“我的”、订单 | `/me`、`/orders`，订单详情 `/o/订单令牌` | 顾客 | 同上，`/account/login` 短信验证码，登录 30 天有效。订单详情链接自带令牌，不登录也能看 | 同上 |
 | 堂食扫码点菜 | `/t/桌码`（桌台页每张桌的“桌码”里有链接和二维码） | 堂食顾客 | 不用登录，桌子要先开台 | 无 |
+| 排队扫码取号 | `/q/门店标识`，例如 `/q/makati`（门口贴的二维码，后台“排队叫号 > 设置”里有）；取号后到 `/q/t/排队令牌` 看进度 | 排队的顾客 | 不用登录，同一个浏览器在一家店同时只能有一个号。店家要先在设置里打开“饭店排队叫号” | 无 |
+| 叫号屏 | `/screen` | 门口电视、取餐台的屏 | 不用账号：后台“点单 > 排队叫号 > 设置 > 叫号屏”添加屏幕得到 6 位配对码，屏上输入，之后长期有效 | 用 `owner1` 添加屏幕 |
 | 堂食平板点菜 | `/ipad` | 桌上的平板 | 不用账号：店员在桌台页 `/merchant/tables` 生成配对码，平板上输入 | 用 `owner1` 或 `cashier1` 生成配对码 |
 | 商家后台 | `/login` 选“商家后台”标签，进入 `/merchant/orders` | 店主、经理、接单员 | 用户名加密码。账号在多家店或多个身份时，登录后到 `/login/pick` 选身份；侧栏“切换身份”可以换到员工工作台。从工作台切回后台要再输一次密码。只有岗位、没有后台身份的员工登不进后台，会被引到工作台 | 店主 `owner1`（马卡蒂小馆）、`owner2`（BGC 面馆，验证商户隔离）、`owner3` 到 `owner9`（商城里的其他演示店）；接单员 `cashier1`。演示数据里没有经理账号，用 `owner1` 在 `/merchant/staff` 新建一个角色选“经理”即可 |
 | 员工工作台 | `/login` 选“员工工作台”标签，进入 `/work` | 有岗位的员工（后厨工位、打包、骑手），以及有岗位的店主、经理、接单员 | 用户名加密码，和商家后台同一个登录页 | `kitchen1`（后厨各工位和打包）、`zhang1`（炸台、热厨）、`wang1`（打包台加骑手，可切换岗位）、`rider1`、`rider2`（只有骑手） |
@@ -55,7 +57,7 @@ docker compose run --rm seed    # 可选：载入演示数据
 | 员工工作台 App（安卓） | App 打开的是这套部署的 `/work` | 员工，主要是骑手（锁屏推送、后台定位） | App 里的登录页只有“员工工作台”，用户名加密码。打包见 `mobile/README.md` 和 `docs/DEPLOY.md` 第 15 节 | 同员工工作台 |
 | 平台管理后台 | `/admin/login`，进入 `/admin/dashboard` | 平台管理员 | 单独的登录页和单独的 Cookie，`/login` 登不进平台后台，平台账号也登不进商家后台 | `admin`。生产环境不要跑 seed，用 `cmd/admin` 创建：`docker compose run --rm -e ADMIN_PASSWORD='强密码' admin`（见 `docs/DEPLOY.md` 第 4 节） |
 
-商家后台常用页面（都用 `/login` 的商家后台身份）：订单台 `/merchant/orders`、代客下单 `/merchant/orders/new`、桌台 `/merchant/tables`、菜单 `/merchant/menu`、员工 `/merchant/staff`、角色权限 `/merchant/staff/roles`（只有店主能打开）、骑手状态 `/merchant/riders`、模板 `/merchant/templates`。接单员能看到哪些页面由店主在“角色权限”里配置，见 `docs/STAFF_ACCESS_DESIGN.md`。
+商家后台常用页面（都用 `/login` 的商家后台身份）：订单台 `/merchant/orders`、代客下单 `/merchant/order/dine` 和 `/merchant/order/delivery`、排队叫号 `/merchant/queue`、桌台 `/merchant/tables`、菜单 `/merchant/menu`、员工 `/merchant/staff`、角色权限 `/merchant/staff/roles`（只有店主能打开）、骑手状态 `/merchant/riders`、模板 `/merchant/templates`。接单员能看到哪些页面由店主在“角色权限”里配置，见 `docs/STAFF_ACCESS_DESIGN.md`。
 
 ### 短信验证码
 

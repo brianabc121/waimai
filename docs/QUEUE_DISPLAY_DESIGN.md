@@ -1,6 +1,6 @@
 # 排队叫号屏 设计方案 v0.1（已确认）
 
-> 状态：2026-11-25 v0.1，brian 2026-11-26 确认按这一版全面落实，第 13 节全部按推荐。
+> 状态：2026-11-25 v0.1，brian 2026-11-26 确认按这一版全面落实，第 13 节全部按推荐。已实现，见文末“实现说明”。
 > 效果图：[docs/queue-display-screens/](queue-display-screens/)，原型 [docs/queue-display-prototype/index.html](queue-display-prototype/index.html)（地址后加 `#s1` 到 `#s7` 切换，数据都是示意）。
 >
 > | 效果图 | 内容 |
@@ -317,3 +317,13 @@ brian 的原话：“堂食这边还需要新增排队页面，这个页面可�
 13. **大屏要不要放宣传物料**：（推荐放，用现有“宣传物料”，可关）
 14. **叫号屏怎么接入**：（推荐配对码，和绑定平板一样，电视上不登录账号）
 15. **分批**：（推荐先做奶茶店模式，再做饭店模式）
+
+## 实现说明（全面落实）
+
+- 数据库：迁移 `00070_queue.sql`（`branches.queue_settings`、`queue_screens`、`queue_groups`、`queue_tickets`、`queue_events`、`pickup_calls`，并给已有角色补上三项权限）。
+- 后端：`internal/app/queue.go`（桌型分组、取号、预计等待、空桌推荐和升桌、叫号留座、入座开台、过号复号、插队、改人数、取消、记录、顾客页）、`internal/app/queue_screens.go`（设置、叫号屏配对、取餐屏数据、重叫、已取餐），接口在 `internal/httpapi/queue.go`。叫号短信用系统文字 `sys.sms.queue_called`（12 种语言）。
+- 页面：后台 `web/src/views/queue/`（`QueueView` 四个标签：排队叫号 / 取餐叫号 / 排队记录 / 设置），叫号屏 `ScreenView.vue`（固定 1920×1080 或 1080×1920 画布按屏幕缩放），顾客页 `GuestTake.vue`、`GuestTicket.vue`；堂食台面空桌显示“留给 A012”。
+- 不涉及金额：入座走原来的开台，“已取餐”走原来的打包和交给顾客，没有新的算钱逻辑。
+- 已知限制：语音播报靠浏览器自带语音，电视盒子没有对应语言的语音时只响提示音（设置里“试播”可以先试）；浏览器推送只在页面开着时提醒（没有接后台推送）；取餐屏的号码来自后厨屏状态，没开后厨屏的店号码会一直在“等待制作”，做好后点“已取餐”即可。
+- 测试：`internal/app/queue_test.go`（排队、分组、取餐屏、屏幕配对），端到端 `e2e/queue.cjs`，实际截图在项目文件 `queue-display-screens/impl/`。
+
