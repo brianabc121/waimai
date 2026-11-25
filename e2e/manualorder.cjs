@@ -33,7 +33,7 @@ await page.click('button.primary')
 await page.waitForURL(u => !/\/login$/.test(u.pathname))
 await page.goto(BASE + '/merchant/orders')
 await page.click(tid('manual-order-new'))
-await page.waitForURL(u => u.pathname === '/merchant/orders/new')
+await page.waitForURL(u => u.pathname === '/merchant/order/delivery')
 await page.waitForSelector(tid('manual-order'))
 step('the desk opens "order for a customer"')
 
@@ -139,7 +139,7 @@ step('the order desk marks the order as placed by staff')
 
 // the phone layout fits without sideways scrolling
 await page.setViewportSize({ width: 390, height: 844 })
-await page.goto(BASE + '/merchant/orders/new')
+await page.goto(BASE + '/merchant/order/delivery')
 await page.waitForSelector(tid('manual-order'))
 const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
 expect(wide <= 0, true, 'page wider than the phone by ' + wide)

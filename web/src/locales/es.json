@@ -3384,5 +3384,10 @@
  "dp.search": "Busca un país, región o código",
  "dp.common": "Frecuentes",
  "dp.all": "Todos",
- "dp.none": "Sin resultados"
+ "dp.none": "Sin resultados",
+ "pos.nav": "Pedidos",
+ "pos.dine": "Pedido en mesa",
+ "pos.delivery": "Pedido a domicilio",
+ "pos.new_delivery": "＋ Pedido a domicilio",
+ "pos.delivery_hint": "Domicilio y para recoger"
 }

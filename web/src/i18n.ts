@@ -138,6 +138,9 @@ const dict: Record<string, [string, string]> = {
   shift_on: ['上班中', 'At work'], shift_start: ['上班', 'Clock on'], shift_end: ['点一下下班', 'Click to clock off'],
   bad_login: ['用户名或密码不对', 'Wrong username or password'],
   orders: ['订单', 'Orders'], menu_admin: ['菜单', 'Menu'], settings: ['设置', 'Settings'], cash: ['核款', 'Cash'], kitchen: ['后厨', 'Kitchen'],
+  // 点单: the two ordering pages of the back office (dine-in, delivery and pickup)
+  'pos.nav': ['点单', 'Ordering'], 'pos.dine': ['堂食下单', 'Dine-in order'], 'pos.delivery': ['外卖下单', 'Delivery order'],
+  'pos.new_delivery': ['＋ 外卖下单', '+ Delivery order'], 'pos.delivery_hint': ['外卖和自取', 'Delivery and pickup'],
   active: ['进行中', 'Active'], history: ['历史', 'History'], no_orders: ['暂无订单', 'No orders'],
   accept: ['接单', 'Accept'], reject: ['拒单', 'Reject'], cancel: ['取消', 'Cancel'], reason: ['原因', 'Reason'],
   reason_required: ['请填写原因', 'Please give a reason'], assign_rider: ['指派骑手', 'Assign rider'], reassign: ['改派', 'Reassign'],

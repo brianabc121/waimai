@@ -3384,5 +3384,10 @@
  "dp.search": "国・地域名または番号で検索",
  "dp.common": "よく使う",
  "dp.all": "すべて",
- "dp.none": "見つかりません"
+ "dp.none": "見つかりません",
+ "pos.nav": "注文受付",
+ "pos.dine": "店内注文",
+ "pos.delivery": "デリバリー注文",
+ "pos.new_delivery": "＋ デリバリー注文",
+ "pos.delivery_hint": "デリバリーと持ち帰り"
 }

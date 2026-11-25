@@ -32,7 +32,7 @@ for (const [name, opts] of sizes) {
   await page.fill('input[type=password]', 'demo1234')
   await page.click('button.primary')
   await page.waitForURL(u => !/\/login$/.test(u.pathname))
-  await page.goto(BASE + '/merchant/orders/new?mode=delivery')
+  await page.goto(BASE + '/merchant/order/delivery')
   await page.waitForSelector(tid('manual-order'))
 
   // by code still works

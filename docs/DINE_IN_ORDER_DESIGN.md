@@ -1,5 +1,7 @@
 # 代客下单 · 堂食模式 设计方案 v0.1
 
+> **2026-11-25 更新：拆成两页。** 商家后台左侧菜单新增一级分类“点单”，下面两个页面：**堂食下单** `/merchant/order/dine`（原堂食模式，要“桌台收银”权限）和 **外卖下单** `/merchant/order/delivery`（外卖和自取，要“代客下单”权限），顶栏不再有“外卖/自取 | 堂食”切换。旧链接 `/merchant/orders/new` 自动转到对应页面：`?mode=dine` 或 `?table=` 去堂食，`?append=` 去外卖，其余去这台设备上次用的那页；只有一种权限的员工直接去那一页。下文的 `/merchant/orders/new` 都按这个理解。测试 e2e/pospages.cjs。
+
 > 状态：2026-11-24 brian 确认，第 12 节全部按推荐（菜品格带图片也已定）。
 > 效果图：[docs/dine-in-order-screens/](dine-in-order-screens/)，原型 [docs/dine-in-order-prototype/index.html](dine-in-order-prototype/index.html)（地址后加 `#s1` 到 `#s6` 切换）。
 >

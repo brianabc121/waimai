@@ -3384,5 +3384,10 @@
  "dp.search": "Rechercher un pays ou un indicatif",
  "dp.common": "Fréquents",
  "dp.all": "Tous",
- "dp.none": "Aucun résultat"
+ "dp.none": "Aucun résultat",
+ "pos.nav": "Commandes",
+ "pos.dine": "Commande sur place",
+ "pos.delivery": "Commande à livrer",
+ "pos.new_delivery": "＋ Commande à livrer",
+ "pos.delivery_hint": "Livraison et à emporter"
 }

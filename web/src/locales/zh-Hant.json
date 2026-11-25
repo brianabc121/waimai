@@ -3384,5 +3384,10 @@
  "dp.search": "搜尋國家、地區或區號",
  "dp.common": "常用",
  "dp.all": "全部",
- "dp.none": "沒有找到"
+ "dp.none": "沒有找到",
+ "pos.nav": "點單",
+ "pos.dine": "堂食下單",
+ "pos.delivery": "外賣下單",
+ "pos.new_delivery": "＋ 外賣下單",
+ "pos.delivery_hint": "外賣和自取"
 }
