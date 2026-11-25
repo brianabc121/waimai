@@ -521,9 +521,7 @@ func (a *App) mallPromos(ctx context.Context, list []*MallStore) error {
 	for rows.Next() {
 		var bid int64
 		var p Promotion
-		if err := rows.Scan(&bid, &p.ID, &p.Name, &p.NameEn, &p.Kind, &p.Threshold, &p.Value, &p.MaxDiscount,
-			&p.AppliesDelivery, &p.AppliesPickup, &p.StartsAt, &p.EndsAt, &p.DailyStart, &p.DailyEnd,
-			&p.TotalQuota, &p.PerPhoneLimit, &p.UsedCount, &p.Status, &p.Scope, &p.phoneUsed); err != nil {
+		if err := rows.Scan(p.scanDest(&bid)...); err != nil {
 			return err
 		}
 		s := byID[bid]
