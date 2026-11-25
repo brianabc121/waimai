@@ -323,7 +323,10 @@ func couponStage(kind string) pricing.Stage {
 	return pricing.StageOrder
 }
 
-func priceMoney(in moneyIn) (*priced, error) {
+// engineInput is in as the pricing engine takes it: the dish promotions,
+// the promotion, the coupons in their fixed order (coupons.go couponOrder),
+// the percentage off at checkout and the round-off, in that order.
+func engineInput(in moneyIn) pricing.Input {
 	adj := append([]pricing.Adjustment{}, in.Dish...)
 	if in.Promo != nil {
 		a := pricing.Adjustment{Kind: "promotion", Ref: in.Promo.ID, Name: in.Promo.Name, NameEn: in.Promo.NameEn,
@@ -333,7 +336,6 @@ func priceMoney(in moneyIn) (*priced, error) {
 		}
 		adj = append(adj, a)
 	}
-	// coupons in their fixed order (coupons.go couponOrder)
 	for _, kind := range couponOrder {
 		for _, c := range in.Coupons {
 			if c.Kind == kind {
@@ -350,9 +352,13 @@ func priceMoney(in moneyIn) (*priced, error) {
 		adj = append(adj, pricing.Adjustment{Kind: map[string]string{"round": "round_off", "set_total": "set_total"}[in.Round.Mode],
 			FundedBy: "store", Stage: pricing.StageRound, Amount: in.Round.Amount})
 	}
-	r, err := pricing.Price(pricing.Input{Lines: in.Lines, Adjustments: adj, Fees: pricing.Fees{TaxRateBP: in.Fees.TaxRateBP,
+	return pricing.Input{Lines: in.Lines, Adjustments: adj, Fees: pricing.Fees{TaxRateBP: in.Fees.TaxRateBP,
 		TaxInclusive: in.Fees.TaxInclusive, ServiceChargeBP: in.Fees.ServiceChargeBP, Packaging: in.Fees.PackagingFee,
-		Delivery: in.Delivery}})
+		Delivery: in.Delivery}}
+}
+
+func priceMoney(in moneyIn) (*priced, error) {
+	r, err := pricing.Price(engineInput(in))
 	switch err {
 	case pricing.ErrRoundTooBig, pricing.ErrSetTooBig:
 		return nil, ErrValidation(err.Error())

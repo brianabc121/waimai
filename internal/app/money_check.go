@@ -1,0 +1,208 @@
+package app
+
+import (
+	"context"
+	"fmt"
+	"strconv"
+	"time"
+
+	"github.com/brianabc121/waimai/internal/pricing"
+)
+
+// CheckOrderMoney checks one stored order against the rules of
+// docs/PRICING_CHECK.md §2 and returns one line per broken rule (nil when
+// all hold). It only reads.
+//
+// Besides the sums on the order (D1–D9), it replays the order (R1–R3): it
+// prices the order again from nothing but what the order itself holds — its
+// fee rates, its live dishes, the rules of its dish promotions, what its
+// promotion and coupons took off, the discount at checkout — and the result
+// must be what is stored, to the cent, line by line. A change that writes
+// an amount the engine would not give back breaks it.
+func (a *App) CheckOrderMoney(ctx context.Context, orderID int64) ([]string, error) {
+	var bad []string
+	fail := func(f string, v ...any) { bad = append(bad, fmt.Sprintf(f, v...)) }
+
+	var o struct {
+		status                                                  string
+		sub, pack, ship, svc, tax, disc, merch, platf, staff    int64
+		round, total, rows, perLine, ledger, refunded, negative int64
+		incl, hasRows                                           bool
+	}
+	if err := a.DB.QueryRow(ctx, `SELECT o.acceptance_status, o.subtotal, o.packaging_fee, o.delivery_fee,
+		o.service_charge, o.tax_amount, o.discount, o.merchant_discount, o.platform_subsidy, o.staff_discount,
+		o.round_off, o.total, o.tax_inclusive,
+		EXISTS (SELECT 1 FROM order_discounts d WHERE d.order_id = o.id),
+		COALESCE((SELECT sum(amount) FROM order_discounts d WHERE d.order_id = o.id), 0),
+		COALESCE((SELECT sum(v.value::bigint) FROM order_discounts d, jsonb_each_text(d.per_line) v
+			WHERE d.order_id = o.id), 0),
+		COALESCE((SELECT sum(e.delta_total) FROM order_money_events e WHERE e.order_id = o.id), 0),
+		COALESCE((SELECT sum(r.amount) FROM order_refunds r WHERE r.order_id = o.id), 0),
+		(SELECT count(*) FROM order_discounts d WHERE d.order_id = o.id AND d.amount < 0)
+		FROM orders o WHERE o.id = $1`, orderID).Scan(&o.status, &o.sub, &o.pack, &o.ship, &o.svc, &o.tax, &o.disc,
+		&o.merch, &o.platf, &o.staff, &o.round, &o.total, &o.incl, &o.hasRows, &o.rows, &o.perLine, &o.ledger,
+		&o.refunded, &o.negative); err != nil {
+		return nil, err
+	}
+	// D1 no amount below 0
+	for name, v := range map[string]int64{"subtotal": o.sub, "packaging": o.pack, "delivery": o.ship,
+		"service": o.svc, "tax": o.tax, "discount": o.disc, "merchant": o.merch, "platform": o.platf,
+		"staff": o.staff, "round_off": o.round, "total": o.total, "discount rows below 0": o.negative} {
+		if v < 0 || (name == "discount rows below 0" && v > 0) {
+			fail("D1 %s is %d", name, v)
+		}
+	}
+	// D6 the ledger adds up to the total (it records rejected orders too)
+	if o.ledger != o.total {
+		fail("D6 money ledger adds up to %d, total %d", o.ledger, o.total)
+	}
+	// D7 never more given back than was paid
+	if o.refunded > o.total {
+		fail("D7 refunded %d of %d", o.refunded, o.total)
+	}
+	if o.status == "rejected" || o.status == "cancelled" {
+		return bad, nil // nothing is owed; their amounts are what they were
+	}
+	// D2 what is paid adds up from its parts
+	parts := o.sub + o.pack + o.ship + o.svc - o.disc - o.staff - o.round
+	if !o.incl {
+		parts += o.tax
+	}
+	if parts != o.total {
+		fail("D2 parts give %d, total %d", parts, o.total)
+	}
+	// D3 store + platform = discount; D4 the discount rows add up to it
+	if o.merch+o.platf != o.disc {
+		fail("D3 merchant %d + platform %d, discount %d", o.merch, o.platf, o.disc)
+	}
+	if o.hasRows && o.rows != o.disc {
+		fail("D4 discount rows add up to %d, discount %d", o.rows, o.disc)
+	}
+
+	// D5, D8, D9 the dish lines' shares
+	type line struct{ disc, svc, tax int64 }
+	stored := map[int64]line{}
+	var ldisc, lsvc, ltax, voided int64
+	rows, err := a.DB.Query(ctx, `SELECT id, discount_share, service_share, tax_share, prep_status = 'cancelled'
+		FROM order_items WHERE order_id = $1`, orderID)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var id int64
+		var l line
+		var gone bool
+		if err := rows.Scan(&id, &l.disc, &l.svc, &l.tax, &gone); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if gone {
+			voided += l.disc + l.svc + l.tax
+			continue
+		}
+		stored[id] = l
+		ldisc, lsvc, ltax = ldisc+l.disc, lsvc+l.svc, ltax+l.tax
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if voided != 0 {
+		fail("D5 voided dishes still carry %d of discount, service and tax", voided)
+	}
+	if lsvc != o.svc {
+		fail("D8 dishes' service %d, service charge %d", lsvc, o.svc)
+	}
+	if ltax > o.tax || (o.pack == 0 && ltax != o.tax) {
+		fail("D8 dishes' tax %d, tax %d (packaging %d)", ltax, o.tax, o.pack)
+	}
+	if ldisc != o.perLine+o.staff {
+		fail("D9 dishes' discount %d, discount rows' shares %d + checkout discount %d", ldisc, o.perLine, o.staff)
+	}
+
+	// R1–R3 replay. An order without a single dish line (the demo sales
+	// figures cmd/seed writes) has nothing to replay.
+	if len(stored) == 0 && voided == 0 {
+		var any bool
+		if err := a.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM order_items WHERE order_id = $1)`, orderID).Scan(&any); err != nil {
+			return nil, err
+		}
+		if !any {
+			return bad, nil
+		}
+	}
+	m, err := loadMoney(ctx, a.DB, orderID)
+	if err != nil {
+		return nil, err
+	}
+	var promo *Promotion
+	var off Discount
+	if m.Promo != nil && m.PromoAmount > 0 {
+		promo, off = m.Promo, promoOn(m.Promo.Kind, m.PromoAmount)
+	}
+	in := m.input(nil, m.Dish, promo, off)
+	if m.AdjMode != "" {
+		in.Round = &Adjust{Mode: "round", Amount: m.RoundOff}
+	}
+	p, err := priceMoney(in)
+	if err != nil {
+		fail("R1 the order does not price again: %v", err)
+		return bad, nil
+	}
+	// R1 the engine's own rules hold on the replay
+	for _, s := range pricing.Check(engineInput(in), p.Result) {
+		fail("R1 %s", s)
+	}
+	// R2 the replay gives the stored amounts
+	t := p.Totals
+	if t.Subtotal != o.sub || t.ServiceCharge != o.svc || t.TaxAmount != o.tax || t.Discount != o.disc ||
+		t.MerchantDiscount != o.merch || t.PlatformSubsidy != o.platf || t.StaffDiscount != o.staff ||
+		t.RoundOff != o.round || t.Total != o.total {
+		fail("R2 replayed subtotal %d service %d tax %d discount %d (store %d platform %d) staff %d round %d total %d; "+
+			"stored %d %d %d %d (%d %d) %d %d %d", t.Subtotal, t.ServiceCharge, t.TaxAmount, t.Discount,
+			t.MerchantDiscount, t.PlatformSubsidy, t.StaffDiscount, t.RoundOff, t.Total, o.sub, o.svc, o.tax, o.disc,
+			o.merch, o.platf, o.staff, o.round, o.total)
+	}
+	// R3 and gives every dish the share it has stored
+	for _, l := range p.Result.Lines {
+		id, _ := strconv.ParseInt(l.Key, 10, 64)
+		if s := stored[id]; s.disc != l.Discount || s.svc != l.Service || s.tax != l.Tax {
+			fail("R3 dish line %d replayed discount %d service %d tax %d; stored %d %d %d", id,
+				l.Discount, l.Service, l.Tax, s.disc, s.svc, s.tax)
+		}
+	}
+	return bad, nil
+}
+
+// CheckAllOrderMoney runs CheckOrderMoney over the orders created since
+// since (all orders for the zero time), and returns the broken ones by id.
+func (a *App) CheckAllOrderMoney(ctx context.Context, since time.Time) (int, map[int64][]string, error) {
+	rows, err := a.DB.Query(ctx, `SELECT id FROM orders WHERE created_at >= $1 ORDER BY id`, since)
+	if err != nil {
+		return 0, nil, err
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, nil, err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, nil, err
+	}
+	out := map[int64][]string{}
+	for _, id := range ids {
+		bad, err := a.CheckOrderMoney(ctx, id)
+		if err != nil {
+			return 0, nil, fmt.Errorf("order %d: %w", id, err)
+		}
+		if len(bad) > 0 {
+			out[id] = bad
+		}
+	}
+	return len(ids), out, nil
+}
