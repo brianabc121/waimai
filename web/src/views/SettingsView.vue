@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import '../addon'
 import '../progress'
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import '../officeStrings'
 import { get, patch, post, put } from '../api'
 import { both, extend, money, pick, t, toMajor, toMinor } from '../i18n'
 import { can, session } from '../session'
@@ -92,20 +93,49 @@ async function saveStation() {
 }
 
 const link = () => `${location.origin}/s/${branch.value?.slug}`
+const copied = ref(false)
+async function copyLink() { try { await navigator.clipboard.writeText(link()); copied.value = true } catch { /* the link is shown anyway */ } }
+// the sections in the rail; a click scrolls to one
+const sections = computed(() => [
+  { id: 'set-link', label: t('share_link'), on: true },
+  { id: 'set-store', label: t('store_settings'), on: can('settings') },
+  { id: 'set-pay', label: t('ox.set.pay'), on: can('settings') },
+  { id: 'set-texts', label: t('ox.set.texts'), on: can('menu.translate') },
+  { id: 'set-mall', label: t('mls.title'), on: !!listing.value && can('mall') },
+  { id: 'set-zones', label: t('zones'), on: can('delivery.map') },
+  { id: 'set-stations', label: t('stations'), on: can('settings') },
+  { id: 'set-staff', label: t('staff'), on: can('staff.view') },
+].filter(x => x.on))
+const at = ref('set-link')
+function jump(id: string) { at.value = id; document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
 </script>
 
 <template>
-  <div class="page stack" v-if="branch" style="max-width:900px">
+  <div class="ox warm">
+  <div class="page ox-page setpage" v-if="branch">
+    <div class="ox-head">
+      <div><h1>{{ t('settings') }}</h1><p class="ox-sub">{{ t('ox.set.sub') }}</p></div>
+      <div class="ox-acts"><a class="btn" :href="link()" target="_blank" rel="noopener">{{ t('ox.set.open_store') }}</a></div>
+    </div>
     <div v-if="error" class="banner bad">{{ error }}</div>
     <div v-else-if="saved" class="banner ok">{{ t('saved') }}</div>
 
-    <div class="card stack">
-      <h2>{{ t('share_link') }}</h2>
-      <a :href="link()" target="_blank">{{ link() }}</a>
-    </div>
+    <div class="ox-body">
+    <aside class="ox-rail">
+      <div class="ox-rail-h">{{ t('ox.set.sections') }}</div>
+      <div class="ox-rail-list">
+        <button v-for="x in sections" :key="x.id" type="button" class="ox-cat" :class="{ on: at === x.id }" @click="jump(x.id)"><span class="nm">{{ x.label }}</span></button>
+      </div>
+    </aside>
+    <div class="ox-stack setmain">
+    <section id="set-link" class="ox-panel stack">
+      <div class="ox-panel-h" style="margin:0"><h2>{{ t('share_link') }}</h2></div>
+      <div class="linkrow"><a :href="link()" target="_blank">{{ link() }}</a><button type="button" class="btn small" @click="copyLink">{{ copied ? t('copied') : t('copy_link') }}</button></div>
+    </section>
 
-    <form v-if="can('settings')" class="card" @submit.prevent="saveSettings">
-      <h2 style="margin-bottom:12px">{{ t('store_settings') }}</h2>
+    <form v-if="can('settings')" id="set-store" class="ox-panel" @submit.prevent="saveSettings">
+      <div class="ox-panel-h"><h2>{{ t('store_settings') }}</h2><span class="grow"></span><button class="btn primary">{{ t('save') }}</button></div>
+      <h3>{{ t('ox.set.basic') }}</h3>
       <div class="grid2">
         <label class="field"><span>{{ t('name_zh') }}</span><input v-model="s.name" required /></label>
         <label class="field"><span>{{ t('name_en') }}</span><input v-model="s.name_en" /></label>
@@ -113,10 +143,17 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
         <label class="field"><span>{{ t('phone') }}</span><input v-model="s.phone" /></label>
         <label class="field"><span>{{ t('open_time') }}</span><input type="time" v-model="s.open_time" required /></label>
         <label class="field"><span>{{ t('close_time') }}</span><input type="time" v-model="s.close_time" required /></label>
+      </div>
+      <h3>{{ t('ox.set.fees') }}</h3>
+      <div class="grid2">
         <label class="field"><span>{{ t('tax_rate') }}</span><input type="number" min="0" max="50" step="0.01" v-model.number="s.tax" /></label>
         <label class="field"><span>{{ t('service_rate') }}</span><input type="number" min="0" max="50" step="0.01" v-model.number="s.service" /></label>
         <label class="field"><span>{{ t('packaging_fee') }} ({{ branch.currency }})</span><input type="number" min="0" step="0.01" v-model.number="s.packaging" /></label>
         <label class="field"><span>{{ t('min_order') }} ({{ branch.currency }})</span><input type="number" min="0" step="0.01" v-model.number="s.min_order" /></label>
+        <label class="check"><input type="checkbox" v-model="s.tax_inclusive" />{{ t('tax_inclusive') }}</label>
+      </div>
+      <h3>{{ t('ox.set.timing') }}</h3>
+      <div class="grid2">
         <label class="field"><span>{{ t('accept_timeout') }}</span><input type="number" min="1" max="120" v-model.number="s.accept_timeout_minutes" /></label>
         <label class="field"><span>{{ t('ao.set.minutes') }}</span><input type="number" min="1" max="60" data-testid="addon-minutes" v-model.number="s.addon_confirm_minutes" :title="t('ao.set.minutes_hint')" /></label>
         <label class="field"><span>{{ t('prep_minutes') }}</span><input type="number" min="5" max="240" v-model.number="s.prep_minutes" /></label>
@@ -124,7 +161,9 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
         <label class="field"><span>{{ t('set.slow_minutes') }}</span><input type="number" min="1" max="120" name="kitchen_slow_minutes" v-model.number="s.kitchen_slow_minutes" /></label>
         <label class="field"><span>{{ t('set.detour_percent') }}</span><input type="number" min="5" max="300" name="detour_percent" v-model.number="s.detour_percent" /></label>
         <label class="field"><span>{{ t('set.detour_km') }}</span><input type="number" min="0.1" max="20" step="0.1" name="detour_km" v-model.number="s.detour_km" /></label>
-        <label class="check"><input type="checkbox" v-model="s.tax_inclusive" />{{ t('tax_inclusive') }}</label>
+      </div>
+      <h3>{{ t('ox.set.switches') }}</h3>
+      <div class="grid2 checks">
         <label class="check"><input type="checkbox" v-model="s.paused" />{{ t('pause_orders') }}</label>
         <label class="check"><input type="checkbox" v-model="s.delivery_enabled" />{{ t('delivery') }}</label>
         <label class="check"><input type="checkbox" v-model="s.pickup_enabled" />{{ t('pickup') }}</label>
@@ -141,14 +180,14 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
       </fieldset>
       <label class="field"><span>{{ t('set.notice') }}</span><textarea name="notice" v-model="s.notice" rows="2" maxlength="300"></textarea></label>
       <label class="field"><span>{{ t('set.intro') }}</span><textarea name="intro" v-model="s.intro" rows="3" maxlength="500"></textarea></label>
-      <button class="btn primary">{{ t('save') }}</button>
+      <div class="setfoot"><button class="btn primary">{{ t('save') }}</button></div>
     </form>
 
-    <PaySettingsCard v-if="can('settings')" :branch-id="bid" />
+    <div v-if="can('settings')" id="set-pay"><PaySettingsCard :branch-id="bid" /></div>
 
-    <StoreTextsCard v-if="can('menu.translate')" ref="texts" :base="`/merchant/branches/${bid}`" @en-name="v => s.name_en = v" />
+    <div v-if="can('menu.translate')" id="set-texts"><StoreTextsCard ref="texts" :base="`/merchant/branches/${bid}`" @en-name="v => s.name_en = v" /></div>
 
-    <form v-if="listing && can('mall')" class="card stack" data-testid="mall-listing" @submit.prevent="saveListing">
+    <form v-if="listing && can('mall')" id="set-mall" class="ox-panel stack" data-testid="mall-listing" @submit.prevent="saveListing">
       <h2>{{ t('mls.title') }}</h2>
       <p class="muted small">{{ t('mls.hint') }}</p>
       <div v-if="listing.hidden" class="banner bad" data-testid="mall-listing-hidden">{{ t('mls.hidden') }}</div>
@@ -172,14 +211,14 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
       </div>
     </form>
 
-    <div v-if="can('delivery.map')" class="card stack">
+    <div v-if="can('delivery.map')" id="set-zones" class="ox-panel stack">
       <h2>{{ t('zones') }}</h2>
       <p class="muted">{{ t('zones_moved') }}</p>
       <div><span v-for="zone in zones" :key="zone.id" class="tag" :class="zone.active ? 'ok' : ''" style="margin:0 6px 6px 0">{{ both(zone.name, zone.name_en) }} · {{ money(zone.fee, branch.currency) }}</span></div>
       <router-link class="btn" to="/merchant/delivery-map" data-testid="to-delivery-map">{{ t('delivery_map') }}</router-link>
     </div>
 
-    <div v-if="can('settings')" class="card stack">
+    <div v-if="can('settings')" id="set-stations" class="ox-panel stack">
       <h2>{{ t('stations') }}</h2>
       <p class="muted small">{{ t('stations_hint') }}</p>
       <table class="data" v-if="stations.length">
@@ -199,15 +238,26 @@ const link = () => `${location.origin}/s/${branch.value?.slug}`
       </form>
     </div>
 
-    <div v-if="can('staff.view')" class="card row between">
+    <div v-if="can('staff.view')" id="set-staff" class="ox-panel row between">
       <span><b>{{ t('staff') }}</b> <span class="muted small">{{ t('staff_moved') }}</span></span>
       <router-link class="btn" to="/merchant/staff">{{ t('staff') }}</router-link>
+    </div>
+  </div>
+    </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.grid2.checks { gap: 4px 12px; margin-bottom: 12px; }
+.setpage h3 { margin: 14px 0 8px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 15px; color: #2f1810; }
+.setpage .ox-panel-h + h3 { border-top: 0; padding-top: 0; margin-top: 0; }
+.setpage .ox-panel h2 { font-size: 18px; color: #2f1810; }
+.setmain > [id] { scroll-margin-top: 16px; }
+.setmain :deep(.card) { background: var(--card); border-color: var(--line); }
+.setfoot { display: flex; justify-content: flex-end; }
+.linkrow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; } .linkrow a { overflow-wrap: anywhere; font-weight: 600; }
 .contact-fields { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 2px; margin: 0 0 12px; }
 .contact-fields legend { font-weight: 600; padding: 0 6px; }
 .contact-fields .row { gap: 4px 22px; margin-top: 8px; }

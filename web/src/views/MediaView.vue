@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // Promo media of the ordering page: upload, crop, order, hide and delete.
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ApiError, del, get, patch, put, upload } from '../api'
 import { t } from '../i18n'
 import '../media'
+import '../officeStrings'
 import { currentRole, session } from '../session'
 import type { PromoMedia } from '../types'
 import MediaCropper, { type CropResult } from './MediaCropper.vue'
@@ -31,6 +32,10 @@ async function run(fn: () => Promise<unknown>) {
 // ---- picking a file ----
 const LIMIT = { image: 2, gif: 8, video: 20 } as const
 const picker = ref<HTMLInputElement | null>(null)
+const KINDS = ['image', 'gif', 'video'] as const
+const kind = ref('')
+const show = ref<'' | 'on' | 'off'>('')
+const shownList = computed(() => list.value.filter(m => (!kind.value || m.kind === kind.value) && (!show.value || m.active === (show.value === 'on'))))
 const crop = reactive<{ open: boolean; kind: PromoMedia['kind']; src: string; file: Blob | null; item: PromoMedia | null; busy: boolean; error: string }>(
   { open: false, kind: 'image', src: '', file: null, item: null, busy: false, error: '' })
 
@@ -125,56 +130,87 @@ async function saved(r: CropResult) { await save(r); stamp.value = Date.now() }
 </script>
 
 <template>
-  <div class="page stack">
-    <div class="row between wrap" style="gap:10px">
-      <h1>{{ t('promo_media') }}</h1>
-      <div class="row" style="gap:8px">
+  <div class="ox warm">
+  <div class="page ox-page">
+    <div class="ox-head">
+      <div><h1>{{ t('promo_media') }}</h1><p class="ox-sub">{{ t('ox.pm.sub') }}</p></div>
+      <div class="ox-acts">
         <a v-if="slug" class="btn" :href="'/s/' + slug" target="_blank" rel="noopener">{{ t('pm.preview') }}</a>
-        <button class="btn primary" data-testid="media-upload" :disabled="list.length >= max" @click="picker?.click()">{{ t('pm.upload') }}</button>
+        <button class="btn primary" data-testid="media-upload" :disabled="list.length >= max" @click="picker?.click()">＋ {{ t('pm.upload') }}</button>
         <input ref="picker" type="file" hidden data-testid="media-file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" @change="picked" />
       </div>
     </div>
-    <p class="muted" style="margin:0">{{ t('pm.hint') }}<br /><span class="small">{{ t('pm.limits', { n: max }) }}</span></p>
     <div v-if="error" class="banner bad" data-testid="media-error">{{ error }}</div>
 
-    <div v-if="!loading && !list.length" class="card muted" data-testid="media-none">{{ t('pm.none') }}</div>
-    <div class="mlist">
-      <div v-for="(m, i) in list" :key="m.id" class="card mcard" :class="{ off: !m.active }" data-testid="media-card" :data-kind="m.kind" :data-active="m.active">
-        <div class="thumb">
-          <MediaFrame :kind="m.kind" :src="m.url" :crop="m.crop" :poster="poster(m)" :still="!!m.poster_url" lazy />
-          <span class="no">{{ i + 1 }}</span>
+    <div class="ox-stats">
+      <div class="ox-stat"><span class="l">{{ t('ox.pm.total') }}</span><b class="v">{{ list.length }} <small class="muted">/ {{ max }}</small></b></div>
+      <div class="ox-stat"><span class="l">{{ t('pm.shown') }}</span><b class="v">{{ list.filter(m => m.active).length }}</b></div>
+      <div class="ox-stat"><span class="l">{{ t('pm.hidden') }}</span><b class="v">{{ list.filter(m => !m.active).length }}</b></div>
+      <div class="ox-stat"><span class="l">{{ t('ox.pm.left') }}</span><b class="v" :class="{ red: list.length >= max }">{{ Math.max(0, max - list.length) }}</b></div>
+    </div>
+
+    <div class="ox-body">
+      <aside class="ox-rail">
+        <div class="ox-rail-h">{{ t('ox.pm.kinds') }}</div>
+        <div class="ox-rail-list">
+          <button class="ox-cat" :class="{ on: kind === '' }" @click="kind = ''"><span class="nm">{{ t('ox.pm.all') }}</span><span class="n">{{ list.length }}</span></button>
+          <button v-for="k in KINDS" :key="k" class="ox-cat" :class="{ on: kind === k }" @click="kind = k"><span class="nm">{{ t('pm.' + k) }}</span><span class="n">{{ list.filter(m => m.kind === k).length }}</span></button>
         </div>
-        <div class="info">
-          <div class="row wrap" style="gap:6px">
-            <span class="tag">{{ t('pm.' + m.kind) }}</span>
-            <span class="tag" :class="m.active ? 'ok' : ''">{{ t(m.active ? 'pm.shown' : 'pm.hidden') }}</span>
-            <span class="muted small">{{ mb(m.size) }}</span>
+        <p class="ox-rail-tip">{{ t('pm.limits', { n: max }) }}</p>
+      </aside>
+
+      <section class="ox-panel">
+        <div class="ox-tools">
+          <div class="ox-chips">
+            <button :class="{ on: show === '' }" @click="show = ''">{{ t('ox.tb.all_states') }}</button>
+            <button :class="{ on: show === 'on' }" @click="show = 'on'">{{ t('pm.shown') }}</button>
+            <button :class="{ on: show === 'off' }" @click="show = 'off'">{{ t('pm.hidden') }}</button>
           </div>
-          <div class="bold name">{{ m.title || '—' }}</div>
-          <div class="row wrap acts">
-            <button class="btn small" :disabled="i === 0" :aria-label="t('pm.up')" :title="t('pm.up')" data-testid="media-up" @click="shift(i, -1)">↑</button>
-            <button class="btn small" :disabled="i === list.length - 1" :aria-label="t('pm.down')" :title="t('pm.down')" data-testid="media-down" @click="shift(i, 1)">↓</button>
-            <button class="btn small" data-testid="media-crop" @click="edit(m)">{{ t('pm.crop') }}</button>
-            <button class="btn small" data-testid="media-toggle" @click="toggle(m)">{{ t(m.active ? 'pm.hide' : 'pm.show') }}</button>
-            <button class="btn small danger" data-testid="media-delete" @click="remove(m)">{{ t('delete') }}</button>
+          <span class="grow"></span><span class="muted small">{{ t('ox.pm.order') }}</span>
+        </div>
+        <div v-if="!loading && !list.length" class="ox-empty" data-testid="media-none">{{ t('pm.none') }}</div>
+        <div v-else-if="!shownList.length" class="ox-empty">{{ t('ox.pm.no_match') }}</div>
+        <div class="mlist">
+          <div v-for="m in shownList" :key="m.id" class="mcard" :class="{ off: !m.active }" data-testid="media-card" :data-kind="m.kind" :data-active="m.active">
+            <div class="thumb">
+              <MediaFrame :kind="m.kind" :src="m.url" :crop="m.crop" :poster="poster(m)" :still="!!m.poster_url" lazy />
+              <span class="no">{{ list.indexOf(m) + 1 }}</span>
+              <span class="tag ox-pill st" :class="m.active ? 'ok' : ''">{{ t(m.active ? 'pm.shown' : 'pm.hidden') }}</span>
+            </div>
+            <div class="info">
+              <div class="bold name ox-strong">{{ m.title || '—' }}</div>
+              <div class="row wrap" style="gap:6px">
+                <span class="ox-tag" :class="{ gold: m.kind === 'gif', blue: m.kind === 'video' }">{{ t('pm.' + m.kind) }}</span>
+                <span class="muted small">{{ mb(m.size) }}</span>
+              </div>
+              <div class="ox-ops acts">
+                <button class="op" :disabled="list.indexOf(m) === 0" :aria-label="t('pm.up')" :title="t('pm.up')" data-testid="media-up" @click="shift(list.indexOf(m), -1)">↑</button>
+                <button class="op" :disabled="list.indexOf(m) === list.length - 1" :aria-label="t('pm.down')" :title="t('pm.down')" data-testid="media-down" @click="shift(list.indexOf(m), 1)">↓</button>
+                <button class="op red" data-testid="media-crop" @click="edit(m)">{{ t('pm.crop') }}</button>
+                <button class="op" data-testid="media-toggle" @click="toggle(m)">{{ t(m.active ? 'pm.hide' : 'pm.show') }}</button>
+                <button class="op bad" data-testid="media-delete" @click="remove(m)">{{ t('delete') }}</button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
 
     <MediaCropper v-if="crop.open" :key="crop.src" :kind="crop.kind" :src="crop.src" :initial="crop.item" :busy="crop.busy" :error="crop.error"
       @save="saved" @cancel="closeCrop" />
   </div>
+  </div>
 </template>
 
 <style scoped>
-.mlist { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); }
-.mcard { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 14px; align-items: start; padding: 12px; }
+.mlist { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.mcard { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .mcard.off .thumb { opacity: .45; }
-.thumb { position: relative; border-radius: 8px; overflow: hidden; }
-.no { position: absolute; inset-inline-start: 6px; top: 6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: rgba(0, 0, 0, .6); color: #fff; font-size: 12px; line-height: 22px; text-align: center; }
-.info { display: grid; gap: 8px; min-width: 0; }
+.thumb { position: relative; background: #f3e9da; }
+.no { position: absolute; inset-inline-start: 8px; top: 8px; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 999px; background: rgba(47, 24, 16, .7); color: #fff; font-size: 12.5px; line-height: 24px; text-align: center; font-weight: 700; }
+.st { position: absolute; inset-inline-end: 4px; top: 8px; }
+.info { display: grid; gap: 6px; min-width: 0; padding: 10px 12px; }
 .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.acts { gap: 6px; }
-@media (max-width: 480px) { .mcard { grid-template-columns: minmax(0, 1fr); } }
+.acts { justify-content: flex-start; margin-inline-start: -10px; }
+.ox-stat .v small { font-size: 14px; font-weight: 500; }
 </style>

@@ -9,6 +9,7 @@ import { sourceName } from '../bills'
 import { discountLabel, kindName } from '../coupons'
 import { locale, money, t } from '../i18n'
 import { session } from '../session'
+import '../officeStrings'
 import type { BillList, BillOrder, BillSummary } from '../types'
 import { addDays, addMonths, clock, dayOf, monthEnd, monthStart } from './staff/time'
 
@@ -67,17 +68,18 @@ async function showSettlement(id: number) {
 </script>
 
 <template>
-  <div class="page stack bills" style="max-width:1280px">
-    <div class="row between wrap" style="gap:8px">
-      <h1>{{ t('bl.nav') }}</h1>
-      <a v-if="tab === 'orders'" class="btn" data-testid="bill-export" :href="exportHref" download>{{ t('bl.export') }}</a>
+  <div class="ox warm">
+  <div class="page ox-page bills">
+    <div class="ox-head">
+      <div><h1>{{ t('bl.nav') }}</h1><p class="ox-sub">{{ t('ox.bl.sub') }}</p></div>
+      <div class="ox-acts"><a v-if="tab === 'orders'" class="btn" data-testid="bill-export" :href="exportHref" download>{{ t('bl.export') }}</a></div>
     </div>
-    <div class="subtabs" role="tablist">
+    <div class="ox-tabs" role="tablist">
       <button type="button" role="tab" :class="{ on: tab === 'orders' }" data-testid="bill-tab-orders" @click="setTab('orders')">{{ t('bl.tab_orders') }}</button>
       <button type="button" role="tab" :class="{ on: tab === 'summary' }" data-testid="bill-tab-summary" @click="setTab('summary')">{{ t('bl.tab_sum') }}</button>
     </div>
-    <div class="row wrap periods" style="gap:6px">
-      <button v-for="p in (['today', 'yesterday', 'week', 'month', 'last_month', 'custom'] as Preset[])" :key="p" class="btn small" :class="{ primary: preset === p }"
+    <div class="ox-tools ox-chips periods" style="margin:0">
+      <button v-for="p in (['today', 'yesterday', 'week', 'month', 'last_month', 'custom'] as Preset[])" :key="p" :class="{ on: preset === p }"
         :data-preset="p" @click="p === 'custom' ? preset = 'custom' : choose(p)">{{ t('bl.p.' + p) }}</button>
       <span v-if="preset === 'custom'" class="custom"><input v-model="from" type="date" :max="to"> ~ <input v-model="to" type="date" :min="from" :max="today"></span>
       <select v-if="tab === 'orders'" v-model="filter" data-testid="bill-filter" class="filter">
@@ -86,9 +88,10 @@ async function showSettlement(id: number) {
     <div v-if="error" class="banner bad">{{ error }}</div>
 
     <template v-if="tab === 'orders' && list">
-      <p class="muted small" style="margin:0">{{ t('bl.hint') }}</p>
       <div v-if="list.count > list.shown" class="banner warn">{{ t('bl.cut', { n: list.shown }) }}</div>
-      <div class="card" style="padding:0;overflow:auto">
+      <div class="ox-panel">
+      <p class="muted small" style="margin:0 0 10px">{{ t('bl.hint') }}</p>
+      <div class="ox-scroll">
         <table class="data bill" data-testid="bill-table">
           <thead><tr><th>{{ t('bl.no') }}</th><th>{{ t('bl.type') }}</th><th class="r">{{ t('bl.food') }}</th><th class="r">{{ t('bl.fee') }}</th>
             <th class="r">{{ t('bl.promo') }}</th><th class="r">{{ t('bl.store_coupon') }}</th><th class="r">{{ t('bl.fee_coupon') }}</th>
@@ -97,14 +100,14 @@ async function showSettlement(id: number) {
             <template v-for="o in list.orders" :key="o.id">
               <tr :class="{ off: o.state !== 'completed', has: o.discounts.length, opened: open === o.id }" data-testid="bill-row"
                 @click="o.discounts.length && (open = open === o.id ? null : o.id)">
-                <td><b>{{ o.public_no }}</b><div class="small muted">{{ dayOf(o.created_at, tz).slice(5) }} {{ clock(o.created_at, tz) }}</div></td>
+                <td><b class="ox-code">{{ o.public_no }}</b><div class="small muted">{{ dayOf(o.created_at, tz).slice(5) }} {{ clock(o.created_at, tz) }}</div></td>
                 <td>{{ t('bl.' + o.service_type) }}</td>
                 <td class="r">{{ m(o.food) }}</td><td class="r">{{ m(o.delivery_fee) }}</td>
                 <td class="r neg">{{ off(o.promotion + (o.dish_promotion ?? 0)) }}</td><td class="r neg">{{ off(storeCoupons(o)) }}</td><td class="r neg">{{ off(o.store_delivery) }}</td>
                 <td class="r plat">{{ o.platform_free ? '+' + money(o.platform_free, cur) : '—' }}</td>
                 <td class="r">{{ o.state === 'completed' ? money(o.paid, cur) : money(0, cur) }}</td>
                 <td class="r"><b>{{ o.state === 'completed' ? money(o.takings, cur) : money(0, cur) }}</b></td>
-                <td><span class="tag" :class="{ ok: o.state === 'completed' }">{{ t('bl.st.' + o.state) }}</span>
+                <td><span class="tag ox-pill" :class="{ ok: o.state === 'completed' }">{{ t('bl.st.' + o.state) }}</span>
                   <span v-if="o.discounts.length" class="chev">{{ open === o.id ? '▾' : '▸' }}</span></td>
               </tr>
               <tr v-if="open === o.id" class="detail" data-testid="bill-detail"><td colspan="11">
@@ -118,7 +121,7 @@ async function showSettlement(id: number) {
                 </div>
               </td></tr>
             </template>
-            <tr v-if="!list.orders.length"><td colspan="11" class="muted">{{ t('bl.none') }}</td></tr>
+            <tr v-if="!list.orders.length"><td colspan="11" class="ox-empty">{{ t('bl.none') }}</td></tr>
           </tbody>
           <tfoot v-if="list.orders.length"><tr data-testid="bill-sum">
             <td colspan="2"><b>{{ t('bl.sum', { n: list.orders.filter(o => o.state === 'completed').length }) }}</b></td>
@@ -129,22 +132,23 @@ async function showSettlement(id: number) {
           </tr></tfoot>
         </table>
       </div>
+      </div>
     </template>
 
     <template v-if="tab === 'summary' && sum">
-      <div class="cards" data-testid="bill-cards">
-        <div class="card"><span>{{ t('bl.c.orders') }}</span><b>{{ sum.orders }}</b><small v-if="sum.cancelled">{{ t('bl.c.cancelled', { n: sum.cancelled }) }}</small></div>
-        <div class="card"><span>{{ t('bl.c.food') }}</span><b>{{ money(sum.food, cur) }}</b></div>
-        <div class="card"><span>{{ t('bl.c.discount') }}</span><b>{{ money(sum.merchant_discount + sum.platform_discount, cur) }}</b>
-          <small>{{ t('bl.c.discount_sub', { m: money(sum.merchant_discount, cur), p: money(sum.platform_discount, cur) }) }}</small></div>
-        <div class="card"><span>{{ t('bl.c.paid') }}</span><b>{{ money(sum.paid, cur) }}</b></div>
-        <div class="card"><span>{{ t('bl.c.due') }}</span><b class="plat">{{ money(sum.platform_discount, cur) }}</b></div>
-        <div class="card"><span>{{ t('bl.c.takings') }}</span><b class="ok">{{ money(sum.takings, cur) }}</b></div>
-        <div v-if="sum.refunded" class="card" data-testid="bl-refunded"><span>{{ t('bl.c.refunded') }}</span><b class="neg">-{{ money(sum.refunded, cur) }}</b>
-          <small>{{ t('bl.c.refunded_sub') }}</small></div>
+      <div class="ox-stats" data-testid="bill-cards">
+        <div class="ox-stat"><span class="l">{{ t('bl.c.orders') }}</span><b class="v">{{ sum.orders }}</b><small v-if="sum.cancelled" class="s">{{ t('bl.c.cancelled', { n: sum.cancelled }) }}</small></div>
+        <div class="ox-stat"><span class="l">{{ t('bl.c.food') }}</span><b class="v">{{ money(sum.food, cur) }}</b></div>
+        <div class="ox-stat"><span class="l">{{ t('bl.c.discount') }}</span><b class="v">{{ money(sum.merchant_discount + sum.platform_discount, cur) }}</b>
+          <small class="s">{{ t('bl.c.discount_sub', { m: money(sum.merchant_discount, cur), p: money(sum.platform_discount, cur) }) }}</small></div>
+        <div class="ox-stat"><span class="l">{{ t('bl.c.paid') }}</span><b class="v">{{ money(sum.paid, cur) }}</b></div>
+        <div class="ox-stat"><span class="l">{{ t('bl.c.due') }}</span><b class="v plat">{{ money(sum.platform_discount, cur) }}</b></div>
+        <div class="ox-stat"><span class="l">{{ t('bl.c.takings') }}</span><b class="v ok">{{ money(sum.takings, cur) }}</b></div>
+        <div v-if="sum.refunded" class="ox-stat" data-testid="bl-refunded"><span class="l">{{ t('bl.c.refunded') }}</span><b class="v neg">-{{ money(sum.refunded, cur) }}</b>
+          <small class="s">{{ t('bl.c.refunded_sub') }}</small></div>
       </div>
       <div class="cols">
-        <div class="card stack">
+        <div class="ox-panel stack">
           <h2>{{ t('bl.kinds') }}</h2>
           <table class="data" data-testid="bill-kinds">
             <thead><tr><th>{{ t('bl.k.kind') }}</th><th>{{ t('bl.k.who') }}</th><th class="r">{{ t('bl.k.orders') }}</th><th class="r">{{ t('bl.k.amount') }}</th><th class="r">{{ t('bl.k.avg') }}</th></tr></thead>
@@ -157,14 +161,14 @@ async function showSettlement(id: number) {
           <h2>{{ t('bl.rep') }}</h2>
           <p class="small" style="margin:0">{{ t('bl.rep_line', { issued: sum.repurchase.issued, used: sum.repurchase.used, rate, sales: money(sum.repurchase.sales, cur) }) }}</p>
         </div>
-        <div class="card stack">
+        <div class="ox-panel stack">
           <h2>{{ t('bl.settle') }}</h2>
           <p class="muted small" style="margin:0">{{ t('bl.settle_hint') }}</p>
           <div v-if="!sum.settlements.length" class="muted small">{{ t('bl.settle_none') }}</div>
           <div v-for="s in sum.settlements" :key="s.id" class="settle" data-testid="bill-settlement">
             <div class="row between wrap" style="gap:6px">
               <div><b>{{ s.month }}</b> · {{ s.orders }} · <b>{{ money(s.amount, s.currency) }}</b></div>
-              <span class="tag" :class="{ ok: s.status === 'paid' }">{{ t('bl.s.' + s.status) }}</span>
+              <span class="tag ox-pill" :class="{ ok: s.status === 'paid' }">{{ t('bl.s.' + s.status) }}</span>
             </div>
             <div v-if="s.status === 'paid'" class="small muted">{{ t('bl.paid_on', { d: s.paid_on ?? '', ref: s.transfer_ref }) }}</div>
             <div class="row" style="gap:6px">
@@ -177,7 +181,7 @@ async function showSettlement(id: number) {
           </div>
         </div>
       </div>
-      <div v-if="sum.days.length > 1" class="card" style="padding:0;overflow:auto">
+      <div v-if="sum.days.length > 1" class="ox-panel ox-scroll">
         <table class="data">
           <thead><tr><th>{{ t('bl.day') }}</th><th class="r">{{ t('bl.c.orders') }}</th><th class="r">{{ t('bl.food') }}</th><th class="r">{{ t('bl.c.discount') }}</th>
             <th class="r">{{ t('bl.paid') }}</th><th class="r">{{ t('bl.takings') }}</th></tr></thead>
@@ -187,9 +191,13 @@ async function showSettlement(id: number) {
       </div>
     </template>
   </div>
+  </div>
 </template>
 
 <style scoped>
+.bills .cols h2 { font-size: 17px; color: #2f1810; }
+.ox-stat .v.ok { color: var(--ok, #2f7a2a); } .ox-stat .v.plat { color: #6d28d9; } .ox-stat .v.neg { color: #b8392a; }
+.periods select { margin-inline-start: auto; }
 .custom input { width: auto; }
 .filter { width: auto; margin-inline-start: auto; }
 .r { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }

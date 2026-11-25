@@ -8,6 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import CouponRules from './CouponRules.vue'
 import '../coupons'
 import '../checkout'
+import '../officeStrings'
 
 // Three tabs: delivery promotions, dine-in promotions (the two never mix,
 // docs/CHECKOUT_DISCOUNT_DESIGN.md §4) and coupons. The tab is kept in the address.
@@ -105,6 +106,9 @@ function setStatus(p: Promotion, status: string) {
   void run(() => post(`/merchant/branches/${bid}/promotions/${p.id}/status`, { status }))
 }
 
+const STATES = ['active', 'draft', 'paused', 'ended'] as const
+const st = ref('')
+const picked = computed(() => promos.value.filter(p => !st.value || p.status === st.value))
 const statusTag = (p: Promotion) => p.status === 'active' ? (p.live_now ? 'ok' : 'warn') : p.status === 'paused' ? 'warn' : p.status === 'ended' ? 'bad' : ''
 const statusText = (p: Promotion) => p.status === 'active' && !p.live_now ? t('promo.not_live') : t('promo.' + p.status)
 const when = (p: Promotion) => {
@@ -127,73 +131,88 @@ async function runTrial() {
 </script>
 
 <template>
-  <div class="page stack" style="max-width:1000px">
-    <div class="row between">
-      <h1>{{ t('cr.page') }}</h1>
-      <button v-if="tab !== 'coupons'" class="btn primary" data-testid="promo-new" @click="edit(null)">{{ dine ? t('ck.new_dine') : t('new_promo') }}</button>
+  <div class="ox warm">
+  <div class="page ox-page">
+    <div class="ox-head">
+      <div><h1>{{ t('cr.page') }}</h1><p class="ox-sub">{{ t('ox.pr.sub') }}</p></div>
+      <div class="ox-acts"><button v-if="tab !== 'coupons'" class="btn primary" data-testid="promo-new" @click="edit(null)">＋ {{ dine ? t('ck.new_dine') : t('new_promo') }}</button></div>
     </div>
-    <div class="subtabs" role="tablist">
+    <div class="ox-tabs" role="tablist">
       <button type="button" role="tab" :class="{ on: tab === 'promos' }" data-testid="promo-tab" @click="setTab('promos')">{{ t('ck.tab_delivery') }}</button>
       <button type="button" role="tab" :class="{ on: tab === 'dine' }" data-testid="promo-dine-tab" @click="setTab('dine')">{{ t('ck.tab_dine') }}</button>
       <button type="button" role="tab" :class="{ on: tab === 'coupons' }" data-testid="coupon-tab" @click="setTab('coupons')">{{ t('ck.tab_coupons') }}</button>
     </div>
-    <CouponRules v-if="tab === 'coupons'" />
+    <div v-if="tab === 'coupons'" class="ox-panel"><CouponRules /></div>
     <template v-else>
-    <p v-if="dine" class="banner warn small" data-testid="promo-dine-hint">{{ t('ck.dine_hint') }}</p>
-    <p v-else class="muted small">{{ t('promos_hint') }} {{ t('ck.delivery_hint') }}</p>
     <div v-if="error && !form.open" class="banner bad">{{ error }}</div>
 
-    <div class="card" style="padding:0;overflow:auto">
-      <table class="data">
-        <thead><tr><th>{{ t('promo_name') }}</th><th>{{ t('promo_rule') }}</th><th>{{ t('promo_when') }}</th><th>{{ t('promo_usage') }}</th><th></th><th></th></tr></thead>
-        <tbody>
-          <tr v-for="p in promos" :key="p.id">
-            <td><b>{{ p.name }}</b><div class="muted small">{{ p.name_en }}</div></td>
-            <td>{{ promoLabel(p, cur) }}
-              <div class="muted small" v-if="isDish(p.kind)" data-testid="promo-dishes">{{ dishNames(p) }}</div>
-              <div class="muted small" v-if="!dine">{{ [p.applies_delivery && t('delivery'), p.applies_pickup && t('pickup')].filter(Boolean).join(' · ') }}</div></td>
-            <td class="small">{{ when(p) }}</td>
-            <td>{{ p.used_count }}<span v-if="p.total_quota"> / {{ p.total_quota }}</span>
-              <div class="muted small" v-if="p.per_phone_limit">{{ t('per_customer_n', { n: p.per_phone_limit }) }}</div></td>
-            <td><span class="tag" :class="statusTag(p)">{{ statusText(p) }}</span></td>
-            <td class="right">
-              <div class="row wrap" style="justify-content:flex-end;gap:6px" v-if="p.status !== 'ended'">
-                <button v-if="p.status === 'draft'" class="btn small primary" @click="setStatus(p, 'active')">{{ t('publish') }}</button>
-                <button v-if="p.status === 'active'" class="btn small" @click="setStatus(p, 'paused')">{{ t('pause') }}</button>
-                <button v-if="p.status === 'paused'" class="btn small primary" @click="setStatus(p, 'active')">{{ t('resume') }}</button>
-                <button class="btn small" @click="edit(p)">{{ t('edit') }}</button>
-                <button class="btn small danger" @click="setStatus(p, 'ended')">{{ t('end') }}</button>
-              </div>
-            </td>
-          </tr>
-          <tr v-if="promos.length === 0"><td colspan="6" class="muted">{{ t('no_promos') }}</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <div class="ox-body">
+      <aside class="ox-rail">
+        <div class="ox-rail-h">{{ t('ox.pr.state') }}</div>
+        <div class="ox-rail-list">
+          <button class="ox-cat" :class="{ on: st === '' }" @click="st = ''"><span class="nm">{{ t('ox.pr.all') }}</span><span class="n">{{ promos.length }}</span></button>
+          <button v-for="k in STATES" :key="k" class="ox-cat" :class="{ on: st === k }" :data-state="k" @click="st = k"><span class="nm">{{ t('promo.' + k) }}</span><span class="n">{{ promos.filter(p => p.status === k).length }}</span></button>
+        </div>
+        <p v-if="!dine" class="ox-rail-tip">{{ t('promos_hint') }} {{ t('ck.delivery_hint') }}</p>
+      </aside>
 
-    <form class="card stack" @submit.prevent="runTrial">
-      <h2>{{ t('trial') }}</h2>
-      <p class="muted small">{{ t('trial_hint') }}</p>
-      <div class="row wrap">
-        <select v-if="!dine" v-model="trial.service_type" style="flex:0 1 120px" :aria-label="t('delivery')">
-          <option value="delivery">{{ t('delivery') }}</option><option value="pickup">{{ t('pickup') }}</option>
-        </select>
-        <label class="row" style="gap:6px">{{ t('subtotal') }}<input type="number" min="0" step="0.01" v-model.number="trial.subtotal" style="width:110px" /></label>
-        <label class="row" style="gap:6px" v-if="trial.service_type === 'delivery'">{{ t('delivery_fee') }}<input type="number" min="0" step="0.01" v-model.number="trial.delivery_fee" style="width:110px" /></label>
-        <button class="btn primary">{{ t('trial_run') }}</button>
+      <div class="ox-stack">
+        <section class="ox-panel">
+          <p v-if="dine" class="ox-tip small" style="margin:0 0 12px" data-testid="promo-dine-hint">{{ t('ck.dine_hint') }}</p>
+          <div class="ox-scroll">
+            <table class="data">
+              <thead><tr><th>{{ t('promo_name') }}</th><th>{{ t('promo_rule') }}</th><th>{{ t('promo_when') }}</th><th class="num">{{ t('promo_usage') }}</th><th>{{ t('ox.pr.state') }}</th><th class="right">{{ t('ox.ops') }}</th></tr></thead>
+              <tbody>
+                <tr v-for="p in picked" :key="p.id">
+                  <td><b class="ox-strong">{{ p.name }}</b><div class="muted small">{{ p.name_en }}</div></td>
+                  <td><span class="ox-tag brand">{{ promoLabel(p, cur) }}</span>
+                    <div class="muted small" v-if="isDish(p.kind)" data-testid="promo-dishes">{{ dishNames(p) }}</div>
+                    <div class="muted small" v-if="!dine">{{ [p.applies_delivery && t('delivery'), p.applies_pickup && t('pickup')].filter(Boolean).join(' · ') }}</div></td>
+                  <td class="small">{{ when(p) }}</td>
+                  <td class="num">{{ p.used_count }}<span v-if="p.total_quota" class="muted"> / {{ p.total_quota }}</span>
+                    <div class="muted small" v-if="p.per_phone_limit">{{ t('per_customer_n', { n: p.per_phone_limit }) }}</div></td>
+                  <td><span class="tag ox-pill" :class="statusTag(p)">{{ statusText(p) }}</span></td>
+                  <td class="right">
+                    <span v-if="p.status !== 'ended'" class="ox-ops">
+                      <button v-if="p.status === 'draft'" class="op red" @click="setStatus(p, 'active')">{{ t('publish') }}</button>
+                      <button v-if="p.status === 'active'" class="op" @click="setStatus(p, 'paused')">{{ t('pause') }}</button>
+                      <button v-if="p.status === 'paused'" class="op red" @click="setStatus(p, 'active')">{{ t('resume') }}</button>
+                      <button class="op red" @click="edit(p)">{{ t('edit') }}</button>
+                      <button class="op bad" @click="setStatus(p, 'ended')">{{ t('end') }}</button>
+                    </span>
+                  </td>
+                </tr>
+                <tr v-if="picked.length === 0"><td colspan="6" class="ox-empty">{{ t('no_promos') }}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <form class="ox-panel stack" @submit.prevent="runTrial">
+          <div class="ox-panel-h" style="margin:0"><h2>{{ t('trial') }}</h2></div>
+          <p class="muted small" style="margin:0">{{ t('trial_hint') }}</p>
+          <div class="ox-tools" style="margin:0">
+            <select v-if="!dine" v-model="trial.service_type" style="flex:0 1 120px;min-width:0" :aria-label="t('delivery')">
+              <option value="delivery">{{ t('delivery') }}</option><option value="pickup">{{ t('pickup') }}</option>
+            </select>
+            <label class="row" style="gap:6px">{{ t('subtotal') }}<input type="number" min="0" step="0.01" v-model.number="trial.subtotal" style="width:110px" /></label>
+            <label class="row" style="gap:6px" v-if="trial.service_type === 'delivery'">{{ t('delivery_fee') }}<input type="number" min="0" step="0.01" v-model.number="trial.delivery_fee" style="width:110px" /></label>
+            <button class="btn primary">{{ t('trial_run') }}</button>
+          </div>
+          <template v-if="result">
+            <table class="data">
+              <tbody><tr v-for="r in result.rows" :key="r.id">
+                <td>{{ r.name }} <span class="tag" v-if="r.status !== 'active'">{{ t('promo.' + r.status) }}</span></td>
+                <td class="price">{{ r.reason ? '—' : '−' + money(r.discount, cur) }}</td>
+                <td><span v-if="r.wins" class="tag ok">{{ t('trial_wins') }}</span><span v-else-if="r.reason" class="muted small">{{ t('why.' + r.reason) }}</span></td>
+              </tr></tbody>
+            </table>
+            <div class="row between bold trial-total"><span>{{ t('total') }}</span>
+              <span class="ox-money">{{ money(result.totals.total, cur) }} <span class="muted small" v-if="result.totals.discount">(−{{ money(result.totals.discount, cur) }})</span></span></div>
+          </template>
+        </form>
       </div>
-      <template v-if="result">
-        <table class="data">
-          <tbody><tr v-for="r in result.rows" :key="r.id">
-            <td>{{ r.name }} <span class="tag" v-if="r.status !== 'active'">{{ t('promo.' + r.status) }}</span></td>
-            <td class="price">{{ r.reason ? '—' : '−' + money(r.discount, cur) }}</td>
-            <td><span v-if="r.wins" class="tag ok">{{ t('trial_wins') }}</span><span v-else-if="r.reason" class="muted small">{{ t('why.' + r.reason) }}</span></td>
-          </tr></tbody>
-        </table>
-        <div class="row between bold"><span>{{ t('total') }}</span>
-          <span>{{ money(result.totals.total, cur) }} <span class="muted small" v-if="result.totals.discount">(−{{ money(result.totals.discount, cur) }})</span></span></div>
-      </template>
-    </form>
+    </div>
 
     <div class="sheet-mask" v-if="form.open" @click.self="form.open = false">
       <form class="sheet center" @submit.prevent="save">
@@ -252,9 +271,11 @@ async function runTrial() {
     </div>
     </template>
   </div>
+  </div>
 </template>
 
 <style scoped>
+.trial-total { font-size: 16px; padding: 4px 2px 0; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: center; }
 .dishpick { margin: 8px 0; }
 .dishlist { max-height: 240px; overflow: auto; border: 1px solid var(--line, #e5e7eb); border-radius: 8px; padding: 4px 10px; }
