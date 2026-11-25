@@ -1,5 +1,5 @@
 // Command admin creates the platform administrator, or resets its password.
-// The platform administrator signs in at /login and creates merchants.
+// The platform administrator signs in at /admin/login and creates merchants.
 //
 //	ADMIN_USERNAME=admin ADMIN_PASSWORD='a long password' admin
 //
