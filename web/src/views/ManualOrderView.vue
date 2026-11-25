@@ -110,7 +110,8 @@ const specText = (l: Line) => optionsOf(l).filter(x => x.n && isSpec(x.g)).map(x
 const addonsOf = (l: Line) => optionsOf(l).filter(x => x.n && !isSpec(x.g))
 const hasAddons = (l: Line) => l.item.groups.some(g => !isSpec(g))
 const unit = (l: Line) => l.item.price + optionsOf(l).reduce((s, x) => s + x.o.price_delta * x.n, 0)
-const groupCount = (l: Line, g: OptionGroup) => g.options.reduce((s, o) => s + (l.picks[o.id] ?? 0), 0)
+// how many different options of the group are picked: the group's limit is on kinds, not portions
+const groupCount = (l: Line, g: OptionGroup) => g.options.reduce((s, o) => s + (l.picks[o.id] ? 1 : 0), 0)
 const count = computed(() => lines.value.reduce((s, l) => s + l.qty, 0))
 const subtotal = computed(() => lines.value.reduce((s, l) => s + unit(l) * l.qty, 0))
 
@@ -159,7 +160,8 @@ function removeLine(l: Line) { lines.value = lines.value.filter(x => x !== l) }
 function setQty(l: Line, d: number) { l.qty = Math.max(1, Math.min(999, l.qty + d)) }
 function setAddon(l: Line, g: OptionGroup, id: number, d: number) {
   const n = (l.picks[id] ?? 0) + d
-  if (d > 0 && groupCount(l, g) >= g.max_select) return
+  if (d > 0 && !l.picks[id] && groupCount(l, g) >= g.max_select) return
+  if (n > 20) return
   if (n <= 0) delete l.picks[id]
   else l.picks[id] = n
 }
