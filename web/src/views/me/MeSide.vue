@@ -6,10 +6,15 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { t } from '../../i18n'
 import { avatarUrl, displayName, me } from './me'
+import { onOwnSite, ownSite, ownSlug } from '../../site'
 
 const route = useRoute()
 interface Link { to: string; key: string; icon: string; dot?: boolean }
-const groups = computed<{ key: string; links: Link[] }[]>(() => [
+// a store's own page keeps the pages of that store; its messages are the chat with it
+const groups = computed(() => allGroups.value
+  .map(g => ({ ...g, links: g.links.map(l => l.to === '/me/messages' && ownSite() ? { ...l, to: `/chat/${ownSlug()}` } : l).filter(l => onOwnSite(l.to)) }))
+  .filter(g => g.links.length))
+const allGroups = computed<{ key: string; links: Link[] }[]>(() => [
   { key: '', links: [
     { to: '/me', key: 'cn.center', icon: 'M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z' },
     { to: '/orders', key: 'cn.orders', icon: 'M6.5 4.5h11a1.5 1.5 0 0 1 1.5 1.500v13a1.5 1.5 0 0 1-1.500 1.500h-11A1.5 1.5 0 0 1 5 19V6a1.5 1.5 0 0 1 1.500-1.500zM9 9.500h6M9 13.500h4' },

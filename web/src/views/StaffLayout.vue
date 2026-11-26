@@ -30,7 +30,7 @@ const show = (path: string) => { const p = pagePerms(path); return !p || can(...
 const groupPages: Record<string, string[]> = {
   pos: ['/merchant/order/', '/merchant/queue'], orders: ['/merchant/progress', '/merchant/voids'],
   cm: ['/merchant/members', '/merchant/addresses'], msg: ['/merchant/messages', '/merchant/support'],
-  deco: ['/merchant/media', '/merchant/templates'], fin: ['/merchant/cash', '/merchant/bills', '/merchant/reconcile'],
+  deco: ['/merchant/media', '/merchant/templates', '/merchant/site-link'], fin: ['/merchant/cash', '/merchant/bills', '/merchant/reconcile'],
   dlv: ['/merchant/riders', '/merchant/delivery-map'],
 }
 const openGrps = ref<Record<string, boolean>>({})
@@ -144,11 +144,12 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
           </template>
         </template>
         <router-link v-if="show('/merchant/menu')" to="/merchant/menu">{{ t('menu_admin') }}</router-link>
-        <template v-if="show('/merchant/media') || show('/merchant/templates')">
+        <template v-if="show('/merchant/media') || show('/merchant/templates') || show('/merchant/site-link')">
           <button class="navgrp" :class="{ open: isOpen('deco') }" :aria-expanded="isOpen('deco')" data-testid="nav-deco" @click="toggleGrp('deco')"><span class="grow">{{ t('deco.nav') }}</span><i class="caret"></i></button>
           <template v-if="isOpen('deco')">
             <router-link v-if="show('/merchant/media')" to="/merchant/media" class="navsub" data-testid="nav-media">{{ t('promo_media') }}</router-link>
             <router-link v-if="show('/merchant/templates')" to="/merchant/templates" class="navsub" data-testid="nav-templates">{{ t('templates') }}</router-link>
+            <router-link v-if="show('/merchant/site-link')" to="/merchant/site-link" class="navsub" data-testid="nav-site-link">{{ t('sl.title') }}</router-link>
           </template>
         </template>
         <router-link v-if="show('/merchant/promos')" to="/merchant/promos">{{ t('promos') }}</router-link>

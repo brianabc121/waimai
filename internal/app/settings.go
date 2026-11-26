@@ -51,6 +51,7 @@ var settingDefs = []settingDef{
 	{"TRANSLATE_PROVIDER", "translate", false, func(c *config.Config) *string { return &c.TranslateProvider }},
 	{"ANTHROPIC_API_KEY", "translate", true, func(c *config.Config) *string { return &c.AnthropicAPIKey }},
 	{"GOOGLE_TRANSLATE_API_KEY", "translate", true, func(c *config.Config) *string { return &c.GoogleTranslateKey }},
+	{"STORE_SITE_DOMAIN", "site", false, func(c *config.Config) *string { return &c.StoreSiteDomain }},
 }
 
 func settingDefByKey(key string) *settingDef {
@@ -363,6 +364,8 @@ type SettingsView struct {
 		SMS     string `json:"sms"` // log, webhook, twilio
 		// Translate is the menu translation service in use, "off" without one.
 		Translate string `json:"translate"`
+		// Site is the domain of the stores' own pages, "" when not set.
+		Site string `json:"site"`
 	} `json:"active"`
 	// WeakSecret: APP_SECRET is the development default, so the encryption
 	// protects nothing.
@@ -429,6 +432,7 @@ func (a *App) settingsView(saved map[string]storedSetting) *SettingsView {
 	out.Active.WebPush = cfg.VAPIDPublicKey != "" && cfg.VAPIDPrivateKey != ""
 	out.Active.AppPush = cfg.FCMServiceAccount != ""
 	out.Active.SMS = cfg.SMSProvider
+	out.Active.Site = strings.ToLower(cfg.StoreSiteDomain)
 	out.Active.Translate = "off"
 	if tr := newTranslator(cfg); tr != nil {
 		out.Active.Translate = tr.Name()
@@ -474,6 +478,10 @@ func checkSetting(key, v string) error {
 		u, err := url.Parse(v)
 		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
 			return ErrValidation("SMS_WEBHOOK_URL must be an http(s) address")
+		}
+	case "STORE_SITE_DOMAIN":
+		if !validDomain(strings.ToLower(v)) {
+			return ErrValidation("STORE_SITE_DOMAIN must be a domain such as abcfood.com")
 		}
 	case "VAPID_SUBJECT":
 		if !strings.HasPrefix(v, "mailto:") && !strings.HasPrefix(v, "https://") {

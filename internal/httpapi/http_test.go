@@ -83,6 +83,10 @@ func (c *client) do(method, path string, body any, headers ...string) (int, map[
 	req.Header.Set("X-Requested-With", "test")
 	req.Header.Set("X-Forwarded-For", c.ip)
 	for i := 0; i+1 < len(headers); i += 2 {
+		if headers[i] == "Host" {
+			req.Host = headers[i+1]
+			continue
+		}
 		if headers[i+1] == "" {
 			req.Header.Del(headers[i])
 		} else {

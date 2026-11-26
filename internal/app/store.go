@@ -78,7 +78,9 @@ type Branch struct {
 	IntroTr  string `json:"intro_tr,omitempty"`
 	// StoreCode starts staff order numbers (YPX000123); DayResetTime is when
 	// DineIn- and Online- numbers start from 1 again (docs/ORDER_TYPES_DESIGN.md §4).
-	StoreCode    string `json:"store_code"`
+	StoreCode string `json:"store_code"`
+	// StoreNo names the store's own page: <store_no>.<site domain>.
+	StoreNo      int    `json:"store_no"`
 	DayResetTime string `json:"day_reset_time"`
 }
 
@@ -163,7 +165,7 @@ const branchCols = `id, merchant_id, slug, name, name_en, address, phone, timezo
 	lat, lng, zone_mode, zone_tolerance_m, kitchen_slow_minutes, detour_percent, detour_meters,
 	notice, intro, baskets_enabled, country_code, country, province, city, district, postal_code, contact_fields,
 	menu_lang, menu_langs_off, addon_confirm_minutes, cook_target_minutes, (SELECT m.status = 'suspended' FROM merchants m WHERE m.id = branches.merchant_id),
-	store_code, day_reset_time`
+	store_code, day_reset_time, store_no`
 
 func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 	var b Branch
@@ -172,7 +174,7 @@ func scanBranch(row interface{ Scan(...any) error }) (*Branch, error) {
 		&b.AcceptTimeoutMinutes, &b.DeliveryEnabled, &b.PickupEnabled, &b.Paused, &b.OpenTime, &b.CloseTime, &b.NotifySMS,
 		&b.SchedulingEnabled, &b.PrepMinutes, &b.Lat, &b.Lng, &b.ZoneMode, &b.ZoneToleranceM,
 		&b.KitchenSlowMinutes, &b.DetourPercent, &b.DetourMeters, &b.Notice, &b.Intro, &b.BasketsEnabled,
-		&b.CountryCode, &b.Country, &b.Province, &b.City, &b.District, &b.PostalCode, &b.ContactFields, &b.MenuLang, &b.MenuLangsOff, &b.AddonConfirmMinutes, &b.CookTargetMinutes, &b.Suspended, &b.StoreCode, &b.DayResetTime)
+		&b.CountryCode, &b.Country, &b.Province, &b.City, &b.District, &b.PostalCode, &b.ContactFields, &b.MenuLang, &b.MenuLangsOff, &b.AddonConfirmMinutes, &b.CookTargetMinutes, &b.Suspended, &b.StoreCode, &b.DayResetTime, &b.StoreNo)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, ErrNotFound

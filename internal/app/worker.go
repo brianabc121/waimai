@@ -109,6 +109,7 @@ func (w *Worker) Tick(ctx context.Context) {
 	w.runTask(ctx, "jobs", a.runJobs)
 	if time.Since(w.lastTrips) > tripInterval {
 		w.runTask(ctx, "rider_trips", a.AdvanceTrips)
+		w.runTask(ctx, "check_domains", a.CheckDomains)
 		w.lastTrips = time.Now()
 	}
 	if time.Since(w.lastCleanup) > cleanupInterval {

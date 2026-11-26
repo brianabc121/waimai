@@ -46,6 +46,7 @@ async function out() { await logout(); session.loaded = true; router.replace('/a
       <router-link to="/admin/mall">{{ t('ad.mall') }}</router-link>
       <router-link to="/admin/coupons" data-testid="nav-coupons">{{ t('ad.coupons') }}</router-link>
       <router-link to="/admin/bills" data-testid="nav-bills">{{ t('bl.nav') }}</router-link>
+      <router-link to="/admin/domains" data-testid="nav-domains">{{ t('ad.dom.nav') }}</router-link>
       <router-link to="/admin/pay-methods" data-testid="nav-pay-methods">{{ t('ad.pay') }}</router-link>
       <router-link to="/admin/support" data-testid="nav-support">{{ t('ad.support') }}<span v-if="monitor.supportUnread" class="badge" data-testid="support-badge">{{ monitor.supportUnread > 99 ? '99+' : monitor.supportUnread }}</span></router-link>
       <router-link to="/admin/chats" data-testid="nav-chats">{{ t('ad.chats') }}</router-link>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The coupons a store lets customers claim, as a row of small tickets on its
 // page (docs/COUPON_DESIGN.md §3.5). Claiming needs an account.
+import { storePath } from '../site'
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { get, post } from '../api'
@@ -18,7 +19,7 @@ async function load() {
 }
 onMounted(load)
 async function claim(c: ClaimableCoupon) {
-  if (!(await loadCustomer())) { router.push(loginRoute(`/s/${props.slug}`, props.slug)); return }
+  if (!(await loadCustomer())) { router.push(loginRoute(storePath(props.slug), props.slug)); return }
   busy.value = c.id; note.value = ''
   try { await post(`/stores/${props.slug}/coupons/${c.id}/claim`); note.value = t('cb.got') } catch (e) { note.value = (e as Error).message }
   finally { busy.value = 0; await load() }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { storeURL } from '../site'
 import '../addon'
 import '../progress'
 import { computed, onMounted, reactive, ref } from 'vue'
@@ -93,7 +94,8 @@ async function saveStation() {
   if (await run(() => st.id ? put(`/merchant/branches/${bid}/stations/${st.id}`, body) : post(`/merchant/branches/${bid}/stations`, body))) editStation(null)
 }
 
-const link = () => `${location.origin}/s/${branch.value?.slug}`
+// the store's own page (docs/ORDER_TYPES_DESIGN.md §5)
+const link = () => branch.value ? storeURL(branch.value) : ''
 const copied = ref(false)
 async function copyLink() { try { await navigator.clipboard.writeText(link()); copied.value = true } catch { /* the link is shown anyway */ } }
 // the sections in the rail; a click scrolls to one

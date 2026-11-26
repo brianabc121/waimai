@@ -107,7 +107,7 @@ try {
   await cust.fill(tid('login-phone'), phone)
   await cust.check(tid('login-agree'))
   await cust.click(tid('login-send'))
-  await cust.waitForURL(u => u.pathname === '/s/makati')
+  await cust.waitForURL(u => u.pathname === '/mall/s/makati')
   await cust.waitForSelector(tid('claim-btn'))
   await cust.click(tid('claim-btn'))
   await cust.waitForSelector(tid('claim-note'))

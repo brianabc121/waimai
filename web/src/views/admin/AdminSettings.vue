@@ -12,7 +12,7 @@ interface Setting {
 }
 interface View {
   items: Setting[]
-  active: { maps: string; routes: string; web_push: boolean; app_push: boolean; sms: string; translate: string }
+  active: { maps: string; routes: string; web_push: boolean; app_push: boolean; sms: string; translate: string; site?: string }
   otp_sent_today?: number
   weak_secret: boolean
 }
@@ -24,7 +24,7 @@ const error = ref('')
 const failed = ref('') // the group whose save was refused
 const saved = ref('')
 const busy = ref(false)
-const groups = ['maps', 'web_push', 'app_push', 'sms', 'translate'] as const
+const groups = ['maps', 'web_push', 'app_push', 'sms', 'translate', 'site'] as const
 type Group = typeof groups[number]
 
 function take(v: View) {
@@ -82,6 +82,7 @@ function state(g: Group): { on: boolean; text: string } {
   if (g === 'web_push') return { on: a.web_push, text: t(a.web_push ? 'ad.set.on' : 'ad.set.off') }
   if (g === 'app_push') return { on: a.app_push, text: t(a.app_push ? 'ad.set.on' : 'ad.set.off') }
   if (g === 'translate') return { on: a.translate !== 'off', text: t('ad.set.tr_' + a.translate) }
+  if (g === 'site') return { on: !!a.site, text: a.site ? t('ad.set.site_on', { d: a.site }) : t('ad.set.off') }
   return { on: a.sms !== 'log', text: t('ad.set.sms_' + a.sms) }
 }
 </script>
@@ -123,7 +124,7 @@ function state(g: Group): { on: boolean; text: string } {
             </select>
             <textarea v-else-if="s.key === 'FCM_SERVICE_ACCOUNT'" v-model="draft[s.key]" rows="3" spellcheck="false" :placeholder="t('ad.set.fcm_ph')"></textarea>
             <input v-else v-model="draft[s.key]" :type="s.secret ? 'password' : 'text'" autocomplete="new-password" spellcheck="false"
-              :placeholder="s.secret ? t(s.source === 'none' ? 'ad.set.enter' : 'ad.set.replace') : ''" />
+              :placeholder="s.secret ? t(s.source === 'none' ? 'ad.set.enter' : 'ad.set.replace') : s.key === 'STORE_SITE_DOMAIN' ? 'abcfood.com' : ''" />
             <button v-if="s.source === 'admin' || s.unreadable" class="btn small danger" :disabled="busy" data-testid="clear" @click="clear(s)">{{ t('ad.set.clear') }}</button>
           </div>
         </div>

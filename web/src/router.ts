@@ -1,13 +1,22 @@
 import { createRouter, createWebHistory, type LocationQuery } from 'vue-router'
 import { can, homeFor, loadSession, officeRoles, scopeFor, useScope } from './session'
 import { adminScope } from './i18n'
+import { get } from './api'
+import { ownSite, ownSiteRedirect, ownSlug, site, storeURL } from './site'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', component: () => import('./views/mall/MallHome.vue') },
-    { path: '/s/:slug', component: () => import('./views/StoreView.vue'), props: true },
-    { path: '/s/:slug/checkout', component: () => import('./views/CheckoutView.vue'), props: true },
+    // the mall, or the store itself on its own page (site.ts)
+    { path: '/', component: () => import('./views/HomeView.vue') },
+    { path: '/checkout', component: () => import('./views/CheckoutView.vue'), props: () => ({ slug: ownSlug() }),
+      beforeEnter: () => ownSite() || '/' },
+    { path: '/mall/s/:slug', component: () => import('./views/StoreView.vue'), props: true },
+    { path: '/mall/s/:slug/checkout', component: () => import('./views/CheckoutView.vue'), props: true },
+    // The link merchants used to share: now their own page, or the store in
+    // the mall while the platform has no domain for those pages.
+    { path: '/s/:slug', component: () => import('./views/NotFound.vue'), beforeEnter: to => oldStoreLink(to.params.slug as string, to.query, false) },
+    { path: '/s/:slug/checkout', component: () => import('./views/NotFound.vue'), beforeEnter: to => oldStoreLink(to.params.slug as string, to.query, true) },
     { path: '/orders', component: () => import('./views/CustomerOrders.vue') },
     { path: '/o/:token', component: () => import('./views/OrderView.vue'), props: true },
     { path: '/o/:token/append', component: () => import('./views/AddonCheckout.vue'), props: true },
@@ -56,6 +65,7 @@ export const router = createRouter({
         { path: 'menu', component: () => import('./views/MenuView.vue') },
         { path: 'templates', component: () => import('./views/TemplatesView.vue') },
         { path: 'media', component: () => import('./views/MediaView.vue') },
+        { path: 'site-link', component: () => import('./views/SiteLinkView.vue') },
         { path: 'promos', component: () => import('./views/PromosView.vue') },
         { path: 'cash', component: () => import('./views/CashView.vue') },
         { path: 'bills', component: () => import('./views/BillsView.vue') },
@@ -91,6 +101,7 @@ export const router = createRouter({
         { path: 'mall', component: () => import('./views/admin/AdminMall.vue'), meta: { title: 'ad.mall' } },
         { path: 'coupons', component: () => import('./views/admin/AdminCoupons.vue'), meta: { title: 'ad.coupons' } },
         { path: 'bills', component: () => import('./views/admin/AdminBills.vue'), meta: { title: 'bl.nav' } },
+        { path: 'domains', component: () => import('./views/admin/AdminDomains.vue'), meta: { title: 'ad.dom.nav' } },
         { path: 'pay-methods', component: () => import('./views/admin/AdminPayMethods.vue'), meta: { title: 'ad.pay' } },
         { path: 'support', component: () => import('./views/admin/AdminSupport.vue'), meta: { title: 'ad.support' } },
         { path: 'chats', component: () => import('./views/admin/AdminChats.vue'), meta: { title: 'ad.chats' } },
@@ -112,6 +123,8 @@ export const router = createRouter({
 const officePage = (p: string) => /^\/merchant(\/|$)/.test(p)
 
 router.beforeEach(async to => {
+  const own = ownSiteRedirect(to.path)
+  if (own && own !== to.path) return own
   const scope = scopeFor(to.path)
   if (to.meta.staff || to.path === '/login' || to.path === '/admin/login') useScope(scope)
   if (to.path === '/admin/login') {
@@ -153,3 +166,14 @@ function oldOrderPage(q: LocationQuery) {
 
 // The platform back office is in Chinese or English only (see i18n.ts).
 router.afterEach(to => { adminScope.value = to.path === '/admin' || to.path.startsWith('/admin/') })
+
+async function oldStoreLink(slug: string, query: LocationQuery, checkout: boolean) {
+  if (ownSite()) return { path: slug === ownSlug() && checkout ? '/checkout' : '/', query }
+  if (site.store_domain && !query.append) {
+    try {
+      const s = await get<{ branch: { store_no: number; slug: string } }>(`/stores/${encodeURIComponent(slug)}`)
+      if (s.branch.store_no) { location.replace(storeURL(s.branch) + (checkout ? '/checkout' : '/')); return false }
+    } catch { /* not a store: the mall shows it */ }
+  }
+  return { path: `/mall/s/${slug}${checkout ? '/checkout' : ''}`, query }
+}

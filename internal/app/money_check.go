@@ -13,7 +13,7 @@ import (
 // docs/PRICING_CHECK.md §2 and returns one line per broken rule (nil when
 // all hold). It only reads.
 //
-// Besides the sums on the order (D1–D9), it replays the order (R1–R3): it
+// Besides the sums on the order (D1–D9, D12), it replays the order (R1–R3): it
 // prices the order again from nothing but what the order itself holds — its
 // fee rates, its live dishes, the rules of its dish promotions, what its
 // promotion and coupons took off, the discount at checkout — and the result
@@ -28,6 +28,8 @@ func (a *App) CheckOrderMoney(ctx context.Context, orderID int64) ([]string, err
 		sub, pack, ship, svc, tax, disc, merch, platf, staff    int64
 		round, total, rows, perLine, ledger, refunded, negative int64
 		incl, hasRows                                           bool
+		otype                                                   string
+		platfRows                                               int64
 	}
 	if err := a.DB.QueryRow(ctx, `SELECT o.acceptance_status, o.subtotal, o.packaging_fee, o.delivery_fee,
 		o.service_charge, o.tax_amount, o.discount, o.merchant_discount, o.platform_subsidy, o.staff_discount,
@@ -38,10 +40,11 @@ func (a *App) CheckOrderMoney(ctx context.Context, orderID int64) ([]string, err
 			WHERE d.order_id = o.id), 0),
 		COALESCE((SELECT sum(e.delta_total) FROM order_money_events e WHERE e.order_id = o.id), 0),
 		COALESCE((SELECT sum(r.amount) FROM order_refunds r WHERE r.order_id = o.id), 0),
-		(SELECT count(*) FROM order_discounts d WHERE d.order_id = o.id AND d.amount < 0)
+		(SELECT count(*) FROM order_discounts d WHERE d.order_id = o.id AND d.amount < 0),
+		o.order_type, (SELECT count(*) FROM order_discounts d WHERE d.order_id = o.id AND d.funded_by = 'platform')
 		FROM orders o WHERE o.id = $1`, orderID).Scan(&o.status, &o.sub, &o.pack, &o.ship, &o.svc, &o.tax, &o.disc,
 		&o.merch, &o.platf, &o.staff, &o.round, &o.total, &o.incl, &o.hasRows, &o.rows, &o.perLine, &o.ledger,
-		&o.refunded, &o.negative); err != nil {
+		&o.refunded, &o.negative, &o.otype, &o.platfRows); err != nil {
 		return nil, err
 	}
 	// D1 no amount below 0
@@ -55,6 +58,11 @@ func (a *App) CheckOrderMoney(ctx context.Context, orderID int64) ([]string, err
 	// D6 the ledger adds up to the total (it records rejected orders too)
 	if o.ledger != o.total {
 		fail("D6 money ledger adds up to %d, total %d", o.ledger, o.total)
+	}
+	// D12 platform coupons are for the mall: an order on the store's own page
+	// has no platform-funded discount (docs/ORDER_TYPES_DESIGN.md §9.4)
+	if o.otype == "web" && (o.platf != 0 || o.platfRows != 0) {
+		fail("D12 order on the store's own page has platform discount %d (%d rows)", o.platf, o.platfRows)
 	}
 	// D7 never more given back than was paid
 	if o.refunded > o.total {

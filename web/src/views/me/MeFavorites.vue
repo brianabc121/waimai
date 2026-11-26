@@ -2,6 +2,7 @@
 // The stores the customer keeps, and the ones they have ordered from. With no
 // store remembered on this device, "home" leads here too, so the page is open
 // to someone who is not logged in.
+import { storePath } from '../../site'
 import { computed, ref, watch } from 'vue'
 import { pick, t, sn } from '../../i18n'
 import CustomerTabs from './CustomerTabs.vue'
@@ -33,7 +34,7 @@ async function toggle(s: MyStore) {
       <div v-if="!kept.length" class="card empty" data-testid="fav-empty">{{ t(visited.length ? 'mf.none' : 'mf.no_store') }}</div>
       <div v-else class="card list">
         <div v-for="s in kept" :key="s.slug" class="store" data-testid="fav-store">
-          <router-link :to="`/s/${s.slug}`" class="lnk">
+          <router-link :to="storePath(s.slug)" class="lnk">
             <img v-if="s.logo_url" :src="s.logo_url" alt="" class="me-logo" /><span v-else class="me-logo">{{ sn(s).slice(0, 1) }}</span>
             <span class="grow"><b>{{ sn(s) }}</b><span class="small muted">{{ s.address }}</span></span>
           </router-link>
@@ -44,7 +45,7 @@ async function toggle(s: MyStore) {
         <h3 class="me-sec">{{ t('mf.visited') }}</h3>
         <div class="card list">
           <div v-for="s in visited" :key="s.slug" class="store" data-testid="visited-store">
-            <router-link :to="`/s/${s.slug}`" class="lnk">
+            <router-link :to="storePath(s.slug)" class="lnk">
               <img v-if="s.logo_url" :src="s.logo_url" alt="" class="me-logo" /><span v-else class="me-logo">{{ sn(s).slice(0, 1) }}</span>
               <span class="grow"><b>{{ sn(s) }}</b><span class="small muted">{{ s.address }}</span></span>
             </router-link>

@@ -46,6 +46,11 @@ type QuoteInput struct {
 	// Lang is the customer's language: the lines are named in it as well, and
 	// the order keeps those names (docs/I18N_DESIGN.md §6.4).
 	Lang string `json:"lang"`
+	// OwnSite is set by the server when the customer orders on the store's
+	// own page (docs/ORDER_TYPES_DESIGN.md §3.2): the order is an Online- one
+	// and platform coupons do not apply (§9.4). What the browser sends is
+	// replaced.
+	OwnSite bool `json:"own_site,omitempty"`
 	// feeOverride replaces the zone's delivery fee (an order placed by staff).
 	feeOverride *int64
 }
@@ -243,7 +248,7 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 	dish := dishOnly(promos, now, b, in.ServiceType, subtotal)
 	dishAdj := dishAdjustments(dish, quoteDishLines(lines))
 	promo, d := bestPromotion(promos, now, b.location(), in.ServiceType, subtotal-dishOff(dishAdj), deliveryFee)
-	wallet, err := walletFor(ctx, q, phone, b)
+	wallet, err := walletFor(ctx, q, phone, b, in.OwnSite)
 	if err != nil {
 		return nil, err
 	}

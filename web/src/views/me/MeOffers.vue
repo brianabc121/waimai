@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The customer's coupons (usable / used / expired) and, under the usable
 // ones, the promotions their stores run, which apply by themselves.
+import { ownSite, ownSlug, storePath } from '../../site'
 import { computed, ref, watch } from 'vue'
 import { get } from '../../api'
 import { couponName, couponStub, validity, whereUsable, lastDay } from '../../coupons'
@@ -18,13 +19,14 @@ watch(() => me.profile?.id, async id => {
   if (!id) return
   try {
     const [o, c] = await Promise.all([myOffers(homeStore()?.slug), get<{ coupons: CustomerCoupon[] }>('/customer/coupons')])
-    offers.value = o; coupons.value = c.coupons
+    // a store's own page shows that store's offers only (its coupons come filtered)
+    offers.value = ownSite() ? o.filter(x => x.store.slug === ownSlug()) : o; coupons.value = c.coupons
   } catch (e) { error.value = describe(e) }
 }, { immediate: true })
 const shown = computed(() => (coupons.value ?? []).filter(c => c.status === tab.value))
 const openCount = computed(() => (coupons.value ?? []).filter(c => c.status === 'available').length)
 // A store coupon leads to its store; a platform coupon to the marketplace.
-const useLink = (c: CustomerCoupon) => c.store_slug ? `/s/${c.store_slug}` : '/'
+const useLink = (c: CustomerCoupon) => c.store_slug ? storePath(c.store_slug) : '/'
 
 // Who the offer is for, when it is not for every order.
 function only(p: Promotion): string {
@@ -80,7 +82,7 @@ function valid(p: Promotion): string {
           <span v-if="named(p, o.currency)" class="small nm">{{ named(p, o.currency) }}</span>
           <span class="small">{{ valid(p) }}</span>
         </div>
-        <router-link :to="`/s/${o.store.slug}`" class="use">{{ t('mo.use') }}
+        <router-link :to="storePath(o.store.slug)" class="use">{{ t('mo.use') }}
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg></router-link>
       </div>
     </template>

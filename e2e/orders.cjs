@@ -105,7 +105,7 @@ await cust.click(tid('order-back'))
 await cust.waitForURL(u => u.pathname === '/orders')
 await listReady(cust)
 await cust.click(tid('orders-back'))
-await cust.waitForURL(u => u.pathname.startsWith('/s/makati'))
+await cust.waitForURL(u => u.pathname.startsWith('/mall/s/makati'))
 step('back works from the order page and from the list')
 
 // ---- tabs and search ----
@@ -180,7 +180,7 @@ step('the order was reviewed from the list')
 
 // ---- order the same again ----
 await cust.click(`[data-order="${first}"] ${tid('card-again')}`)
-await cust.waitForURL(u => u.pathname === '/s/makati')
+await cust.waitForURL(u => u.pathname === '/mall/s/makati')
 await cust.waitForSelector('.item')
 expect(await text(cust, tid('cart-count')), '2', 'dishes back in the cart')
 await cust.goBack()

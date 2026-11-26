@@ -4,6 +4,7 @@
 // What it says about delivery is only the fee, the minimum and the time. A
 // store near the customer that does not deliver to them keeps its colours and
 // says "no delivery" next to the distance; opening it starts its cart on pickup when it offers that.
+import { storePath } from '../../site'
 import { computed } from 'vue'
 import { money, pick, promoLabel, t, mn, sn } from '../../i18n'
 import { cart, useCart } from '../../cart'
@@ -31,7 +32,7 @@ function opened() {
 </script>
 
 <template>
-  <router-link :to="`/s/${s.slug}`" class="mcard" :class="{ off: !open, nodel }" data-testid="mall-store" :data-slug="s.slug" :data-nodelivery="nodel || undefined" @click="opened">
+  <router-link :to="storePath(s.slug)" class="mcard" :class="{ off: !open, nodel }" data-testid="mall-store" :data-slug="s.slug" :data-nodelivery="nodel || undefined" @click="opened">
     <div class="cover" :style="cover ? { backgroundImage: `url(${cover})` } : {}">
       <span v-if="eta" class="eta">{{ eta }}</span>
       <span v-if="!open" class="veil">{{ shut }}<template v-if="opens"> · {{ opens }}</template></span>

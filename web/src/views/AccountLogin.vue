@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Customer login: a mobile number and a texted code, nothing else. A number
 // that has no account yet gets one when the code checks out.
+import { storePath } from '../site'
 import LangButton from './LangButton.vue'
 import DialPicker from './DialPicker.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -128,7 +129,7 @@ async function login() {
   try {
     await post('/otp/verify', { phone: full.value, code: code.value })
     await loadCustomer(true)
-    router.replace(next.value || (slug.value ? `/s/${slug.value}` : '/me'))
+    router.replace(next.value || (slug.value ? storePath(slug.value) : '/me'))
   } catch (e) {
     error.value = describe(e)
     code.value = ''
@@ -138,12 +139,12 @@ async function login() {
 watch(code, c => { if (c.length === 6 && sentTo.value) void login() })
 
 function back() {
-  if (slug.value) router.replace(`/s/${slug.value}`)
+  if (slug.value) router.replace(storePath(slug.value))
   else router.back()
 }
 
 onMounted(async () => {
-  if (await loadCustomer(true)) { router.replace(next.value || (slug.value ? `/s/${slug.value}` : '/me')); return }
+  if (await loadCustomer(true)) { router.replace(next.value || (slug.value ? storePath(slug.value) : '/me')); return }
   if (slug.value) store.value = await get<Storefront>(`/stores/${slug.value}`).catch(() => null)
   if (dialSet) return
   const d = store.value ? dialOf(store.value.branch.country_code) : await guessDial()

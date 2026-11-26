@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The logged-in customer's orders in every store: tabs by state, a search
 // box, one card per order with what can be done about it.
+import { storePath } from '../site'
 import LangButton from './LangButton.vue'
 import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -57,7 +58,7 @@ watch(q, () => { window.clearTimeout(timer); timer = window.setTimeout(() => voi
 // directly goes to the store of the latest order.
 function back() {
   if (window.history.state?.back) router.back()
-  else router.replace(orders.value[0] ? `/s/${orders.value[0].store.slug}` : '/')
+  else router.replace(orders.value[0] ? storePath(orders.value[0].store.slug) : '/')
 }
 const open = (o: OrderCard, query: Record<string, string> = {}) => router.push({ path: `/o/${o.token}`, query })
 async function again(o: OrderCard) {
@@ -95,7 +96,7 @@ const tone = (o: OrderCard) => closedStatus(o.display_status) ? 'bad' : finished
 
       <article v-for="o in orders" :key="o.token" class="ol-card" :data-order="o.public_no" @click="open(o)">
         <div class="ol-store">
-          <a class="ol-name" :href="`/s/${o.store.slug}`" @click.prevent.stop="router.push(`/s/${o.store.slug}`)">
+          <a class="ol-name" :href="storePath(o.store.slug)" @click.prevent.stop="router.push(storePath(o.store.slug))">
             <img v-if="o.store.logo_url" :src="o.store.logo_url" alt="" />
             <span v-else class="ph"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 3.500c-.8.9.8 1.7 0 2.600M12 3.500c-.8.9.8 1.7 0 2.600M15 3.500c-.8.9.8 1.7 0 2.6" /><path d="M4 11h16a8 8 0 0 1-5 7.400V20H9v-1.600A8 8 0 0 1 4 11z" fill="currentColor" stroke="none" /></svg></span>
             <b>{{ sn(o.store) }}</b>

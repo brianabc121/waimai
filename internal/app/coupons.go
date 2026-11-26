@@ -160,8 +160,10 @@ func (c *CustomerCoupon) worksAt(b *Branch) bool {
 	return true
 }
 
-// walletFor lists the customer's unused, unexpired coupons that work at the store.
-func walletFor(ctx context.Context, q Querier, phone string, b *Branch) ([]CustomerCoupon, error) {
+// walletFor lists the customer's unused, unexpired coupons that work at the
+// store. On the store's own page only the store's coupons do: platform
+// coupons are for the mall (docs/ORDER_TYPES_DESIGN.md §9.4).
+func walletFor(ctx context.Context, q Querier, phone string, b *Branch, ownSite bool) ([]CustomerCoupon, error) {
 	if phone == "" {
 		return nil, nil
 	}
@@ -173,7 +175,7 @@ func walletFor(ctx context.Context, q Querier, phone string, b *Branch) ([]Custo
 	}
 	out := cs[:0]
 	for _, c := range cs {
-		if c.worksAt(b) {
+		if c.worksAt(b) && !(ownSite && (c.Issuer == "platform" || fundedBy(c.Kind) == "platform")) {
 			out = append(out, c)
 		}
 	}
