@@ -36,7 +36,9 @@ type Site struct {
 }
 
 type SiteStore struct {
-	ID      int64  `json:"-"`
+	ID int64 `json:"-"`
+	// BrandID is the brand whose page this is (docs/MULTI_BRAND_DESIGN.md §9).
+	BrandID int64  `json:"-"`
 	Slug    string `json:"slug"`
 	StoreNo int    `json:"store_no"`
 	Name    string `json:"name"`
@@ -95,16 +97,18 @@ func (a *App) SiteFor(ctx context.Context, host string) (*Site, error) {
 		return site, nil
 	}
 	var st SiteStore
-	const cols = `b.id, b.slug, b.store_no, b.name, b.name_en FROM branches b
+	// each brand has its own number; a store's own domain is its main brand's
+	const cols = `b.id, br.id, br.slug, br.store_no, br.name, br.name_en FROM brands br
+		JOIN branches b ON b.id = br.branch_id
 		JOIN merchants m ON m.id = b.merchant_id AND m.deleted_at IS NULL`
 	var err error
 	if no, ok := storeNoOf(host, domain); ok {
-		err = a.DB.QueryRow(ctx, `SELECT `+cols+` WHERE b.store_no=$1 AND b.deleted_at IS NULL`, no).
-			Scan(&st.ID, &st.Slug, &st.StoreNo, &st.Name, &st.NameEn)
+		err = a.DB.QueryRow(ctx, `SELECT `+cols+` WHERE br.store_no=$1 AND br.status='active' AND b.deleted_at IS NULL`, no).
+			Scan(&st.ID, &st.BrandID, &st.Slug, &st.StoreNo, &st.Name, &st.NameEn)
 	} else {
 		err = a.DB.QueryRow(ctx, `SELECT `+cols+` JOIN branch_domains d ON d.branch_id = b.id
-			WHERE d.domain=$1 AND d.status='active' AND b.deleted_at IS NULL`, host).
-			Scan(&st.ID, &st.Slug, &st.StoreNo, &st.Name, &st.NameEn)
+			WHERE d.domain=$1 AND d.status='active' AND b.deleted_at IS NULL AND br.is_main`, host).
+			Scan(&st.ID, &st.BrandID, &st.Slug, &st.StoreNo, &st.Name, &st.NameEn)
 	}
 	if isNoRows(err) {
 		return site, nil

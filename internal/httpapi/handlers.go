@@ -145,7 +145,7 @@ func (s *Server) createQuote(c *gin.Context) {
 	if !ok {
 		return
 	}
-	in.OwnSite, in.BrandID = site.OwnSite(), 0
+	in.OwnSite, in.BrandID = site.OwnSite(), 0 // the brand is the one the slug names (CreateQuote)
 	q, err := s.App.CreateQuote(c, c.Param("slug"), in, phone)
 	if err != nil {
 		fail(c, hideZones(err))
@@ -254,11 +254,11 @@ func (s *Server) customerOrders(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var store int64
+	var store, brand int64
 	if site.OwnSite() {
-		store = site.Store.ID // the store's own page shows its orders only
+		store, brand = site.Store.ID, site.Store.BrandID // the brand's own page shows its orders only
 	}
-	page, err := s.App.CustomerOrdersAt(c, cu.ID, store, c.Query("tab"), c.Query("q"), max(before, 0))
+	page, err := s.App.CustomerOrdersAt(c, cu.ID, store, brand, c.Query("tab"), c.Query("q"), max(before, 0))
 	if err == nil {
 		err = s.App.LocalizeOrderCards(c, page, reqLang(c))
 	}

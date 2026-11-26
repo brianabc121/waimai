@@ -168,7 +168,7 @@ func (s *Server) myCoupons(c *gin.Context) {
 		if site.OwnSite() { // the store's own page shows its coupons only
 			mine := list[:0]
 			for _, x := range list {
-				if x.BranchID != nil && *x.BranchID == site.Store.ID {
+				if x.BranchID != nil && *x.BranchID == site.Store.ID && x.BrandID != nil && *x.BrandID == site.Store.BrandID {
 					mine = append(mine, x)
 				}
 			}

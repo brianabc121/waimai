@@ -42,7 +42,12 @@ type Brand struct {
 	Sort        int    `json:"sort"`
 	// OwnMenu: the brand sells its own pick of the store's dishes, with its
 	// own names and prices (brand_menu.go); otherwise the store's menu as it is.
-	OwnMenu   bool      `json:"own_menu"`
+	OwnMenu bool `json:"own_menu"`
+	// LogoURL, CoverURL, Intro: what customers see of a brand; empty = the
+	// store's (the main brand's are always the store's).
+	LogoURL   string    `json:"logo_url"`
+	CoverURL  string    `json:"cover_url"`
+	Intro     string    `json:"intro"`
 	CreatedAt time.Time `json:"created_at"`
 	// Today is the brand's orders today (the brand list only).
 	Today *BrandDay `json:"today,omitempty"`
@@ -72,12 +77,13 @@ func (b *Brand) Ref() BrandRef {
 }
 
 const brandCols = `id, branch_id, name, name_en, code, store_no, slug, dine_in, delivery, is_main, color,
-	open_time, close_time, paused, mall_visible, status, sort, own_menu, created_at`
+	open_time, close_time, paused, mall_visible, status, sort, own_menu, logo_url, cover_url, intro, created_at`
 
 func scanBrand(row interface{ Scan(...any) error }) (*Brand, error) {
 	var b Brand
 	err := row.Scan(&b.ID, &b.BranchID, &b.Name, &b.NameEn, &b.Code, &b.StoreNo, &b.Slug, &b.DineIn, &b.Delivery,
-		&b.IsMain, &b.Color, &b.OpenTime, &b.CloseTime, &b.Paused, &b.MallVisible, &b.Status, &b.Sort, &b.OwnMenu, &b.CreatedAt)
+		&b.IsMain, &b.Color, &b.OpenTime, &b.CloseTime, &b.Paused, &b.MallVisible, &b.Status, &b.Sort, &b.OwnMenu,
+		&b.LogoURL, &b.CoverURL, &b.Intro, &b.CreatedAt)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	}
@@ -108,6 +114,33 @@ func (a *App) MainBrandID(ctx context.Context, branchID int64) (int64, error) {
 		return 0, ErrNotFound
 	}
 	return id, err
+}
+
+// brandBySlug is the brand a customer's address names: a brand's own slug,
+// or the store's, which is its main brand's.
+func brandBySlug(ctx context.Context, q Querier, branchID int64, slug string) (*Brand, error) {
+	br, err := scanBrand(q.QueryRow(ctx, `SELECT `+brandCols+` FROM brands WHERE branch_id=$1 AND slug=$2`, branchID, slug))
+	if err == ErrNotFound {
+		return loadBrand(ctx, q, branchID, 0)
+	}
+	return br, err
+}
+
+// forBrand dresses the store as one of its brands for customers: the brand's
+// name, address and number, its own hours when it has them, and its pause.
+// The kitchen, delivery areas, fees and tax stay the store's.
+func (b *Branch) forBrand(br *Brand) *Branch {
+	if br == nil {
+		return b
+	}
+	b.Paused = b.Paused || br.Paused || br.Status != "active"
+	if br.OpenTime != "" && br.OpenTime != br.CloseTime {
+		b.OpenTime, b.CloseTime = br.OpenTime, br.CloseTime
+	}
+	if !br.IsMain {
+		b.Name, b.NameEn, b.Slug, b.StoreNo = br.Name, br.NameEn, br.Slug, br.StoreNo
+	}
+	return b
 }
 
 // orderBrand is the brand a staff member orders under: active, taking
@@ -188,12 +221,16 @@ type BrandInput struct {
 	MallVisible bool   `json:"mall_visible"`
 	Status      string `json:"status"`
 	Sort        int    `json:"sort"`
+	LogoURL     string `json:"logo_url"`
+	CoverURL    string `json:"cover_url"`
+	Intro       string `json:"intro"`
 }
 
 func (in *BrandInput) clean() error {
 	in.Name, in.NameEn = strings.TrimSpace(in.Name), strings.TrimSpace(in.NameEn)
 	in.Code = strings.ToUpper(strings.TrimSpace(in.Code))
 	in.OpenTime, in.CloseTime = strings.TrimSpace(in.OpenTime), strings.TrimSpace(in.CloseTime)
+	in.LogoURL, in.CoverURL, in.Intro = strings.TrimSpace(in.LogoURL), strings.TrimSpace(in.CoverURL), strings.TrimSpace(in.Intro)
 	if in.Status == "" {
 		in.Status = "active"
 	}
@@ -210,6 +247,8 @@ func (in *BrandInput) clean() error {
 	case (in.OpenTime == "") != (in.CloseTime == ""),
 		in.OpenTime != "" && (!hhmmRe.MatchString(in.OpenTime) || !hhmmRe.MatchString(in.CloseTime)):
 		return ErrValidation("opening hours are HH:MM")
+	case len(in.LogoURL) > 500 || len(in.CoverURL) > 500 || len([]rune(in.Intro)) > 300:
+		return ErrValidation("picture link or introduction too long")
 	case in.Status != "active" && in.Status != "disabled":
 		return ErrValidation("invalid status")
 	case !in.DineIn && !in.Delivery:
@@ -285,11 +324,11 @@ func (a *App) CreateBrand(ctx context.Context, branchID int64, actor Actor, in B
 		}
 		var err error
 		br, err = scanBrand(tx.QueryRow(ctx, `INSERT INTO brands (branch_id, name, name_en, code, slug, dine_in,
-				delivery, color, open_time, close_time, paused, mall_visible, sort)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
+				delivery, color, open_time, close_time, paused, mall_visible, logo_url, cover_url, intro, sort)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
 				(SELECT COALESCE(max(sort), 0) + 1 FROM brands WHERE branch_id=$1))
 			RETURNING `+brandCols, branchID, in.Name, in.NameEn, in.Code, free, in.DineIn, in.Delivery, in.Color,
-			in.OpenTime, in.CloseTime, in.Paused, in.MallVisible))
+			in.OpenTime, in.CloseTime, in.Paused, in.MallVisible, in.LogoURL, in.CoverURL, in.Intro))
 		if err != nil {
 			return brandErr(err)
 		}
@@ -331,10 +370,16 @@ func (a *App) UpdateBrand(ctx context.Context, branchID, brandID int64, actor Ac
 				return brandErr(err)
 			}
 		}
+		if old.IsMain {
+			// the main brand looks like the store: its page design has the pictures
+			in.LogoURL, in.CoverURL, in.Intro = "", "", ""
+		}
 		br, err = scanBrand(tx.QueryRow(ctx, `UPDATE brands SET name=$3, name_en=$4, code=$5, dine_in=$6,
-				delivery=$7, color=$8, open_time=$9, close_time=$10, paused=$11, mall_visible=$12, status=$13
+				delivery=$7, color=$8, open_time=$9, close_time=$10, paused=$11, mall_visible=$12, status=$13,
+				logo_url=$14, cover_url=$15, intro=$16
 			WHERE branch_id=$1 AND id=$2 RETURNING `+brandCols, branchID, brandID, in.Name, in.NameEn, in.Code,
-			in.DineIn, in.Delivery, in.Color, in.OpenTime, in.CloseTime, in.Paused, in.MallVisible, in.Status))
+			in.DineIn, in.Delivery, in.Color, in.OpenTime, in.CloseTime, in.Paused, in.MallVisible, in.Status,
+			in.LogoURL, in.CoverURL, in.Intro))
 		if err != nil {
 			return brandErr(err)
 		}

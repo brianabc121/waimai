@@ -194,8 +194,10 @@ func (b *Branch) latLng() *LatLng {
 }
 
 func branchBySlug(ctx context.Context, q Querier, slug string) (*Branch, error) {
-	return scanBranch(q.QueryRow(ctx, `SELECT `+branchCols+` FROM branches WHERE slug=$1 AND deleted_at IS NULL
-		AND EXISTS (SELECT 1 FROM merchants m WHERE m.id = branches.merchant_id AND m.deleted_at IS NULL)`, slug))
+	// a brand's slug names its store too (the brand is read with brandBySlug)
+	return scanBranch(q.QueryRow(ctx, `SELECT `+branchCols+` FROM branches
+		WHERE (slug=$1 OR id = (SELECT br.branch_id FROM brands br WHERE br.slug=$1 AND br.status='active'))
+		AND deleted_at IS NULL AND EXISTS (SELECT 1 FROM merchants m WHERE m.id = branches.merchant_id AND m.deleted_at IS NULL)`, slug))
 }
 
 func (a *App) BranchByID(ctx context.Context, id int64) (*Branch, error) {
@@ -507,14 +509,21 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	return a.StorefrontOf(ctx, slug, 0)
 }
 
-// StorefrontOf is the storefront of one of the store's brands (0 = the main
-// one): its menu, names and prices, and its promotions.
+// StorefrontOf is the storefront of one of the store's brands (0 = the one
+// the slug names, the main one for the store's own slug): its menu, names and
+// prices, and its promotions. A brand other than the main one looks like a
+// shop of its own (docs/MULTI_BRAND_DESIGN.md §9).
 func (a *App) StorefrontOf(ctx context.Context, slug string, brandID int64) (*Storefront, error) {
 	b, err := branchBySlug(ctx, a.DB, slug)
 	if err != nil {
 		return nil, err
 	}
-	brand, err := loadBrand(ctx, a.DB, b.ID, brandID)
+	var brand *Brand
+	if brandID == 0 {
+		brand, err = brandBySlug(ctx, a.DB, b.ID, slug)
+	} else {
+		brand, err = loadBrand(ctx, a.DB, b.ID, brandID)
+	}
 	if err == ErrNotFound {
 		return nil, Err(http.StatusNotFound, "BRAND_UNKNOWN", "no such brand in this store")
 	}
@@ -522,6 +531,7 @@ func (a *App) StorefrontOf(ctx context.Context, slug string, brandID int64) (*St
 		return nil, err
 	}
 	// The storefront shows a suspended merchant the same way as a paused store.
+	b.forBrand(brand)
 	b.Paused = !b.takesOrders()
 	a.forCustomer(b)
 	zones, err := loadZones(ctx, a.DB, b.ID, true)
@@ -540,7 +550,7 @@ func (a *App) StorefrontOf(ctx context.Context, slug string, brandID int64) (*St
 		}
 	}
 	cats = shown
-	sold, sales, err := salesCounts(ctx, a.DB, b.ID)
+	sold, sales, err := salesCounts(ctx, a.DB, b.ID, brand.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -554,7 +564,7 @@ func (a *App) StorefrontOf(ctx context.Context, slug string, brandID int64) (*St
 			it.Sold = sold[it.ID]
 		}
 	}
-	rating, err := reviewSummary(ctx, a.DB, b.ID)
+	rating, err := reviewSummary(ctx, a.DB, b.ID, brand.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -573,6 +583,19 @@ func (a *App) StorefrontOf(ctx context.Context, slug string, brandID int64) (*St
 	media, err := listMedia(ctx, a.DB, b.ID, true)
 	if err != nil {
 		return nil, err
+	}
+	if !brand.IsMain {
+		// the store's pictures are of its main brand
+		media = []Media{}
+		for ch, t := range tpl {
+			if brand.LogoURL != "" {
+				t.LogoURL = brand.LogoURL
+			}
+			if brand.CoverURL != "" {
+				t.CoverURL = brand.CoverURL
+			}
+			tpl[ch] = t
+		}
 	}
 	ref := brand.Ref()
 	return &Storefront{Brand: &ref, Branch: b, Zones: zones, Categories: cats, Promotions: promos, DinePromotions: dinePromos, Slots: b.Slots(time.Now()), Templates: tpl,

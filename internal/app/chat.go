@@ -365,6 +365,12 @@ func (a *App) CustomerChat(ctx context.Context, customerID int64, slug string) (
 	if err != nil {
 		return nil, err
 	}
+	// the chat is with the store; it shows the brand whose page it was opened on
+	br, err := brandBySlug(ctx, a.DB, b.ID, slug)
+	if err != nil {
+		return nil, err
+	}
+	b.forBrand(br)
 	out := &CustomerChat{BranchID: b.ID, Slug: b.Slug, StoreName: b.Name, StoreNameEn: b.NameEn, Phone: b.Phone,
 		OpenNow: b.takesOrders() && b.isOpen(time.Now()), OpenTime: b.OpenTime, Peer: branchIM(b.ID)}
 	if err := a.DB.QueryRow(ctx, `SELECT chat_enabled FROM branches WHERE id=$1`, b.ID).Scan(&out.Enabled); err != nil {

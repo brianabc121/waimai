@@ -44,10 +44,12 @@ func validCouponKind(k string) bool {
 
 // CustomerCoupon is one coupon a customer holds.
 type CustomerCoupon struct {
-	ID          int64  `json:"id"`
-	Kind        string `json:"kind"`
-	Issuer      string `json:"issuer"`
-	BranchID    *int64 `json:"branch_id"`
+	ID       int64  `json:"id"`
+	Kind     string `json:"kind"`
+	Issuer   string `json:"issuer"`
+	BranchID *int64 `json:"branch_id"`
+	// BrandID is the brand a store coupon works at (named by StoreSlug, StoreName).
+	BrandID     *int64 `json:"brand_id"`
 	StoreSlug   string `json:"store_slug"`
 	StoreName   string `json:"store_name"`
 	StoreNameEn string `json:"store_name_en"`
@@ -112,13 +114,15 @@ func fundedBy(kind string) string {
 	return "store"
 }
 
-const couponCols = `c.id, c.kind, c.issuer, c.branch_id, COALESCE(b.slug, ''), COALESCE(b.name, ''), COALESCE(b.name_en, ''),
+const couponCols = `c.id, c.kind, c.issuer, c.branch_id, c.brand_id, COALESCE(br.slug, b.slug, ''), COALESCE(br.name, b.name, ''),
+	COALESCE(br.name_en, b.name_en, ''),
 	c.currency, c.name, c.name_en, c.value, c.threshold, c.source, c.issued_at, c.expires_at,
 	CASE WHEN c.status = 'used' THEN 'used' WHEN c.status = 'void' OR c.expires_at <= now() THEN 'expired' ELSE 'available' END,
 	c.order_id, c.used_at, c.country, c.country_code, c.province, c.scope, c.scope_branch_ids`
 
 func queryCoupons(ctx context.Context, q Querier, where string, args ...any) ([]CustomerCoupon, error) {
 	rows, err := q.Query(ctx, `SELECT `+couponCols+` FROM customer_coupons c LEFT JOIN branches b ON b.id = c.branch_id
+		LEFT JOIN brands br ON br.id = c.brand_id
 		WHERE `+where, args...)
 	if err != nil {
 		return nil, err
@@ -127,7 +131,7 @@ func queryCoupons(ctx context.Context, q Querier, where string, args ...any) ([]
 	out := []CustomerCoupon{}
 	for rows.Next() {
 		var c CustomerCoupon
-		if err := rows.Scan(&c.ID, &c.Kind, &c.Issuer, &c.BranchID, &c.StoreSlug, &c.StoreName, &c.StoreNameEn,
+		if err := rows.Scan(&c.ID, &c.Kind, &c.Issuer, &c.BranchID, &c.BrandID, &c.StoreSlug, &c.StoreName, &c.StoreNameEn,
 			&c.Currency, &c.Name, &c.NameEn, &c.Value, &c.Threshold, &c.Source, &c.IssuedAt, &c.ExpiresAt, &c.Status,
 			&c.OrderID, &c.UsedAt, &c.Country, &c.CountryCode, &c.Province, &c.scope, &c.scopeBranchIDs); err != nil {
 			return nil, err

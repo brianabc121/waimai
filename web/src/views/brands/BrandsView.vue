@@ -7,6 +7,7 @@ import { ApiError, get, post, put } from '../../api'
 import { money, t } from '../../i18n'
 import { can, currentRole, reloadUser, session } from '../../session'
 import { storeURL } from '../../site'
+import ImageUpload from '../ImageUpload.vue'
 import type { Brand } from '../../types'
 import '../../brands'
 import '../../officeStrings'
@@ -28,7 +29,8 @@ const dineTaken = (id: number) => brands.value.some(b => b.dine_in && b.status =
 
 // ---- the form ----
 const empty = () => ({ id: 0, is_main: false, name: '', name_en: '', code: '', dine_in: false, delivery: true, color: COLORS[1],
-  own_hours: false, open_time: '11:00', close_time: '22:00', paused: false, mall_visible: true, status: 'active' as 'active' | 'disabled' })
+  own_hours: false, open_time: '11:00', close_time: '22:00', paused: false, mall_visible: true, status: 'active' as 'active' | 'disabled',
+  logo_url: '', cover_url: '', intro: '' })
 const f = reactive({ open: false, saving: false, error: '', ...empty() })
 function add() {
   Object.assign(f, empty(), { open: true, error: '', color: COLORS[brands.value.length % COLORS.length] })
@@ -36,7 +38,8 @@ function add() {
 function edit(b: Brand) {
   Object.assign(f, { open: true, error: '', saving: false, id: b.id, is_main: b.is_main, name: b.name, name_en: b.name_en, code: b.code,
     dine_in: b.dine_in, delivery: b.delivery, color: b.color, own_hours: !!b.open_time, open_time: b.open_time || '11:00',
-    close_time: b.close_time || '22:00', paused: b.paused, mall_visible: b.mall_visible, status: b.status })
+    close_time: b.close_time || '22:00', paused: b.paused, mall_visible: b.mall_visible, status: b.status,
+    logo_url: b.logo_url ?? '', cover_url: b.cover_url ?? '', intro: b.intro ?? '' })
 }
 let codeTimer = 0
 function suggest() {
@@ -63,7 +66,7 @@ async function save(status?: 'active' | 'disabled') {
   f.saving = true; f.error = ''
   const body = { name: f.name, name_en: f.name_en, code: f.code, dine_in: f.dine_in, delivery: f.delivery, color: f.color,
     open_time: f.own_hours ? f.open_time : '', close_time: f.own_hours ? f.close_time : '', paused: f.paused,
-    mall_visible: f.mall_visible, status: status ?? f.status }
+    mall_visible: f.mall_visible, status: status ?? f.status, logo_url: f.logo_url, cover_url: f.cover_url, intro: f.intro }
   try {
     if (f.id) await put(`${base}/brands/${f.id}`, body)
     else await post(`${base}/brands`, body)
@@ -103,7 +106,7 @@ const hours = (b: Brand) => b.open_time ? `${b.open_time}–${b.close_time}` : t
           <span class="tag">{{ t('br.hours') }} {{ hours(b) }}</span>
         </div>
         <router-link v-if="mayMenu && b.status === 'active'" class="btn small" :to="'/merchant/brand-menu/' + b.id" :data-testid="'brand-menu-' + b.id">{{ t('bm.link') }}</router-link>
-        <div v-if="b.is_main" class="muted small">{{ t('br.site') }} {{ storeURL({ store_no: b.store_no, slug: b.slug }) }}</div>
+        <div v-if="b.delivery || b.is_main" class="muted small" data-testid="brand-site">{{ t('br.site') }} {{ storeURL({ store_no: b.store_no, slug: b.slug }) }}</div>
         <div class="row between">
           <span v-if="b.today" class="small">{{ t('br.today', { n: b.today.orders, s: money(b.today.total, cur) }) }}</span>
           <b v-if="b.status !== 'active'" class="bad small">{{ t('br.disabled') }}</b>
@@ -137,6 +140,12 @@ const hours = (b: Brand) => b.open_time ? `${b.open_time}–${b.close_time}` : t
             <label class="check"><input v-model="f.own_hours" type="radio" :value="true" />{{ t('br.hours_own') }}
               <template v-if="f.own_hours"><input v-model="f.open_time" type="time" /> – <input v-model="f.close_time" type="time" /></template></label>
           </div>
+          <template v-if="!f.is_main && f.delivery">
+            <div class="field">{{ t('br.look') }}<span class="muted small">{{ t('br.look_hint') }}</span></div>
+            <ImageUpload v-model="f.logo_url" :base="base" :ratio="1" :width="400" :label="t('br.logo')" testid="brand-f-logo" />
+            <ImageUpload v-model="f.cover_url" :base="base" :ratio="16 / 9" :width="1280" :label="t('br.cover')" testid="brand-f-cover" />
+            <label class="field">{{ t('br.intro') }}<input v-model="f.intro" maxlength="300" data-testid="brand-f-intro" /></label>
+          </template>
           <label class="check"><input v-model="f.mall_visible" type="checkbox" />{{ t('br.mall') }}</label>
           <label class="check"><input v-model="f.paused" type="checkbox" data-testid="brand-f-paused" />{{ t('br.paused') }}</label>
           <div v-if="f.error" class="banner bad" data-testid="brand-f-error">{{ f.error }}</div>

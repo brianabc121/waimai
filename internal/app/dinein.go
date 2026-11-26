@@ -339,7 +339,7 @@ func (a *App) OpenTable(ctx context.Context, tableID int64, guests int, tags []s
 		if b.Suspended {
 			return errStoreClosed
 		}
-		no, err := nextOrderNo(ctx, tx, b, TypeDineIn)
+		no, err := nextOrderNo(ctx, tx, b, nil, TypeDineIn)
 		if err != nil {
 			return err
 		}
