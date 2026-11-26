@@ -24,7 +24,6 @@ import NotePicker from './NotePicker.vue'
 import { cartTags, hasNotes, toggleTag } from '../notes'
 
 const PlacePicker = defineAsyncComponent(() => import('./PlacePicker.vue'))
-const PicPicker = defineAsyncComponent(() => import('./PicPicker.vue'))
 const router = useRouter()
 const route = useRoute()
 
@@ -198,15 +197,14 @@ function choose(it: Item) {
 }
 
 // The spec sheet: shown for a dish with a size or a choice it must have.
-// Opened from the pictures (byPic), the same choice again adds to that line.
-const spec = ref<{ item: Item; picks: Record<number, number>; byPic?: boolean } | null>(null)
-function openSpec(it: Item, byPic = false) {
+const spec = ref<{ item: Item; picks: Record<number, number> } | null>(null)
+function openSpec(it: Item) {
   const picks: Record<number, number> = {}
   for (const g of it.groups) if (isSpec(g) && g.min_select > 0) {
     const o = g.options.find(o => !o.sold_out)
     if (o) picks[o.id] = 1
   }
-  spec.value = { item: it, picks, byPic }
+  spec.value = { item: it, picks }
 }
 function specToggle(g: OptionGroup, id: number) {
   const p = spec.value!.picks
@@ -217,36 +215,9 @@ function specToggle(g: OptionGroup, id: number) {
 const specMissing = computed(() => spec.value?.item.groups.find(g => g.options.reduce((s, o) => s + (spec.value!.picks[o.id] ?? 0), 0) < g.min_select) ?? null)
 function specAdd() {
   if (!spec.value || specMissing.value) return
-  const { item, picks, byPic } = spec.value
+  addLine(spec.value.item, { ...spec.value.picks })
   spec.value = null
-  if (byPic) { bump(item, { ...picks }); return }
-  addLine(item, { ...picks })
   void nextTick(() => pickInput.value?.focus())
-}
-
-// ---------- choosing by picture ----------
-// For staff who do not remember the codes (PicPicker.vue). A tap adds one to
-// a line of the same dish and options that has no note yet, or a new line.
-const picOpen = ref(false)
-const picService = computed(() => target.value?.service_type === 'pickup' ? 'pickup' : appendId ? 'delivery' : service.value)
-function bump(item: Item, picks: Record<number, number> = {}) {
-  const ks = Object.keys(picks)
-  const same = (p: Record<number, number>) => Object.keys(p).length === ks.length && ks.every(k => p[+k] === picks[+k])
-  const l = lines.value.find(x => x.item.id === item.id && same(x.picks) && !x.note && !x.tags.length)
-  if (l) { setQty(l, 1); selKey.value = l.key } else addLine(item, picks)
-}
-function picPick(it: Item) {
-  if (it.sold_out) return
-  if (it.groups.some(g => isSpec(g) || g.min_select > 0)) openSpec(it, true)
-  else bump(it)
-}
-const picLines = computed(() => lines.value.map(l => ({ key: l.key, item: l.item, qty: l.qty, amount: unit(l) * l.qty,
-  text: [specText(l), ...addonsOf(l).map(a => `+${mn(a.o)}${a.n > 1 ? '×' + a.n : ''}`), ...noteTagsOf(l), l.note].filter(Boolean).join(' · ') })))
-function picQty(key: number, d: number) {
-  const l = lines.value.find(x => x.key === key)
-  if (!l) return
-  if (l.qty + d <= 0) removeLine(l)
-  else setQty(l, d)
 }
 
 // ---------- the member ----------
@@ -711,8 +682,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
             </template>
             <div class="bh add" data-testid="ao-this">＋ {{ t('ao.m.this') }} · {{ batchTitle((target.batches?.length ?? 1) + 1) }}</div>
           </template>
-          <div v-if="!lines.length" class="empty muted">{{ t('vo.empty') }}
-            <div><button class="btn picbtn big" data-testid="mo-by-pic-empty" :disabled="!store" @click="picOpen = true">{{ t('vo.by_pic') }}</button></div></div>
+          <div v-if="!lines.length" class="empty muted">{{ t('vo.empty') }}</div>
           <template v-for="(l, i) in lines" :key="l.key">
             <div class="tr" :class="{ sel: l.key === selKey }" data-testid="mo-line" @click="selKey = l.key">
               <span class="no">{{ i + 1 }}</span>
@@ -935,8 +905,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
               <div v-if="!hits.length" class="it muted">{{ t('vo.no_match') }}</div>
             </div>
           </div>
-          <div class="pickrow"><span class="muted small pickhint">{{ t('vo.pick_hint') }}</span>
-            <button class="btn picbtn" data-testid="mo-by-pic" :disabled="!store" @click="picOpen = true">{{ t('vo.by_pic') }}</button></div>
+          <div class="muted small pickhint">{{ t('vo.pick_hint') }}</div>
         </div>
         <div class="confirmbar">
           <div v-if="error" class="banner bad" data-testid="mo-error">{{ error }}</div>
@@ -961,9 +930,6 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
         <div v-if="!byStaff.length" class="qi muted">—</div>
       </aside>
     </div>
-
-    <PicPicker v-if="picOpen && store" :categories="store.categories" :service="picService" :lines="picLines" :currency="cur" :total="subtotal"
-      @pick="picPick" @qty="picQty" @close="picOpen = false" />
 
     <!-- options of a dish -->
     <div v-if="spec" class="sheet-mask" @click.self="spec = null">
@@ -1138,10 +1104,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 .btnrow a.btn.off { opacity: .45; cursor: not-allowed; }
 .drop .hint { padding: 6px 12px; font-size: 12px; color: var(--muted); background: var(--paper); }
 .pick .inp { background: #fff; border-color: var(--brand); font-weight: 700; font-size: 15px; }
-.pickrow { display: flex; align-items: center; gap: 8px; padding-inline-start: 80px; }
-.pickrow .pickhint { flex: 1; min-width: 0; }
-.picbtn.big { margin-top: 14px; padding: 10px 22px; font-size: 15px; }
-.picbtn { flex: none; background: var(--gold-soft); border-color: var(--gold); color: var(--brand-dark); font-weight: 700; }
+.pickhint { padding-inline-start: 80px; }
 .huashu { position: absolute; top: 38px; right: 0; width: 380px; max-width: 90vw; background: #fff; border: 1px solid var(--edge); border-radius: 12px; box-shadow: 0 10px 28px rgba(0,0,0,.18); z-index: 6; padding: 10px; }
 .huashu .it { display: block; width: 100%; text-align: start; padding: 7px 9px; border-radius: 8px; font-size: 13px; border: 1px solid var(--line); margin-top: 6px; background: #fff; white-space: pre-wrap; }
 .huashu .it:hover { background: var(--brand-soft); }
@@ -1179,8 +1142,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
   .panel, .pscroll { display: contents; }
   .pscroll > * { margin-inline: 14px; }
   .pick { order: 2; margin-top: 8px; padding-top: 14px; border-top: 6px solid var(--row); margin-inline: 0; padding-inline: 14px; }
-  .pickrow { order: 2; margin-top: -2px; padding-inline-start: 0; }
-  .picbtn { min-height: 40px; }
+  .pickhint { order: 2; margin-top: -4px; padding-inline-start: 0; }
   .order { order: 3; border-right: 0; border-top: 1px solid var(--line); }
   .confirmbar { order: 4; position: sticky; bottom: 0; z-index: 6; background: var(--paper); border-top: 1px solid var(--line);
     box-shadow: 0 -6px 16px rgba(59, 31, 20, .08); padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
@@ -1213,8 +1175,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
   .sec { flex-wrap: wrap; }
   .idin { flex: 1 0 130px; }
 }
-/* a finger: the hint is for keyboards; the picture button takes the row */
-@media (pointer: coarse) { .pickhint { display: none; } .pickrow .picbtn { flex: 1; min-height: 42px; font-size: 15px; } }
+@media (pointer: coarse) { .pickhint { display: none; } }
 /* Phone: each label above its field, fields full width and taller. */
 @media (max-width: 767px) {
   .sec:not(.idrow) { flex-direction: column; align-items: stretch; gap: 4px; }

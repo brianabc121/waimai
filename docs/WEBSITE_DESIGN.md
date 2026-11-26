@@ -38,7 +38,7 @@
 
 | 卖点 | 对应现有功能 | 设计文档 |
 |---|---|---|
-| **一套系统接所有订单** | 外卖商城（按位置列店、配送费起送价）、顾客自取、堂食桌台扫码点餐、代客下单（微信/电话来的单，看图点菜、会员号）、加单 | MALL / DINE_IN_ORDER / MANUAL_ORDER / ADD_ON_ORDER |
+| **一套系统接所有订单** | 外卖商城（按位置列店、配送费起送价）、顾客自取、堂食桌台扫码点餐、代客下单（微信/电话来的单，编号点菜、会员号）、加单 | MALL / DINE_IN_ORDER / MANUAL_ORDER / ADD_ON_ORDER |
 | **后厨不乱** | 按制作台分单、烹饪进度看板、催菜、出餐目标时间、退菜和损耗授权 | COOKING_PROGRESS / VOID_ITEM |
 | **菜单好管** | 分类、规格、口味模板、加料模板、Excel 批量导入导出、菜品多图、按堂食/外卖/自取上架 | NOTE_TEMPLATE / menu-import / topping-templates |
 | **生意做得多** | 满减、指定菜品打折、第二份半价、复购优惠券、宣传物料轮播、会员和地址库、送餐热力图 | COUPON / PRICING_REVIEW / DELIVERY_ADDRESS_STATS |

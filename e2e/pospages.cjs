@@ -74,7 +74,7 @@ for (const [name, opts] of sizes) {
   for (const id of ['nav-pos', 'nav-orders-fold', 'nav-cm', 'nav-msg', 'nav-deco', 'nav-fin', 'nav-dlv']) await page.click(tid(id))
   expect(await page.locator(tid('nav-pos')).getAttribute('aria-expanded'), 'true', `${name}: 点单 opened`)
   const opened = await menu()
-  for (const want of ['nav-pos,nav-pos-dine,nav-pos-delivery,订单,nav-progress,nav-voids,nav-cm,nav-members,nav-addresses',
+  for (const want of ['nav-pos,nav-pos-dine,nav-pos-delivery,nav-queue,订单,nav-progress,nav-voids,nav-cm,nav-members,nav-addresses',
     'nav-msg,nav-messages,nav-support', 'nav-deco,nav-media,nav-templates', 'nav-fin,nav-cash,nav-bills,nav-reconcile', 'nav-dlv,nav-riders,nav-delivery-map']) {
     const first = want.split(',')[0], i = opened.indexOf(first)
     expect(opened.slice(i, i + want.split(',').length).join(','), want, `${name}: ${first} opened`)
