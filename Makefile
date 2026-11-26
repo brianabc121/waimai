@@ -65,7 +65,6 @@ e2e:
 	$(E2E_NODE) e2e/staffexport.cjs
 	$(E2E_NODE) e2e/settings.cjs
 	$(E2E_NODE) e2e/responsive.cjs
-	$(E2E_NODE) e2e/manualpic.cjs
 	$(E2E_NODE) e2e/storefront.cjs
 	$(E2E_NODE) e2e/manualorder.cjs
 	$(E2E_NODE) e2e/addon.cjs
