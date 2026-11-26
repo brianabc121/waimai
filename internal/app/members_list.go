@@ -15,7 +15,10 @@ import (
 // MemberFilter narrows the member list. BranchID 0 is every store (the
 // platform only).
 type MemberFilter struct {
-	BranchID   int64
+	BranchID int64
+	// BrandID narrows to one brand's members; 0 is every brand (the platform
+	// only: a store's page always names a brand).
+	BrandID    int64
 	MerchantID int64
 	Q          string
 	// Status is "active", "temp" or "" for both.
@@ -34,6 +37,8 @@ type MemberRow struct {
 	*Member
 	BranchID     int64      `json:"branch_id"`
 	BranchName   string     `json:"branch_name"`
+	BrandName    string     `json:"brand_name"`
+	BrandCode    string     `json:"brand_code"`
 	MerchantName string     `json:"merchant_name"`
 	Currency     string     `json:"currency"`
 	Orders       int        `json:"orders"`
@@ -62,21 +67,22 @@ var memberColsM = func() string {
 
 const memberRowFrom = `FROM store_members m
 	JOIN branches b ON b.id = m.branch_id
+	JOIN brands br ON br.id = m.brand_id
 	JOIN merchants mc ON mc.id = b.merchant_id
 	LEFT JOIN LATERAL (SELECT count(*) AS n, COALESCE(sum(o.total), 0) AS spent, max(o.created_at) AS last
-		FROM orders o WHERE o.branch_id = m.branch_id
+		FROM orders o WHERE o.branch_id = m.branch_id AND o.brand_id = m.brand_id
 			AND (o.member_id = m.id OR (m.phone <> '' AND o.customer_phone = m.phone))
 			AND o.acceptance_status NOT IN ('rejected','cancelled')) s ON true`
 
-const memberRowCols = `, b.id, b.name, mc.name, b.currency, s.n, s.spent, s.last,
+const memberRowCols = `, b.id, b.name, br.name, br.code, mc.name, b.currency, s.n, s.spent, s.last,
 	(SELECT count(*) FROM store_member_addresses ad WHERE ad.member_id = m.id)`
 
 func scanMemberRow(row interface{ Scan(...any) error }) (*MemberRow, error) {
 	m := &Member{}
 	r := &MemberRow{Member: m}
-	err := row.Scan(&m.ID, &m.No, &m.Status, &m.Phone, &m.Name, &m.Source, &m.Contact, &m.AddressLine,
+	err := row.Scan(&m.ID, &m.BrandID, &m.No, &m.Status, &m.Phone, &m.Name, &m.Source, &m.Contact, &m.AddressLine,
 		&m.AddressUnit, &m.AddressNote, &m.Lat, &m.Lng, &m.Note, &m.ExpiresAt, &m.CreatedAt,
-		&r.BranchID, &r.BranchName, &r.MerchantName, &r.Currency, &r.Orders, &r.Spent, &r.LastAt, &r.AddressCount)
+		&r.BranchID, &r.BranchName, &r.BrandName, &r.BrandCode, &r.MerchantName, &r.Currency, &r.Orders, &r.Spent, &r.LastAt, &r.AddressCount)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	}
@@ -97,6 +103,9 @@ func (a *App) ListMembers(ctx context.Context, f MemberFilter) (*MemberList, err
 	}
 	if f.MerchantID != 0 {
 		where = append(where, "b.merchant_id = "+arg(f.MerchantID))
+	}
+	if f.BrandID != 0 {
+		where = append(where, "m.brand_id = "+arg(f.BrandID))
 	}
 	if f.Source != "" {
 		where = append(where, "m.source = "+arg(f.Source))
@@ -173,8 +182,8 @@ func (a *App) MemberDetail(ctx context.Context, id int64) (*MemberRow, error) {
 }
 
 // MemberByNo is MemberDetail for a store's member number.
-func (a *App) MemberByNo(ctx context.Context, branchID int64, no int) (*MemberRow, error) {
-	id, err := a.MemberIDByNo(ctx, branchID, no)
+func (a *App) MemberByNo(ctx context.Context, branchID, brandID int64, no int) (*MemberRow, error) {
+	id, err := a.MemberIDByNo(ctx, branchID, brandID, no)
 	if err != nil {
 		return nil, err
 	}
@@ -207,16 +216,18 @@ type MemberOrders struct {
 // MemberOrderHistory lists a member's orders at their store, newest first,
 // with declined and cancelled ones too.
 func (a *App) MemberOrderHistory(ctx context.Context, memberID int64, p Page) (*MemberOrders, error) {
-	var branchID int64
+	var branchID, brandID int64
 	var phone string
-	err := a.DB.QueryRow(ctx, `SELECT branch_id, phone FROM store_members WHERE id=$1`, memberID).Scan(&branchID, &phone)
+	err := a.DB.QueryRow(ctx, `SELECT branch_id, brand_id, phone FROM store_members WHERE id=$1`, memberID).
+		Scan(&branchID, &brandID, &phone)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	const mine = `o.branch_id=$1 AND (o.member_id=$2 OR ($3 <> '' AND o.customer_phone=$3))`
+	mine := `o.branch_id=$1 AND (o.member_id=$2 OR ($3 <> '' AND o.customer_phone=$3)) AND o.brand_id=` +
+		strconv.FormatInt(brandID, 10)
 	out := &MemberOrders{Items: []MemberOrder{}}
 	if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM orders o WHERE `+mine, branchID, memberID, phone).
 		Scan(&out.Total); err != nil {
@@ -246,10 +257,14 @@ func (a *App) MemberOrderHistory(ctx context.Context, memberID int64, p Page) (*
 }
 
 // MemberIDByNo finds a live member of the store.
-func (a *App) MemberIDByNo(ctx context.Context, branchID int64, no int) (int64, error) {
+func (a *App) MemberIDByNo(ctx context.Context, branchID, brandID int64, no int) (int64, error) {
+	brandID, err := memberBrand(ctx, a.DB, branchID, brandID)
+	if err != nil {
+		return 0, err
+	}
 	var id int64
-	err := a.DB.QueryRow(ctx, `SELECT id FROM store_members WHERE branch_id=$1 AND member_no=$2 AND `+liveMember,
-		branchID, no).Scan(&id)
+	err = a.DB.QueryRow(ctx, `SELECT id FROM store_members WHERE brand_id=$1 AND member_no=$2 AND `+liveMember,
+		brandID, no).Scan(&id)
 	if isNoRows(err) {
 		return 0, ErrNotFound
 	}
@@ -259,10 +274,10 @@ func (a *App) MemberIDByNo(ctx context.Context, branchID int64, no int) (int64, 
 // AdminSaveMember changes a member's details from the platform's back
 // office. Like the store's own form, it makes a temporary member a member.
 func (a *App) AdminSaveMember(ctx context.Context, actor AdminActor, id int64, in MemberInput) (*MemberRow, error) {
-	var branchID int64
+	var branchID, brandID int64
 	var no int
-	err := a.DB.QueryRow(ctx, `SELECT branch_id, member_no FROM store_members WHERE id=$1 AND `+liveMember, id).
-		Scan(&branchID, &no)
+	err := a.DB.QueryRow(ctx, `SELECT branch_id, brand_id, member_no FROM store_members WHERE id=$1 AND `+liveMember, id).
+		Scan(&branchID, &brandID, &no)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	}
@@ -274,7 +289,7 @@ func (a *App) AdminSaveMember(ctx context.Context, actor AdminActor, id int64, i
 		return nil, err
 	}
 	err = a.inTx(ctx, func(tx pgx.Tx) error {
-		if _, err := upsertMember(ctx, tx, branchID, 0, in); err != nil {
+		if _, err := upsertMember(ctx, tx, branchID, brandID, 0, in); err != nil {
 			return err
 		}
 		return adminAudit(ctx, tx, actor, "member.update", "member", id,

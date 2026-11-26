@@ -21,6 +21,7 @@ const pages: [string, string[]][] = [
   ['/merchant/templates', ['store.design']],
   ['/merchant/media', ['store.design']],
   ['/merchant/site-link', ['settings']],
+  ['/merchant/brands', ['brand.manage', 'settings']],
   ['/merchant/promos', ['promo']],
   ['/merchant/cash', ['cash']],
   ['/merchant/bills', ['bills']],
@@ -155,4 +156,6 @@ extend({
   'rp.d.queue.manage': ['桌型分组、升桌规则、绑定和停用叫号屏', 'Table-size groups, upgrade rules, pairing and revoking screens'],
   'rp.p.kitchen.screen': ['后厨大屏', 'Kitchen screen'],
   'rp.d.kitchen.screen': ['打开后厨大屏', 'Open the kitchen screen'],
+  'rp.p.brand.manage': ['品牌管理', 'Manage brands'],
+  'rp.d.brand.manage': ['新建品牌、改品牌名和代码、停用品牌', 'Add brands, change their names and codes, switch them off'],
 })

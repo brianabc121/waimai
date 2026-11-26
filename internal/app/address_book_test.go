@@ -46,23 +46,23 @@ func TestAddressBook(t *testing.T) {
 	// The order desk finds it by words in any order, and by a typo; another phone
 	// sees it as a book address. Stores in another city do not.
 	for _, q := range []string{"6750 ayala", "AYALA TOWR ONE", "tower one"} {
-		hs, err := a.AddressHints(ctx, s.branchID, q, "+639179999999")
+		hs, err := a.AddressHints(ctx, s.branchID, 0, q, "+639179999999")
 		noErr(t, err)
 		if len(hs) == 0 || hs[0].Kind != "book" || hs[0].Line != "Ayala Tower One, 6750 Ayala Ave" || hs[0].Lat == nil {
 			t.Fatalf("hints for %q: %+v", q, hs)
 		}
 	}
-	hs, err := a.AddressHints(ctx, s.branchID, "ayala", "+639170000001")
+	hs, err := a.AddressHints(ctx, s.branchID, 0, "ayala", "+639170000001")
 	noErr(t, err)
 	if len(hs) != 1 || hs[0].Kind != "mine" {
 		t.Fatalf("the phone's own address comes once, as its own: %+v", hs)
 	}
-	hs, err = a.AddressHints(ctx, s.branchID, "unpinned", "")
+	hs, err = a.AddressHints(ctx, s.branchID, 0, "unpinned", "")
 	noErr(t, err)
 	if len(hs) != 1 || hs[0].Kind != "store" {
 		t.Fatalf("past delivery without a pin: %+v", hs)
 	}
-	hs, err = a.AddressHints(ctx, other.branchID, "ayala", "")
+	hs, err = a.AddressHints(ctx, other.branchID, 0, "ayala", "")
 	noErr(t, err)
 	if len(hs) != 0 {
 		t.Fatalf("another city's store: %+v", hs)

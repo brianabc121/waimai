@@ -45,6 +45,10 @@ type BranchRole struct {
 	// Platforms: the store is on at least one delivery platform, so staff can
 	// enter its orders (docs/ORDER_TYPES_DESIGN.md §7.1).
 	Platforms bool `json:"platforms"`
+	// BrandIDs are the brands the person works on; nil means all of them
+	// (docs/MULTI_BRAND_DESIGN.md §13). Brands are those brands, main first.
+	BrandIDs []int64    `json:"brand_ids"`
+	Brands   []BrandRef `json:"brands"`
 }
 
 type User struct {
@@ -119,7 +123,7 @@ func (a *App) loadUser(ctx context.Context, id int64) (*User, error) {
 	}
 	rows, err := a.DB.Query(ctx, `SELECT r.branch_id, b.name, b.slug, b.currency, r.role,
 		EXISTS (SELECT 1 FROM branch_platforms bp
-			WHERE bp.branch_id = b.id AND bp.enabled) FROM user_branch_roles r
+			WHERE bp.branch_id = b.id AND bp.enabled), r.brand_ids FROM user_branch_roles r
 		JOIN branches b ON b.id = r.branch_id JOIN merchants m ON m.id = b.merchant_id
 		WHERE r.user_id=$1 AND b.deleted_at IS NULL AND m.deleted_at IS NULL ORDER BY r.branch_id`, id)
 	if err != nil {
@@ -127,8 +131,8 @@ func (a *App) loadUser(ctx context.Context, id int64) (*User, error) {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		r := BranchRole{Posts: []Post{}}
-		if err := rows.Scan(&r.BranchID, &r.BranchName, &r.Slug, &r.Currency, &r.Role, &r.Platforms); err != nil {
+		r := BranchRole{Posts: []Post{}, Brands: []BrandRef{}}
+		if err := rows.Scan(&r.BranchID, &r.BranchName, &r.Slug, &r.Currency, &r.Role, &r.Platforms, &r.BrandIDs); err != nil {
 			return nil, err
 		}
 		u.Roles = append(u.Roles, r)
@@ -146,6 +150,9 @@ func (a *App) loadUser(ctx context.Context, id int64) (*User, error) {
 	}
 	conf, err := branchPerms(ctx, a.DB, ids)
 	if err != nil {
+		return nil, err
+	}
+	if err := roleBrands(ctx, a.DB, u.Roles); err != nil {
 		return nil, err
 	}
 	for i := range u.Roles {

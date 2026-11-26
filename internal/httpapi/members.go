@@ -31,33 +31,36 @@ func memberNo(c *gin.Context) (int, bool) {
 	return n, true
 }
 
+// Members belong to a brand (docs/MULTI_BRAND_DESIGN.md §8): every member
+// route takes ?brand= (none = the main brand).
+
 func (s *Server) searchMembers(c *gin.Context) {
-	if bid, ok := branchScope(c, pMemberLookup); ok {
-		ms, err := s.App.SearchMembers(c, bid, c.Query("q"))
+	if bid, brand, ok := s.brandScope(c, pMemberLookup, queryInt(c, "brand")); ok {
+		ms, err := s.App.SearchMembers(c, bid, brand, c.Query("q"))
 		reply(c, gin.H{"members": ms}, err)
 	}
 }
 
 func (s *Server) newMember(c *gin.Context) {
-	if bid, ok := branchScope(c, pMemberWrite); ok {
-		m, err := s.App.NewMember(c, bid, currentUser(c).ID)
+	if bid, brand, ok := s.brandScope(c, pMemberWrite, queryInt(c, "brand")); ok {
+		m, err := s.App.NewMember(c, bid, brand, currentUser(c).ID)
 		reply(c, m, err)
 	}
 }
 
 func (s *Server) getMember(c *gin.Context) {
-	bid, ok := branchScope(c, pMemberLookup)
+	bid, brand, ok := s.brandScope(c, pMemberLookup, queryInt(c, "brand"))
 	if !ok {
 		return
 	}
 	if no, ok := memberNo(c); ok {
-		m, err := s.App.MemberByNo(c, bid, no)
+		m, err := s.App.MemberByNo(c, bid, brand, no)
 		reply(c, m, err)
 	}
 }
 
 func (s *Server) saveMember(c *gin.Context) {
-	bid, ok := branchScope(c, pMemberWrite)
+	bid, brand, ok := s.brandScope(c, pMemberWrite, queryInt(c, "brand"))
 	if !ok {
 		return
 	}
@@ -67,13 +70,13 @@ func (s *Server) saveMember(c *gin.Context) {
 		return
 	}
 	in.No = no
-	m, err := s.App.SaveMember(c, bid, currentUser(c).ID, in)
+	m, err := s.App.SaveMember(c, bid, brand, currentUser(c).ID, in)
 	reply(c, m, err)
 }
 
 func (s *Server) addressHints(c *gin.Context) {
-	if bid, ok := branchScope(c, pMemberLookup); ok {
-		hs, err := s.App.AddressHints(c, bid, c.Query("q"), c.Query("phone"))
+	if bid, brand, ok := s.brandScope(c, pMemberLookup, queryInt(c, "brand")); ok {
+		hs, err := s.App.AddressHints(c, bid, brand, c.Query("q"), c.Query("phone"))
 		reply(c, gin.H{"addresses": hs}, err)
 	}
 }
@@ -84,6 +87,9 @@ func (s *Server) staffQuote(c *gin.Context) {
 	if !ok || !bind(c, &in) {
 		return
 	}
+	if !s.mayUseBrand(c, bid, in.BrandID) {
+		return
+	}
 	q, err := s.App.StaffQuote(c, bid, in)
 	reply(c, q, err)
 }
@@ -92,6 +98,9 @@ func (s *Server) staffOrder(c *gin.Context) {
 	bid, ok := branchScope(c, pManual)
 	var in app.StaffOrderInput
 	if !ok || !bind(c, &in) {
+		return
+	}
+	if !s.mayUseBrand(c, bid, in.BrandID) {
 		return
 	}
 	if in.HasAdjust() && !s.discountOK(c, bid) {
@@ -108,21 +117,21 @@ func memberFilter(c *gin.Context) app.MemberFilter {
 }
 
 func (s *Server) listMembers(c *gin.Context) {
-	if bid, ok := branchScope(c, pMemberView); ok {
+	if bid, brand, ok := s.brandScope(c, pMemberView, queryInt(c, "brand")); ok {
 		f := memberFilter(c)
-		f.BranchID = bid
+		f.BranchID, f.BrandID = bid, brand
 		l, err := s.App.ListMembers(c, f)
 		reply(c, l, err)
 	}
 }
 
 func (s *Server) memberOrders(c *gin.Context) {
-	bid, ok := branchScope(c, pMemberLookup)
+	bid, brand, ok := s.brandScope(c, pMemberLookup, queryInt(c, "brand"))
 	if !ok {
 		return
 	}
 	if no, ok := memberNo(c); ok {
-		id, err := s.App.MemberIDByNo(c, bid, no)
+		id, err := s.App.MemberIDByNo(c, bid, brand, no)
 		if err != nil {
 			fail(c, err)
 			return
@@ -135,7 +144,7 @@ func (s *Server) memberOrders(c *gin.Context) {
 // The platform's member page: every store's members.
 func (s *Server) adminListMembers(c *gin.Context) {
 	f := memberFilter(c)
-	f.BranchID, f.MerchantID = queryInt(c, "branch_id"), queryInt(c, "merchant_id")
+	f.BranchID, f.MerchantID, f.BrandID = queryInt(c, "branch_id"), queryInt(c, "merchant_id"), queryInt(c, "brand_id")
 	l, err := s.App.ListMembers(c, f)
 	reply(c, l, err)
 }
@@ -165,7 +174,7 @@ func (s *Server) adminSaveMember(c *gin.Context) {
 }
 
 func (s *Server) deleteMemberAddress(c *gin.Context) {
-	bid, ok := branchScope(c, pMemberWrite)
+	bid, brand, ok := s.brandScope(c, pMemberWrite, queryInt(c, "brand"))
 	if !ok {
 		return
 	}
@@ -177,7 +186,7 @@ func (s *Server) deleteMemberAddress(c *gin.Context) {
 	if !ok {
 		return
 	}
-	id, err := s.App.MemberIDByNo(c, bid, no)
+	id, err := s.App.MemberIDByNo(c, bid, brand, no)
 	if err == nil {
 		err = s.App.DeleteMemberAddress(c, id, aid)
 	}

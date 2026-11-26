@@ -13,9 +13,9 @@ func TestStoreMembersAndStaffOrders(t *testing.T) {
 	a := testApp
 
 	// "New member" takes the next number and holds it.
-	m1, err := a.NewMember(ctx, s.branchID, 0)
+	m1, err := a.NewMember(ctx, s.branchID, 0, 0)
 	noErr(t, err)
-	m2, err := a.NewMember(ctx, s.branchID, 0)
+	m2, err := a.NewMember(ctx, s.branchID, 0, 0)
 	noErr(t, err)
 	if m1.No != 1 || m2.No != 2 || m1.Status != "temp" || m1.ExpiresAt == nil {
 		t.Fatalf("new members: %+v %+v", m1, m2)
@@ -23,30 +23,30 @@ func TestStoreMembersAndStaffOrders(t *testing.T) {
 	// An hour later, the unused number at the top comes back.
 	_, err = a.DB.Exec(ctx, `UPDATE store_members SET expires_at = now() - interval '1 minute' WHERE id=$1`, m2.ID)
 	noErr(t, err)
-	_, err = a.GetMember(ctx, s.branchID, 2)
+	_, err = a.GetMember(ctx, s.branchID, 0, 2)
 	wantCode(t, err, "NOT_FOUND")
-	m3, err := a.NewMember(ctx, s.branchID, 0)
+	m3, err := a.NewMember(ctx, s.branchID, 0, 0)
 	noErr(t, err)
 	if m3.No != 2 {
 		t.Fatalf("recycled number: %d", m3.No)
 	}
 
 	// Filling in the details: phone and where they asked from are required, the name is not.
-	_, err = a.SaveMember(ctx, s.branchID, 0, app.MemberInput{No: 1, Source: "wechat"})
+	_, err = a.SaveMember(ctx, s.branchID, 0, 0, app.MemberInput{No: 1, Source: "wechat"})
 	wantCode(t, err, "PHONE_REQUIRED")
-	_, err = a.SaveMember(ctx, s.branchID, 0, app.MemberInput{No: 1, Phone: "+63 917 555 2046"})
+	_, err = a.SaveMember(ctx, s.branchID, 0, 0, app.MemberInput{No: 1, Phone: "+63 917 555 2046"})
 	wantCode(t, err, "SOURCE_REQUIRED")
-	saved, err := a.SaveMember(ctx, s.branchID, 0, app.MemberInput{No: 1, Phone: "+63 917 555 2046", Source: "wechat", Contact: "chen"})
+	saved, err := a.SaveMember(ctx, s.branchID, 0, 0, app.MemberInput{No: 1, Phone: "+63 917 555 2046", Source: "wechat", Contact: "chen"})
 	noErr(t, err)
 	if saved.Status != "active" || saved.ExpiresAt != nil || saved.Phone != "+639175552046" {
 		t.Fatalf("saved member: %+v", saved)
 	}
-	found, err := a.SearchMembers(ctx, s.branchID, "0000")
+	found, err := a.SearchMembers(ctx, s.branchID, 0, "0000")
 	noErr(t, err)
 	if len(found) != 2 {
 		t.Fatalf("search by number: %d", len(found))
 	}
-	found, err = a.SearchMembers(ctx, s.branchID, "5552046")
+	found, err = a.SearchMembers(ctx, s.branchID, 0, "5552046")
 	noErr(t, err)
 	if len(found) != 1 || found[0].No != 1 {
 		t.Fatalf("search by phone: %+v", found)
@@ -97,13 +97,13 @@ func TestStoreMembersAndStaffOrders(t *testing.T) {
 	in.Member.Name = "Mark T."
 	_, err = a.PlaceStaffOrder(ctx, s.branchID, s.staff, uniq("k"), in)
 	noErr(t, err)
-	m, err := a.GetMember(ctx, s.branchID, 7)
+	m, err := a.GetMember(ctx, s.branchID, 0, 7)
 	noErr(t, err)
 	if m.Name != "Mark T." || m.Stats.Orders != 2 || m.Stats.Week != 2 || len(m.Stats.Favorites) == 0 {
 		t.Fatalf("member 7: %+v %+v", m, m.Stats)
 	}
 	// The next new number follows the highest one.
-	m8, err := a.NewMember(ctx, s.branchID, 0)
+	m8, err := a.NewMember(ctx, s.branchID, 0, 0)
 	noErr(t, err)
 	if m8.No != 8 {
 		t.Fatalf("next number: %d", m8.No)
@@ -113,7 +113,7 @@ func TestStoreMembersAndStaffOrders(t *testing.T) {
 	_, err = a.PlaceStaffOrder(ctx, s.branchID, s.staff, uniq("k"), in)
 	wantCode(t, err, "ADDRESS_REQUIRED")
 
-	hints, err := a.AddressHints(ctx, s.branchID, "zamora", "")
+	hints, err := a.AddressHints(ctx, s.branchID, 0, "zamora", "")
 	noErr(t, err)
 	if len(hints) != 1 || hints[0].Line != "2621 Zamora St" {
 		t.Fatalf("address hints: %+v", hints)
@@ -188,12 +188,12 @@ func TestMemberPages(t *testing.T) {
 	in.Member.No = o1.Member.No
 	_, err = a.PlaceStaffOrder(ctx, s.branchID, s.staff, uniq("k"), in)
 	noErr(t, err)
-	_, err = a.SaveMember(ctx, s.branchID, 0, app.MemberInput{Phone: "+639171110002", Source: "line", Name: "Lina", AddressLine: "12 Rizal Ave"})
+	_, err = a.SaveMember(ctx, s.branchID, 0, 0, app.MemberInput{Phone: "+639171110002", Source: "line", Name: "Lina", AddressLine: "12 Rizal Ave"})
 	noErr(t, err)
-	tmp, err := a.NewMember(ctx, s.branchID, 0)
+	tmp, err := a.NewMember(ctx, s.branchID, 0, 0)
 	noErr(t, err)
 	elsewhere := uniq("elsewhere")
-	_, err = a.SaveMember(ctx, other.branchID, 0, app.MemberInput{Phone: "+639171110009", Source: "phone", Name: elsewhere})
+	_, err = a.SaveMember(ctx, other.branchID, 0, 0, app.MemberInput{Phone: "+639171110009", Source: "phone", Name: elsewhere})
 	noErr(t, err)
 
 	// A store sees its own members only, newest first, with what they ordered.
@@ -235,7 +235,7 @@ func TestMemberPages(t *testing.T) {
 	}
 
 	// Details and order history.
-	d, err := a.MemberByNo(ctx, s.branchID, chen.No)
+	d, err := a.MemberByNo(ctx, s.branchID, 0, chen.No)
 	noErr(t, err)
 	if d.Stats == nil || d.Stats.Orders != 2 || d.Orders != 2 {
 		t.Fatalf("detail: %+v", d)
@@ -245,7 +245,7 @@ func TestMemberPages(t *testing.T) {
 	if h.Total != 2 || !h.Items[0].Linked || h.Items[0].Items == "" || h.Items[0].OrderSource != "wechat" {
 		t.Fatalf("history: %+v", h)
 	}
-	if d2, _ := a.MemberByNo(ctx, other.branchID, chen.No); d2 != nil && d2.ID == chen.ID {
+	if d2, _ := a.MemberByNo(ctx, other.branchID, 0, chen.No); d2 != nil && d2.ID == chen.ID {
 		t.Fatal("another store found this store's member")
 	}
 
@@ -279,7 +279,7 @@ func TestMemberAddressBook(t *testing.T) {
 	order(no, " 12 rizal ave ", "5f") // the same address, typed differently
 	order(no, "88 Ayala Ave", "")     // a new one
 	order(no, "12 Rizal Ave", "7F")   // another unit is another address
-	d, err := a.MemberByNo(ctx, s.branchID, no)
+	d, err := a.MemberByNo(ctx, s.branchID, 0, no)
 	noErr(t, err)
 	if len(d.Addresses) != 3 {
 		t.Fatalf("addresses: %+v", d.Addresses)
@@ -297,15 +297,15 @@ func TestMemberAddressBook(t *testing.T) {
 		t.Fatalf("uses of the repeated address: %+v", rizal5)
 	}
 	// Ordering for pickup does not add an address; saving details does.
-	_, err = a.SaveMember(ctx, s.branchID, 0, app.MemberInput{No: no, Phone: "+639181112222", Source: "wechat", AddressLine: "1 Bonifacio St"})
+	_, err = a.SaveMember(ctx, s.branchID, 0, 0, app.MemberInput{No: no, Phone: "+639181112222", Source: "wechat", AddressLine: "1 Bonifacio St"})
 	noErr(t, err)
-	d, err = a.MemberByNo(ctx, s.branchID, no)
+	d, err = a.MemberByNo(ctx, s.branchID, 0, no)
 	noErr(t, err)
 	if len(d.Addresses) != 4 || d.Addresses[0].Line != "1 Bonifacio St" || d.Addresses[0].Uses != 0 {
 		t.Fatalf("saved address: %+v", d.Addresses)
 	}
 	// The address book shows up when typing an address for this phone.
-	hints, err := a.AddressHints(ctx, s.branchID, "", "+639181112222")
+	hints, err := a.AddressHints(ctx, s.branchID, 0, "", "+639181112222")
 	noErr(t, err)
 	if len(hints) < 3 {
 		t.Fatalf("hints: %+v", hints)
@@ -313,7 +313,7 @@ func TestMemberAddressBook(t *testing.T) {
 	// Any address but the current one can be removed.
 	wantCode(t, a.DeleteMemberAddress(ctx, d.ID, d.Addresses[0].ID), "NOT_FOUND")
 	noErr(t, a.DeleteMemberAddress(ctx, d.ID, rizal5.ID))
-	d, err = a.MemberByNo(ctx, s.branchID, no)
+	d, err = a.MemberByNo(ctx, s.branchID, 0, no)
 	noErr(t, err)
 	if len(d.Addresses) != 3 {
 		t.Fatalf("after delete: %+v", d.Addresses)

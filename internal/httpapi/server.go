@@ -576,6 +576,7 @@ func (s *Server) Router() *gin.Engine {
 	s.uiTextRoutes(api, admin)
 	s.chatAdminRoutes(auth, admin)
 	s.memberRoutes(auth)
+	s.brandRoutes(auth)
 	s.deliveryStatsRoutes(auth)
 
 	s.static(r)

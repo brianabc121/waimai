@@ -18,6 +18,7 @@ import ApprovePinDialog from './ApprovePinDialog.vue'
 import { pagePerms } from '../perms'
 import { useShell } from '../shell'
 import { storeChats } from '../chat'
+import '../brands'
 
 const router = useRouter(), route = useRoute()
 const shell = useShell('store')
@@ -172,6 +173,7 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
           </template>
         </template>
         <router-link v-if="show('/merchant/staff')" to="/merchant/staff" data-testid="nav-staff">{{ t('staff') }}</router-link>
+        <router-link v-if="show('/merchant/brands')" to="/merchant/brands" data-testid="nav-brands">{{ t('br.nav') }}</router-link>
         <router-link v-if="show('/merchant/settings')" to="/merchant/settings">{{ t('settings') }}</router-link>
         <router-link v-if="posts.length" to="/work">{{ t('my_workbench') }}</router-link>
       </div>

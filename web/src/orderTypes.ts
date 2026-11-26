@@ -1,6 +1,7 @@
 // Order types and order numbers (docs/ORDER_TYPES_DESIGN.md): the five types,
 // their colours and texts, shared by the order list, kitchen and settings.
 import { extend, locale, t } from './i18n'
+import { multiBrand } from './brands'
 
 extend({
   'ot.all': ['全部', 'All'],
@@ -29,9 +30,10 @@ export type OrderType = typeof ORDER_TYPES[number]
 
 // typeLabel is the short tag of an order: 堂食 · 店员, 代客, 商城...
 // A platform order shows its platform: Grab, foodpanda.
-export function typeLabel(o: { order_type?: string; dine_source?: string; platform?: { name: string; names?: Record<string, string> } }): string {
+// In a store with several brands it reads 好吃党 Grab (docs/MULTI_BRAND_DESIGN.md §6).
+export function typeLabel(o: { order_type?: string; dine_source?: string; brand_name?: string; platform?: { name: string; names?: Record<string, string> } }): string {
   const ty = o.order_type || 'web'
-  if (o.platform) return o.platform.names?.[locale.value] || o.platform.name
+  if (o.platform) return (multiBrand() && o.brand_name ? o.brand_name + ' ' : '') + (o.platform.names?.[locale.value] || o.platform.name)
   const base = t('ot.t.' + ty)
   return ty === 'dine_in' && o.dine_source ? `${base} · ${t('ot.ds.' + o.dine_source)}` : base
 }

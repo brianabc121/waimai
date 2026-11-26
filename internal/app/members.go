@@ -27,7 +27,10 @@ const memberHold = time.Hour
 var OrderSources = []string{"wechat", "line", "whatsapp", "phone", "other"}
 
 type Member struct {
-	ID          int64      `json:"id"`
+	ID int64 `json:"id"`
+	// BrandID is the brand the member belongs to: members are kept per brand
+	// (docs/MULTI_BRAND_DESIGN.md §8).
+	BrandID     int64      `json:"brand_id"`
 	No          int        `json:"no"`
 	Status      string     `json:"status"`
 	Phone       string     `json:"phone"`
@@ -74,12 +77,12 @@ type MemberInput struct {
 	Note        string   `json:"note"`
 }
 
-const memberCols = `id, member_no, status, phone, name, source, contact, address_line, address_unit, address_note,
+const memberCols = `id, brand_id, member_no, status, phone, name, source, contact, address_line, address_unit, address_note,
 	lat, lng, note, expires_at, created_at`
 
 func scanMember(row interface{ Scan(...any) error }) (*Member, error) {
 	m := &Member{}
-	err := row.Scan(&m.ID, &m.No, &m.Status, &m.Phone, &m.Name, &m.Source, &m.Contact, &m.AddressLine,
+	err := row.Scan(&m.ID, &m.BrandID, &m.No, &m.Status, &m.Phone, &m.Name, &m.Source, &m.Contact, &m.AddressLine,
 		&m.AddressUnit, &m.AddressNote, &m.Lat, &m.Lng, &m.Note, &m.ExpiresAt, &m.CreatedAt)
 	if isNoRows(err) {
 		return nil, ErrNotFound
@@ -139,21 +142,24 @@ func recycleMembers(ctx context.Context, q Querier, branchID int64) error {
 
 // NewMember takes the store's next member number and holds it for an hour
 // as a temporary member.
-func (a *App) NewMember(ctx context.Context, branchID, staffID int64) (*Member, error) {
+func (a *App) NewMember(ctx context.Context, branchID, brandID, staffID int64) (*Member, error) {
 	var m *Member
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
 		// One number at a time per store.
 		if _, err := tx.Exec(ctx, `SELECT id FROM branches WHERE id=$1 FOR UPDATE`, branchID); err != nil {
 			return err
 		}
+		brandID, err := memberBrand(ctx, tx, branchID, brandID)
+		if err != nil {
+			return err
+		}
 		if err := recycleMembers(ctx, tx, branchID); err != nil {
 			return err
 		}
-		var err error
-		m, err = scanMember(tx.QueryRow(ctx, `INSERT INTO store_members (branch_id, member_no, status, expires_at, created_by)
-			VALUES ($1, (SELECT COALESCE(MAX(member_no), 0) + 1 FROM store_members WHERE branch_id=$1), 'temp',
+		m, err = scanMember(tx.QueryRow(ctx, `INSERT INTO store_members (branch_id, brand_id, member_no, status, expires_at, created_by)
+			VALUES ($1, $4, (SELECT COALESCE(MAX(member_no), 0) + 1 FROM store_members WHERE brand_id=$4), 'temp',
 				now() + make_interval(secs => $2), NULLIF($3, 0))
-			RETURNING `+memberCols, branchID, memberHold.Seconds(), staffID))
+			RETURNING `+memberCols, branchID, memberHold.Seconds(), staffID, brandID))
 		return err
 	})
 	if err != nil {
@@ -163,18 +169,22 @@ func (a *App) NewMember(ctx context.Context, branchID, staffID int64) (*Member, 
 }
 
 // SearchMembers finds live members of the store by number, phone or name.
-func (a *App) SearchMembers(ctx context.Context, branchID int64, q string) ([]*Member, error) {
+func (a *App) SearchMembers(ctx context.Context, branchID, brandID int64, q string) ([]*Member, error) {
 	q = strings.TrimSpace(q)
 	if q == "" {
 		return []*Member{}, nil
 	}
+	brandID, err := memberBrand(ctx, a.DB, branchID, brandID)
+	if err != nil {
+		return nil, err
+	}
 	digits := strings.TrimLeft(q, "+0")
 	n, _ := strconv.Atoi(strings.TrimLeft(q, "0"))
 	rows, err := a.DB.Query(ctx, `SELECT `+memberCols+` FROM store_members
-		WHERE branch_id=$1 AND `+liveMember+` AND (
+		WHERE brand_id=$1 AND `+liveMember+` AND (
 			lpad(member_no::text, 6, '0') LIKE $2 || '%' OR member_no = $3
 			OR ($4 <> '' AND phone LIKE '%' || $4 || '%') OR name ILIKE '%' || $2 || '%')
-		ORDER BY (member_no = $3) DESC, updated_at DESC LIMIT 10`, branchID, q, n, onlyDigits(digits))
+		ORDER BY (member_no = $3) DESC, updated_at DESC LIMIT 10`, brandID, q, n, onlyDigits(digits))
 	if err != nil {
 		return nil, err
 	}
@@ -203,9 +213,13 @@ func onlyDigits(s string) string {
 }
 
 // GetMember looks one member up by number, with their order counts.
-func (a *App) GetMember(ctx context.Context, branchID int64, no int) (*Member, error) {
+func (a *App) GetMember(ctx context.Context, branchID, brandID int64, no int) (*Member, error) {
+	brandID, err := memberBrand(ctx, a.DB, branchID, brandID)
+	if err != nil {
+		return nil, err
+	}
 	m, err := scanMember(a.DB.QueryRow(ctx, `SELECT `+memberCols+` FROM store_members
-		WHERE branch_id=$1 AND member_no=$2 AND `+liveMember, branchID, no))
+		WHERE brand_id=$1 AND member_no=$2 AND `+liveMember, brandID, no))
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +229,9 @@ func (a *App) GetMember(ctx context.Context, branchID int64, no int) (*Member, e
 
 func memberStats(ctx context.Context, q Querier, branchID int64, m *Member) (*MemberStats, error) {
 	st := &MemberStats{Favorites: []string{}}
-	const mine = `o.branch_id=$1 AND (o.member_id=$2 OR ($3 <> '' AND o.customer_phone=$3))
+	// Orders of the member's own brand only: brands do not share members.
+	const mine = `o.branch_id=$1 AND o.brand_id=(SELECT brand_id FROM store_members WHERE id=$2)
+		AND (o.member_id=$2 OR ($3 <> '' AND o.customer_phone=$3))
 		AND o.acceptance_status NOT IN ('rejected','cancelled')`
 	err := q.QueryRow(ctx, `SELECT
 			count(*) FILTER (WHERE o.created_at >= date_trunc('week', now() AT TIME ZONE b.timezone) AT TIME ZONE b.timezone),
@@ -246,14 +262,14 @@ func memberStats(ctx context.Context, q Querier, branchID int64, m *Member) (*Me
 
 // SaveMember fills in a member's details: a temporary member becomes a
 // member, and a number nobody has yet is created.
-func (a *App) SaveMember(ctx context.Context, branchID, staffID int64, in MemberInput) (*Member, error) {
+func (a *App) SaveMember(ctx context.Context, branchID, brandID, staffID int64, in MemberInput) (*Member, error) {
 	if err := in.clean(false); err != nil {
 		return nil, err
 	}
 	var m *Member
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
 		var err error
-		m, err = upsertMember(ctx, tx, branchID, staffID, in)
+		m, err = upsertMember(ctx, tx, branchID, brandID, staffID, in)
 		return err
 	})
 	if err != nil {
@@ -265,29 +281,33 @@ func (a *App) SaveMember(ctx context.Context, branchID, staffID int64, in Member
 // upsertMember saves what staff filled in against the member number: the
 // member is created when the number is free (a new number when 0), and
 // changed details replace the old ones.
-func upsertMember(ctx context.Context, tx pgx.Tx, branchID, staffID int64, in MemberInput) (*Member, error) {
+func upsertMember(ctx context.Context, tx pgx.Tx, branchID, brandID, staffID int64, in MemberInput) (*Member, error) {
 	if _, err := tx.Exec(ctx, `SELECT id FROM branches WHERE id=$1 FOR UPDATE`, branchID); err != nil {
+		return nil, err
+	}
+	brandID, err := memberBrand(ctx, tx, branchID, brandID)
+	if err != nil {
 		return nil, err
 	}
 	if err := recycleMembers(ctx, tx, branchID); err != nil {
 		return nil, err
 	}
 	if in.No == 0 {
-		if err := tx.QueryRow(ctx, `SELECT COALESCE(MAX(member_no), 0) + 1 FROM store_members WHERE branch_id=$1`,
-			branchID).Scan(&in.No); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT COALESCE(MAX(member_no), 0) + 1 FROM store_members WHERE brand_id=$1`,
+			brandID).Scan(&in.No); err != nil {
 			return nil, err
 		}
 	}
 	m, err := scanMember(tx.QueryRow(ctx, `INSERT INTO store_members (branch_id, member_no, status, phone, name, source,
-			contact, address_line, address_unit, address_note, lat, lng, note, created_by)
-		VALUES ($1,$2,'active',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13, 0))
-		ON CONFLICT (branch_id, member_no) DO UPDATE SET status='active', expires_at=NULL, phone=EXCLUDED.phone,
+			contact, address_line, address_unit, address_note, lat, lng, note, created_by, brand_id)
+		VALUES ($1,$2,'active',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13, 0),$14)
+		ON CONFLICT (brand_id, member_no) DO UPDATE SET status='active', expires_at=NULL, phone=EXCLUDED.phone,
 			name=EXCLUDED.name, source=EXCLUDED.source, contact=EXCLUDED.contact,
 			address_line=EXCLUDED.address_line, address_unit=EXCLUDED.address_unit,
 			address_note=EXCLUDED.address_note, lat=EXCLUDED.lat, lng=EXCLUDED.lng, note=EXCLUDED.note,
 			updated_at=now()
 		RETURNING `+memberCols, branchID, in.No, in.Phone, in.Name, in.Source, in.Contact, in.AddressLine,
-		in.AddressUnit, in.AddressNote, in.Lat, in.Lng, in.Note, staffID))
+		in.AddressUnit, in.AddressNote, in.Lat, in.Lng, in.Note, staffID, brandID))
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +338,7 @@ type AddressHint struct {
 // AddressHints lists, for what was typed: the phone's own addresses, then the
 // address book's in the store's region, then the store's past deliveries
 // not already among those.
-func (a *App) AddressHints(ctx context.Context, branchID int64, q, phone string) ([]AddressHint, error) {
+func (a *App) AddressHints(ctx context.Context, branchID, brandID int64, q, phone string) ([]AddressHint, error) {
 	q, phone = strings.TrimSpace(q), strings.TrimSpace(phone)
 	if q == "" && phone == "" {
 		return []AddressHint{}, nil
@@ -330,24 +350,31 @@ func (a *App) AddressHints(ctx context.Context, branchID int64, q, phone string)
 	if err != nil {
 		return nil, err
 	}
+	// The phone's own addresses come from this brand's orders and members
+	// only (brands do not share members); other deliveries of the store are
+	// offered without saying whose they were.
+	brandID, err = memberBrand(ctx, a.DB, branchID, brandID)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := a.DB.Query(ctx, `SELECT line, unit, note, lat, lng, mine, addr_key(line) FROM (
 			SELECT DISTINCT ON (addr_key(line)) line, unit, note, lat, lng, mine, at FROM (
 				SELECT address_line AS line, address_unit AS unit, address_note AS note, dest_lat AS lat, dest_lng AS lng,
-					($3 <> '' AND customer_phone = $3) AS mine, created_at AS at
+					($3 <> '' AND customer_phone = $3 AND brand_id = $4) AS mine, created_at AS at
 				FROM orders WHERE branch_id=$1 AND service_type='delivery' AND address_line <> ''
 					AND ($2 = '' OR address_line ILIKE '%' || $2 || '%' OR addr_key(address_line) LIKE '%' || addr_key($2) || '%')
 				UNION ALL
 				SELECT address_line, address_unit, address_note, lat, lng, ($3 <> '' AND phone = $3), updated_at
-				FROM store_members WHERE branch_id=$1 AND address_line <> '' AND `+liveMember+`
+				FROM store_members WHERE brand_id=$4 AND address_line <> '' AND `+liveMember+`
 					AND ($2 = '' OR address_line ILIKE '%' || $2 || '%' OR addr_key(address_line) LIKE '%' || addr_key($2) || '%')
 				UNION ALL
 				SELECT a.address_line, a.address_unit, a.address_note, a.lat, a.lng, ($3 <> '' AND m.phone = $3), a.last_used_at
 				FROM store_member_addresses a JOIN store_members m ON m.id = a.member_id
-				WHERE m.branch_id=$1 AND `+liveMember+` AND ($2 = '' OR a.address_line ILIKE '%' || $2 || '%'
+				WHERE m.brand_id=$4 AND `+liveMember+` AND ($2 = '' OR a.address_line ILIKE '%' || $2 || '%'
 					OR addr_key(a.address_line) LIKE '%' || addr_key($2) || '%')
 			) x WHERE addr_key(line) <> '' AND ($2 <> '' OR mine)
 			ORDER BY addr_key(line), mine DESC, at DESC
-		) y ORDER BY mine DESC, at DESC LIMIT 12`, branchID, q, phone)
+		) y ORDER BY mine DESC, at DESC LIMIT 12`, branchID, q, phone, brandID)
 	if err != nil {
 		return nil, err
 	}
@@ -436,6 +463,9 @@ type StaffLine struct {
 }
 
 type StaffOrderInput struct {
+	// BrandID is the brand the order is placed under; 0 is the store's main
+	// brand. The member and the order number belong to it.
+	BrandID     int64       `json:"brand_id"`
 	Member      MemberInput `json:"member"`
 	ServiceType string      `json:"service_type"`
 	// ZoneID is the delivery area, for a store that picks areas from a list.
@@ -574,6 +604,10 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 		if err != nil {
 			return err
 		}
+		brand, err := orderBrand(ctx, tx, b.ID, in.BrandID)
+		if err != nil {
+			return err
+		}
 		scope := fmt.Sprintf("staff-order:%d", b.ID)
 		var rec staffPlaced
 		replayed, err := idemBegin(ctx, tx, scope, idemKey, hashJSON(in), &rec)
@@ -614,12 +648,12 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 		if err := reserveStock(ctx, tx, cur.Lines); err != nil {
 			return err
 		}
-		m, err := upsertMember(ctx, tx, b.ID, actor.ID, in.Member)
+		m, err := upsertMember(ctx, tx, b.ID, brand.ID, actor.ID, in.Member)
 		if err != nil {
 			return err
 		}
 		memberID = m.ID
-		no, err := staffOrderNo(ctx, tx, b, m.No)
+		no, err := staffOrderNo(ctx, tx, b, brand, m.No)
 		if err != nil {
 			return err
 		}
@@ -659,18 +693,18 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 			service_charge, tax_amount, tax_inclusive, tax_rate_bp, discount, total, payment_method, accept_deadline,
 			promotion_id, promotion_name, promotion_name_en, scheduled_for, release_at, dest_lat, dest_lng,
 			zone_distance_m, contact_phone, contact_wechat, contact_line, contact_whatsapp,
-			member_id, order_source, placed_by, staff_note)
+			member_id, order_source, placed_by, staff_note, brand_id, brand_name)
 			VALUES ($1,$2,$3,$4,$5,$6,'staff',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
 				now() + make_interval(mins => $27), NULLIF($28, 0), $29, $30,
 				$31::timestamptz, $31::timestamptz - make_interval(mins => $32), $33, $34, $35, $36, $37, $38, $39,
-				$40, $41, NULLIF($42, 0), $43)
+				$40, $41, NULLIF($42, 0), $43, $44, $45)
 			RETURNING id`,
 			b.MerchantID, b.ID, publicNo, pickupCode, hashToken(token), nonce, cur.ServiceType, m.Name, phone,
 			cur.ZoneID, cur.ZoneName, addrLine, addrUnit, addrNote, strings.TrimSpace(in.Note), b.Currency,
 			t.Subtotal, t.PackagingFee, t.DeliveryFee, t.ServiceCharge, t.TaxAmount, t.TaxInclusive, t.TaxRateBP,
 			t.Discount, t.Total, payMethod, b.AcceptTimeoutMinutes, t.PromotionID, t.PromotionName,
 			t.PromotionNameEn, cur.ScheduledFor, b.PrepMinutes, lat, lng, cur.ZoneDistanceM,
-			phone, wechat, line, whatsapp, m.ID, m.Source, actor.ID, strings.TrimSpace(in.StaffNote)).Scan(&orderID)
+			phone, wechat, line, whatsapp, m.ID, m.Source, actor.ID, strings.TrimSpace(in.StaffNote), brand.ID, brand.Name).Scan(&orderID)
 		if err != nil {
 			return wrap("insert order", err)
 		}
@@ -759,4 +793,16 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 		return nil, err
 	}
 	return &StaffOrder{Order: o, Member: m, AccessToken: token}, nil
+}
+
+// memberBrand is the brand members are looked up and numbered in: brandID
+// when it is one of the store's brands, the main brand for 0.
+func memberBrand(ctx context.Context, q Querier, branchID, brandID int64) (int64, error) {
+	var id int64
+	err := q.QueryRow(ctx, `SELECT id FROM brands WHERE branch_id=$1 AND (id=$2 OR $2 = 0 AND is_main)`,
+		branchID, brandID).Scan(&id)
+	if isNoRows(err) {
+		return 0, Err(http.StatusUnprocessableEntity, "BRAND_UNKNOWN", "no such brand in this store")
+	}
+	return id, err
 }

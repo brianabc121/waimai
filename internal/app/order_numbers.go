@@ -74,16 +74,23 @@ func nextOrderNo(ctx context.Context, tx pgx.Tx, b *Branch, typ string) (orderNo
 	return orderNo{Type: typ, Public: prefix + code, Code: code, BizDate: biz}, nil
 }
 
-// staffOrderNo numbers an order staff place for a member: the store code and
-// the member number, and -2, -3 for the member's next orders that business day.
-func staffOrderNo(ctx context.Context, tx pgx.Tx, b *Branch, memberNo int) (orderNo, error) {
-	code, err := ensureStoreCode(ctx, tx, b)
-	if err != nil {
-		return orderNo{}, err
+// staffOrderNo numbers an order staff place for a member: the brand's code
+// and the member number, and -2, -3 for the member's next orders that
+// business day (docs/MULTI_BRAND_DESIGN.md §6). The main brand's code is the
+// store code.
+func staffOrderNo(ctx context.Context, tx pgx.Tx, b *Branch, brand *Brand, memberNo int) (orderNo, error) {
+	code, kind := brand.Code, "staff:"
+	if brand.IsMain {
+		var err error
+		if code, err = ensureStoreCode(ctx, tx, b); err != nil {
+			return orderNo{}, err
+		}
+	} else {
+		kind = fmt.Sprintf("staff:%d:", brand.ID)
 	}
 	biz := b.businessDay(time.Now()).Format("2006-01-02")
 	no := fmt.Sprintf("%06d", memberNo)
-	n, err := counter(ctx, tx, b.ID, "staff:"+no, biz)
+	n, err := counter(ctx, tx, b.ID, kind+no, biz)
 	if err != nil {
 		return orderNo{}, err
 	}
@@ -164,7 +171,7 @@ func (a *App) SaveOrderNumbering(ctx context.Context, branchID int64, in OrderNu
 	}
 	tag, err := a.DB.Exec(ctx, `UPDATE branches SET store_code=$2, day_reset_time=$3 WHERE id=$1`,
 		branchID, in.StoreCode, in.DayResetTime)
-	if isUnique(err, "branches_store_code") {
+	if isUnique(err, "branches_store_code") || isUnique(err, "brands_code") {
 		return nil, Err(http.StatusConflict, "STORE_CODE_TAKEN", "another store already uses this code")
 	}
 	if err != nil {
