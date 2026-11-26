@@ -482,6 +482,7 @@ func (s *Server) Router() *gin.Engine {
 	auth.PUT("/merchant/branches/:bid/location", s.saveLocation)
 	auth.PUT("/merchant/branches/:bid/zone-mode", s.saveZoneMode)
 	auth.PUT("/merchant/branches/:bid/settings", s.menuChanged, s.saveSettings)
+	auth.PUT("/merchant/branches/:bid/order-numbering", s.saveOrderNumbering)
 	auth.GET("/merchant/branches/:bid/mall", s.mallListing)
 	auth.PUT("/merchant/branches/:bid/mall", s.saveMallListing)
 	auth.POST("/merchant/branches/:bid/images", s.uploadImage)

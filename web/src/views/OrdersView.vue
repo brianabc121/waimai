@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ORDER_TYPES, typeColor, typeLabel } from '../orderTypes'
 import KitchenNote from './KitchenNote.vue'
 import { computed, ref } from 'vue'
 import { ApiError, api, get, post } from '../api'
@@ -90,6 +91,11 @@ async function savePay() {
 }
 const scope = ref<'active' | 'history'>('active')
 const orders = ref<Order[]>([])
+// the type tabs over the list (docs/ORDER_TYPES_DESIGN.md §8); dine-in bills live on the tables page
+const typeFilter = ref('')
+const typeTabs = computed(() => ORDER_TYPES.filter(x => x !== 'dine_in')
+  .map(x => ({ id: x, n: orders.value.filter(o => (o.order_type || 'web') === x).length })))
+const shown = computed(() => typeFilter.value ? orders.value.filter(o => (o.order_type || 'web') === typeFilter.value) : orders.value)
 const riders = ref<RiderInfo[]>([])
 // ?order=ID opens that order (from the cooking progress page)
 const selectedId = ref<number | null>(Number(useRoute().query.order) || null)
@@ -270,14 +276,19 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
 
     <div class="desk" :class="{ picked: !!selected }">
       <div class="list">
-        <div v-if="orders.length === 0" class="card muted">{{ t('no_orders') }}</div>
-        <button v-for="o in orders" :key="o.id" class="card ord" :class="{ sel: o.id === selectedId, pend: o.acceptance_status === 'pending' }" @click="selectedId = o.id">
+        <div class="ottabs" data-testid="ot-tabs">
+          <button :class="{ on: !typeFilter }" @click="typeFilter = ''">{{ t('ot.all') }} {{ orders.length }}</button>
+          <button v-for="x in typeTabs" :key="x.id" :class="{ on: typeFilter === x.id }" :data-testid="'ot-tab-' + x.id" @click="typeFilter = x.id">{{ t('ot.t.' + x.id) }} {{ x.n }}</button>
+        </div>
+        <div v-if="shown.length === 0" class="card muted">{{ t('no_orders') }}</div>
+        <button v-for="o in shown" :key="o.id" class="card ord" :class="{ sel: o.id === selectedId, pend: o.acceptance_status === 'pending' }" @click="selectedId = o.id">
           <div class="row between"><b>{{ o.public_no }}</b><span class="price bold">{{ money(o.totals.total, o.currency) }}</span></div>
           <div class="row between small" style="margin-top:4px">
             <span>{{ t(o.service_type) }} · {{ o.customer_name }}</span>
             <span class="muted" v-if="scope === 'active'">{{ t('waiting') }} {{ waited(o) }} {{ t('min') }}</span>
           </div>
           <div class="row wrap" style="margin-top:8px;gap:6px">
+            <span class="tag ottag" :style="{ background: typeColor[o.order_type || 'web'] }" data-testid="ot-tag">{{ typeLabel(o) }}</span>
             <span v-if="o.order_source" class="tag info" data-testid="by-staff-tag">{{ t('vo.tag', { s: srcText(o.order_source) }) }}</span>
             <span class="tag brand" v-if="o.scheduled_for">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span>
             <span class="tag" :class="accTag(o.acceptance_status)">{{ t('a.' + o.acceptance_status) }}</span>
@@ -298,7 +309,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
         <div class="stack">
           <button class="btn link backlist" data-testid="order-back" @click="selectedId = null">‹ {{ t('back') }}</button>
           <div class="row between">
-            <h2>{{ selected.public_no }} · {{ t(selected.service_type) }}</h2>
+            <h2>{{ selected.public_no }} · {{ typeLabel(selected) }} · {{ t(selected.service_type) }}</h2>
             <a class="btn small" :href="`/ticket/${selected.id}`" target="_blank">{{ t('print') }}</a>
           </div>
           <div class="row wrap" style="gap:6px">
@@ -490,6 +501,10 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
 </template>
 
 <style scoped>
+.ottabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.ottabs button { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.ottabs button.on { border-color: var(--brand); color: var(--brand); }
+.ottag { color: #fff; border: 0; }
 .paybox { position: fixed; left: 50%; top: 16vh; transform: translateX(-50%); width: min(440px, calc(100vw - 32px)); z-index: 41; }
 .adjrow span:last-child { color: #8a5a12; text-align: end; }
 .voidline > .grow > b, .voidline > .grow { text-decoration: line-through; color: var(--muted); }
