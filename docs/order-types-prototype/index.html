@@ -54,7 +54,7 @@ table{border-collapse:collapse;width:100%}
 .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
 .go{background:var(--brand);color:#fff;border-radius:10px;padding:13px;text-align:center;font-weight:700;font-size:16px}
 .tag{display:inline-flex;align-items:center;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
-.t-dine{background:var(--dine)}.t-staff{background:var(--staff)}.t-online{background:var(--online)}.t-grab{background:var(--grab)}.t-fp{background:var(--fp)}.t-shopee{background:var(--shopee)}
+.t-dine{background:var(--dine)}.t-staff{background:var(--staff)}.t-online{background:var(--online)}.t-web{background:var(--online)}.t-hippo{background:#c2410c}.t-grab{background:var(--grab)}.t-fp{background:var(--fp)}.t-shopee{background:var(--shopee)}
 .page{padding:18px 22px;display:grid;gap:14px;align-content:start}
 .ph1{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .ph1 h2{font-size:24px;margin:0;color:#2f1810}.ph1 p{margin:2px 0 0;color:var(--muted);font-size:13px}
@@ -80,7 +80,7 @@ table{border-collapse:collapse;width:100%}
 .sw.off{background:#ccc}.sw.off::after{right:auto;left:2px}
 .mini{font-size:12px;color:var(--muted)}
 .drawer{background:#fff;border-left:1px solid var(--line);padding:16px;display:grid;gap:10px;align-content:start}
-.kds{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.kds{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 .tk{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .tk .h{padding:10px 12px;color:#fff;display:flex;justify-content:space-between;align-items:center}
 .tk .h b{font-size:19px}
@@ -95,6 +95,20 @@ table{border-collapse:collapse;width:100%}
 .hs{display:flex;gap:8px;overflow:hidden}
 .hs .pb{min-width:120px}
 .fixbar{position:sticky;bottom:0;background:var(--brand-dark);color:#fff;padding:10px 12px;display:grid;gap:8px}
+.phonebox{width:390px;border-radius:28px;border:8px solid #2a2a2a;overflow:hidden;background:#fffaf2;box-shadow:0 6px 24px rgba(0,0,0,.15)}
+.url{background:#eee;color:#333;font-size:12px;padding:6px 12px;text-align:center}
+.url b{color:#111}
+.ctop{background:var(--brand) repeating-radial-gradient(circle at 0 0,transparent 0 10px,rgba(255,255,255,.06) 10px 11px);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px}
+.cover{height:150px;background:linear-gradient(135deg,#8c3b1e,#d98b3a);display:flex;align-items:flex-end;padding:12px;color:#fff;font-weight:800;font-size:20px}
+.sinfo{padding:10px 14px;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line)}
+.av{width:44px;height:44px;border-radius:12px;background:#a02c20;color:#fff;display:grid;place-items:center;font-weight:800}
+.dish{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.dish .im{width:64px;height:64px;border-radius:10px;background:linear-gradient(135deg,#f3c98b,#c96f2d);flex:none}
+.bnav{display:flex;justify-content:space-around;border-top:1px solid var(--line);padding:8px 0 12px;background:#fff;font-size:12px;color:var(--muted)}
+.bnav .on{color:var(--brand);font-weight:700}
+.note{max-width:300px;display:grid;gap:8px;font-size:13px}
+.note h4{margin:0;font-size:16px}
+.good{color:var(--ok)}.badx{color:var(--bad)}
 </style>
 </head>
 <body>
@@ -104,7 +118,7 @@ const s = new URLSearchParams(location.search).get('s') || '1';
 const side = (on) => `<aside class="side"><div class="shop">马卡蒂小馆</div><div class="who"><b>店主</b>店长 owner1</div>
 <div class="g">点单</div><div class="s ${on==='dine'?'on':''}">堂食下单</div><div class="s ${on==='del'?'on':''}">外卖下单</div><div class="s ${on==='plat'?'on':''}">平台下单 <span class="tag t-grab" style="font-size:10px;padding:0 5px">新</span></div>
 <div class="g">订单</div><div class="s ${on==='orders'?'on':''}">订单列表</div><div class="s">烹饪进度</div><div class="s">退菜记录</div>
-<div class="g">客户管理</div><div class="g">消息</div><div class="g">菜单</div><div class="g">店铺装修</div>
+<div class="g">客户管理</div><div class="g">消息</div><div class="g">菜单</div><div class="g">店铺装修</div>${on==='link'?'<div class="s">宣传物料</div><div class="s">模板</div><div class="s on">店铺链接 <span class="tag t-grab" style="font-size:10px;padding:0 5px">新</span></div>':''}
 <div class="g">财务</div>${on==='recon'?'<div class="s">核款</div><div class="s">账单</div><div class="s on">对账</div>':''}
 <div class="g">配送管理</div><div class="g">员工</div><div class="g ${on==='set'?'':''}" style="${on==='set'?'color:#fff;background:#353b44;border-radius:8px':''}">店铺设置</div></aside>`;
 
@@ -166,20 +180,21 @@ const screens = {
 
 '3': () => `<div class="shell">${side('orders')}<div class="main"><div class="page">
 <div class="ph1"><div><h2>订单</h2><p>今天营业日 11-26（04:00 切换）· 共 58 单</p></div><div class="tool"><span class="btn">导出</span><span class="btn primary">＋ 平台下单</span></div></div>
-<div class="tabs"><span class="on">全部<span class="n">58</span></span><span>堂食<span class="n">21</span></span><span>代客<span class="n">12</span></span><span>平台<span class="n">17</span></span><span>线上<span class="n">8</span></span></div>
-<div class="tool"><div class="in ph search">🔍 搜订单号、流水号、平台单号、会员号、电话</div><span class="chip">全部平台</span><span class="chip"><span class="tag t-grab">Grab 11</span></span><span class="chip"><span class="tag t-fp">foodpanda 6</span></span><span class="chip">状态 ▾</span></div>
+<div class="tabs"><span class="on">全部<span class="n">58</span></span><span>堂食<span class="n">21</span></span><span>代客<span class="n">12</span></span><span>平台<span class="n">17</span></span><span>商城<span class="n">5</span></span><span>网店<span class="n">3</span></span></div>
+<div class="tool"><div class="in ph search">🔍 搜订单号、流水号、平台单号、会员号、电话</div><span class="chip">堂食：全部 ▾</span><span class="chip">全部平台</span><span class="chip"><span class="tag t-grab">Grab 11</span></span><span class="chip"><span class="tag t-fp">foodpanda 6</span></span><span class="chip">状态 ▾</span></div>
 <div class="panel" style="padding:0;overflow:hidden"><table class="grid">
 <tr><th>订单号</th><th>类型</th><th>方式</th><th>客户</th><th>下单</th><th class="num">金额</th><th>状态</th></tr>
 <tr><td class="no">Grab GF-123</td><td><span class="tag t-grab">Grab</span></td><td>平台骑手</td><td>Maria</td><td>12:41</td><td class="num">₱649<div class="mini">到账 ₱482.30</div></td><td><span class="pill w">备餐中</span></td></tr>
-<tr><td class="no">DineIn-021</td><td><span class="tag t-dine">堂食</span></td><td>A3 桌 · 4 人</td><td>—</td><td>12:38</td><td class="num">₱1,284</td><td><span class="pill w">用餐中</span></td></tr>
+<tr><td class="no">DineIn-21</td><td><span class="tag t-dine">堂食 · 店员</span></td><td>A3 桌 · 4 人</td><td>—</td><td>12:38</td><td class="num">₱1,284</td><td><span class="pill w">用餐中</span></td></tr>
 <tr><td class="no">YPX000123</td><td><span class="tag t-staff">代客 · 微信</span></td><td>外卖</td><td>王先生 · 会员 000123</td><td>12:30</td><td class="num">₱540</td><td><span class="pill">配送中</span></td></tr>
 <tr><td class="no">foodpanda #a8kx-21qe</td><td><span class="tag t-fp">foodpanda</span></td><td>顾客自取</td><td>Ken</td><td>12:22</td><td class="num">₱410</td><td><span class="pill">已取走</span></td></tr>
-<tr><td class="no">Online-008</td><td><span class="tag t-online">线上</span></td><td>自取</td><td>+63 917 *** 2231</td><td>12:15</td><td class="num">₱318</td><td><span class="pill">已备好</span></td></tr>
+<tr><td class="no">Hippo-5</td><td><span class="tag t-hippo">商城</span></td><td>自取</td><td>+63 917 *** 2231</td><td>12:15</td><td class="num">₱318</td><td><span class="pill">已备好</span></td></tr>
 <tr><td class="no">YPX000123-2</td><td><span class="tag t-staff">代客 · 电话</span></td><td>自取</td><td>王先生 · 会员 000123</td><td>12:02</td><td class="num">₱160</td><td><span class="pill">已取走</span></td></tr>
-<tr><td class="no">DineIn-020</td><td><span class="tag t-dine">堂食</span></td><td>扫码 · B1 桌</td><td>—</td><td>11:55</td><td class="num">₱620</td><td><span class="pill g">已结账</span></td></tr>
-<tr><td class="no">W1125-044 <div class="mini">老订单，号码不变</div></td><td><span class="tag t-online">线上</span></td><td>外卖</td><td>+63 918 *** 0090</td><td>昨天</td><td class="num">₱455</td><td><span class="pill g">已送达</span></td></tr>
+<tr><td class="no">Web-3</td><td><span class="tag t-web">网店</span></td><td>外卖</td><td>+63 915 *** 7712</td><td>12:08</td><td class="num">₱702</td><td><span class="pill">配送中</span></td></tr>
+<tr><td class="no">DineIn-20</td><td><span class="tag t-dine">堂食 · 扫码</span></td><td>扫码 · B1 桌</td><td>—</td><td>11:55</td><td class="num">₱620</td><td><span class="pill g">已结账</span></td></tr>
+<tr><td class="no">W1125-044 <div class="mini">老订单，号码不变</div></td><td><span class="tag t-web">网店</span></td><td>外卖</td><td>+63 918 *** 0090</td><td>昨天</td><td class="num">₱455</td><td><span class="pill g">已送达</span></td></tr>
 </table></div>
-<div class="info">号码规则：堂食 DineIn-当天序号 · 代客 商家代码+会员号（同一会员当天第二单加 -2）· 平台 平台名+平台单号 · 线上 Online-当天序号。老订单保留原号码。</div>
+<div class="info">号码规则：堂食 DineIn-当天序号（分店员 / 扫码）· 代客 商家代码+会员号（同一会员当天第二单加 -2）· 平台 平台名+平台单号 · 商城 Hippo-当天序号（00:00 清零）· 网店 Web-当天序号（按重置时间清零）。老订单保留原号码。</div>
 </div></div></div>`,
 
 '4': () => `<div class="shell">${side('set')}<div class="main"><div class="page">
@@ -188,12 +203,13 @@ const screens = {
 <div class="row2">
 <div class="panel"><h3>订单编号</h3><div class="kv">
 <label>商家代码 *</label><div class="in focus"><b>YPX</b><span class="mini" style="margin-inline-start:auto">2–8 位字母或数字，全平台唯一 ✓ 可用</span></div>
-<label>每日重置时间</label><div class="in">04:00 ▾<span class="mini" style="margin-inline-start:auto">这个时间之前的单算前一天</span></div>
+<label>每日重置时间</label><div class="in">04:00 ▾<span class="mini" style="margin-inline-start:auto">堂食、网店单号这时清零；之前的单算前一天</span></div>
 <label>编号预览</label><div class="preview">
-<div><span class="tag t-dine">堂食</span><b>DineIn-001</b><span class="mini">每天 04:00 从 001 重来</span></div>
+<div><span class="tag t-dine">堂食</span><b>DineIn-1</b><span class="mini">店员点单、扫码自助都用它；每天 04:00 从 1 重来</span></div>
 <div><span class="tag t-staff">代客</span><b>YPX000123</b><span class="mini">商家代码 + 会员号；同一会员当天第二单 YPX000123-2</span></div>
 <div><span class="tag t-grab">平台</span><b>Grab GF-123</b><span class="mini">平台名 + 平台单号</span></div>
-<div><span class="tag t-online">线上</span><b>Online-001</b><span class="mini">顾客自己下的单，每天重来</span></div></div>
+<div><span class="tag t-hippo">商城</span><b>Hippo-1</b><span class="mini">顾客从河马商城进店下的单；每天当地 00:00 从 1 重来</span></div>
+<div><span class="tag t-web">网店</span><b>Web-1</b><span class="mini">顾客打开本店链接下的单；每天 04:00 从 1 重来</span></div></div>
 </div><div class="info" style="margin-top:12px">改商家代码只影响以后的单，已有订单号码不变。</div></div>
 <div class="panel"><h3>本店上了哪些外卖平台</h3><table class="grid">
 <tr><th>平台</th><th>开通</th><th>平台上的店铺 ID</th><th class="num">佣金</th><th class="num">平台价加价</th></tr>
@@ -248,7 +264,7 @@ const screens = {
 <tr><td class="no">Grab GF-097 <span class="pill w">扣款 ₱36</span></td><td>11:20</td><td>Ben</td><td class="num">₱560</td><td class="num">₱0</td><td class="num">₱0</td><td class="num">₱560</td><td class="num">−₱168.00</td><td class="num">₱356.00</td></tr>
 </table></div>
 <div class="row2"><div class="panel"><h3>营业额按类型</h3><table class="grid"><tr><th>类型</th><th class="num">单数</th><th class="num">营业额</th></tr>
-<tr><td><span class="tag t-dine">堂食</span></td><td class="num">21</td><td class="num">₱18,420</td></tr><tr><td><span class="tag t-staff">代客</span></td><td class="num">12</td><td class="num">₱6,130</td></tr><tr><td><span class="tag t-grab">Grab</span> <span class="tag t-fp">foodpanda</span></td><td class="num">17</td><td class="num">₱10,487</td></tr><tr><td><span class="tag t-online">线上</span></td><td class="num">8</td><td class="num">₱2,904</td></tr></table></div>
+<tr><td><span class="tag t-dine">堂食 · 店员</span></td><td class="num">14</td><td class="num">₱13,260</td></tr><tr><td><span class="tag t-dine">堂食 · 扫码</span></td><td class="num">7</td><td class="num">₱5,160</td></tr><tr><td><span class="tag t-staff">代客</span></td><td class="num">12</td><td class="num">₱6,130</td></tr><tr><td><span class="tag t-grab">Grab</span> <span class="tag t-fp">foodpanda</span></td><td class="num">17</td><td class="num">₱10,487</td></tr><tr><td><span class="tag t-hippo">商城</span></td><td class="num">5</td><td class="num">₱1,742</td></tr><tr><td><span class="tag t-web">网店</span></td><td class="num">3</td><td class="num">₱1,162</td></tr></table></div>
 <div class="panel"><h3>钱箱应有（只算现金）</h3><div class="money"><div class="l"><span>柜台现金</span><b>₱9,210</b></div><div class="l"><span>骑手代收</span><b>₱3,480</b></div><div class="l"><span class="muted">平台订单</span><span class="muted">不计入</span></div><div class="l t"><span>应有</span><span>₱12,690</span></div></div></div></div>
 </div></div></div>`,
 
@@ -256,15 +272,65 @@ const screens = {
 <div class="ph1"><div><h2>后厨屏 / 烹饪进度</h2><p>订单号大字显示，前面是类型色块；平台单用平台颜色</p></div></div>
 <div class="kds">
 <div class="tk"><div class="h" style="background:var(--grab)"><b>Grab GF-123</b><span>12:41 · 4′</span></div><ul><li>2 × 卤肉饭 <span class="sub">少辣</span></li><li>1 × 盐酥鸡</li><li>1 × 珍珠奶茶 大杯 <span class="sub">半糖少冰</span></li></ul><div class="ft">平台骑手取餐 · 备注：不要葱，餐具 2 份</div></div>
-<div class="tk"><div class="h" style="background:var(--dine)"><b>DineIn-021</b><span>A3 桌 · 7′</span></div><ul><li>1 × 三杯鸡</li><li>2 × 白饭</li><li>1 × 酸菜鱼 <span class="sub">微辣</span></li></ul><div class="ft">堂食 · 4 人 · 第 2 批加菜</div></div>
+<div class="tk"><div class="h" style="background:var(--dine)"><b>DineIn-21</b><span>A3 · 7′</span></div><ul><li>1 × 三杯鸡 <span class="sub">店员点</span></li><li>2 × 白饭 <span class="sub">店员点</span></li><li>1 × 酸菜鱼 <span class="sub">顾客扫码加 · 微辣</span></li></ul><div class="ft">堂食 · 店员开台 · 4 人</div></div>
 <div class="tk"><div class="h" style="background:var(--staff)"><b>YPX000123</b><span>12:30 · 15′</span></div><ul><li>2 × 牛肉面</li><li>1 × 卤蛋</li></ul><div class="ft">代客 · 微信 · 外卖 · 会员 000123</div></div>
-<div class="tk"><div class="h" style="background:var(--online)"><b>Online-008</b><span>12:15 · 20′</span></div><ul><li>1 × 鸡排饭</li><li>1 × 柠檬茶</li></ul><div class="ft">线上 · 自取</div></div>
+<div class="tk"><div class="h" style="background:#c2410c"><b>Hippo-5</b><span>12:15 · 20′</span></div><ul><li>1 × 鸡排饭</li><li>1 × 柠檬茶</li></ul><div class="ft">商城 · 自取</div></div>
+<div class="tk"><div class="h" style="background:var(--online)"><b>Web-3</b><span>12:08 · 27′</span></div><ul><li>2 × 卤肉饭</li><li>1 × 盐酥鸡</li></ul><div class="ft">网店 · 外卖</div></div>
 </div>
 <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
 <div class="paper"><div class="c"><b>马卡蒂小馆</b><br>后厨单</div><hr><div class="c" style="font-size:22px"><b>Grab GF-123</b></div><div class="c">平台订单 · 平台骑手取餐</div><hr>2 x 卤肉饭<br>&nbsp;&nbsp;- 少辣<br>1 x 盐酥鸡<br>1 x 珍珠奶茶 (大杯)<br>&nbsp;&nbsp;- 半糖 少冰<hr>备注：不要葱，餐具 2 份<br>录入：Lina 12:41<br>流水号 W1126-041</div>
 <div class="paper"><div class="c"><b>马卡蒂小馆</b><br>后厨单</div><hr><div class="c" style="font-size:22px"><b>YPX000123-2</b></div><div class="c">代客下单 · 电话 · 自取</div><hr>1 x 牛肉面<br>1 x 卤蛋<hr>会员 000123 王先生<br>今天第 2 单</div>
-<div class="panel" style="width:330px"><h3>取餐屏</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-weight:800;font-size:20px"><div style="color:var(--muted);font-size:13px">制作中</div><div style="color:var(--ok);font-size:13px">请取餐</div><div>Online-009</div><div style="color:var(--ok)">Online-008</div><div>YPX000456</div><div style="color:var(--ok)">Grab GF-118</div></div></div>
-</div></div></div></div>`
+<div class="panel" style="width:330px"><h3>取餐屏</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-weight:800;font-size:20px"><div style="color:var(--muted);font-size:13px">制作中</div><div style="color:var(--ok);font-size:13px">请取餐</div><div>Web-4</div><div style="color:var(--ok)">Hippo-5</div><div>DineIn-22</div><div style="color:var(--ok)">Web-3</div><div>YPX000456</div><div style="color:var(--ok)">Grab GF-118</div></div></div>
+</div></div></div></div>`,
+'8': () => `<div class="shell">${side('link')}<div class="main"><div class="page">
+<div class="ph1"><div><h2>店铺链接</h2><p>顾客打开这个链接只看得到本店，进不了商城。从这里下的单是“网店订单 Web-”</p></div></div>
+<div class="row2">
+<div class="panel"><h3>本店专属网址</h3>
+<div style="display:flex;gap:16px;align-items:center">
+<div style="width:132px;height:132px;flex:none;background:repeating-conic-gradient(#222 0 25%,#fff 0 50%) 0 0/16px 16px;border:8px solid #fff;outline:1px solid var(--line)"></div>
+<div style="display:grid;gap:8px;flex:1"><div class="in"><b>https://67891.abcfood.com</b></div>
+<div class="tool"><span class="btn primary">复制链接</span><span class="btn">下载二维码</span><span class="btn">打开看看</span></div>
+<div class="mini">店铺号 67891，开店时自动分配，不会变。发到微信群、贴在门口、印在外卖袋上都用这个。</div></div></div>
+<div class="info" style="margin-top:12px">以前分享出去的老链接（order.abcfood.com/s/makati）会自动跳到这个网址。</div>
+<h3 style="margin-top:16px">从哪来的单（本月）</h3>
+<table class="grid"><tr><th>入口</th><th class="num">单数</th><th class="num">营业额</th></tr>
+<tr><td><span class="tag t-web">网店</span> 67891.abcfood.com</td><td class="num">96</td><td class="num">₱38,410</td></tr>
+<tr><td><span class="tag t-web">网店</span> order.yupinxuan.com</td><td class="num">41</td><td class="num">₱17,050</td></tr>
+<tr><td><span class="tag t-hippo">商城</span> 河马商城进店</td><td class="num">152</td><td class="num">₱52,980</td></tr></table></div>
+<div style="display:grid;gap:14px">
+<div class="panel"><h3>用自己的域名</h3>
+<table class="grid"><tr><th>域名</th><th>状态</th><th></th></tr>
+<tr><td><b>order.yupinxuan.com</b></td><td><span class="pill">✓ 已生效 · 证书自动续期</span></td><td class="mini">删除</td></tr>
+<tr><td><b>yupinxuan.ph</b></td><td><span class="pill w">等待 DNS 生效 · 上次检查 3 分钟前</span></td><td class="mini">重新检查</td></tr></table>
+<div class="info" style="margin-top:10px">到域名商那里加一条记录：<br>类型 <b>CNAME</b> · 主机 <b>@</b> 或 <b>order</b> · 指向 <b>67891.abcfood.com</b><br>生效后系统自动签 HTTPS 证书，一般 10 分钟到几小时。</div>
+<div class="tool" style="margin-top:10px"><div class="in ph search">输入你的域名，如 order.yourshop.com</div><span class="btn primary">添加</span></div></div>
+<div class="panel"><h3>没有域名？向平台申请购买</h3>
+<div class="kv" style="grid-template-columns:110px 1fr"><label>想要的域名</label><div class="in">yupinxuan.com</div><label>备选</label><div class="in">yupinxuan.ph · ypx-food.com</div><label>联系方式</label><div class="in">微信 ypx_owner</div></div>
+<div class="tool" style="margin-top:10px"><span class="btn primary">提交申请</span><span class="mini">平台客服会联系你报价，买好后自动绑定到本店</span></div>
+<div class="mini" style="margin-top:8px">申请记录：yupinxuan.com · <b>已报价</b>，等你确认（11-25）</div></div>
+</div></div></div></div></div>`,
+'9': () => `<div style="display:flex;gap:40px;justify-content:center;padding:24px;align-items:flex-start;flex-wrap:wrap">
+<div style="display:grid;gap:8px;justify-items:center"><b>从河马商城进店 → 商城订单 Hippo-</b>
+<div class="phonebox"><div class="url">🔒 <b>order.abcfood.com</b>/mall/s/makati</div>
+<div class="ctop"><span>‹ 商城</span><b style="flex:1">马卡蒂小馆</b><span>🔍</span><span>💬</span></div>
+<div class="cover">马卡蒂小馆</div>
+<div class="sinfo"><div class="av">马</div><div style="flex:1"><b>马卡蒂小馆</b><div class="mini">4.8 分 · 月售 1.2k · 30 分钟 · 配送 ₱49</div></div></div>
+<div class="dish"><div class="im"></div><div style="flex:1"><b>卤肉饭</b><div class="mini">月售 320</div><b style="color:var(--brand)">₱159</b></div></div>
+<div class="dish"><div class="im"></div><div style="flex:1"><b>盐酥鸡</b><div class="mini">月售 210</div><b style="color:var(--brand)">₱189</b></div></div>
+<div style="padding:10px 14px;background:#fbeae3;font-size:12.5px">附近还有：<u>茶语</u> · <u>鸡排工坊</u> · <u>便当屋</u> →</div>
+<div class="bnav"><span>首页（商城）</span><span>订单</span><span>我的</span></div></div>
+<div class="note"><div class="good">✓ 能回商城、能看别的店</div><div class="good">✓ 可以用平台券</div><div>“我的”：全平台订单、收藏、券、平台客服</div></div></div>
+<div style="display:grid;gap:8px;justify-items:center"><b>打开商家分享的链接 → 网店订单 Web-</b>
+<div class="phonebox"><div class="url">🔒 <b>67891.abcfood.com</b>（或 order.yupinxuan.com）</div>
+<div class="ctop"><div class="av" style="width:30px;height:30px;border-radius:8px;font-size:13px;background:#fff;color:var(--brand)">马</div><b style="flex:1">马卡蒂小馆</b><span>💬</span></div>
+<div class="cover">马卡蒂小馆</div>
+<div class="sinfo"><div class="av">马</div><div style="flex:1"><b>马卡蒂小馆</b><div class="mini">4.8 分 · 30 分钟 · 配送 ₱49</div></div></div>
+<div class="dish"><div class="im"></div><div style="flex:1"><b>卤肉饭</b><div class="mini">月售 320</div><b style="color:var(--brand)">₱159</b></div></div>
+<div class="dish"><div class="im"></div><div style="flex:1"><b>盐酥鸡</b><div class="mini">月售 210</div><b style="color:var(--brand)">₱189</b></div></div>
+<div style="padding:10px 14px;text-align:center;font-size:11px;color:var(--muted)">由河马点餐系统提供</div>
+<div class="bnav"><span class="on">点餐</span><span>订单</span><span>我的</span></div></div>
+<div class="note"><div class="badx">✕ 没有返回商城、没有别的店</div><div class="badx">✕ 不能用平台券，只能用本店券</div><div>“我的”：只有本店订单、本店券、地址、和本店的消息</div></div></div>
+</div>`
 };
 document.getElementById('app').innerHTML = (screens[s] || screens['1'])();
 </script>
