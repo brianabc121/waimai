@@ -7,28 +7,27 @@ import (
 )
 
 func (s *Server) repurchaseRule(c *gin.Context) {
-	bid, ok := branchScope(c, pPromo)
-	if !ok {
-		return
+	if bid, brand, ok := s.brandScope(c, pPromo, queryInt(c, "brand")); ok {
+		r, err := s.App.RepurchaseRuleOf(c, bid, brand)
+		reply(c, r, err)
 	}
-	r, err := s.App.RepurchaseRule(c, bid)
-	reply(c, r, err)
 }
 
 func (s *Server) saveRepurchaseRule(c *gin.Context) {
-	bid, ok := branchScope(c, pPromo)
-	if !ok {
-		return
-	}
 	var in app.RepurchaseInput
 	if !bind(c, &in) {
 		return
 	}
+	bid, brand, ok := s.brandScope(c, pPromo, in.BrandID)
+	if !ok {
+		return
+	}
+	in.BrandID = brand
 	if err := s.App.SaveRepurchaseRule(c, bid, in, staffActor(c)); err != nil {
 		fail(c, err)
 		return
 	}
-	r, err := s.App.RepurchaseRule(c, bid)
+	r, err := s.App.RepurchaseRuleOf(c, bid, brand)
 	reply(c, r, err)
 }
 

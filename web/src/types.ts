@@ -65,11 +65,13 @@ export interface Promotion {
   total_quota: number | null; per_phone_limit: number | null; used_count: number; status: string; live_now: boolean
   name_tr?: string
   scope?: 'delivery' | 'dine_in'
+  // the store's brands it applies to (docs/MULTI_BRAND_DESIGN.md §10)
+  brand_ids?: number[]
 }
 export interface Template { layout: 'list' | 'featured' | 'grid'; theme_color: string; logo_url: string; cover_url: string }
 export type Channel = 'delivery' | 'qr' | 'ipad'
 export interface ChannelTemplate { channel: Channel; published: Template; draft: Template | null; published_at: string | null }
-export interface Storefront { branch: Branch; zones: Zone[]; categories: Category[]; promotions: Promotion[]; dine_promotions?: Promotion[]; slots: string[]; templates: Record<Channel, Template>
+export interface Storefront { branch: Branch; brand?: BrandRef | null; zones: Zone[]; categories: Category[]; promotions: Promotion[]; dine_promotions?: Promotion[]; slots: string[]; templates: Record<Channel, Template>
   sales: number; rating: ReviewSummary; media?: PromoMedia[]
   // some of the menu is shown machine translated
   machine_translated?: boolean }
@@ -100,7 +102,7 @@ export interface Adjust { percent_bp: number; mode: '' | 'round' | 'set_total'; 
 export interface PayChoice { type: 'cash' | 'card' | 'online'; channel_id: number }
 export interface LineOption { option_id?: number; group: string; group_en: string; name: string; name_en: string; price_delta: number; group_tr?: string; name_tr?: string; qty?: number; topping?: boolean }
 export interface OrderItem {
-  id: number; item_id: number; name: string; name_en: string; name_tr?: string; unit_price: number; qty: number; line_total: number
+  id: number; item_id: number; name: string; name_en: string; base_name?: string; name_tr?: string; unit_price: number; qty: number; line_total: number
   options: LineOption[]; note: string; needs_prep: boolean; prep_status: string
   note_tags?: LineNoteTag[]
   station_id: number | null; station_name: string
@@ -274,6 +276,7 @@ export interface CouponBatch {
   name: string; name_en: string; currency: string; value: number; threshold: number; valid_days: number
   total_quota: number | null; per_customer: number | null; budget: number | null
   country_code: string; country: string; province: string; issued_count: number; status: 'active' | 'paused' | 'ended'
+  brand_id?: number | null
   stats: { issued: number; used: number; open: number; spent: number }
 }
 export interface ClaimableCoupon { id: number; kind: CouponKind; name: string; name_en: string; value: number; threshold: number; valid_days: number; claimed: boolean; gone: boolean }

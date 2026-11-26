@@ -15,7 +15,9 @@ import (
 // ---- customer ----
 
 func (s *Server) storefront(c *gin.Context) {
-	sf, err := s.App.Storefront(c, c.Param("slug"))
+	// ?brand= is one of the store's brands (docs/MULTI_BRAND_DESIGN.md §5):
+	// staff ordering under it see its menu, names and prices
+	sf, err := s.App.StorefrontOf(c, c.Param("slug"), queryInt(c, "brand"))
 	if err != nil {
 		fail(c, err)
 		return
@@ -143,7 +145,7 @@ func (s *Server) createQuote(c *gin.Context) {
 	if !ok {
 		return
 	}
-	in.OwnSite = site.OwnSite()
+	in.OwnSite, in.BrandID = site.OwnSite(), 0
 	q, err := s.App.CreateQuote(c, c.Param("slug"), in, phone)
 	if err != nil {
 		fail(c, hideZones(err))

@@ -245,24 +245,26 @@ type Item struct {
 	ID         int64 `json:"id"`
 	CategoryID int64 `json:"category_id"`
 	// Code is the short code staff type to find the dish (B1); may be empty.
-	Code              string        `json:"code"`
-	Name              string        `json:"name"`
-	NameEn            string        `json:"name_en"`
-	Description       string        `json:"description"`
-	ImageURL          string        `json:"image_url"`
-	Photos            []string      `json:"photos"`
-	Details           string        `json:"details"`
-	Price             int64         `json:"price"`
-	Published         bool          `json:"published"`
-	SoldOut           bool          `json:"sold_out"`
-	StockQty          *int          `json:"stock_qty"`
-	NeedsPrep         bool          `json:"needs_prep"`
-	DeliveryAvailable bool          `json:"delivery_available"`
-	PickupAvailable   bool          `json:"pickup_available"`
-	DineInAvailable   bool          `json:"dine_in_available"`
-	Sort              int           `json:"sort"`
-	StationID         *int64        `json:"station_id"`
-	Groups            []OptionGroup `json:"groups"`
+	Code              string   `json:"code"`
+	Name              string   `json:"name"`
+	NameEn            string   `json:"name_en"`
+	Description       string   `json:"description"`
+	ImageURL          string   `json:"image_url"`
+	Photos            []string `json:"photos"`
+	Details           string   `json:"details"`
+	Price             int64    `json:"price"`
+	Published         bool     `json:"published"`
+	SoldOut           bool     `json:"sold_out"`
+	StockQty          *int     `json:"stock_qty"`
+	NeedsPrep         bool     `json:"needs_prep"`
+	DeliveryAvailable bool     `json:"delivery_available"`
+	PickupAvailable   bool     `json:"pickup_available"`
+	DineInAvailable   bool     `json:"dine_in_available"`
+	Sort              int      `json:"sort"`
+	// BaseName is the store's own name of a dish a brand renamed.
+	BaseName  string        `json:"base_name,omitempty"`
+	StationID *int64        `json:"station_id"`
+	Groups    []OptionGroup `json:"groups"`
 	// NoteTemplateIDs are the flavour note templates the dish shows; Notes
 	// are their groups with the tags on offer (note_templates.go).
 	NoteTemplateIDs []int64 `json:"note_template_ids"`
@@ -311,6 +313,8 @@ type Category struct {
 	Required bool   `json:"required"`
 	Items    []Item `json:"items"`
 	NameTr   string `json:"name_tr,omitempty"`
+	// brand: a category of a brand's own menu (brand_menu.go), not the store's.
+	brand bool
 }
 
 func loadZones(ctx context.Context, q Querier, branchID int64, activeOnly bool) ([]Zone, error) {
@@ -476,7 +480,9 @@ func loadMenu(ctx context.Context, q Querier, branchID int64, publishedOnly bool
 
 // Storefront is the anonymous, cacheable view of a branch.
 type Storefront struct {
-	Branch     *Branch     `json:"branch"`
+	Branch *Branch `json:"branch"`
+	// Brand is the brand whose menu and promotions these are.
+	Brand      *BrandRef   `json:"brand"`
 	Zones      []Zone      `json:"zones"`
 	Categories []Category  `json:"categories"`
 	Promotions []Promotion `json:"promotions"`
@@ -498,7 +504,20 @@ type Storefront struct {
 }
 
 func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) {
+	return a.StorefrontOf(ctx, slug, 0)
+}
+
+// StorefrontOf is the storefront of one of the store's brands (0 = the main
+// one): its menu, names and prices, and its promotions.
+func (a *App) StorefrontOf(ctx context.Context, slug string, brandID int64) (*Storefront, error) {
 	b, err := branchBySlug(ctx, a.DB, slug)
+	if err != nil {
+		return nil, err
+	}
+	brand, err := loadBrand(ctx, a.DB, b.ID, brandID)
+	if err == ErrNotFound {
+		return nil, Err(http.StatusNotFound, "BRAND_UNKNOWN", "no such brand in this store")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +528,7 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	if err != nil {
 		return nil, err
 	}
-	cats, err := loadMenu(ctx, a.DB, b.ID, true)
+	cats, err := brandMenuCategories(ctx, a.DB, b.ID, brand, true)
 	if err != nil {
 		return nil, err
 	}
@@ -539,11 +558,11 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	if err != nil {
 		return nil, err
 	}
-	promos, err := livePromotions(ctx, a.DB, b, "delivery")
+	promos, err := livePromotions(ctx, a.DB, b, brand.ID, "delivery")
 	if err != nil {
 		return nil, err
 	}
-	dinePromos, err := livePromotions(ctx, a.DB, b, "dine_in")
+	dinePromos, err := livePromotions(ctx, a.DB, b, brand.ID, "dine_in")
 	if err != nil {
 		return nil, err
 	}
@@ -555,6 +574,7 @@ func (a *App) Storefront(ctx context.Context, slug string) (*Storefront, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &Storefront{Branch: b, Zones: zones, Categories: cats, Promotions: promos, DinePromotions: dinePromos, Slots: b.Slots(time.Now()), Templates: tpl,
+	ref := brand.Ref()
+	return &Storefront{Brand: &ref, Branch: b, Zones: zones, Categories: cats, Promotions: promos, DinePromotions: dinePromos, Slots: b.Slots(time.Now()), Templates: tpl,
 		Sales: sales, Rating: *rating, Media: media}, nil
 }

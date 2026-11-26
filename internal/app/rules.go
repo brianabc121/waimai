@@ -151,6 +151,8 @@ type dishRule struct {
 	Kind    string  `json:"kind"`
 	Value   int64   `json:"value"`
 	ItemIDs []int64 `json:"item_ids"`
+	// BrandIDs are the brands it applied to then.
+	BrandIDs []int64 `json:"brand_ids,omitempty"`
 }
 
 // dishPromo is a dish promotion applied to an order: the promotion and the
@@ -219,13 +221,13 @@ func dishOff(adj []pricing.Adjustment) int64 {
 
 // liveDishPromos are the dish promotions of b that apply at at to an order
 // of service, with its dishes costing sub.
-func liveDishPromos(ctx context.Context, q Querier, b *Branch, service string, at time.Time, sub int64) ([]*Promotion, error) {
+func liveDishPromos(ctx context.Context, q Querier, b *Branch, brandID int64, service string, at time.Time, sub int64) ([]*Promotion, error) {
 	scope := "delivery"
 	if service == "dine_in" {
 		scope = "dine_in"
 	}
 	ps, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.kind IN ('dish_percent','dish_second') AND p.scope="+
-		scopeSQL(scope), "")
+		scopeSQL(scope)+" AND "+brandPromoSQL(brandID), "")
 	if err != nil {
 		return nil, err
 	}
@@ -250,12 +252,12 @@ func promoFromRule(id int64, name, nameEn string, raw []byte) (*Promotion, bool)
 		return nil, false
 	}
 	return &Promotion{ID: id, Name: name, NameEn: nameEn, Kind: r.Kind, Value: r.Value, ItemIDs: r.ItemIDs,
-		Status: "active"}, true
+		BrandIDs: r.BrandIDs, Status: "active"}, true
 }
 
 // ruleOf is what an order records of a dish promotion.
 func ruleOf(p *Promotion) []byte {
-	b, _ := json.Marshal(dishRule{Kind: p.Kind, Value: p.Value, ItemIDs: p.ItemIDs})
+	b, _ := json.Marshal(dishRule{Kind: p.Kind, Value: p.Value, ItemIDs: p.ItemIDs, BrandIDs: p.BrandIDs})
 	return b
 }
 

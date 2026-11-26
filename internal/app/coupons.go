@@ -167,13 +167,16 @@ func (c *CustomerCoupon) worksAt(b *Branch) bool {
 // walletFor lists the customer's unused, unexpired coupons that work at the
 // store. On the store's own page only the store's coupons do: platform
 // coupons are for the mall (docs/ORDER_TYPES_DESIGN.md §9.4).
-func walletFor(ctx context.Context, q Querier, phone string, b *Branch, ownSite bool) ([]CustomerCoupon, error) {
+//
+// A store coupon works only at the brand that gave it
+// (docs/MULTI_BRAND_DESIGN.md §10); platform coupons at every brand.
+func walletFor(ctx context.Context, q Querier, phone string, b *Branch, brandID int64, ownSite bool) ([]CustomerCoupon, error) {
 	if phone == "" {
 		return nil, nil
 	}
 	cs, err := queryCoupons(ctx, q, `c.customer_id = (SELECT id FROM customers WHERE phone=$1) AND c.status='unused'
-		AND c.expires_at > now() AND (c.branch_id = $2 OR (c.issuer = 'platform' AND c.currency = $3))
-		ORDER BY c.expires_at, c.id`, phone, b.ID, b.Currency)
+		AND c.expires_at > now() AND ((c.branch_id = $2 AND c.brand_id = $4) OR (c.issuer = 'platform' AND c.currency = $3))
+		ORDER BY c.expires_at, c.id`, phone, b.ID, b.Currency, brandID)
 	if err != nil {
 		return nil, err
 	}
@@ -449,15 +452,17 @@ func expiryFor(now time.Time, loc *time.Location, days int) time.Time {
 	return time.Date(l.Year(), l.Month(), l.Day()+days, 0, 0, 0, 0, loc)
 }
 
-// giftRepurchase gives the store's repurchase coupon when a customer's first
-// order there is completed. It runs in the transaction that completes the
-// order, so a rolled-back completion gives nothing.
+// giftRepurchase gives the brand's repurchase coupon when a customer's first
+// order at that brand is completed (each brand has its own rule and its
+// coupons only work there, docs/MULTI_BRAND_DESIGN.md §10). It runs in the
+// transaction that completes the order, so a rolled-back completion gives nothing.
 func (a *App) giftRepurchase(ctx context.Context, tx pgx.Tx, orderID int64) error {
-	var branchID, subtotal int64
+	var branchID, brandID, subtotal int64
 	var customerID *int64
-	var service string
-	if err := tx.QueryRow(ctx, `SELECT branch_id, customer_id, subtotal, service_type FROM orders WHERE id=$1`, orderID).
-		Scan(&branchID, &customerID, &subtotal, &service); err != nil {
+	var service, brandName string
+	if err := tx.QueryRow(ctx, `SELECT o.branch_id, o.brand_id, br.name, o.customer_id, o.subtotal, o.service_type
+		FROM orders o JOIN brands br ON br.id = o.brand_id WHERE o.id=$1`, orderID).
+		Scan(&branchID, &brandID, &brandName, &customerID, &subtotal, &service); err != nil {
 		return err
 	}
 	if customerID == nil || (service != "delivery" && service != "pickup") {
@@ -465,7 +470,7 @@ func (a *App) giftRepurchase(ctx context.Context, tx pgx.Tx, orderID int64) erro
 	}
 	var bt CouponBatch
 	err := tx.QueryRow(ctx, `SELECT `+batchCols+` FROM coupon_batches
-		WHERE branch_id=$1 AND source='repurchase' AND status='active' FOR UPDATE`, branchID).Scan(bt.scan()...)
+		WHERE branch_id=$1 AND brand_id=$2 AND source='repurchase' AND status='active' FOR UPDATE`, branchID, brandID).Scan(bt.scan()...)
 	if isNoRows(err) {
 		return nil
 	} else if err != nil {
@@ -476,8 +481,8 @@ func (a *App) giftRepurchase(ctx context.Context, tx pgx.Tx, orderID int64) erro
 	}
 	var before bool
 	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM orders WHERE customer_id=$1 AND branch_id=$2 AND id <> $3
-		AND service_type IN ('delivery','pickup') AND fulfillment_status IN ('delivered','picked_up'))`,
-		*customerID, branchID, orderID).Scan(&before); err != nil || before {
+		AND brand_id=$4 AND service_type IN ('delivery','pickup') AND fulfillment_status IN ('delivered','picked_up'))`,
+		*customerID, branchID, orderID, brandID).Scan(&before); err != nil || before {
 		return err
 	}
 	b, err := scanBranch(tx.QueryRow(ctx, `SELECT `+branchCols+` FROM branches WHERE id=$1`, branchID))
@@ -500,10 +505,10 @@ func (a *App) giftRepurchase(ctx context.Context, tx pgx.Tx, orderID int64) erro
 	exp := expiryFor(now, b.location(), bt.ValidDays)
 	var couponID int64
 	err = tx.QueryRow(ctx, `INSERT INTO customer_coupons (batch_id, customer_id, issuer, kind, branch_id, currency, name,
-		name_en, value, threshold, source, source_order_id, expires_at)
-		VALUES ($1,$2,'store',$3,$4,$5,$6,$7,$8,$9,'repurchase',$10,$11)
+		name_en, value, threshold, source, source_order_id, expires_at, brand_id)
+		VALUES ($1,$2,'store',$3,$4,$5,$6,$7,$8,$9,'repurchase',$10,$11,$12)
 		ON CONFLICT (batch_id, customer_id) WHERE source = 'repurchase' DO NOTHING RETURNING id`,
-		bt.ID, *customerID, bt.Kind, branchID, b.Currency, bt.Name, bt.NameEn, bt.Value, bt.Threshold, orderID, exp).Scan(&couponID)
+		bt.ID, *customerID, bt.Kind, branchID, b.Currency, bt.Name, bt.NameEn, bt.Value, bt.Threshold, orderID, exp, brandID).Scan(&couponID)
 	if isNoRows(err) {
 		return nil // already had it
 	} else if err != nil {
@@ -515,7 +520,7 @@ func (a *App) giftRepurchase(ctx context.Context, tx pgx.Tx, orderID int64) erro
 	zh, en := couponWords(bt.Kind, bt.Value, bt.Threshold, b.Currency)
 	day := exp.Add(-time.Second).In(b.location())
 	return tell(ctx, tx, *customerID, Message{Kind: "wallet",
-		Title:   b.Name + "送你一张" + zh,
+		Title:   brandName + "送你一张" + zh,
 		TitleEn: pickName(b.NameEn, b.Name) + " sent you a coupon: " + en,
 		Body:    day.Format("1月2日") + "前在本店下单可用", BodyEn: "Use it at this store by " + day.Format("2 Jan"),
 		Link: "/me/coupons", Key: "store_coupon", Args: map[string]string{"store": b.Name, "store_en": b.NameEn,

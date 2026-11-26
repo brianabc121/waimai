@@ -51,6 +51,9 @@ type QuoteInput struct {
 	// and platform coupons do not apply (§9.4). What the browser sends is
 	// replaced.
 	OwnSite bool `json:"own_site,omitempty"`
+	// BrandID is the brand ordered from (docs/MULTI_BRAND_DESIGN.md), 0 =
+	// the main brand; set by the server, never taken from the browser.
+	BrandID int64 `json:"brand_id,omitempty"`
 	// feeOverride replaces the zone's delivery fee (an order placed by staff).
 	feeOverride *int64
 }
@@ -98,6 +101,9 @@ type QuoteLine struct {
 	Basket    int           `json:"basket"`
 	// CategoryID is only used while pricing, to check required categories.
 	CategoryID int64 `json:"-"`
+	// BaseName is the store's name of the dish when the brand sells it under
+	// another (docs/MULTI_BRAND_DESIGN.md §5): what the kitchen knows it by.
+	BaseName string `json:"base_name,omitempty"`
 }
 
 type Quote struct {
@@ -218,7 +224,13 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		minOrder = max(b.MinOrderAmount, z.MinOrder)
 	}
 
-	lines, subtotal, err := priceLines(ctx, q, b.ID, in.ServiceType, in.Items)
+	brand, err := orderBrand(ctx, q, b.ID, in.BrandID)
+	if err != nil {
+		return nil, err
+	}
+	in.BrandID = brand.ID
+	quote.Input.BrandID = brand.ID
+	lines, subtotal, err := priceLinesOn(ctx, q, b.ID, brand, in.ServiceType, in.Items, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -231,14 +243,17 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		return nil, err
 	}
 	quote.Lines = lines
-	if err := checkRequired(ctx, q, b.ID, in.ServiceType, lines); err != nil {
-		return nil, err
+	// a brand's own menu has no required categories
+	if !brand.OwnMenu {
+		if err := checkRequired(ctx, q, b.ID, in.ServiceType, lines); err != nil {
+			return nil, err
+		}
 	}
 	if subtotal < minOrder {
 		return nil, ErrD(http.StatusUnprocessableEntity, "BELOW_MINIMUM", "order is below the minimum amount",
 			map[string]any{"minimum": minOrder, "subtotal": subtotal})
 	}
-	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope='delivery'", phone)
+	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope='delivery' AND "+brandPromoSQL(brand.ID), phone)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +263,7 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 	dish := dishOnly(promos, now, b, in.ServiceType, subtotal)
 	dishAdj := dishAdjustments(dish, quoteDishLines(lines))
 	promo, d := bestPromotion(promos, now, b.location(), in.ServiceType, subtotal-dishOff(dishAdj), deliveryFee)
-	wallet, err := walletFor(ctx, q, phone, b, in.OwnSite)
+	wallet, err := walletFor(ctx, q, phone, b, brand.ID, in.OwnSite)
 	if err != nil {
 		return nil, err
 	}
@@ -351,13 +366,15 @@ func checkRequired(ctx context.Context, q Querier, branchID int64, service strin
 // priceLines validates cart lines against the live menu and prices them. It is
 // shared by delivery/pickup quotes and dine-in batches.
 func priceLines(ctx context.Context, q Querier, branchID int64, service string, in []QuoteLineInput) ([]QuoteLine, int64, error) {
-	return priceLinesOn(ctx, q, branchID, service, in, nil)
+	return priceLinesOn(ctx, q, branchID, nil, service, in, nil)
 }
 
 // priceLinesOn is priceLines at a delivery platform's prices when pp is set
 // (docs/ORDER_TYPES_DESIGN.md §9.3): the dish's platform price, and each
-// option's extra price with the markup.
-func priceLinesOn(ctx context.Context, q Querier, branchID int64, service string, in []QuoteLineInput, pp *platformPricer) ([]QuoteLine, int64, error) {
+// option's extra price with the markup. A brand with its own menu sells
+// only the dishes it picked, at its names and prices (brand_menu.go); nil is
+// the store's menu as it is.
+func priceLinesOn(ctx context.Context, q Querier, branchID int64, brand *Brand, service string, in []QuoteLineInput, pp *platformPricer) ([]QuoteLine, int64, error) {
 	if len(in) == 0 {
 		return nil, 0, ErrValidation("cart is empty")
 	}
@@ -365,7 +382,7 @@ func priceLinesOn(ctx context.Context, q Querier, branchID int64, service string
 		return nil, 0, ErrValidation("too many lines")
 	}
 	lines := []QuoteLine{}
-	items, err := loadItems(ctx, q, branchID, true)
+	items, _, err := brandItems(ctx, q, branchID, brand, true)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -398,7 +415,8 @@ func priceLinesOn(ctx context.Context, q Querier, branchID int64, service string
 			continue
 		}
 		ql := QuoteLine{ItemID: it.ID, Name: it.Name, NameEn: it.NameEn, Qty: line.Qty, Note: line.Note,
-			NeedsPrep: it.NeedsPrep, Options: []LineOption{}, Basket: max(1, line.Basket), CategoryID: it.CategoryID}
+			NeedsPrep: it.NeedsPrep, Options: []LineOption{}, Basket: max(1, line.Basket), CategoryID: it.CategoryID,
+			BaseName: it.BaseName}
 		unit := it.Price
 		if pp != nil {
 			unit = pp.dish(it.ID, it.Price)

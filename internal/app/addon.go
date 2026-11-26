@@ -188,7 +188,12 @@ func quoteAddon(ctx context.Context, q Querier, b *Branch, o *lockedOrder, in Ad
 	} else if pp != nil {
 		return nil, ErrInvalidState("a platform order is changed on the platform")
 	}
-	lines, sub, err := priceLinesOn(ctx, q, b.ID, service, in.Items, pp)
+	// dishes are added at the order's brand's names and prices
+	brand, err := brandOfOrder(ctx, q, o.ID)
+	if err != nil {
+		return nil, err
+	}
+	lines, sub, err := priceLinesOn(ctx, q, b.ID, brand, service, in.Items, pp)
 	if err != nil {
 		return nil, err
 	}
@@ -244,10 +249,10 @@ func (a *App) applyAddon(ctx context.Context, tx pgx.Tx, b *Branch, o *lockedOrd
 			status = "ready"
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name, name_en,
-			unit_price, qty, line_total, options, note, needs_prep, prep_status, basket_no, name_customer, note_tags)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`, o.ID, b.ID, batchID, l.ItemID, l.Name,
+			unit_price, qty, line_total, options, note, needs_prep, prep_status, basket_no, name_customer, note_tags, base_name)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`, o.ID, b.ID, batchID, l.ItemID, l.Name,
 			l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, status, max(1, l.Basket), l.NameTr,
-			noteTagsJSON(l.NoteTags)); err != nil {
+			noteTagsJSON(l.NoteTags), l.BaseName); err != nil {
 			return Totals{}, wrap("insert add-on item", err)
 		}
 	}

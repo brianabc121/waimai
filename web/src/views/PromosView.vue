@@ -6,6 +6,9 @@ import { currentRole, session } from '../session'
 import type { Category, Promotion, Totals } from '../types'
 import { useRoute, useRouter } from 'vue-router'
 import CouponRules from './CouponRules.vue'
+import BrandSeg from './brands/BrandSeg.vue'
+import BrandTag from './brands/BrandTag.vue'
+import { brandById, brandsHere, multiBrand, useBrandPick } from '../brands'
 import '../coupons'
 import '../checkout'
 import '../officeStrings'
@@ -25,7 +28,17 @@ const error = ref('')
 
 const all = ref<Promotion[]>([])
 async function load() { all.value = (await get<{ promotions: Promotion[] }>(`/merchant/branches/${bid}/promotions`)).promotions }
-watch([all, scope], () => { promos.value = all.value.filter(p => (p.scope ?? 'delivery') === scope.value) }, { immediate: true })
+// Each promotion applies to the brands it lists (docs/MULTI_BRAND_DESIGN.md §10);
+// the page shows one brand's, or all of them.
+const { pick: brandPick } = useBrandPick('promos', brandsHere, true)
+const mainId = () => brandsHere().find(b => b.is_main)?.id ?? 0
+const forBrand = (p: Promotion) => !brandPick.value || (p.brand_ids ?? []).includes(brandPick.value)
+watch([all, scope, brandPick], () => { promos.value = all.value.filter(p => (p.scope ?? 'delivery') === scope.value && forBrand(p)) }, { immediate: true })
+const brandsOf = (p: Promotion) => (p.brand_ids ?? []).map(id => brandById(id)).filter(b => b !== null)
+function toggleBrand(id: number) {
+  const i = form.f.brands.indexOf(id)
+  if (i >= 0) { if (form.f.brands.length > 1) form.f.brands.splice(i, 1) } else form.f.brands.push(id)
+}
 onMounted(() => { void load(); void loadMenu() })
 
 async function run(fn: () => Promise<unknown>) {
@@ -37,9 +50,10 @@ async function run(fn: () => Promise<unknown>) {
 // Dates use the browser's time zone, which is normally the store's.
 interface Form { id: number; scope: 'delivery' | 'dine_in'; name: string; name_en: string; kind: Promotion['kind']; threshold: number; value: number
   cap: number | ''; applies_delivery: boolean; applies_pickup: boolean; starts: string; ends: string
-  daily_start: string; daily_end: string; quota: number | ''; per_phone: number | ''; items: number[] }
+  daily_start: string; daily_end: string; quota: number | ''; per_phone: number | ''; items: number[]; brands: number[] }
 const blank = (): Form => ({ id: 0, scope: scope.value, name: '', name_en: '', kind: 'amount_off', threshold: 0, value: 0, cap: '', applies_delivery: true,
-  applies_pickup: true, starts: '', ends: '', daily_start: '00:00', daily_end: '00:00', quota: '', per_phone: '', items: [] })
+  applies_pickup: true, starts: '', ends: '', daily_start: '00:00', daily_end: '00:00', quota: '', per_phone: '', items: [],
+  brands: [brandPick.value || mainId()].filter(Boolean) })
 const form = reactive<{ open: boolean; f: Form }>({ open: false, f: blank() })
 
 // Promotions on chosen dishes (docs/PRICING_REVIEW.md step 4): a percentage
@@ -82,7 +96,8 @@ function edit(p: Promotion | null) {
   form.f = p ? { id: p.id, scope: p.scope ?? 'delivery', name: p.name, name_en: p.name_en, kind: p.kind, threshold: toMajor(p.threshold),
     value: pctKind(p.kind) ? p.value / 100 : toMajor(p.value), cap: p.max_discount === null ? '' : toMajor(p.max_discount),
     applies_delivery: p.applies_delivery, applies_pickup: p.applies_pickup, starts: toLocal(p.starts_at), ends: toLocal(p.ends_at),
-    daily_start: p.daily_start, daily_end: p.daily_end, quota: p.total_quota ?? '', per_phone: p.per_phone_limit ?? '', items: [...(p.item_ids ?? [])] } : blank()
+    daily_start: p.daily_start, daily_end: p.daily_end, quota: p.total_quota ?? '', per_phone: p.per_phone_limit ?? '', items: [...(p.item_ids ?? [])],
+    brands: [...(p.brand_ids ?? [])] } : blank()
   error.value = ''
   form.open = true
   if (isDish(form.f.kind)) void loadMenu()
@@ -97,7 +112,7 @@ async function save() {
     applies_delivery: !dineIn && f.applies_delivery, applies_pickup: !dineIn && f.kind !== 'free_delivery' && f.applies_pickup,
     starts_at: toISO(f.starts), ends_at: toISO(f.ends), daily_start: f.daily_start || '00:00', daily_end: f.daily_end || '00:00',
     total_quota: isDish(f.kind) ? null : num(f.quota), per_phone_limit: dineIn || isDish(f.kind) ? null : num(f.per_phone),
-    item_ids: isDish(f.kind) ? f.items : [] }
+    item_ids: isDish(f.kind) ? f.items : [], brand_ids: f.brands }
   if (await run(() => f.id ? put(`/merchant/branches/${bid}/promotions/${f.id}`, body) : post(`/merchant/branches/${bid}/promotions`, body))) form.open = false
 }
 
@@ -125,7 +140,7 @@ async function runTrial() {
   error.value = ''
   try {
     result.value = await post(`/merchant/branches/${bid}/promotion-trial`, { service_type: trial.service_type,
-      subtotal: toMinor(trial.subtotal), delivery_fee: toMinor(trial.delivery_fee) })
+      subtotal: toMinor(trial.subtotal), delivery_fee: toMinor(trial.delivery_fee), brand_id: brandPick.value })
   } catch (e) { error.value = (e as Error).message }
 }
 </script>
@@ -142,7 +157,8 @@ async function runTrial() {
       <button type="button" role="tab" :class="{ on: tab === 'dine' }" data-testid="promo-dine-tab" @click="setTab('dine')">{{ t('ck.tab_dine') }}</button>
       <button type="button" role="tab" :class="{ on: tab === 'coupons' }" data-testid="coupon-tab" @click="setTab('coupons')">{{ t('ck.tab_coupons') }}</button>
     </div>
-    <div v-if="tab === 'coupons'" class="ox-panel"><CouponRules /></div>
+    <div v-if="multiBrand()" class="pr-brands"><BrandSeg v-model="brandPick" :brands="brandsHere()" :all="tab !== 'coupons'" /></div>
+    <div v-if="tab === 'coupons'" class="ox-panel"><CouponRules :brand="brandPick || mainId()" /></div>
     <template v-else>
     <div v-if="error && !form.open" class="banner bad">{{ error }}</div>
 
@@ -164,7 +180,8 @@ async function runTrial() {
               <thead><tr><th>{{ t('promo_name') }}</th><th>{{ t('promo_rule') }}</th><th>{{ t('promo_when') }}</th><th class="num">{{ t('promo_usage') }}</th><th>{{ t('ox.pr.state') }}</th><th class="right">{{ t('ox.ops') }}</th></tr></thead>
               <tbody>
                 <tr v-for="p in picked" :key="p.id">
-                  <td><b class="ox-strong">{{ p.name }}</b><div class="muted small">{{ p.name_en }}</div></td>
+                  <td><b class="ox-strong">{{ p.name }}</b><div class="muted small">{{ p.name_en }}</div>
+                    <div v-if="multiBrand()" class="row wrap" style="gap:4px;margin-top:2px" data-testid="promo-brands"><BrandTag v-for="b in brandsOf(p)" :key="b.id" :name="b.name" :color="b.color" /></div></td>
                   <td><span class="ox-tag brand">{{ promoLabel(p, cur) }}</span>
                     <div class="muted small" v-if="isDish(p.kind)" data-testid="promo-dishes">{{ dishNames(p) }}</div>
                     <div class="muted small" v-if="!dine">{{ [p.applies_delivery && t('delivery'), p.applies_pickup && t('pickup')].filter(Boolean).join(' · ') }}</div></td>
@@ -248,6 +265,13 @@ async function runTrial() {
             </div>
             <p class="muted small">{{ t('promo.dish_hint') }}</p>
           </div>
+          <div v-if="multiBrand()" class="stack" style="gap:4px;margin:6px 0" data-testid="promo-f-brands">
+            <b class="small">{{ t('br.promo_brands') }}</b>
+            <div class="row wrap" style="gap:10px">
+              <label v-for="b in brandsHere()" :key="b.id" class="check"><input type="checkbox" :checked="form.f.brands.includes(b.id)" :data-brand="b.id" @change="toggleBrand(b.id)" />{{ b.name }}</label>
+            </div>
+            <span class="muted small">{{ t('br.promo_hint') }}</span>
+          </div>
           <div class="grid2" v-if="form.f.scope !== 'dine_in'">
             <label class="check"><input type="checkbox" v-model="form.f.applies_delivery" />{{ t('delivery') }}</label>
             <label class="check" v-if="form.f.kind !== 'free_delivery'"><input type="checkbox" v-model="form.f.applies_pickup" />{{ t('pickup') }}</label>
@@ -276,6 +300,7 @@ async function runTrial() {
 
 <style scoped>
 .trial-total { font-size: 16px; padding: 4px 2px 0; }
+.pr-brands { margin: 0 0 12px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: center; }
 .dishpick { margin: 8px 0; }
 .dishlist { max-height: 240px; overflow: auto; border: 1px solid var(--line, #e5e7eb); border-radius: 8px; padding: 4px 10px; }

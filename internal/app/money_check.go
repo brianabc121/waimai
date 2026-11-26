@@ -13,7 +13,7 @@ import (
 // docs/PRICING_CHECK.md §2 and returns one line per broken rule (nil when
 // all hold). It only reads.
 //
-// Besides the sums on the order (D1–D9, D12, D15), it replays the order (R1–R3): it
+// Besides the sums on the order (D1–D9, D12, D13, D15), it replays the order (R1–R3): it
 // prices the order again from nothing but what the order itself holds — its
 // fee rates, its live dishes, the rules of its dish promotions, what its
 // promotion and coupons took off, the discount at checkout — and the result
@@ -84,6 +84,22 @@ func (a *App) CheckOrderMoney(ctx context.Context, orderID int64) ([]string, err
 		case !numbered:
 			fail("D15 staff order's number does not end with its member's number")
 		}
+	}
+	// D13 every promotion the order took applied to its brand then, and
+	// every store coupon is the brand's own (docs/MULTI_BRAND_DESIGN.md §11.2);
+	// platform coupons and the platform's offers on platform orders are not
+	// a brand's. Rows from before brands carry no brands and are left alone.
+	var otherPromos, otherCoupons int
+	if err := a.DB.QueryRow(ctx, `SELECT
+		count(*) FILTER (WHERE cardinality(d.brand_ids) > 0 AND NOT o.brand_id = ANY(d.brand_ids)),
+		count(*) FILTER (WHERE c.issuer = 'store' AND c.brand_id IS DISTINCT FROM o.brand_id)
+		FROM order_discounts d JOIN orders o ON o.id = d.order_id
+		LEFT JOIN customer_coupons c ON c.id = d.coupon_id
+		WHERE d.order_id = $1`, orderID).Scan(&otherPromos, &otherCoupons); err != nil {
+		return nil, err
+	}
+	if otherPromos > 0 || otherCoupons > 0 {
+		fail("D13 %d promotions and %d store coupons of another brand", otherPromos, otherCoupons)
 	}
 	// D7 never more given back than was paid
 	if o.refunded > o.total {

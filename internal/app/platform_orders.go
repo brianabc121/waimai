@@ -377,7 +377,11 @@ func platformQuote(ctx context.Context, q Querier, b *Branch, in PlatformOrderIn
 		items = append(items, QuoteLineInput{ItemID: l.ItemID, Qty: l.Qty, OptionIDs: l.OptionIDs,
 			Note: strings.TrimSpace(l.Note), NoteTagIDs: l.NoteTagIDs, repeat: true})
 	}
-	lines, sub, err := priceLinesOn(ctx, q, b.ID, service, items, pp)
+	brand, err := loadBrand(ctx, q, b.ID, 0)
+	if err != nil {
+		return nil, err
+	}
+	lines, sub, err := priceLinesOn(ctx, q, b.ID, brand, service, items, pp)
 	if err != nil {
 		return nil, err
 	}
@@ -543,9 +547,9 @@ func (a *App) PlacePlatformOrder(ctx context.Context, branchID int64, actor Acto
 			opts, _ := json.Marshal(l.Options)
 			var lineID int64
 			if err := tx.QueryRow(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name,
-				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer, note_tags)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,'',$13) RETURNING id`, orderID, b.ID, batchID, l.ItemID, l.Name,
-				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, noteTagsJSON(l.NoteTags)).Scan(&lineID); err != nil {
+				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer, note_tags, base_name)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,'',$13,$14) RETURNING id`, orderID, b.ID, batchID, l.ItemID, l.Name,
+				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, noteTagsJSON(l.NoteTags), l.BaseName).Scan(&lineID); err != nil {
 				return wrap("insert order item", err)
 			}
 			lineIDs = append(lineIDs, lineID)

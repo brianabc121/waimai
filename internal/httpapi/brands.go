@@ -14,6 +14,32 @@ func (s *Server) brandRoutes(auth *gin.RouterGroup) {
 	auth.PUT("/merchant/branches/:bid/brands/:id", s.updateBrand)
 	auth.GET("/merchant/branches/:bid/brand-code", s.suggestBrandCode)
 	auth.PUT("/merchant/branches/:bid/staff/:id/brands", s.setStaffBrands)
+	auth.GET("/merchant/branches/:bid/brands/:id/menu", s.brandMenu)
+	auth.PUT("/merchant/branches/:bid/brands/:id/menu", s.saveBrandMenu)
+}
+
+// A brand's own menu (docs/MULTI_BRAND_DESIGN.md §5).
+func (s *Server) brandMenu(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	if bid, brand, ok := s.brandScope(c, pMenuEdit, id); ok {
+		m, err := s.App.GetBrandMenu(c, bid, brand)
+		reply(c, m, err)
+	}
+}
+
+func (s *Server) saveBrandMenu(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	var in app.BrandMenuInput
+	if !ok || !bind(c, &in) {
+		return
+	}
+	if bid, brand, ok := s.brandScope(c, pMenuEdit, id); ok {
+		m, err := s.App.SaveBrandMenu(c, bid, brand, staffActor(c), in)
+		reply(c, m, err)
+	}
 }
 
 var (

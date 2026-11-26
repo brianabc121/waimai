@@ -16,6 +16,8 @@ type OrderItem struct {
 	ItemID int64  `json:"item_id"`
 	Name   string `json:"name"`
 	NameEn string `json:"name_en"`
+	// BaseName is the store's name of a dish the brand sold under its own.
+	BaseName string `json:"base_name,omitempty"`
 	// NameTr is the name in the language the customer ordered in, when it differs.
 	NameTr    string       `json:"name_tr,omitempty"`
 	UnitPrice int64        `json:"unit_price"`
@@ -334,7 +336,7 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 			ELSE GREATEST(o.accepted_at, o.release_at) END,
 		i.prep_started_at, COALESCE((SELECT u.display_name FROM users u WHERE u.id = i.prep_started_by), ''),
 		i.ready_at, COALESCE((SELECT u.display_name FROM users u WHERE u.id = i.ready_by), ''),
-		i.discount_share, i.service_share, i.tax_share
+		i.discount_share, i.service_share, i.tax_share, i.base_name
 		FROM order_items i JOIN order_batches b ON b.id = i.batch_id JOIN orders o ON o.id = i.order_id
 		WHERE i.order_id = ANY($1) ORDER BY i.id`, ids)
 	if err != nil {
@@ -349,7 +351,7 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 			&it.BatchSeq, &it.BatchSource, &it.ServedAt, &it.VoidReason, &it.Basket, &it.NameTr, &tags,
 			&it.BatchAt, &it.RoundTags, &it.BatchBy, &it.RushAt,
 			&it.KitchenAt, &it.PrepStartedAt, &it.StartedBy, &it.ReadyAt, &it.ReadyBy,
-			&it.DiscountShare, &it.ServiceShare, &it.TaxShare); err != nil {
+			&it.DiscountShare, &it.ServiceShare, &it.TaxShare, &it.BaseName); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -623,11 +625,11 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			service_charge, tax_amount, tax_inclusive, tax_rate_bp, discount, total, payment_method, accept_deadline,
 			promotion_id, promotion_name, promotion_name_en, scheduled_for, release_at, dest_lat, dest_lng,
 			zone_distance_m, address_id, contact_phone, contact_title, contact_wechat, contact_telegram,
-			contact_line, contact_whatsapp, customer_lang)
+			contact_line, contact_whatsapp, customer_lang, brand_id)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
 				now() + make_interval(mins => $27), NULLIF($28, 0), $29, $30,
 				$31::timestamptz, $31::timestamptz - make_interval(mins => $32), $33, $34, $35, $36, $37, $38, $39, $40,
-				$41, $42, $43)
+				$41, $42, $43, NULLIF($44, 0))
 			RETURNING id`,
 			b.MerchantID, b.ID, publicNo, pickupCode, hashToken(token), nonce, cur.ServiceType, in.CustomerName,
 			phone, cur.ZoneID, cur.ZoneName, in.AddressLine, in.AddressUnit, in.AddressNote, in.Note, b.Currency,
@@ -635,7 +637,7 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			t.Discount, t.Total, payMethod, b.AcceptTimeoutMinutes, t.PromotionID, t.PromotionName,
 			t.PromotionNameEn, cur.ScheduledFor, b.PrepMinutes, destLat, destLng, cur.ZoneDistanceM,
 			addressID, contact.Phone, contact.Title, contact.Wechat, contact.Telegram,
-			contact.Line, contact.Whatsapp, langOrEmpty(cur.Input.Lang)).Scan(&orderID)
+			contact.Line, contact.Whatsapp, langOrEmpty(cur.Input.Lang), cur.Input.BrandID).Scan(&orderID)
 		if err != nil {
 			return wrap("insert order", err)
 		}
@@ -669,10 +671,10 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			opts, _ := json.Marshal(l.Options)
 			var lineID int64
 			if err := tx.QueryRow(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name,
-				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer, note_tags)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`, orderID, b.ID, batchID, l.ItemID, l.Name,
+				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer, note_tags, base_name)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`, orderID, b.ID, batchID, l.ItemID, l.Name,
 				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, max(1, l.Basket), l.NameTr,
-				noteTagsJSON(l.NoteTags)).Scan(&lineID); err != nil {
+				noteTagsJSON(l.NoteTags), l.BaseName).Scan(&lineID); err != nil {
 				return wrap("insert order item", err)
 			}
 			lineIDs = append(lineIDs, lineID)

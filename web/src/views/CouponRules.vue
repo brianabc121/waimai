@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The store's coupons: the welcome-back coupon given after a customer's first
 // completed order (docs/COUPON_DESIGN.md §3).
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { get, put } from '../api'
 import { couponStub, couponTitle } from '../coupons'
 import ClaimBatches from './ClaimBatches.vue'
@@ -10,7 +10,10 @@ import { session } from '../session'
 import type { CouponKind, RepurchaseRule } from '../types'
 
 
+// brand: each brand has its own rule and coupons (docs/MULTI_BRAND_DESIGN.md §10); 0 = the main brand
+const props = defineProps<{ brand?: number }>()
 const bid = session.branchId!
+const bq = () => props.brand ? `?brand=${props.brand}` : ''
 const rule = ref<RepurchaseRule | null>(null)
 const f = reactive({ enabled: false, kind: 'store_free' as CouponKind, value: 20, threshold: 0, valid_days: 30, min_order: 0, monthly_cap: '' as number | '' })
 const error = ref(''), saved = ref(false), busy = ref(false)
@@ -20,13 +23,16 @@ function fill(r: RepurchaseRule) {
   Object.assign(f, { enabled: r.enabled, kind: r.kind, value: toMajor(r.value), threshold: toMajor(r.threshold), valid_days: r.valid_days,
     min_order: toMajor(r.min_order), monthly_cap: r.monthly_cap ?? '' })
 }
-onMounted(async () => { try { fill(await get<RepurchaseRule>(`/merchant/branches/${bid}/coupons/repurchase`)) } catch (e) { error.value = (e as Error).message } })
+watch(() => props.brand, async () => {
+  saved.value = false
+  try { fill(await get<RepurchaseRule>(`/merchant/branches/${bid}/coupons/repurchase${bq()}`)) } catch (e) { error.value = (e as Error).message }
+}, { immediate: true })
 
 async function save(enabled = f.enabled) {
   error.value = ''; saved.value = false; busy.value = true
   try {
     fill(await put<RepurchaseRule>(`/merchant/branches/${bid}/coupons/repurchase`, {
-      enabled, kind: f.kind, value: toMinor(f.value), threshold: f.kind === 'store_free' ? 0 : toMinor(f.threshold),
+      brand_id: props.brand ?? 0, enabled, kind: f.kind, value: toMinor(f.value), threshold: f.kind === 'store_free' ? 0 : toMinor(f.threshold),
       valid_days: Number(f.valid_days), min_order: toMinor(f.min_order), monthly_cap: f.monthly_cap === '' ? null : Number(f.monthly_cap),
     }))
     saved.value = true
@@ -78,7 +84,7 @@ const rate = computed(() => rule.value?.stats.issued ? Math.round(rule.value.sta
         <div class="muted small">{{ t('cr.rest', { open: rule.stats.open, expired: rule.stats.expired, cost: money(rule.stats.cost, cur) }) }}</div>
       </div>
     </div>
-    <ClaimBatches class="wide" :currency="cur" />
+    <ClaimBatches class="wide" :currency="cur" :brand="props.brand ?? 0" />
   </div>
 </template>
 
