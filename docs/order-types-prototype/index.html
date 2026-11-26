@@ -190,11 +190,11 @@ const screens = {
 <tr><td class="no">foodpanda #a8kx-21qe</td><td><span class="tag t-fp">foodpanda</span></td><td>顾客自取</td><td>Ken</td><td>12:22</td><td class="num">₱410</td><td><span class="pill">已取走</span></td></tr>
 <tr><td class="no">Hippo-5</td><td><span class="tag t-hippo">商城</span></td><td>自取</td><td>+63 917 *** 2231</td><td>12:15</td><td class="num">₱318</td><td><span class="pill">已备好</span></td></tr>
 <tr><td class="no">YPX000123-2</td><td><span class="tag t-staff">代客 · 电话</span></td><td>自取</td><td>王先生 · 会员 000123</td><td>12:02</td><td class="num">₱160</td><td><span class="pill">已取走</span></td></tr>
-<tr><td class="no">Web-3</td><td><span class="tag t-web">网店</span></td><td>外卖</td><td>+63 915 *** 7712</td><td>12:08</td><td class="num">₱702</td><td><span class="pill">配送中</span></td></tr>
+<tr><td class="no">Online-3</td><td><span class="tag t-web">网店</span></td><td>外卖</td><td>+63 915 *** 7712</td><td>12:08</td><td class="num">₱702</td><td><span class="pill">配送中</span></td></tr>
 <tr><td class="no">DineIn-20</td><td><span class="tag t-dine">堂食 · 扫码</span></td><td>扫码 · B1 桌</td><td>—</td><td>11:55</td><td class="num">₱620</td><td><span class="pill g">已结账</span></td></tr>
 <tr><td class="no">W1125-044 <div class="mini">老订单，号码不变</div></td><td><span class="tag t-web">网店</span></td><td>外卖</td><td>+63 918 *** 0090</td><td>昨天</td><td class="num">₱455</td><td><span class="pill g">已送达</span></td></tr>
 </table></div>
-<div class="info">号码规则：堂食 DineIn-当天序号（分店员 / 扫码）· 代客 商家代码+会员号（同一会员当天第二单加 -2）· 平台 平台名+平台单号 · 商城 Hippo-当天序号（00:00 清零）· 网店 Web-当天序号（按重置时间清零）。老订单保留原号码。</div>
+<div class="info">号码规则：堂食 DineIn-当天序号（分店员 / 扫码）· 代客 商家代码+会员号（同一会员当天第二单加 -2）· 平台 平台名+平台单号 · 商城 Hippo-当天序号（00:00 清零）· 网店 Online-当天序号（按重置时间清零）。老订单保留原号码。</div>
 </div></div></div>`,
 
 '4': () => `<div class="shell">${side('set')}<div class="main"><div class="page">
@@ -209,7 +209,7 @@ const screens = {
 <div><span class="tag t-staff">代客</span><b>YPX000123</b><span class="mini">商家代码 + 会员号；同一会员当天第二单 YPX000123-2</span></div>
 <div><span class="tag t-grab">平台</span><b>Grab GF-123</b><span class="mini">平台名 + 平台单号</span></div>
 <div><span class="tag t-hippo">商城</span><b>Hippo-1</b><span class="mini">顾客从河马商城进店下的单；每天当地 00:00 从 1 重来</span></div>
-<div><span class="tag t-web">网店</span><b>Web-1</b><span class="mini">顾客打开本店链接下的单；每天 04:00 从 1 重来</span></div></div>
+<div><span class="tag t-web">网店</span><b>Online-1</b><span class="mini">顾客打开本店链接下的单；每天 04:00 从 1 重来</span></div></div>
 </div><div class="info" style="margin-top:12px">改商家代码只影响以后的单，已有订单号码不变。</div></div>
 <div class="panel"><h3>本店上了哪些外卖平台</h3><table class="grid">
 <tr><th>平台</th><th>开通</th><th>平台上的店铺 ID</th><th class="num">佣金</th><th class="num">平台价加价</th></tr>
@@ -275,15 +275,15 @@ const screens = {
 <div class="tk"><div class="h" style="background:var(--dine)"><b>DineIn-21</b><span>A3 · 7′</span></div><ul><li>1 × 三杯鸡 <span class="sub">店员点</span></li><li>2 × 白饭 <span class="sub">店员点</span></li><li>1 × 酸菜鱼 <span class="sub">顾客扫码加 · 微辣</span></li></ul><div class="ft">堂食 · 店员开台 · 4 人</div></div>
 <div class="tk"><div class="h" style="background:var(--staff)"><b>YPX000123</b><span>12:30 · 15′</span></div><ul><li>2 × 牛肉面</li><li>1 × 卤蛋</li></ul><div class="ft">代客 · 微信 · 外卖 · 会员 000123</div></div>
 <div class="tk"><div class="h" style="background:#c2410c"><b>Hippo-5</b><span>12:15 · 20′</span></div><ul><li>1 × 鸡排饭</li><li>1 × 柠檬茶</li></ul><div class="ft">商城 · 自取</div></div>
-<div class="tk"><div class="h" style="background:var(--online)"><b>Web-3</b><span>12:08 · 27′</span></div><ul><li>2 × 卤肉饭</li><li>1 × 盐酥鸡</li></ul><div class="ft">网店 · 外卖</div></div>
+<div class="tk"><div class="h" style="background:var(--online)"><b>Online-3</b><span>12:08 · 27′</span></div><ul><li>2 × 卤肉饭</li><li>1 × 盐酥鸡</li></ul><div class="ft">网店 · 外卖</div></div>
 </div>
 <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
 <div class="paper"><div class="c"><b>马卡蒂小馆</b><br>后厨单</div><hr><div class="c" style="font-size:22px"><b>Grab GF-123</b></div><div class="c">平台订单 · 平台骑手取餐</div><hr>2 x 卤肉饭<br>&nbsp;&nbsp;- 少辣<br>1 x 盐酥鸡<br>1 x 珍珠奶茶 (大杯)<br>&nbsp;&nbsp;- 半糖 少冰<hr>备注：不要葱，餐具 2 份<br>录入：Lina 12:41<br>流水号 W1126-041</div>
 <div class="paper"><div class="c"><b>马卡蒂小馆</b><br>后厨单</div><hr><div class="c" style="font-size:22px"><b>YPX000123-2</b></div><div class="c">代客下单 · 电话 · 自取</div><hr>1 x 牛肉面<br>1 x 卤蛋<hr>会员 000123 王先生<br>今天第 2 单</div>
-<div class="panel" style="width:330px"><h3>取餐屏</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-weight:800;font-size:20px"><div style="color:var(--muted);font-size:13px">制作中</div><div style="color:var(--ok);font-size:13px">请取餐</div><div>Web-4</div><div style="color:var(--ok)">Hippo-5</div><div>DineIn-22</div><div style="color:var(--ok)">Web-3</div><div>YPX000456</div><div style="color:var(--ok)">Grab GF-118</div></div></div>
+<div class="panel" style="width:330px"><h3>取餐屏</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-weight:800;font-size:20px"><div style="color:var(--muted);font-size:13px">制作中</div><div style="color:var(--ok);font-size:13px">请取餐</div><div>Online-4</div><div style="color:var(--ok)">Hippo-5</div><div>DineIn-22</div><div style="color:var(--ok)">Online-3</div><div>YPX000456</div><div style="color:var(--ok)">Grab GF-118</div></div></div>
 </div></div></div></div>`,
 '8': () => `<div class="shell">${side('link')}<div class="main"><div class="page">
-<div class="ph1"><div><h2>店铺链接</h2><p>顾客打开这个链接只看得到本店，进不了商城。从这里下的单是“网店订单 Web-”</p></div></div>
+<div class="ph1"><div><h2>店铺链接</h2><p>顾客打开这个链接只看得到本店，进不了商城。从这里下的单是“网店订单 Online-”</p></div></div>
 <div class="row2">
 <div class="panel"><h3>本店专属网址</h3>
 <div style="display:flex;gap:16px;align-items:center">
@@ -320,7 +320,7 @@ const screens = {
 <div style="padding:10px 14px;background:#fbeae3;font-size:12.5px">附近还有：<u>茶语</u> · <u>鸡排工坊</u> · <u>便当屋</u> →</div>
 <div class="bnav"><span>首页（商城）</span><span>订单</span><span>我的</span></div></div>
 <div class="note"><div class="good">✓ 能回商城、能看别的店</div><div class="good">✓ 可以用平台券</div><div>“我的”：全平台订单、收藏、券、平台客服</div></div></div>
-<div style="display:grid;gap:8px;justify-items:center"><b>打开商家分享的链接 → 网店订单 Web-</b>
+<div style="display:grid;gap:8px;justify-items:center"><b>打开商家分享的链接 → 网店订单 Online-</b>
 <div class="phonebox"><div class="url">🔒 <b>67891.abcfood.com</b>（或 order.yupinxuan.com）</div>
 <div class="ctop"><div class="av" style="width:30px;height:30px;border-radius:8px;font-size:13px;background:#fff;color:var(--brand)">马</div><b style="flex:1">马卡蒂小馆</b><span>💬</span></div>
 <div class="cover">马卡蒂小馆</div>
