@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // What the customer has said about their orders.
+import { storePath } from '../../site'
 import { ref, watch } from 'vue'
 import { pick, t, sn } from '../../i18n'
 import MeIntro from './MeIntro.vue'
@@ -22,7 +23,7 @@ watch(() => me.profile?.id, async id => {
     <div v-for="r in reviews ?? []" :key="r.id" class="card stack cell" data-testid="my-review">
       <div class="row">
         <img v-if="r.store.logo_url" :src="r.store.logo_url" alt="" class="me-logo" /><span v-else class="me-logo">{{ sn(r.store).slice(0, 1) }}</span>
-        <div class="grow"><router-link :to="`/s/${r.store.slug}`" class="bold" style="color:var(--ink);font-size:14px;font-weight:600">{{ sn(r.store) }}</router-link>
+        <div class="grow"><router-link :to="storePath(r.store.slug)" class="bold" style="color:var(--ink);font-size:14px;font-weight:600">{{ sn(r.store) }}</router-link>
           <div class="small muted">{{ dateTime(r.created_at) }}</div></div>
         <span class="me-stars"><i v-for="n in 5" :key="n" :class="{ on: n <= r.rating }">★</i></span>
       </div>

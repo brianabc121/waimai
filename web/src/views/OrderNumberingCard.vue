@@ -52,6 +52,7 @@ const code = () => (f.store_code || 'YPX').toUpperCase()
 </template>
 
 <style scoped>
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 .onprev { display: grid; gap: 8px; }
 .onprev > div { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
 .onprev b { font-variant-numeric: tabular-nums; min-width: 110px; }

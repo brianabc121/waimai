@@ -2,6 +2,7 @@
 // The guest's number (docs/QUEUE_DISPLAY_DESIGN.md §8): how many are ahead,
 // the wait, and — when called — a red page that vibrates. The printed slip's
 // QR code opens this page too.
+import { storePath } from '../../site'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ApiError, get, post } from '../../api'
 import { pick, t } from '../../i18n'
@@ -114,7 +115,7 @@ async function cancel() {
       <template v-if="open">
         <p class="keep">{{ t('qu.g.keep') }}</p>
         <div class="row2">
-          <router-link class="pbtn ghost" :to="`/s/${g.queue.slug}`">{{ t('qu.g.menu') }}</router-link>
+          <router-link class="pbtn ghost" :to="storePath(g.queue.slug)">{{ t('qu.g.menu') }}</router-link>
           <button v-if="canNotify" class="pbtn ghost" :disabled="notifyOn" @click="askNotify">{{ notifyOn ? t('qu.g.notify_on') : t('qu.g.notify') }}</button>
         </div>
         <button v-if="g.status === 'waiting'" class="pbtn ghost gray" :disabled="cancelling" data-testid="qt-cancel" @click="cancel">{{ t('qu.g.cancel') }}</button>

@@ -1,4 +1,5 @@
 // What the customer's order list and order page share.
+import { storePath } from './site'
 import type { Router } from 'vue-router'
 import { get } from './api'
 import { replaceCart } from './cart'
@@ -80,6 +81,6 @@ export async function orderAgain(router: Router, token: string): Promise<string>
   if (r.lines.length) replaceCart(r.slug, r.service_type, r.lines.map(l => ({ ...l, note_tags: l.note_tag_ids ?? [] })))
   const note = !r.lines.length ? t('ol.gone_all')
     : r.missing.length ? t('ol.gone_some', { names: r.missing.map(m => pick(m.name, m.name_en)).join('、') }) : ''
-  await router.push(`/s/${r.slug}`)
+  await router.push(storePath(r.slug))
   return note
 }

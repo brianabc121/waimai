@@ -142,7 +142,7 @@ step('pin on the map, then located again')
 
 // ---- into a store and back ----
 await page.click(store('tea'))
-await page.waitForURL(u => u.pathname === '/s/tea')
+await page.waitForURL(u => u.pathname === '/mall/s/tea')
 await page.waitForSelector('.item')
 await page.click(tid('back-mall'))
 await page.waitForURL(u => u.pathname === '/')

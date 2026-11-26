@@ -19,6 +19,7 @@ const pages: [string, string[]][] = [
   ['/merchant/menu', ['menu.soldout', 'menu.edit', 'menu.translate', 'kitchen']],
   ['/merchant/templates', ['store.design']],
   ['/merchant/media', ['store.design']],
+  ['/merchant/site-link', ['settings']],
   ['/merchant/promos', ['promo']],
   ['/merchant/cash', ['cash']],
   ['/merchant/bills', ['bills']],

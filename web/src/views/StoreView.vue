@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { checkoutPath, ownSite, site, storePath, storeURL } from '../site'
 import LangButton from './LangButton.vue'
-import { computed, defineAsyncComponent, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError, get, post } from '../api'
 import { addLine, linePrice, pruneNoteTags, useCart } from '../cart'
@@ -52,6 +53,13 @@ const error = ref('')
 const tab = ref<'menu' | 'reviews' | 'info'>('menu')
 const showCart = ref(false)
 
+function canonical(href: string) {
+  let l = document.querySelector<HTMLLinkElement>('link[rel=canonical]')
+  if (!l) { l = document.createElement('link'); l.rel = 'canonical'; document.head.appendChild(l) }
+  l.href = href
+}
+onUnmounted(() => document.querySelector('link[rel=canonical]')?.remove())
+
 async function load() {
   error.value = ''
   try {
@@ -59,6 +67,8 @@ async function load() {
     store.value = s
     pruneNoteTags(items.value)
     document.title = sn(s.branch)
+    // the store in the mall points search engines at the store's own page
+    if (!ownSite() && site.store_domain && s.branch.store_no) canonical(storeURL(s.branch))
     // "Home" in the bottom navigation comes back to the store last looked at.
     rememberStore({ slug: props.slug, name: sn(s.branch), currency: s.branch.currency, country: s.branch.country_code })
     void isFavorite(props.slug).then(on => { favorite.value = on }).catch(() => null)
@@ -96,7 +106,7 @@ async function relocate() {
 }
 async function checkout() {
   if (appendTok) { router.push(`/o/${appendTok}/append`); return }
-  const to = `/s/${props.slug}/checkout`
+  const to = checkoutPath(props.slug)
   // Ordering needs an account; the cart is kept while the customer logs in.
   if (!(await loadCustomer())) router.push(loginRoute(to, props.slug))
   else router.push(to)
@@ -106,14 +116,14 @@ async function checkout() {
 const showAccount = ref(false)
 async function account() {
   if (await loadCustomer()) showAccount.value = !showAccount.value
-  else router.push(loginRoute(`/s/${props.slug}`, props.slug))
+  else router.push(loginRoute(storePath(props.slug), props.slug))
 }
 async function logout() { await customerLogout(); showAccount.value = false }
 const showAddresses = ref(false)
 // Keeping the store among the customer's favourites needs an account.
 const favorite = ref(false)
 async function toggleFavorite() {
-  if (!(await loadCustomer())) { router.push(loginRoute(`/s/${props.slug}`, props.slug)); return }
+  if (!(await loadCustomer())) { router.push(loginRoute(storePath(props.slug), props.slug)); return }
   try {
     await setFavorite(props.slug, !favorite.value)
     favorite.value = !favorite.value
@@ -254,10 +264,12 @@ const salesText = computed(() => { const n = store.value?.sales ?? 0; return n >
 const showPromos = ref(false)
 const toast = ref('')
 async function share() {
-  const data = { title: name.value, url: location.href }
+  // on its own page the store shares that page, never the mall
+  const url = ownSite() ? location.origin + '/' : location.href
+  const data = { title: name.value, url }
   try {
     if (navigator.share) { await navigator.share(data); return }
-    await navigator.clipboard.writeText(location.href)
+    await navigator.clipboard.writeText(url)
     toast.value = t('sf.link_copied')
     setTimeout(() => { toast.value = '' }, 2000)
   } catch { /* the customer closed the share sheet */ }
@@ -338,12 +350,12 @@ async function sendReport() {
       <header class="shophead">
         <div class="tools">
           <!-- back to the marketplace; delivery or pickup is chosen at checkout -->
-          <router-link to="/" class="ico" :aria-label="t('ml.back_mall')" :title="t('ml.back_mall')" data-testid="back-mall">
+          <router-link v-if="!ownSite()" to="/" class="ico" :aria-label="t('ml.back_mall')" :title="t('ml.back_mall')" data-testid="back-mall">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 5-7 7 7 7" /></svg><span class="lbl">{{ t('ml.back_mall') }}</span></router-link>
           <span class="grow"></span>
           <button class="ico" :class="{ on: searching }" :aria-label="t('sf.search')" data-testid="search-toggle" @click="toggleSearch">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg><span class="lbl">{{ t('sf.search') }}</span></button>
-          <button class="ico" :class="{ fav: favorite }" :aria-label="t(favorite ? 'mf.faved' : 'mf.fav')" :aria-pressed="favorite" data-testid="favorite" @click="toggleFavorite">
+          <button v-if="!ownSite()" class="ico" :class="{ fav: favorite }" :aria-label="t(favorite ? 'mf.faved' : 'mf.fav')" :aria-pressed="favorite" data-testid="favorite" @click="toggleFavorite">
             <svg viewBox="0 0 24 24" width="24" height="24" :fill="favorite ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.500l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.900z" /></svg></button>
           <button class="ico" :aria-label="t('sf.share')" data-testid="share" @click="share">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="18" cy="5" r="2.6" /><circle cx="6" cy="12" r="2.6" /><circle cx="18" cy="19" r="2.6" /><path d="m8.3 10.7 7.4-4.4M8.3 13.3l7.4 4.4" /></svg></button>
@@ -599,6 +611,7 @@ async function sendReport() {
         </form>
       </div>
 
+      <div v-if="ownSite()" class="powered" data-testid="powered">{{ t('site.powered') }}</div>
       <div v-if="toast" class="toast">{{ toast }}</div>
       <CustomerTabs active="home" class="shoptabbar" />
     </template>
@@ -764,6 +777,8 @@ async function sendReport() {
 .ticket.idle .stub { filter: grayscale(.6); opacity: .8; }
 @media (min-width: 768px) { .promosheet { max-width: 480px; } }
 
+.powered { text-align: center; color: var(--muted); font-size: 12px; padding: 14px 0 calc(var(--tabbar-h, 56px) + 24px); }
+@media (min-width: 768px) { .powered { padding-bottom: 96px; } }
 .toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 14px; z-index: 90; }
 
 .sidecart { display: none; }

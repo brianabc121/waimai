@@ -32,6 +32,9 @@ type Config struct {
 	EmbedWorker        bool
 	StaticDir          string
 	PublicBaseURL      string // customer-facing origin, for order links in SMS
+	// StoreSiteDomain is the domain under which each store has its own page,
+	// <store_no>.<StoreSiteDomain> (docs/ORDER_TYPES_DESIGN.md §5).
+	StoreSiteDomain string
 
 	// Web push for the staff workbench in a browser. Empty keys turn it off.
 	// Make a pair with: admin vapid
@@ -101,6 +104,7 @@ func Load() Config {
 		FCMServiceAccount: env("FCM_SERVICE_ACCOUNT", ""),
 
 		PublicBaseURL:      env("PUBLIC_BASE_URL", ""),
+		StoreSiteDomain:    env("STORE_SITE_DOMAIN", ""),
 		SMSProvider:        env("SMS_PROVIDER", "log"),
 		SMSWebhookURL:      env("SMS_WEBHOOK_URL", ""),
 		SMSWebhookAuth:     env("SMS_WEBHOOK_AUTH", ""),

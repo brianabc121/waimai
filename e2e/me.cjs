@@ -102,7 +102,7 @@ await page.waitForSelector(tid('fav-store'))
 expect(await page.locator(tid('fav-store')).count() === 1, 'the kept store should be listed')
 await shot('me4-favorites')
 await page.click(tid('fav-store'))
-await page.waitForURL(u => u.pathname === '/s/makati')
+await page.waitForURL(u => u.pathname === '/mall/s/makati')
 await page.waitForSelector(tid('favorite') + '[aria-pressed=true]')
 // "home" is the marketplace
 await page.click(tid('tab-home'))

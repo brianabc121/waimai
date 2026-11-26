@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // The customer's chat with one store.
+import { storePath } from '../../site'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { loadCustomer, loginRoute } from '../../customer'
@@ -53,7 +54,7 @@ function goBack() { if (window.history.state?.back) router.back(); else void rou
     <header class="ch-bar">
       <button :aria-label="t('back')" data-testid="chat-back" @click="goBack">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7" /></svg></button>
-      <b v-if="info" class="ch-ttl"><router-link :to="`/s/${info.slug}`">{{ pick(info.store_name, info.store_name_en) }}</router-link>
+      <b v-if="info" class="ch-ttl"><router-link :to="storePath(info.slug)">{{ pick(info.store_name, info.store_name_en) }}</router-link>
         <small :class="{ on: info.open_now }" data-testid="chat-open">{{ t(info.open_now ? 'ch.open' : 'ch.closed') }}</small></b>
       <b v-else>{{ t('ch.title') }}</b>
       <span class="right row"><a v-if="info?.phone" class="ch-call" :href="`tel:${info.phone}`" :aria-label="t('ch.call')" :title="t('ch.call')">

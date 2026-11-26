@@ -139,6 +139,11 @@ func (s *Server) createQuote(c *gin.Context) {
 	// The phone is optional here: a verified customer gets promotions checked
 	// against their own usage; an anonymous one is checked again when ordering.
 	phone, _ := s.customerPhone(c)
+	site, ok := s.siteFor(c, c.Param("slug"))
+	if !ok {
+		return
+	}
+	in.OwnSite = site.OwnSite()
 	q, err := s.App.CreateQuote(c, c.Param("slug"), in, phone)
 	if err != nil {
 		fail(c, hideZones(err))
@@ -170,6 +175,11 @@ func (s *Server) placeOrder(c *gin.Context) {
 	if !bind(c, &in) {
 		return
 	}
+	site, ok := s.siteFor(c, c.Param("slug"))
+	if !ok {
+		return
+	}
+	in.OwnSite = site.OwnSite()
 	out, err := s.App.PlaceOrder(c, c.Param("slug"), phone, c.GetHeader("Idempotency-Key"), in)
 	if err != nil {
 		fail(c, hideZones(err))
@@ -238,7 +248,15 @@ func (s *Server) customerOrders(c *gin.Context) {
 		return
 	}
 	before, _ := strconv.ParseInt(c.Query("before"), 10, 64)
-	page, err := s.App.CustomerOrders(c, cu.ID, c.Query("tab"), c.Query("q"), max(before, 0))
+	site, ok := s.site(c)
+	if !ok {
+		return
+	}
+	var store int64
+	if site.OwnSite() {
+		store = site.Store.ID // the store's own page shows its orders only
+	}
+	page, err := s.App.CustomerOrdersAt(c, cu.ID, store, c.Query("tab"), c.Query("q"), max(before, 0))
 	if err == nil {
 		err = s.App.LocalizeOrderCards(c, page, reqLang(c))
 	}

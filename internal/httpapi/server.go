@@ -564,6 +564,7 @@ func (s *Server) Router() *gin.Engine {
 	s.meAdminRoutes(admin)
 	s.mallAdminRoutes(admin)
 	s.couponAdminRoutes(admin)
+	s.siteRoutes(r, api, auth, admin)
 	s.billRoutes(auth, admin)
 	s.translationRoutes(auth, admin)
 	s.noteTemplateRoutes(auth, admin)

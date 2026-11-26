@@ -458,6 +458,8 @@ type PlaceOrderInput struct {
 	AddressUnit  string `json:"address_unit"`
 	AddressNote  string `json:"address_note"`
 	Note         string `json:"note"`
+	// OwnSite: ordered on the store's own page, set by the server.
+	OwnSite bool `json:"-"`
 }
 
 type PlacedOrder struct {
@@ -528,6 +530,10 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		if err := json.Unmarshal(payload, &quoted); err != nil {
 			return err
 		}
+		// a quote from the mall is not used on the store's own page, nor the other way round
+		if quoted.Input.OwnSite != in.OwnSite {
+			return Err(http.StatusConflict, "QUOTE_EXPIRED", "the quote expired, please review the amount again")
+		}
 		// A saved address brings the name and the address with it.
 		if quoted.Input.AddressID == nil || quoted.ServiceType != "delivery" {
 			if in.CustomerName == "" {
@@ -552,7 +558,11 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			return err
 		}
 
-		no, err := nextOrderNo(ctx, tx, b, TypeMall)
+		typ := TypeMall
+		if in.OwnSite {
+			typ = TypeWeb
+		}
+		no, err := nextOrderNo(ctx, tx, b, typ)
 		if err != nil {
 			return err
 		}

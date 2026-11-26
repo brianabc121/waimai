@@ -2,6 +2,7 @@
 // The customer confirms the dishes they add to an order (docs/ADD_ON_ORDER_DESIGN.md §8.2):
 // no address, time or payment to choose, all of it stays as on the order. The
 // page shows the order before and after, and what the add-on costs more.
+import { storePath } from '../site'
 import '../checkout'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -64,7 +65,7 @@ function newOrder() {
   clearLines()
   const main = useCart(slug.value)
   for (const l of lines) main.lines.push(l)
-  router.replace(`/s/${slug.value}`)
+  router.replace(storePath(slug.value))
 }
 </script>
 
@@ -92,7 +93,7 @@ function newOrder() {
             <span>×{{ l.qty }}</span><span class="r">{{ money(l.line_total, order.currency) }}</span>
           </div>
           <div v-if="!quote && !error" class="muted">{{ t('ao.c.empty') }}</div>
-          <router-link v-if="slug" class="btn small ac-more" :to="{ path: `/s/${slug}`, query: { append: token } }">{{ t('ao.c.more') }}</router-link>
+          <router-link v-if="slug" class="btn small ac-more" :to="{ path: storePath(slug), query: { append: token } }">{{ t('ao.c.more') }}</router-link>
         </div>
         <div v-if="quote" class="card ac-card" data-testid="addon-sums">
           <div class="ac-row"><span>{{ t('subtotal') }}</span><span>{{ money(quote.after.subtotal, quote.currency) }}</span></div>

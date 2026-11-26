@@ -2,6 +2,7 @@
 // One order as its customer sees it: where it is, what can be done about it
 // (cancel, ask for a refund, call, order again, review), what was paid, and
 // where it goes. Anyone holding the link sees it; the list needs a login.
+import { storePath } from '../site'
 import { tagNames } from '../notes'
 import { fromLineOptions } from '../extras'
 import LineExtras from './LineExtras.vue'
@@ -77,7 +78,7 @@ async function back() {
   const from = String(window.history.state?.back ?? '')
   if (from.startsWith('/orders')) { router.back(); return }
   if (await loadCustomer()) router.replace('/orders')
-  else if (store.value) router.replace(`/s/${store.value.slug}`)
+  else if (store.value) router.replace(storePath(store.value.slug))
   else if (from) router.back()
   else router.replace('/')
 }
@@ -177,7 +178,7 @@ const droppedAdd = computed(() => {
 })
 const grouped = computed(() => (order.value?.batches ?? []).filter(b => b.status === 'accepted').length > 1)
 const addMins = computed(() => waitingAdd.value?.expires_at ? Math.max(1, Math.ceil((new Date(waitingAdd.value.expires_at).getTime() - Date.now()) / 60000)) : 0)
-function addDishes() { router.push({ path: `/s/${store.value!.slug}`, query: { append: props.token } }) }
+function addDishes() { router.push({ path: storePath(store.value!.slug), query: { append: props.token } }) }
 async function withdraw() {
   error.value = ''
   try { order.value = await api<Order>('DELETE', `/customer/orders/${props.token}/append/${waitingAdd.value!.seq}`) }
@@ -307,7 +308,7 @@ async function copyNo() {
 
         <!-- what was bought: the store, the dishes, the sums -->
         <section class="od-card od-side od-receipt" data-testid="order-fees">
-          <a v-if="store" class="od-store" :href="`/s/${store.slug}`" data-testid="order-store" @click.prevent="router.push(`/s/${store.slug}`)">
+          <a v-if="store" class="od-store" :href="storePath(store.slug)" data-testid="order-store" @click.prevent="router.push(storePath(store.slug))">
             <img v-if="store.logo_url" :src="store.logo_url" alt="" />
             <span v-else class="ph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path :d="ICONS.bowl" /></svg></span>
             <span class="grow"><b>{{ storeName }}</b><small>{{ t('od.fees') }} · {{ t('ol.n_items', { n: itemCount }) }}</small></span>

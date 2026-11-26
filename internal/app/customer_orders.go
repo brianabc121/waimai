@@ -69,6 +69,12 @@ const inProgress = `(o.acceptance_status = 'pending' OR (o.acceptance_status = '
 // or aftersale; search matches the store's or a dish's name; before is the
 // cursor a previous page returned.
 func (a *App) CustomerOrders(ctx context.Context, customerID int64, tab, search string, before int64) (*OrderCardPage, error) {
+	return a.CustomerOrdersAt(ctx, customerID, 0, tab, search, before)
+}
+
+// CustomerOrdersAt is CustomerOrders of one store (branchID > 0): on a store's
+// own page the customer sees only the orders of that store.
+func (a *App) CustomerOrdersAt(ctx context.Context, customerID, branchID int64, tab, search string, before int64) (*OrderCardPage, error) {
 	cond := "true"
 	switch tab {
 	case "", "all":
@@ -97,7 +103,8 @@ func (a *App) CustomerOrders(ctx context.Context, customerID int64, tab, search 
 		WHERE o.customer_id = $1 AND o.service_type <> 'dine_in' AND (`+cond+`)
 		AND ($2 = '' OR b.name ILIKE $3 OR b.name_en ILIKE $3 OR o.public_no ILIKE $3 OR EXISTS (SELECT 1 FROM order_items i
 			WHERE i.order_id = o.id AND (i.name ILIKE $3 OR i.name_en ILIKE $3)))
-		AND ($4 = 0 OR o.id < $4) ORDER BY o.id DESC LIMIT $5`, customerID, search, like, before, orderPageSize+1)
+		AND ($4 = 0 OR o.id < $4) AND ($6 = 0 OR o.branch_id = $6) ORDER BY o.id DESC LIMIT $5`,
+		customerID, search, like, before, orderPageSize+1, branchID)
 	if err != nil {
 		return nil, wrap("customer orders", err)
 	}

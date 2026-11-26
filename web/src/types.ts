@@ -10,6 +10,7 @@ export interface Branch {
   // the name, notice and introduction in the customer's language (customer pages)
   name_tr?: string; notice_tr?: string; intro_tr?: string
   // order numbers (docs/ORDER_TYPES_DESIGN.md §4)
+  store_no?: number
   store_code?: string; day_reset_time?: string
   kitchen_slow_minutes: number; cook_target_minutes?: number; detour_percent: number; detour_meters: number
   lat: number | null; lng: number | null; zone_mode: 'list' | 'map'; zone_tolerance_m: number

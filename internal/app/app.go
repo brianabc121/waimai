@@ -55,6 +55,11 @@ type App struct {
 	Push map[string]PushSender
 	// PublicBaseURL is the customer-facing origin, used for order links in SMS.
 	PublicBaseURL string
+	// SiteDomain is the domain of the stores' own pages when the App is not
+	// built from a configuration (tests); see siteDomain().
+	SiteDomain string
+	// LookupCNAME looks up a merchant's domain; nil uses the system resolver.
+	LookupCNAME func(ctx context.Context, host string) (string, error)
 	// MapsOff is set when the platform has no map key. Customers cannot pin
 	// an address then, so every store behaves as "pick a zone from a list".
 	MapsOff bool

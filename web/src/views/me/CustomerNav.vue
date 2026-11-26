@@ -4,25 +4,29 @@
 // A phone has the bottom navigation instead, so it does not show this.
 import LangButton from '../LangButton.vue'
 import { computed } from 'vue'
-import { locale, setLocale, t } from '../../i18n'
+import { locale, pick, setLocale, t } from '../../i18n'
 import { avatarUrl, displayName, me } from './me'
+import { ownSite, ownSlug, site } from '../../site'
 
 defineProps<{ active?: 'home' | 'orders' | 'me' }>()
+// on a store's own page the bar is the store's: its name, and the chat with it
+const brand = computed(() => ownSite() ? pick(site.store!.name, site.store!.name_en) : t('cn.brand'))
+const messages = computed(() => ownSite() ? `/chat/${ownSlug()}` : '/me/messages')
 const unread = computed(() => me.profile ? me.profile.unread + me.profile.chat_unread : 0)
 </script>
 
 <template>
   <header class="cnav" data-testid="customer-nav">
     <div class="cnav-in">
-      <router-link to="/" class="brand" :title="t('cn.brand')">{{ t('cn.brand') }}</router-link>
+      <router-link to="/" class="brand" :title="brand">{{ brand }}</router-link>
       <nav class="links">
-        <router-link to="/" :class="{ on: active === 'home' }" :title="t('me.home')">{{ t('me.home') }}</router-link>
+        <router-link to="/" :class="{ on: active === 'home' }" :title="t(ownSite() ? 'site.order' : 'me.home')">{{ t(ownSite() ? 'site.order' : 'me.home') }}</router-link>
         <router-link to="/orders" :class="{ on: active === 'orders' }" data-testid="nav-orders" :title="t('cn.orders')">{{ t('cn.orders') }}</router-link>
         <router-link to="/me" :class="{ on: active === 'me' }" data-testid="nav-me" :title="t('cn.center')">{{ t('cn.center') }}</router-link>
       </nav>
       <span class="grow"></span>
       <LangButton class="lang" />
-      <router-link to="/me/messages" class="msg" :aria-label="t('me.messages')" data-testid="nav-messages">
+      <router-link :to="messages" class="msg" :aria-label="t('me.messages')" data-testid="nav-messages">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.500c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.150-2.9-.400L5 20l.9-3.300C4.400 15.400 3.500 13.600 3.500 11.500c0-3.900 3.800-7 8.500-7z" /><path d="M8.5 11.500h.01M12 11.500h.01M15.5 11.500h.01" /></svg>
         <i v-if="unread">{{ unread > 99 ? '99+' : unread }}</i>
       </router-link>

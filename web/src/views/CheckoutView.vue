@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { storePath, checkoutPath } from '../site'
 import { cartTags, tagNames } from '../notes'
 import { fromCart, fromLineOptions, type Extras } from '../extras'
 import LineExtras from './LineExtras.vue'
@@ -122,7 +123,7 @@ const couponOff = computed(() => coupons.value.reduce((s, c) => s + c.amount, 0)
 function couponsChosen(ids: number[]) { couponIds.value = ids; showCoupons.value = false; void requote() }
 async function requote() {
   error.value = ''; short.value = 0
-  if (cart.lines.length === 0) { router.replace(`/s/${props.slug}`); return }
+  if (cart.lines.length === 0) { router.replace(storePath(props.slug)); return }
   // Without an address there is nothing to price a delivery for yet.
   if (delivery.value && !address.value) { quote.value = null; return }
   if (mustSchedule.value && !scheduled.value) { quote.value = null; error.value = slots.value.length ? t('pick_time') : t('closed'); return }
@@ -150,7 +151,7 @@ async function requote() {
 }
 
 // Ordering needs an account: without one, log in first and come back here.
-const toLogin = () => router.replace(loginRoute(`/s/${props.slug}/checkout`, props.slug))
+const toLogin = () => router.replace(loginRoute(checkoutPath(props.slug), props.slug))
 onMounted(async () => {
   if (!(await loadCustomer(true))) { toLogin(); return }
   await loadStore()
@@ -235,7 +236,7 @@ async function submit() {
 <template>
   <div class="phone wide co warm" :data-ready="loaded || undefined">
     <header class="co-top">
-      <router-link :to="`/s/${slug}`" :aria-label="t('back_to_menu')" class="co-back">
+      <router-link :to="storePath(slug)" :aria-label="t('back_to_menu')" class="co-back">
         <svg class="rtl-flip" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7" /></svg></router-link>
       <h1>{{ t('co.title') }}</h1><span></span>
     </header>

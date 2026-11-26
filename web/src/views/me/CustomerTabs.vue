@@ -3,6 +3,7 @@
 import { computed } from 'vue'
 import { t } from '../../i18n'
 import { homePath, me } from './me'
+import { ownSite } from '../../site'
 
 defineProps<{ active: 'home' | 'orders' | 'me' }>()
 const home = computed(() => homePath())
@@ -13,7 +14,7 @@ const home = computed(() => homePath())
     <div>
       <router-link :to="home" :class="{ on: active === 'home' }" data-testid="tab-home">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" /></svg>
-        <span>{{ t('me.home') }}</span>
+        <span>{{ t(ownSite() ? 'site.order' : 'me.home') }}</span>
       </router-link>
       <router-link to="/orders" :class="{ on: active === 'orders' }" data-testid="tab-orders">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16" rx="2.5" /><path d="M9 3v3M15 3v3M9 11h6M9 15h4" /></svg>

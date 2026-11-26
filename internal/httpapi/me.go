@@ -160,7 +160,20 @@ func (s *Server) myOffers(c *gin.Context) {
 
 func (s *Server) myCoupons(c *gin.Context) {
 	if cu, ok := s.me(c); ok {
+		site, ok := s.site(c)
+		if !ok {
+			return
+		}
 		list, err := s.App.MyCoupons(c, cu.ID)
+		if site.OwnSite() { // the store's own page shows its coupons only
+			mine := list[:0]
+			for _, x := range list {
+				if x.BranchID != nil && *x.BranchID == site.Store.ID {
+					mine = append(mine, x)
+				}
+			}
+			list = mine
+		}
 		reply(c, gin.H{"coupons": list}, err)
 	}
 }

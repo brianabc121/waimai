@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // "Me": who is logged in, what they hold, and the way into everything that
 // belongs to the customer rather than to one store.
+import { onOwnSite, ownSite, ownSlug, storePath } from '../../site'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { get } from '../../api'
@@ -45,7 +46,7 @@ function go(path: string, open = false) {
 }
 function addresses() { go('/me/addresses') }
 async function share() {
-  const url = location.origin + (home ? `/s/${home.slug}` : '/me')
+  const url = ownSite() ? location.origin : location.origin + (home ? storePath(home.slug) : '/me')
   try {
     if (navigator.share) await navigator.share({ title: home?.name ?? document.title, url })
     else { await navigator.clipboard.writeText(url); toast.value = t('me.link_copied'); setTimeout(() => { toast.value = '' }, 2000) }
@@ -53,15 +54,21 @@ async function share() {
 }
 
 interface Entry { key: string; to?: string; open?: boolean; dot?: boolean; icon: string }
+// On a store's own page only that store's pages are there: its coupons, the
+// addresses, the chat with it and the profile.
+const mine = (es: Entry[]) => es.map(e => e.to === '/me/messages' && ownSite() ? { ...e, to: `/chat/${ownSlug()}` } : e)
+  .filter(e => !e.to || onOwnSite(e.to))
 // what is used most, as large icons
-const common = computed<Entry[]>(() => [
+const common = computed<Entry[]>(() => mine(allCommon.value))
+const more = computed<Entry[]>(() => mine(allMore.value))
+const allCommon = computed<Entry[]>(() => [
   { key: 'addresses', icon: 'M12 13a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2zM12 21s6.5-5.8 6.5-10.6a6.5 6.5 0 0 0-13 0C5.5 15.2 12 21 12 21z' },
   { key: 'favorites', to: '/me/favorites', icon: 'M12 20s-7.5-4.6-7.5-10.100A4.3 4.3 0 0 1 12 7.200a4.3 4.3 0 0 1 7.5 2.700C19.5 15.4 12 20 12 20z' },
   { key: 'messages', to: '/me/messages', dot: !!profile.value && profile.value.unread + profile.value.chat_unread > 0, icon: 'M4.5 6.500A2.5 2.5 0 0 1 7 4h10a2.5 2.5 0 0 1 2.5 2.500v7A2.5 2.5 0 0 1 17 16h-5l-4.5 4v-4H7a2.5 2.5 0 0 1-2.5-2.500zM8.5 10h.01M12 10h.01M15.5 10h.01' },
   { key: 'support', to: '/me/support', open: true, icon: 'M5 13v-1a7 7 0 0 1 14 0v1M5 13h2.500v5H6a1 1 0 0 1-1-1zM19 13h-2.500v5H18a1 1 0 0 0 1-1zM16.5 18c0 1.7-1.5 2.5-3.5 2.5' },
 ])
 // the rest, as rows
-const more = computed<Entry[]>(() => [
+const allMore = computed<Entry[]>(() => [
   { key: 'reviews', to: '/me/reviews', icon: 'M19 12v5.500a2 2 0 0 1-2 2H6.500a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2H14M8 10h4M8 14h3M14.5 13.500l6-6-2-2-6 6-.5 2.500z' },
   { key: 'feedback', to: '/me/feedback', icon: 'M4 6.500h16v11H4zM4.5 7l7.5 6 7.5-6' },
   { key: 'help', to: '/me/help', open: true, icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.500a2.5 2.5 0 1 1 3.7 2.200c-.8.5-1.2 1-1.2 1.900M12 16.800h.01' },
@@ -96,10 +103,10 @@ const more = computed<Entry[]>(() => [
     </header>
 
     <div class="body">
-      <div class="stats">
-        <button data-testid="me-balance" @click="go('/me/wallet/balance')"><b>{{ symbol }}{{ plain(wallet.balance) }}</b><span>{{ t('me.balance') }}</span></button>
+      <div class="stats" :class="{ one: ownSite() }">
+        <button v-if="!ownSite()" data-testid="me-balance" @click="go('/me/wallet/balance')"><b>{{ symbol }}{{ plain(wallet.balance) }}</b><span>{{ t('me.balance') }}</span></button>
         <button class="hot" data-testid="me-coupons" @click="go('/me/coupons')"><b>{{ offerCount }}</b><span>{{ t('me.coupons') }}</span></button>
-        <button data-testid="me-bonus" @click="go('/me/wallet/bonus')"><b>{{ symbol }}{{ plain(wallet.bonus) }}</b><span>{{ t('me.bonus') }}</span></button>
+        <button v-if="!ownSite()" data-testid="me-bonus" @click="go('/me/wallet/bonus')"><b>{{ symbol }}{{ plain(wallet.bonus) }}</b><span>{{ t('me.bonus') }}</span></button>
       </div>
 
       <section>
@@ -131,7 +138,7 @@ const more = computed<Entry[]>(() => [
         </div>
       </section>
 
-      <section class="moresvc">
+      <section v-if="more.length" class="moresvc">
         <h2>{{ t('me.more_services') }}</h2>
         <div class="panel rows">
           <button v-for="e in more" :key="e.key" :data-testid="'me-' + e.key" @click="go(e.to!, e.open)">
@@ -167,6 +174,7 @@ const more = computed<Entry[]>(() => [
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); padding: 12px 0; background: var(--paper); border-radius: 14px; box-shadow: 0 6px 18px rgba(90, 40, 15, .12); margin: 0 -2px; }
 .stats button { border: 0; background: none; display: grid; gap: 2px; justify-items: center; cursor: pointer; color: var(--ink); border-inline-start: 1px solid var(--line); padding: 2px 4px; min-width: 0; }
 .stats button:first-child { border-inline-start: 0; }
+.stats.one { grid-template-columns: 1fr; }
 .stats b { font-size: 18px; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .stats .hot b { color: var(--red); }
 .stats span { font-size: 12px; color: var(--muted); }

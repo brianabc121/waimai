@@ -4,6 +4,7 @@
 // says where that is (found by the device, changed with a tap), the top right
 // leads to the messages. A store's delivery area is never shown: a store
 // delivers there, with its fee, minimum and time, or it does not.
+import { storePath } from '../../site'
 import LangButton from '../LangButton.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -121,7 +122,7 @@ const trackStyle = computed(() => ({
   transition: dragging.value ? 'none' : undefined,
 }))
 function follow(b: MallBanner) {
-  if (b.link_slug) void router.push(`/s/${b.link_slug}`)
+  if (b.link_slug) void router.push(storePath(b.link_slug))
   else if (b.link_url.startsWith('/')) void router.push(b.link_url)
   else if (b.link_url) window.location.href = b.link_url
 }
@@ -214,13 +215,13 @@ onBeforeUnmount(() => clearInterval(timer))
           <section v-if="frequent.length && !narrowed" class="freq" data-testid="mall-frequent">
             <h2>{{ t('ml.frequent') }}</h2>
             <div>
-              <router-link v-for="s in frequent" :key="s.slug" :to="`/s/${s.slug}`">
+              <router-link v-for="s in frequent" :key="s.slug" :to="storePath(s.slug)">
                 <img v-if="s.logo_url || s.cover_url" :src="s.logo_url || s.cover_url" alt="" />
                 <span v-else class="letter">{{ sn(s).slice(0, 1) }}</span>
                 <span>{{ sn(s) }}</span>
               </router-link>
             </div>
-            <router-link v-if="frequent.length === 1" class="go" :to="`/s/${frequent[0].slug}`" :aria-label="sn(frequent[0])" tabindex="-1">
+            <router-link v-if="frequent.length === 1" class="go" :to="storePath(frequent[0].slug)" :aria-label="sn(frequent[0])" tabindex="-1">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg>
             </router-link>
           </section>
