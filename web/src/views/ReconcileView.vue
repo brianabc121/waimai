@@ -12,14 +12,17 @@ import { locale, money, pick, t, toMinor } from '../i18n'
 import { session } from '../session'
 import type { PayChannel } from '../types'
 import { addDays, addMonths, clock, dayOf, monthEnd, monthStart } from './staff/time'
+import ReconPlatforms, { type ReconPlatform, type ReconType } from './ReconPlatforms.vue'
+import { platformName } from '../platforms'
 
-interface Row { pay_type: string; channel_id: number; name: string; names: Record<string, string>; count: number; amount: number
+interface Row { pay_type: string; channel_id: number; platform_id: number; name: string; names: Record<string, string>; count: number; amount: number
   dine: number; takeaway: number; ok: number; problem: number; unchecked: number }
 interface CashCount { day: string; expected: number; counted: number; note: string; counted_by: string; at: string }
 interface Summary { timezone: string; currency: string; count: number; total: number; rows: Row[]; problems: number
   cash: { counter: number; rider_collected: number; rider_returned: number; rider_pending: number; refunded: number; expected: number }
   refunds: { count: number; total: number; cash: number }; net: number
-  discounts: { promotion: number; coupon: number; staff: number; round_off: number; total: number }; cash_count: CashCount | null }
+  discounts: { promotion: number; coupon: number; staff: number; round_off: number; platform_merchant: number; platform_subsidy: number; total: number }
+  cash_count: CashCount | null; platforms: ReconPlatform[]; types: ReconType[] }
 interface Payment { order_id: number; public_no: string; paid_at: string; service_type: string; table_name: string; channel_id: number
   method: string; names: Record<string, string>; amount: number; staff: string; status: '' | 'ok' | 'problem'; note: string; checked_by: string; checked_at: string | null }
 interface Entry { order_id: number; public_no: string; at: string; service_type: string; table_name: string; percent_bp: number; mode: string
@@ -77,7 +80,8 @@ const cur = computed(() => sum.value?.currency ?? 'PHP')
 const m = (v: number) => money(v, cur.value)
 const exportHref = computed(() => `/api/v1/merchant/branches/${bid}/reconcile?${q()}&format=xlsx&lang=${locale.value}`)
 const asChannel = (x: { name: string; names: Record<string, string> }) => channelName({ name: x.name, names: x.names } as PayChannel)
-const rowName = (r: Row) => r.pay_type === 'online' ? `${t('ck.pt.online')} · ${asChannel(r)}` : t('ck.pt.' + r.pay_type)
+const rowName = (r: Row) => r.pay_type === 'online' ? `${t('ck.pt.online')} · ${asChannel(r)}`
+  : r.pay_type === 'platform' ? `${t('ck.pt.platform')} · ${platformName(r)}` : t('ck.pt.' + r.pay_type)
 const onlineRows = computed(() => (sum.value?.rows ?? []).filter(r => r.pay_type === 'online'))
 const when = (iso: string) => `${dayOf(iso, tz.value).slice(5)} ${clock(iso, tz.value)}`
 const where = (x: { service_type: string; table_name: string }) => x.service_type === 'dine_in' ? t('rc.table', { t: x.table_name }) : t('bl.' + x.service_type)
@@ -140,10 +144,11 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
       <p class="muted small" style="margin:0">{{ t('rc.hint') }}</p>
       <div class="ox-stats" data-testid="rc-cards">
         <div class="ox-stat"><span class="l">{{ t('rc.c.total') }}</span><b class="v red" data-testid="rc-total">{{ m(sum.total) }}</b><small class="s">{{ t('rc.c.count', { n: sum.count }) }}</small></div>
-        <div v-for="r in sum.rows" :key="r.pay_type + r.channel_id" class="ox-stat"><span class="l">{{ rowName(r) }}</span><b class="v">{{ m(r.amount) }}</b>
+        <div v-for="r in sum.rows" :key="r.pay_type + r.channel_id + '-' + r.platform_id" class="ox-stat"><span class="l">{{ rowName(r) }}</span><b class="v">{{ m(r.amount) }}</b>
           <small class="s">{{ t('rc.c.count', { n: r.count }) }}</small></div>
         <div class="ox-stat"><span class="l">{{ t('rc.c.discount') }}</span><b class="v neg">{{ m(sum.discounts.total) }}</b>
-          <small class="s">{{ t('rc.d.promo') }} {{ m(sum.discounts.promotion) }} · {{ t('rc.d.staff') }} {{ m(sum.discounts.staff) }} · {{ t('rc.d.round') }} {{ m(sum.discounts.round_off) }}</small></div>
+          <small class="s">{{ t('rc.d.promo') }} {{ m(sum.discounts.promotion) }} · {{ t('rc.d.staff') }} {{ m(sum.discounts.staff) }} · {{ t('rc.d.round') }} {{ m(sum.discounts.round_off) }}<template v-if="sum.discounts.platform_merchant">
+            · {{ t('po.merchant') }} {{ m(sum.discounts.platform_merchant) }}</template></small></div>
         <div v-if="sum.refunds.count" class="ox-stat" data-testid="rc-refunds"><span class="l">{{ t('rc.c.refunds') }}</span><b class="v neg">-{{ m(sum.refunds.total) }}</b>
           <small class="s">{{ t('rc.c.count', { n: sum.refunds.count }) }} · {{ t('rc.c.net', { v: m(sum.net) }) }}</small></div>
       </div>
@@ -153,7 +158,7 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
             <thead><tr><th>{{ t('rc.col.method') }}</th><th class="r">{{ t('rc.col.count') }}</th><th class="r">{{ t('rc.col.amount') }}</th>
               <th class="r">{{ t('rc.col.dine') }}</th><th class="r">{{ t('rc.col.takeaway') }}</th><th>{{ t('rc.col.check') }}</th></tr></thead>
             <tbody>
-              <tr v-for="r in sum.rows" :key="r.pay_type + r.channel_id" :data-method="r.pay_type === 'online' ? r.name : r.pay_type">
+              <tr v-for="r in sum.rows" :key="r.pay_type + r.channel_id + '-' + r.platform_id" :data-method="r.pay_type === 'online' || r.pay_type === 'platform' ? r.name : r.pay_type">
                 <td><b>{{ rowName(r) }}</b></td><td class="r">{{ r.count }}</td><td class="r"><b>{{ m(r.amount) }}</b></td>
                 <td class="r">{{ m(r.dine) }}</td><td class="r">{{ m(r.takeaway) }}</td>
                 <td class="small"><a v-if="r.pay_type === 'online'" href="#" :class="{ neg: r.problem }" @click.prevent="filt.channel = r.channel_id; filt.status = ''; setTab('online')">
@@ -187,6 +192,7 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
           <p v-else class="muted small" style="margin:0">{{ t('rc.count_day_only') }}</p>
         </div>
       </div>
+      <ReconPlatforms :bid="bid" :from="from" :to="to" :tz="tz" :currency="cur" :total="sum.total" :platforms="sum.platforms ?? []" :types="sum.types ?? []" @changed="load" />
     </template>
 
     <!-- online payments -->

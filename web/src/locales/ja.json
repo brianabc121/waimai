@@ -3806,5 +3806,19 @@
  "po.o.save": "保存",
  "po.o.delete": "削除",
  "po.o.until_rider": "配達員が受け取るまで追加できます",
- "po.o.deduct_row": "プラットフォーム差し引き {s} · {r} · {at}"
+ "po.o.deduct_row": "プラットフォーム差し引き {s} · {r} · {at}",
+ "rc.ty.title": "注文タイプ別の売上",
+ "rc.ty.hint": "プラットフォーム注文は店舗の受取額（支払額＋PF負担）で計上",
+ "rc.ty.share": "割合",
+ "rc.pf.title": "プラットフォーム注文",
+ "rc.pf.hint": "入金予定 = 受取額 − 手数料 − その他費用 − 差し引き。実際の入金は精算書どおりに入力し、選んだ期間内の精算分だけ数えます。",
+ "rc.pf.orders": "件数",
+ "rc.pf.subtotal": "PF価格の売上",
+ "rc.pf.actual": "実際の入金",
+ "rc.pf.diff": "差額",
+ "rc.pf.enter": "入力",
+ "rc.pf.period": "精算期間 {f} ~ {t}",
+ "rc.pf.note_ph": "メモ（精算書番号など）",
+ "rc.pf.detail": "注文ごとの明細",
+ "rc.pf.detail_hint": "注文ごとの差し引きは日付に関係なくその注文の全額です"
 }

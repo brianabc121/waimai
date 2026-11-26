@@ -3806,5 +3806,19 @@
  "po.o.save": "Guardar",
  "po.o.delete": "Eliminar",
  "po.o.until_rider": "Se pueden añadir platos hasta que lo recoja el repartidor de la plataforma",
- "po.o.deduct_row": "Descontado por la plataforma {s} · {r} · {at}"
+ "po.o.deduct_row": "Descontado por la plataforma {s} · {r} · {at}",
+ "rc.ty.title": "Ventas por tipo de pedido",
+ "rc.ty.hint": "Los pedidos de plataforma cuentan lo que debe la plataforma (pagado + financiado por la plataforma)",
+ "rc.ty.share": "Parte",
+ "rc.pf.title": "Pedidos de plataforma",
+ "rc.pf.hint": "Previsto = adeudado − comisión − otros cargos − descontado. Escribe el pago real según la liquidación; solo cuentan las liquidaciones dentro de las fechas elegidas.",
+ "rc.pf.orders": "Pedidos",
+ "rc.pf.subtotal": "A precios de plataforma",
+ "rc.pf.actual": "Pago real",
+ "rc.pf.diff": "Diferencia",
+ "rc.pf.enter": "Anotar",
+ "rc.pf.period": "Liquidación {f} ~ {t}",
+ "rc.pf.note_ph": "Nota, p. ej. n.º de liquidación",
+ "rc.pf.detail": "Pedidos",
+ "rc.pf.detail_hint": "Lo descontado por pedido es todo lo de ese pedido, sea cual sea la fecha"
 }

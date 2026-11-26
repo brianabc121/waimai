@@ -3806,5 +3806,19 @@
  "po.o.save": "Enregistrer",
  "po.o.delete": "Supprimer",
  "po.o.until_rider": "On peut ajouter des plats jusqu'au passage du livreur de la plateforme",
- "po.o.deduct_row": "Retenu par la plateforme {s} · {r} · {at}"
+ "po.o.deduct_row": "Retenu par la plateforme {s} · {r} · {at}",
+ "rc.ty.title": "Ventes par type de commande",
+ "rc.ty.hint": "Les commandes plateforme comptent ce que doit la plateforme (payé + financé par la plateforme)",
+ "rc.ty.share": "Part",
+ "rc.pf.title": "Commandes plateforme",
+ "rc.pf.hint": "Prévu = dû − commission − autres frais − retenues. Saisissez le versement réel d'après le relevé ; seuls les relevés compris dans les dates choisies comptent.",
+ "rc.pf.orders": "Commandes",
+ "rc.pf.subtotal": "Aux prix plateforme",
+ "rc.pf.actual": "Versement réel",
+ "rc.pf.diff": "Écart",
+ "rc.pf.enter": "Saisir",
+ "rc.pf.period": "Relevé {f} ~ {t}",
+ "rc.pf.note_ph": "Note, ex. n° de relevé",
+ "rc.pf.detail": "Commandes",
+ "rc.pf.detail_hint": "Les retenues par commande sont toutes celles de la commande, quelle que soit la date"
 }

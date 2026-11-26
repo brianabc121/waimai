@@ -116,9 +116,9 @@ R 这一组是最重要的：任何一条改金额的路径如果绕开了 `load
 | 11 | 商家改了活动规则、服务费率、税率之后，老订单的改单仍按下单（开台）时的快照 | `TestPricingFixServiceChargeDrift`、`TestPricingFixPromoKindDrift`、`TestDishPromotions` |
 | 12 | 一张单走完全程：下单（菜品活动 + 满减 + 店铺券 + 平台券）→ 打 9 折 → 加单 → 店铺原因退菜 → 顾客原因退菜 → 抹零 → 取走 → 逐道退款到全部退完，每一步都验 | `TestPricingCheckChain` |
 | 13 | 金额流水：每种改动都有记录、合计等于应付、不能改删 | `TestMoneyLedgerOverAllOrders` |
-| 14 | 对账、账单的各项合计和订单、退款对得上 | `TestReconciliation`、`TestBills` |
+| 14 | 对账、账单的各项合计和订单、退款对得上；平台单按平台汇总（应收、佣金、扣费、扣款、预计到账、实际到账）、营业额按类型合计等于收款合计、平台单不进现金 | `TestReconciliation`、`TestBills`、`TestPlatformReconciliation` |
 | 15 | 币种：按店铺国家定币种，老订单保留原币种 | `TestCurrencyTableMatchesMigration` |
-| 16 | 平台订单：平台价下单（手设价优先，没设按加价取整）、商家出资 + 平台出资优惠、一律含税、佣金；店铺原因退菜商家优惠按比例保留、平台优惠不变；改了加价之后加单仍按下单时的加价；顾客原因退菜；手改佣金、其他扣费、记录平台扣款（进退款）、平台取消；不套本店活动 | 样例 S9；`TestPlatformOrder`、`TestPlatformOrderChain`、`TestPlatformOrderOverHTTP` |
+| 16 | 平台订单：平台价下单（手设价优先，没设按加价取整）、商家出资 + 平台出资优惠、一律含税、佣金；店铺原因退菜商家优惠按比例保留、平台优惠不变；改了加价之后加单仍按下单时的加价；顾客原因退菜；手改佣金、其他扣费、记录平台扣款（进退款）、平台取消；不套本店活动 | 样例 S9；`TestPlatformOrder`、`TestPlatformOrderChain`、`TestPlatformOrderOverHTTP`、`TestPlatformReconciliation` |
 | 17 | 商城单和网店单：同一购物车在商城和店铺专属页面下单金额一分不差（没有平台券时）；网店单不用平台券（不列、点名要也不用），顾客多付的正好是平台券的钱；商城报价不能拿到专属页面下单 | `TestMallVsWebOrder`、`TestStoreSiteOverHTTP` |
 
 ---
@@ -251,4 +251,4 @@ PRICING_REVIEW.md 问题 1 的门店：含税 12%、服务费 5%。鸡 169.00 ×
 - **币种小数位**：所有币种都按 1/100 存，日元、越南盾、韩元等会出现“半日元”（PRICING_REVIEW.md 问题 6，第 5 步，还没做）。做这一步时要给第 4 节加无小数币种的样例。
 - **税的分摊**：包装费那一份税不落在任何一道菜上，所以 C7、D8 只能要求“各道菜税之和 ≤ 税”。按菜退款时这部分不退。
 - **配送费**：店员改过的配送费没有单独记原区域运费；配送费不计税。
-- **对账和账单**仍按订单和退款表汇总，流水用来核对；改对账逻辑时要同时跑 `TestReconciliation`、`TestBills` 和 D6。
+- **对账和账单**仍按订单和退款表汇总，流水用来核对；改对账逻辑时要同时跑 `TestReconciliation`、`TestPlatformReconciliation`、`TestBills` 和 D6。
