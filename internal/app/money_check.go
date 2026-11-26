@@ -13,7 +13,7 @@ import (
 // docs/PRICING_CHECK.md §2 and returns one line per broken rule (nil when
 // all hold). It only reads.
 //
-// Besides the sums on the order (D1–D9, D12, D13, D15), it replays the order (R1–R3): it
+// Besides the sums on the order (D1–D9, D12–D15), it replays the order (R1–R3): it
 // prices the order again from nothing but what the order itself holds — its
 // fee rates, its live dishes, the rules of its dish promotions, what its
 // promotion and coupons took off, the discount at checkout — and the result
@@ -100,6 +100,24 @@ func (a *App) CheckOrderMoney(ctx context.Context, orderID int64) ([]string, err
 	}
 	if otherPromos > 0 || otherCoupons > 0 {
 		fail("D13 %d promotions and %d store coupons of another brand", otherPromos, otherCoupons)
+	}
+	// D14 a platform order was taken by a shop its brand has on the platform,
+	// and its commission is that platform's (the rate on the row is the
+	// brand's shop's when placed, docs/MULTI_BRAND_DESIGN.md §11.2).
+	var noShop bool
+	var badRate int
+	if err := a.DB.QueryRow(ctx, `SELECT o.platform_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM branch_platforms bp
+			WHERE bp.brand_id = o.brand_id AND bp.platform_id = o.platform_id),
+		(SELECT count(*) FROM order_platform_fees f WHERE f.order_id = o.id AND f.kind = 'commission'
+			AND f.platform_id IS DISTINCT FROM o.platform_id)
+		FROM orders o WHERE o.id = $1`, orderID).Scan(&noShop, &badRate); err != nil {
+		return nil, err
+	}
+	if noShop {
+		fail("D14 platform order of a brand without a shop on the platform")
+	}
+	if badRate > 0 {
+		fail("D14 commission of another platform")
 	}
 	// D7 never more given back than was paid
 	if o.refunded > o.total {

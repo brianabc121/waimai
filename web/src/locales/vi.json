@@ -3901,5 +3901,6 @@
  "br.look_hint": "Trong chợ và trên trang riêng, thương hiệu là một cửa hàng độc lập; không có ảnh thì dùng logo và ảnh bìa của cửa hàng.",
  "br.logo": "Logo thương hiệu",
  "br.cover": "Ảnh bìa thương hiệu",
- "br.intro": "Giới thiệu một dòng (hiện trên thẻ ở chợ)"
+ "br.intro": "Giới thiệu một dòng (hiện trên thẻ ở chợ)",
+ "br.pf_hint": "Mỗi thương hiệu là một cửa hàng riêng trên các nền tảng, với mã cửa hàng, hoa hồng và mức tăng giá riêng. Giá nhập tay trên nền tảng chỉ dùng cho thương hiệu chính; thương hiệu khác tăng từ giá của chính mình."
 }

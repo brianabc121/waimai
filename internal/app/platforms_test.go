@@ -59,7 +59,7 @@ func TestDeliveryPlatforms(t *testing.T) {
 	}
 
 	// The store sees the platforms of its country only, Grab and foodpanda among them.
-	offered, err := a.BranchPlatforms(ctx, a.DB, s.branchID, false)
+	offered, err := a.BranchPlatforms(ctx, a.DB, s.branchID, 0, false)
 	noErr(t, err)
 	names := map[int64]bool{}
 	for _, p := range offered {
@@ -71,12 +71,12 @@ func TestDeliveryPlatforms(t *testing.T) {
 	if !names[id] || names[farID] {
 		t.Fatalf("offered %+v", offered)
 	}
-	_, err = a.SaveBranchPlatforms(ctx, s.branchID, []app.BranchPlatformInput{{PlatformID: farID, Enabled: true, RoundStep: 100}})
+	_, err = a.SaveBranchPlatforms(ctx, s.branchID, 0, []app.BranchPlatformInput{{PlatformID: farID, Enabled: true, RoundStep: 100}})
 	wantCode(t, err, "VALIDATION")
-	_, err = a.SaveBranchPlatforms(ctx, s.branchID, []app.BranchPlatformInput{{PlatformID: id, Enabled: true, RoundStep: 300}})
+	_, err = a.SaveBranchPlatforms(ctx, s.branchID, 0, []app.BranchPlatformInput{{PlatformID: id, Enabled: true, RoundStep: 300}})
 	wantCode(t, err, "VALIDATION")
 	own := 2500
-	list, err := a.SaveBranchPlatforms(ctx, s.branchID, []app.BranchPlatformInput{{PlatformID: id, Enabled: true, ShopRef: "PH-123",
+	list, err := a.SaveBranchPlatforms(ctx, s.branchID, 0, []app.BranchPlatformInput{{PlatformID: id, Enabled: true, ShopRef: "PH-123",
 		OwnCommission: &own, RoundStep: 100}})
 	noErr(t, err)
 	if list[0].ID != id || !list[0].Enabled || list[0].Commission != 2500 || list[0].Markup != 2000 || list[0].ShopRef != "PH-123" {
@@ -152,7 +152,7 @@ func TestMenuImportPlatformPrices(t *testing.T) {
 	noErr(t, a.DB.QueryRow(ctx, `SELECT id FROM delivery_platforms WHERE prefix='FP'`).Scan(&fp))
 	_, err := a.DB.Exec(ctx, `UPDATE branches SET country_code='PH' WHERE id=$1`, s.branchID)
 	noErr(t, err)
-	_, err = a.SaveBranchPlatforms(ctx, s.branchID, []app.BranchPlatformInput{{PlatformID: grab, Enabled: true, RoundStep: 100}})
+	_, err = a.SaveBranchPlatforms(ctx, s.branchID, 0, []app.BranchPlatformInput{{PlatformID: grab, Enabled: true, RoundStep: 100}})
 	noErr(t, err)
 
 	head := []any{"分类", "菜名", "价格", "平台价：Grab", "平台价:FP", "平台价:Nope"}

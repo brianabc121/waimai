@@ -41,7 +41,7 @@ func (a *App) AdminMenu(ctx context.Context, branchID int64) (*AdminMenu, error)
 	if err != nil {
 		return nil, err
 	}
-	platforms, err := a.BranchPlatforms(ctx, a.DB, branchID, true)
+	platforms, err := a.BranchPlatforms(ctx, a.DB, branchID, 0, true)
 	if err != nil {
 		return nil, err
 	}

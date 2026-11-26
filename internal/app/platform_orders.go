@@ -73,8 +73,13 @@ func (pp *platformPricer) option(delta int64) int64 {
 	return pricing.PlatformPrice(delta, pp.MarkupBP, pp.Step)
 }
 
-func loadPlatformPricer(ctx context.Context, q Querier, branchID, platformID int64, markup int, step int64) (*platformPricer, error) {
+// The prices set by hand on a platform are the main brand's: another brand's
+// platform prices are its own prices with its markup.
+func loadPlatformPricer(ctx context.Context, q Querier, branchID, platformID int64, markup int, step int64, mainBrand bool) (*platformPricer, error) {
 	pp := &platformPricer{PlatformID: platformID, MarkupBP: markup, Step: step, own: map[int64]int64{}}
+	if !mainBrand {
+		return pp, nil
+	}
 	rows, err := q.Query(ctx, `SELECT p.item_id, p.price FROM item_platform_prices p JOIN menu_items m ON m.id = p.item_id
 		WHERE m.branch_id = $1 AND p.platform_id = $2`, branchID, platformID)
 	if err != nil {
@@ -99,14 +104,16 @@ func orderPlatformPricer(ctx context.Context, q Querier, orderID int64) (*platfo
 	var platformID *int64
 	var markup int
 	var step int64
-	if err := q.QueryRow(ctx, `SELECT branch_id, platform_id, platform_markup_bp, platform_round_step FROM orders WHERE id=$1`,
-		orderID).Scan(&branchID, &platformID, &markup, &step); err != nil {
+	var main bool
+	if err := q.QueryRow(ctx, `SELECT o.branch_id, o.platform_id, o.platform_markup_bp, o.platform_round_step,
+			COALESCE((SELECT is_main FROM brands WHERE id = o.brand_id), true)
+		FROM orders o WHERE o.id=$1`, orderID).Scan(&branchID, &platformID, &markup, &step, &main); err != nil {
 		return nil, err
 	}
 	if platformID == nil {
 		return nil, nil
 	}
-	return loadPlatformPricer(ctx, q, branchID, *platformID, markup, step)
+	return loadPlatformPricer(ctx, q, branchID, *platformID, markup, step, main)
 }
 
 // ---- the store's charges on an order ----
@@ -253,6 +260,8 @@ func platformInfo(ctx context.Context, q Querier, ids []int64) (map[int64]*Platf
 // PlatformOrderInput is a platform order as staff copy it from the platform.
 type PlatformOrderInput struct {
 	PlatformID int64 `json:"platform_id"`
+	// BrandID is the brand whose shop on the platform took the order (0 = the main one).
+	BrandID int64 `json:"brand_id"`
 	// PlatformNo is the platform's own number of the order (GF-123).
 	PlatformNo string `json:"platform_no"`
 	// Pickup is who collects it: the platform's rider (default) or the customer.
@@ -295,6 +304,7 @@ type PlatformQuote struct {
 	pr       *priced
 	pricer   *platformPricer
 	no       string
+	brand    *Brand
 }
 
 // PlatformDuplicate is an order already entered with the same platform number.
@@ -351,7 +361,12 @@ func platformQuote(ctx context.Context, q Querier, b *Branch, in PlatformOrderIn
 	if in.PlatformID == 0 {
 		return nil, ErrValidation("choose the platform")
 	}
-	list, err := branchPlatforms(ctx, q, b.ID, true)
+	// the brand's shop on the platform: its terms, its menu and prices
+	brand, err := orderBrand(ctx, q, b.ID, in.BrandID)
+	if err != nil {
+		return nil, err
+	}
+	list, err := branchPlatforms(ctx, q, b.ID, brand.ID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +379,7 @@ func platformQuote(ctx context.Context, q Querier, b *Branch, in PlatformOrderIn
 	if bp == nil {
 		return nil, Err(http.StatusUnprocessableEntity, "PLATFORM_OFF", "the store does not sell on this platform")
 	}
-	pp, err := loadPlatformPricer(ctx, q, b.ID, bp.ID, bp.Markup, bp.RoundStep)
+	pp, err := loadPlatformPricer(ctx, q, b.ID, bp.ID, bp.Markup, bp.RoundStep, brand.IsMain)
 	if err != nil {
 		return nil, err
 	}
@@ -376,10 +391,6 @@ func platformQuote(ctx context.Context, q Querier, b *Branch, in PlatformOrderIn
 	for _, l := range in.Items {
 		items = append(items, QuoteLineInput{ItemID: l.ItemID, Qty: l.Qty, OptionIDs: l.OptionIDs,
 			Note: strings.TrimSpace(l.Note), NoteTagIDs: l.NoteTagIDs, repeat: true})
-	}
-	brand, err := loadBrand(ctx, q, b.ID, 0)
-	if err != nil {
-		return nil, err
 	}
 	lines, sub, err := priceLinesOn(ctx, q, b.ID, brand, service, items, pp)
 	if err != nil {
@@ -415,7 +426,8 @@ func platformQuote(ctx context.Context, q Querier, b *Branch, in PlatformOrderIn
 		return nil, ErrValidation("the platform's discount is more than the order")
 	}
 	out := &PlatformQuote{Currency: b.Currency, Lines: lines, Totals: t, Receivable: t.Total + t.PlatformSubsidy,
-		CommissionRate: bp.Commission, CommissionBase: bp.CommissionBase, platform: bp, pr: p, pricer: pp, no: in.PlatformNo}
+		CommissionRate: bp.Commission, CommissionBase: bp.CommissionBase, platform: bp, pr: p, pricer: pp, no: in.PlatformNo,
+		brand: brand}
 	out.CommissionAuto = pricing.Commission(commissionBase(bp.CommissionBase, t.Subtotal, t.MerchantDiscount), bp.Commission)
 	out.Commission = out.CommissionAuto
 	if in.Commission != nil {
@@ -522,15 +534,15 @@ func (a *App) PlacePlatformOrder(ctx context.Context, branchID int64, actor Acto
 			subtotal, packaging_fee, delivery_fee, service_charge, service_charge_bp, tax_amount, tax_inclusive, tax_rate_bp,
 			discount, total, payment_method, payment_status, pay_type, amount_received, accept_deadline,
 			scheduled_for, release_at, placed_by, staff_note,
-			platform_id, platform_order_no, platform_pickup, platform_markup_bp, platform_round_step)
+			platform_id, platform_order_no, platform_pickup, platform_markup_bp, platform_round_step, brand_id)
 			VALUES ($1,$2,$3,$4,$5,$6,'staff','pickup',$7,'',$8,$9,$10,$11,0,0,0,$12,true,$13,$14,$15,'prepaid','paid','platform',$15,
 				now() + make_interval(mins => $16), $17::timestamptz, $17::timestamptz - make_interval(mins => $18),
-				NULLIF($19, 0), $20, $21, $22, $23, $24, $25)
+				NULLIF($19, 0), $20, $21, $22, $23, $24, $25, $26)
 			RETURNING id`,
 			b.MerchantID, b.ID, no.Public, no.Code, hashToken(a.orderToken(nonce)), nonce, in.CustomerName, in.Note,
 			b.Currency, t.Subtotal, t.PackagingFee, t.TaxAmount, t.TaxRateBP, t.Discount, t.Total,
 			b.AcceptTimeoutMinutes, in.ScheduledFor, b.PrepMinutes, actor.ID, in.StaffNote,
-			bp.ID, in.PlatformNo, in.Pickup, cur.pricer.MarkupBP, cur.pricer.Step).Scan(&orderID)
+			bp.ID, in.PlatformNo, in.Pickup, cur.pricer.MarkupBP, cur.pricer.Step, cur.brand.ID).Scan(&orderID)
 		if err != nil {
 			return wrap("insert platform order", err)
 		}

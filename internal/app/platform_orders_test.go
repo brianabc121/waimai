@@ -15,7 +15,7 @@ func grabFor(t *testing.T, s *store) int64 {
 	var grab int64
 	noErr(t, a.DB.QueryRow(ctx, `SELECT id FROM delivery_platforms WHERE prefix='Grab'`).Scan(&grab))
 	c, m := 3000, 2000
-	_, err := a.SaveBranchPlatforms(ctx, s.branchID, []app.BranchPlatformInput{{PlatformID: grab, Enabled: true,
+	_, err := a.SaveBranchPlatforms(ctx, s.branchID, 0, []app.BranchPlatformInput{{PlatformID: grab, Enabled: true,
 		OwnCommission: &c, OwnMarkup: &m, RoundStep: 100}})
 	noErr(t, err)
 	return grab
@@ -142,7 +142,7 @@ func TestPlatformOrderChain(t *testing.T) {
 
 	// the store raises its Grab markup to 50%; the order keeps its 20%
 	c, m := 3000, 5000
-	_, err = a.SaveBranchPlatforms(ctx, s.branchID, []app.BranchPlatformInput{{PlatformID: grab, Enabled: true,
+	_, err = a.SaveBranchPlatforms(ctx, s.branchID, 0, []app.BranchPlatformInput{{PlatformID: grab, Enabled: true,
 		OwnCommission: &c, OwnMarkup: &m, RoundStep: 100}})
 	noErr(t, err)
 	add, err := a.StaffAddon(ctx, o.ID, uniq("k"), app.StaffAddonInput{Items: []app.StaffLine{

@@ -57,6 +57,7 @@ extend({
   'br.logo': ['品牌标志', 'Brand logo'],
   'br.cover': ['品牌封面', 'Brand cover'],
   'br.intro': ['一句话简介（商城卡片上显示）', 'One-line introduction (on the mall card)'],
+  'br.pf_hint': ['每个品牌在外卖平台上是一家单独的店：平台店铺号、佣金、加价各填各的。手填的平台菜价只用于主品牌，其他品牌按品牌价加价。', 'Each brand is a shop of its own on the platforms, with its own shop ID, commission and markup. Platform prices typed by hand are the main brand\'s; other brands mark up their own prices.'],
   'bm.link': ['品牌菜单', 'Brand menu'],
   'bm.title': ['{name} · 品牌菜单', '{name} · brand menu'],
   'bm.sub': ['从门店菜品里挑这个品牌卖的菜，可以改名、换图、单独定价；规格、加料、口味、出品档口和沽清跟门店菜品走。只用于外卖和自取，堂食仍用门店菜单。', 'Pick which of the store\'s dishes this brand sells, with its own names, pictures and prices. Options, toppings, notes, stations and sold-out stay with the store\'s dish. Delivery and pickup only; dine-in uses the store menu.'],

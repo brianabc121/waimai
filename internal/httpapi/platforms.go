@@ -26,18 +26,52 @@ func (s *Server) platformRoutes(auth, admin *gin.RouterGroup) {
 	auth.POST("/merchant/orders/:id/platform-deductions", s.platformDeduction)
 }
 
-// orderPlatforms are the platforms the store is on, for the page that enters their orders.
+// orderPlatforms are the platforms the store is on, for the page that enters
+// their orders: each brand's shops (一品湘 Grab, 好吃党 Grab), those of the
+// brands the person works on; platforms are the main brand's.
 func (s *Server) orderPlatforms(c *gin.Context) {
-	if bid, ok := branchScope(c, pPlatform); ok {
-		list, err := s.App.BranchPlatforms(c, s.App.DB, bid, true)
-		reply(c, gin.H{"platforms": list}, err)
+	bid, ok := branchScope(c, pPlatform)
+	if !ok {
+		return
 	}
+	brands, err := s.App.ListBrands(c, bid)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	type shops struct {
+		Brand     app.BrandRef         `json:"brand"`
+		Platforms []app.BranchPlatform `json:"platforms"`
+	}
+	out := []shops{}
+	main := []app.BranchPlatform{}
+	u := currentUser(c)
+	for _, br := range brands {
+		if br.Status != "active" || !br.Delivery || !(u.AllBrands(bid) || u.MayUseBrand(bid, br.ID)) {
+			continue
+		}
+		list, err := s.App.BranchPlatforms(c, s.App.DB, bid, br.ID, true)
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		if br.IsMain {
+			main = list
+		}
+		if len(list) > 0 {
+			out = append(out, shops{Brand: br.Ref(), Platforms: list})
+		}
+	}
+	c.JSON(200, gin.H{"platforms": main, "shops": out})
 }
 
 func (s *Server) platformQuote(c *gin.Context) {
 	bid, ok := branchScope(c, pPlatform)
 	var in app.PlatformOrderInput
 	if !ok || !bind(c, &in) {
+		return
+	}
+	if !s.mayUseBrand(c, bid, in.BrandID) {
 		return
 	}
 	q, err := s.App.PlatformQuote(c, bid, in)
@@ -48,6 +82,9 @@ func (s *Server) platformOrder(c *gin.Context) {
 	bid, ok := branchScope(c, pPlatform)
 	var in app.PlatformOrderInput
 	if !ok || !bind(c, &in) {
+		return
+	}
+	if !s.mayUseBrand(c, bid, in.BrandID) {
 		return
 	}
 	o, err := s.App.PlacePlatformOrder(c, bid, staffActor(c), c.GetHeader("Idempotency-Key"), in)
@@ -125,24 +162,27 @@ func (s *Server) savePlatform(c *gin.Context) {
 	reply(c, gin.H{"id": id}, err)
 }
 
+// branchPlatforms are a brand's shops on the platforms (?brand=, none = the main brand).
 func (s *Server) branchPlatforms(c *gin.Context) {
-	if bid, ok := branchScope(c, pSettings); ok {
-		list, err := s.App.BranchPlatforms(c, s.App.DB, bid, false)
+	brand, _ := strconv.ParseInt(c.Query("brand"), 10, 64)
+	if bid, brand, ok := s.brandScope(c, pSettings, brand); ok {
+		list, err := s.App.BranchPlatforms(c, s.App.DB, bid, brand, false)
 		reply(c, gin.H{"platforms": list}, err)
 	}
 }
 
 func (s *Server) saveBranchPlatforms(c *gin.Context) {
-	bid, ok := branchScope(c, pSettings)
-	if !ok {
-		return
-	}
 	var in struct {
+		BrandID   int64                     `json:"brand_id"`
 		Platforms []app.BranchPlatformInput `json:"platforms"`
 	}
 	if !bind(c, &in) {
 		return
 	}
-	list, err := s.App.SaveBranchPlatforms(c, bid, in.Platforms)
+	bid, brand, ok := s.brandScope(c, pSettings, in.BrandID)
+	if !ok {
+		return
+	}
+	list, err := s.App.SaveBranchPlatforms(c, bid, brand, in.Platforms)
 	reply(c, gin.H{"platforms": list}, err)
 }

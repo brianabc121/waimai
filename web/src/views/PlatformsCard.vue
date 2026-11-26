@@ -3,11 +3,13 @@
 // ID there and its own terms (docs/ORDER_TYPES_DESIGN.md §6). Empty rates
 // follow the platform's defaults. Dish prices on each platform are set on the
 // menu page.
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { get, put } from '../api'
 import { t } from '../i18n'
 import { session } from '../session'
 import { type BranchPlatform, bpToPct, pctToBp, platformName } from '../platforms'
+import { deliveryBrands, multiBrand, useBrandPick } from '../brands'
+import BrandSeg from './brands/BrandSeg.vue'
 
 
 const props = defineProps<{ branchId: number }>()
@@ -21,20 +23,25 @@ const STEPS = [{ v: 0, k: 'pf.set.r0' }, { v: 100, k: 'pf.set.r1' }, { v: 500, k
 function fill(list: BranchPlatform[]) {
   rows.value = list.map(p => ({ p, enabled: p.enabled, shop_ref: p.shop_ref, commission: bpToPct(p.own_commission_bp), markup: bpToPct(p.own_markup_bp), round_step: p.round_step }))
 }
-onMounted(async () => {
-  try { fill((await get<{ platforms: BranchPlatform[] }>(`/merchant/branches/${props.branchId}/platforms`)).platforms) } catch (e) { error.value = (e as Error).message }
+// each brand has its own shops on the platforms (docs/MULTI_BRAND_DESIGN.md §10)
+const { pick: brand } = useBrandPick('platforms', deliveryBrands)
+async function load() {
+  error.value = ''; ok.value = false
+  try { fill((await get<{ platforms: BranchPlatform[] }>(`/merchant/branches/${props.branchId}/platforms?brand=${brand.value}`)).platforms) } catch (e) { error.value = (e as Error).message }
   loaded.value = true
-})
+}
+onMounted(load)
+watch(brand, load)
 async function save() {
   error.value = ''; ok.value = false
   try {
-    const body = { platforms: rows.value.map(r => ({ platform_id: r.p.id, enabled: r.enabled, shop_ref: r.shop_ref,
+    const body = { brand_id: brand.value, platforms: rows.value.map(r => ({ platform_id: r.p.id, enabled: r.enabled, shop_ref: r.shop_ref,
       own_commission_bp: pctToBp(r.commission), own_markup_bp: pctToBp(r.markup), round_step: r.round_step })) }
     const list = (await put<{ platforms: BranchPlatform[] }>(`/merchant/branches/${props.branchId}/platforms`, body)).platforms
     fill(list)
     // the 平台下单 menu follows at once
     const role = session.user?.roles.find(r => r.branch_id === props.branchId)
-    if (role) role.platforms = list.some(p => p.enabled)
+    if (role && list.some(p => p.enabled)) role.platforms = true
     ok.value = true
   } catch (e) { error.value = (e as Error).message }
 }
@@ -45,6 +52,10 @@ async function save() {
     <div class="ox-panel-h" style="margin:0"><h2>{{ t('pf.set.title') }}</h2><span class="grow"></span>
       <button v-if="rows.length" class="btn primary" data-testid="pf-save">{{ t('save') }}</button></div>
     <p class="muted small" style="margin:0">{{ t('pf.set.hint') }}</p>
+    <template v-if="multiBrand() && deliveryBrands().length > 1">
+      <BrandSeg v-model="brand" :brands="deliveryBrands()" />
+      <p class="muted small" style="margin:0">{{ t('br.pf_hint') }}</p>
+    </template>
     <div v-if="error" class="banner bad">{{ error }}</div>
     <div v-else-if="ok" class="banner ok">{{ t('saved') }}</div>
     <p v-if="loaded && !rows.length" class="muted">{{ t('pf.set.none') }}</p>

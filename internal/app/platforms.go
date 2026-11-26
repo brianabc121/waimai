@@ -195,20 +195,23 @@ type BranchPlatform struct {
 	Markup     int `json:"effective_markup_bp"`
 }
 
-// BranchPlatforms lists the active platforms of the store's country, those it
-// sells on first. enabledOnly keeps those.
-func (a *App) BranchPlatforms(ctx context.Context, q Querier, branchID int64, enabledOnly bool) ([]BranchPlatform, error) {
-	return branchPlatforms(ctx, q, branchID, enabledOnly)
+// BranchPlatforms lists the active platforms of the store's country, those
+// the brand sells on first (brandID 0 = the main brand; each brand has its
+// own shops on the platforms, docs/MULTI_BRAND_DESIGN.md §10). enabledOnly
+// keeps those.
+func (a *App) BranchPlatforms(ctx context.Context, q Querier, branchID, brandID int64, enabledOnly bool) ([]BranchPlatform, error) {
+	return branchPlatforms(ctx, q, branchID, brandID, enabledOnly)
 }
 
-func branchPlatforms(ctx context.Context, q Querier, branchID int64, enabledOnly bool) ([]BranchPlatform, error) {
+func branchPlatforms(ctx context.Context, q Querier, branchID, brandID int64, enabledOnly bool) ([]BranchPlatform, error) {
 	rows, err := q.Query(ctx, `SELECT `+platformCols+`, COALESCE(bp.enabled, false), COALESCE(bp.shop_ref, ''),
 		bp.commission_bp, bp.markup_bp, COALESCE(bp.round_step, 100)
 		FROM delivery_platforms p JOIN branches b ON b.id = $1
-		LEFT JOIN branch_platforms bp ON bp.platform_id = p.id AND bp.branch_id = b.id
+		JOIN brands br ON br.branch_id = b.id AND (br.id = $2 OR $2 = 0 AND br.is_main)
+		LEFT JOIN branch_platforms bp ON bp.platform_id = p.id AND bp.brand_id = br.id
 		WHERE (p.active AND (cardinality(p.countries) = 0 OR b.country_code = '' OR upper(b.country_code) = ANY (p.countries)))
 			OR bp.enabled
-		ORDER BY COALESCE(bp.enabled, false) DESC, p.sort, p.id`, branchID)
+		ORDER BY COALESCE(bp.enabled, false) DESC, p.sort, p.id`, branchID, brandID)
 	if err != nil {
 		return nil, err
 	}
@@ -246,9 +249,16 @@ type BranchPlatformInput struct {
 
 // SaveBranchPlatforms stores the store's terms on the platforms listed; the
 // others stay as they are.
-func (a *App) SaveBranchPlatforms(ctx context.Context, branchID int64, in []BranchPlatformInput) ([]BranchPlatform, error) {
-	err := a.inTx(ctx, func(tx pgx.Tx) error {
-		offered, err := a.BranchPlatforms(ctx, tx, branchID, false)
+func (a *App) SaveBranchPlatforms(ctx context.Context, branchID, brandID int64, in []BranchPlatformInput) ([]BranchPlatform, error) {
+	brand, err := loadBrand(ctx, a.DB, branchID, brandID)
+	if err == ErrNotFound {
+		return nil, Err(http.StatusUnprocessableEntity, "BRAND_UNKNOWN", "no such brand in this store")
+	}
+	if err != nil {
+		return nil, err
+	}
+	err = a.inTx(ctx, func(tx pgx.Tx) error {
+		offered, err := a.BranchPlatforms(ctx, tx, branchID, brand.ID, false)
 		if err != nil {
 			return err
 		}
@@ -272,10 +282,10 @@ func (a *App) SaveBranchPlatforms(ctx context.Context, branchID int64, in []Bran
 			if !slices.Contains([]int64{0, 100, 500, 1000}, x.RoundStep) {
 				return ErrValidation("round_step must be 0, 100, 500 or 1000")
 			}
-			if _, err := tx.Exec(ctx, `INSERT INTO branch_platforms (branch_id, platform_id, enabled, shop_ref, commission_bp, markup_bp, round_step)
-				VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (branch_id, platform_id) DO UPDATE SET enabled=$3, shop_ref=$4,
+			if _, err := tx.Exec(ctx, `INSERT INTO branch_platforms (branch_id, platform_id, enabled, shop_ref, commission_bp, markup_bp, round_step, brand_id)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (brand_id, platform_id) DO UPDATE SET enabled=$3, shop_ref=$4,
 				commission_bp=$5, markup_bp=$6, round_step=$7`,
-				branchID, x.PlatformID, x.Enabled, x.ShopRef, x.OwnCommission, x.OwnMarkup, x.RoundStep); err != nil {
+				branchID, x.PlatformID, x.Enabled, x.ShopRef, x.OwnCommission, x.OwnMarkup, x.RoundStep, brand.ID); err != nil {
 				return err
 			}
 		}
@@ -284,7 +294,7 @@ func (a *App) SaveBranchPlatforms(ctx context.Context, branchID int64, in []Bran
 	if err != nil {
 		return nil, err
 	}
-	return a.BranchPlatforms(ctx, a.DB, branchID, false)
+	return a.BranchPlatforms(ctx, a.DB, branchID, brand.ID, false)
 }
 
 // ---- dish prices on the platforms ----
