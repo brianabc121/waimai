@@ -10,6 +10,7 @@ import { CONTACT_FIELDS } from '../addresses'
 import type { Branch, Station, Zone } from '../types'
 import StoreTextsCard from './StoreTextsCard.vue'
 import PaySettingsCard from './checkout/PaySettingsCard.vue'
+import OrderNumberingCard from './OrderNumberingCard.vue'
 
 const bid = session.branchId!
 const branch = ref<Branch | null>(null)
@@ -100,6 +101,7 @@ const sections = computed(() => [
   { id: 'set-link', label: t('share_link'), on: true },
   { id: 'set-store', label: t('store_settings'), on: can('settings') },
   { id: 'set-pay', label: t('ox.set.pay'), on: can('settings') },
+  { id: 'set-numbers', label: t('ot.set.title'), on: can('settings') },
   { id: 'set-texts', label: t('ox.set.texts'), on: can('menu.translate') },
   { id: 'set-mall', label: t('mls.title'), on: !!listing.value && can('mall') },
   { id: 'set-zones', label: t('zones'), on: can('delivery.map') },
@@ -184,6 +186,8 @@ function jump(id: string) { at.value = id; document.getElementById(id)?.scrollIn
     </form>
 
     <div v-if="can('settings')" id="set-pay"><PaySettingsCard :branch-id="bid" /></div>
+
+    <div v-if="can('settings')" id="set-numbers"><OrderNumberingCard :branch="branch" @saved="b => branch = b" /></div>
 
     <div v-if="can('menu.translate')" id="set-texts"><StoreTextsCard ref="texts" :base="`/merchant/branches/${bid}`" @en-name="v => s.name_en = v" /></div>
 

@@ -619,10 +619,11 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 			return err
 		}
 		memberID = m.ID
-		publicNo, pickupCode, err := nextOrderNo(ctx, tx, b, "W")
+		no, err := staffOrderNo(ctx, tx, b, m.No)
 		if err != nil {
 			return err
 		}
+		publicNo, pickupCode := no.Public, no.Code
 		nonce := randomBytes(16)
 		token = a.orderToken(nonce)
 		payMethod := "cod"
@@ -672,6 +673,9 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 			phone, wechat, line, whatsapp, m.ID, m.Source, actor.ID, strings.TrimSpace(in.StaffNote)).Scan(&orderID)
 		if err != nil {
 			return wrap("insert order", err)
+		}
+		if err := stampOrder(ctx, tx, orderID, no, ""); err != nil {
+			return err
 		}
 		// A customer with an account at the platform sees the order in "My orders".
 		if _, err := tx.Exec(ctx, `UPDATE orders o SET customer_id = c.id FROM customers c WHERE o.id=$1 AND c.phone=$2`,

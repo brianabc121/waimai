@@ -339,10 +339,11 @@ func (a *App) OpenTable(ctx context.Context, tableID int64, guests int, tags []s
 		if b.Suspended {
 			return errStoreClosed
 		}
-		publicNo, code, err := nextOrderNo(ctx, tx, b, "D")
+		no, err := nextOrderNo(ctx, tx, b, TypeDineIn)
 		if err != nil {
 			return err
 		}
+		publicNo, code := no.Public, no.Code
 		// The bill starts empty; fees and tax are recomputed with every batch.
 		t := ComputeTotals(0, 0, b.dineInTax(), Discount{})
 		orderNonce := randomBytes(16)
@@ -356,6 +357,10 @@ func (a *App) OpenTable(ctx context.Context, tableID int64, guests int, tags []s
 			b.MerchantID, b.ID, publicNo, code, hashToken(a.orderToken(orderNonce)), orderNonce, b.Currency,
 			t.TaxInclusive, t.TaxRateBP, name).Scan(&orderID); err != nil {
 			return wrap("insert dine-in order", err)
+		}
+		// staff until the first round says otherwise (see AddRound)
+		if err := stampOrder(ctx, tx, orderID, no, "staff"); err != nil {
+			return err
 		}
 		nonce := randomBytes(16)
 		var opener *int64
@@ -522,6 +527,13 @@ func (a *App) AddBatch(ctx context.Context, sessionID int64, source, idemKey str
 			VALUES ($1, (SELECT COALESCE(max(seq), 0) + 1 FROM order_batches WHERE order_id=$1), $2, $3, $4)
 			RETURNING id, seq`, s.OrderID, source, roundTags, placedBy).Scan(&batchID, &seq); err != nil {
 			return err
+		}
+		// A table counts as self-ordered when its first round came from the
+		// customer's phone or the table tablet (docs/ORDER_TYPES_DESIGN.md §3.1).
+		if seq == 1 && (source == "qr" || source == "ipad") {
+			if _, err := tx.Exec(ctx, `UPDATE orders SET dine_source='self' WHERE id=$1`, s.OrderID); err != nil {
+				return err
+			}
 		}
 		for _, l := range lines {
 			opts, _ := json.Marshal(l.Options)

@@ -95,12 +95,16 @@ type CashCollection struct {
 // Order is the full staff-facing view. Customer and rider views are trimmed
 // from it in views.go.
 type Order struct {
-	ID            int64  `json:"id"`
-	MerchantID    int64  `json:"-"`
-	BranchID      int64  `json:"branch_id"`
-	PublicNo      string `json:"public_no"`
-	PickupCode    string `json:"pickup_code"`
-	Channel       string `json:"channel"`
+	ID         int64  `json:"id"`
+	MerchantID int64  `json:"-"`
+	BranchID   int64  `json:"branch_id"`
+	PublicNo   string `json:"public_no"`
+	PickupCode string `json:"pickup_code"`
+	Channel    string `json:"channel"`
+	// OrderType is dine_in, staff, platform, mall or web (docs/ORDER_TYPES_DESIGN.md);
+	// DineSource says who opened a table: staff or self.
+	OrderType     string `json:"order_type"`
+	DineSource    string `json:"dine_source"`
 	ServiceType   string `json:"service_type"`
 	CustomerName  string `json:"customer_name"`
 	CustomerPhone string `json:"customer_phone"`
@@ -255,7 +259,7 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.adj_by), ''),
 	COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.adj_approved_by), ''), o.adj_at, o.pay_type,
 	COALESCE(o.pay_channel_id, 0), COALESCE((SELECT pc.status FROM payment_checks pc WHERE pc.order_id = o.id), ''),
-	COALESCE((SELECT pc.note FROM payment_checks pc WHERE pc.order_id = o.id), '')`
+	COALESCE((SELECT pc.note FROM payment_checks pc WHERE pc.order_id = o.id), ''), o.order_type, o.dine_source`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}, Discounts: []OrderDiscount{}, Voids: []OrderVoid{}, Refunds: []OrderRefund{}}
@@ -272,7 +276,7 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.ContactWhatsapp, &o.AddressPhoto, &t.MerchantDiscount, &t.PlatformSubsidy, &o.MemberNo, &o.OrderSource,
 		&o.PlacedBy, &o.StaffNote, &o.PayMethod, &o.TableTags,
 		&t.AdjPercentBP, &t.StaffDiscount, &t.AdjMode, &t.RoundOff, &o.AdjReason, &o.AdjBy, &o.AdjApprovedBy, &o.AdjAt,
-		&o.PayType, &o.PayChannelID, &o.PayCheck, &o.PayCheckNote)
+		&o.PayType, &o.PayChannelID, &o.PayCheck, &o.PayCheckNote, &o.OrderType, &o.DineSource)
 	if err != nil {
 		return nil, err
 	}
@@ -445,21 +449,6 @@ func bump(ctx context.Context, tx pgx.Tx, id int64) error {
 	return err
 }
 
-// nextOrderNo takes the next number of the branch's daily sequence (in branch
-// local time) and returns the public order number and its short code.
-func nextOrderNo(ctx context.Context, tx pgx.Tx, b *Branch, prefix string) (publicNo, code string, err error) {
-	today := time.Now().In(b.location())
-	var seq int
-	err = tx.QueryRow(ctx, `UPDATE branches SET
-		order_seq = CASE WHEN order_seq_date = $2::date THEN order_seq + 1 ELSE 1 END,
-		order_seq_date = $2::date WHERE id=$1 RETURNING order_seq`, b.ID, today.Format("2006-01-02")).Scan(&seq)
-	if err != nil {
-		return "", "", err
-	}
-	code = fmt.Sprintf("%03d", seq)
-	return fmt.Sprintf("%s%s-%s", prefix, today.Format("0102"), code), code, nil
-}
-
 // ---- placing an order ----
 
 type PlaceOrderInput struct {
@@ -563,10 +552,11 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			return err
 		}
 
-		publicNo, pickupCode, err := nextOrderNo(ctx, tx, b, "W")
+		no, err := nextOrderNo(ctx, tx, b, TypeMall)
 		if err != nil {
 			return err
 		}
+		publicNo, pickupCode := no.Public, no.Code
 		nonce := randomBytes(16)
 		token := a.orderToken(nonce)
 		payMethod := "cod"
@@ -613,6 +603,9 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			contact.Line, contact.Whatsapp, langOrEmpty(cur.Input.Lang)).Scan(&orderID)
 		if err != nil {
 			return wrap("insert order", err)
+		}
+		if err := stampOrder(ctx, tx, orderID, no, ""); err != nil {
+			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE orders o SET customer_id = c.id FROM customers c WHERE o.id=$1 AND c.phone=$2`,
 			orderID, phone); err != nil {

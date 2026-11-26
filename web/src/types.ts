@@ -9,6 +9,8 @@ export interface Branch {
   menu_lang?: string; menu_langs_off?: string[]
   // the name, notice and introduction in the customer's language (customer pages)
   name_tr?: string; notice_tr?: string; intro_tr?: string
+  // order numbers (docs/ORDER_TYPES_DESIGN.md §4)
+  store_code?: string; day_reset_time?: string
   kitchen_slow_minutes: number; cook_target_minutes?: number; detour_percent: number; detour_meters: number
   lat: number | null; lng: number | null; zone_mode: 'list' | 'map'; zone_tolerance_m: number
   notice: string; intro: string; baskets_enabled: boolean
@@ -127,6 +129,8 @@ export interface Cash {
 }
 export interface Order {
   id: number; branch_id: number; public_no: string; pickup_code: string; service_type: 'delivery' | 'pickup' | 'dine_in'
+  // dine_in, staff, platform, mall or web; who opened a table: staff or self
+  order_type?: string; dine_source?: string
   customer_name: string; customer_phone: string; zone_name: string; address_line: string; address_unit: string
   // from the saved address: who to call (may differ from the account that ordered), other ways to reach them, a photo of the door
   contact_phone: string; contact_title: '' | 'mr' | 'ms'; contact_wechat: string; contact_telegram: string; contact_line: string; contact_whatsapp: string; address_photo: boolean

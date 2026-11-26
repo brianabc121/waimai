@@ -859,6 +859,23 @@ func (s *Server) saveSettings(c *gin.Context) {
 	c.JSON(200, b)
 }
 
+func (s *Server) saveOrderNumbering(c *gin.Context) {
+	bid, ok := branchScope(c, pSettings)
+	if !ok {
+		return
+	}
+	var in app.OrderNumbering
+	if !bind(c, &in) {
+		return
+	}
+	b, err := s.App.SaveOrderNumbering(c, bid, in)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, b)
+}
+
 func (s *Server) listStaff(c *gin.Context) {
 	bid, ok := branchScope(c, pStaffView)
 	if !ok {
