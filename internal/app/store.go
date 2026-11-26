@@ -270,6 +270,12 @@ type Item struct {
 	// are among Groups.
 	ToppingTemplateIDs []int64     `json:"topping_template_ids"`
 	Notes              []NoteGroup `json:"notes"`
+	// PlatformPrices are the prices set by hand on delivery platforms, by
+	// platform id; only the back office's menu fills them in.
+	PlatformPrices map[int64]int64 `json:"platform_prices,omitempty"`
+	// PlatformAuto is the price on each platform the store sells on when
+	// none is set by hand: the store price with the markup, rounded.
+	PlatformAuto map[int64]int64 `json:"platform_auto,omitempty"`
 	// Sold is how many were ordered so far; only the storefront fills it in.
 	Sold int `json:"sold"`
 	// The name, description and details in the customer's language, when

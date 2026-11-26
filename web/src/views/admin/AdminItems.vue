@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { del, get, patch, post, put } from '../../api'
 import { money, t } from '../../i18n'
 import type { Category, Item, Station } from '../../types'
+import type { BranchPlatform } from '../../platforms'
 import ItemForm from '../ItemForm.vue'
 import MenuImportDialog from '../MenuImportDialog.vue'
 import MenuTranslations from '../MenuTranslations.vue'
@@ -72,15 +73,15 @@ const allPicked = computed(() => list.items.length > 0 && picked.value.length ==
 function toggleAll() { picked.value = allPicked.value ? [] : list.items.map(i => i.id) }
 
 // ---- item editor: needs the branch's categories, stations and the full item ----
-const form = reactive<{ open: boolean; bid: number; cur: string; item: Item | null; cats: Category[]; stations: Station[] }>({ open: false, bid: 0, cur: 'PHP', item: null, cats: [], stations: [] })
+const form = reactive<{ open: boolean; bid: number; cur: string; item: Item | null; cats: Category[]; stations: Station[]; platforms: BranchPlatform[] }>({ open: false, bid: 0, cur: 'PHP', item: null, cats: [], stations: [], platforms: [] })
 async function edit(row: AdminItemRow | null) {
   const bid = row?.branch_id ?? branchId.value
   error.value = ''
   try {
-    const m = await get<{ branch: { currency: string }; categories: Category[]; stations: Station[] }>(`${base(bid)}/menu`)
+    const m = await get<{ branch: { currency: string }; categories: Category[]; stations: Station[]; platforms?: BranchPlatform[] }>(`${base(bid)}/menu`)
     const item = row ? m.categories.flatMap(c => c.items).find(i => i.id === row.id) ?? null : null
     if (row && !item) { await load(); return }
-    Object.assign(form, { open: true, bid, cur: m.branch.currency, item, cats: m.categories, stations: m.stations })
+    Object.assign(form, { open: true, bid, cur: m.branch.currency, item, cats: m.categories, stations: m.stations, platforms: m.platforms ?? [] })
   } catch (e) { error.value = (e as Error).message }
 }
 async function saved() { form.open = false; await load() }
@@ -194,7 +195,7 @@ function removeCat(c: Category) { if (confirm(t('ad.cat_delete_confirm', { name:
       </div>
     </template>
 
-    <ItemForm v-if="form.open" :item="form.item" :cats="form.cats" :stations="form.stations" :cur="form.cur" :base="base(form.bid)"
+    <ItemForm v-if="form.open" :item="form.item" :cats="form.cats" :stations="form.stations" :platforms="form.platforms" :cur="form.cur" :base="base(form.bid)"
       @saved="saved" @close="form.open = false" @manage-notes="form.open = false; openNotes()" />
 
     <template v-if="cats.open && store">

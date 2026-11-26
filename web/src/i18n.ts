@@ -258,6 +258,8 @@ const dict: Record<string, [string, string]> = {
   'ie.station_unknown': ['工作台不存在或已停用', 'Unknown or disabled station'], 'ie.yes_no_invalid': ['是/否 填写不对', 'Use yes or no'],
   'ie.stock_invalid': ['库存格式不对', 'Invalid stock'], 'ie.text_too_long': ['文字太长', 'Text too long'],
   'ie.duplicate_of_line': ['和第 {n} 行重复', 'Duplicate of row {n}'],
+  'ie.platform_price_invalid': ['平台价格式不对（填数字，或“无”清除）', 'Invalid platform price (a number, or "none" to clear)'],
+  'ie.platform_unknown': ['没有这个外卖平台：{n}', 'No delivery platform with prefix {n}'],
   'ie.note_template_unknown': ['没有这个口味模板：{n}', 'No flavour template named {n}'], 'ie.note_templates_too_many': ['口味模板最多 {n} 个', 'At most {n} flavour templates'],
   'ie.image_invalid': ['图片链接不对，要 https:// 开头', 'Picture links must start with https://'],
   'ie.photos_too_many': ['更多图片最多 {n} 张', 'At most {n} more pictures'], 'ie.details_too_long': ['商品详情最多 {n} 字', 'Details: at most {n} characters'],

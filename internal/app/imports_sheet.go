@@ -202,7 +202,7 @@ var templateExamples = [][]any{
 }
 
 // MenuImportTemplate builds the blank template with three example rows.
-func MenuImportTemplate() ([]byte, error) { return buildTemplate("", nil, nil, nil, nil) }
+func MenuImportTemplate() ([]byte, error) { return buildTemplate("", nil, nil, nil, nil, nil) }
 
 // MenuTemplate builds the template for one store: its currency in the price
 // header, its categories and stations on the help sheet, and with withMenu
@@ -230,6 +230,14 @@ func (a *App) MenuTemplate(ctx context.Context, branchID int64, withMenu bool) (
 		tplName[t.ID] = t.Name
 		notes = append(notes, t.Name)
 	}
+	// a 平台价 column for each platform the store sells on (§6 of
+	// docs/ORDER_TYPES_DESIGN.md): the hand-set price, blank for the price with the markup
+	var extra []templateCol
+	for _, p := range m.Platforms {
+		extra = append(extra, templateCol{head: "平台价:" + p.Prefix, width: 12,
+			note: "选填。这道菜在 " + p.Name + " 上的价格。不填就按店内价加价 " + strconv.FormatFloat(float64(p.Markup)/100, 'f', -1, 64) +
+				"% 后取整；更新时填“无”改回自动算。"})
+	}
 	cats := []string{}
 	var rows [][]any
 	yn := func(b bool) string {
@@ -256,27 +264,36 @@ func (a *App) MenuTemplate(ctx context.Context, branchID int64, withMenu bool) (
 			for _, id := range it.NoteTemplateIDs {
 				names = append(names, tplName[id])
 			}
-			rows = append(rows, []any{c.Name, it.Name, price, it.NameEn, it.Description, formatSpecs(it.Groups),
+			row := []any{c.Name, it.Name, price, it.NameEn, it.Description, formatSpecs(it.Groups),
 				it.ImageURL, strings.Join(it.Photos, "\n"), it.Details, yn(it.Published), yn(it.DineInAvailable),
-				yn(it.DeliveryAvailable), yn(it.PickupAvailable), yn(it.NeedsPrep), station, stock, strings.Join(names, "，")})
+				yn(it.DeliveryAvailable), yn(it.PickupAvailable), yn(it.NeedsPrep), station, stock, strings.Join(names, "，")}
+			for _, p := range m.Platforms {
+				if v, ok := it.PlatformPrices[p.ID]; ok {
+					pp, _ := strconv.ParseFloat(majorText(v), 64)
+					row = append(row, pp)
+				} else {
+					row = append(row, "")
+				}
+			}
+			rows = append(rows, row)
 		}
 	}
 	if withMenu && rows == nil {
 		rows = [][]any{}
 	}
-	return buildTemplate(m.Branch.Currency, rows, cats, stations, notes)
+	return buildTemplate(m.Branch.Currency, rows, cats, stations, notes, extra)
 }
 
 // buildTemplate writes the 菜品 sheet (rows nil: the examples) and the
 // 填写说明 sheet.
-func buildTemplate(currency string, rows [][]any, cats, stations, notes []string) ([]byte, error) {
+func buildTemplate(currency string, rows [][]any, cats, stations, notes []string, extra []templateCol) ([]byte, error) {
 	f := excelize.NewFile()
 	defer f.Close()
 	const sheet, help = "菜品", "填写说明"
 	if err := f.SetSheetName("Sheet1", sheet); err != nil {
 		return nil, err
 	}
-	cols := templateCols(currency)
+	cols := append(templateCols(currency), extra...)
 	if rows == nil {
 		rows = templateExamples
 	}

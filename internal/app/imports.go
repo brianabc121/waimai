@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"strconv"
@@ -52,10 +53,13 @@ type ImportRow struct {
 	// the cell had a value ("无" takes the dish's templates off).
 	NoteTemplates    []string `json:"note_templates"`
 	NoteTemplatesSet bool     `json:"note_templates_set"`
-	Action           string   `json:"action"` // create or update; empty when the row has errors
-	OldPrice         *int64   `json:"old_price,omitempty"`
-	NewCategory      bool     `json:"new_category,omitempty"` // the category does not exist yet and will be made
-	Errors           []string `json:"errors"`
+	// PlatformPrices are the 平台价:Grab cells by platform prefix (lower
+	// case): a price, or nil for "无" (back to the price with the markup).
+	PlatformPrices map[string]*int64 `json:"platform_prices,omitempty"`
+	Action         string            `json:"action"` // create or update; empty when the row has errors
+	OldPrice       *int64            `json:"old_price,omitempty"`
+	NewCategory    bool              `json:"new_category,omitempty"` // the category does not exist yet and will be made
+	Errors         []string          `json:"errors"`
 }
 
 // MenuImport is an uploaded spreadsheet and its parse result.
@@ -94,6 +98,18 @@ var importColumns = map[string][]string{
 	"station":     {"工作台", "station"},
 	"stock":       {"限量库存", "库存", "stock"},
 	"notes":       {"口味模板", "口味备注", "notetemplates", "flavournotes"},
+}
+
+// platformHeader reads 平台价:Grab (or "platform price: Grab"): the price of
+// the dish on the platform with that prefix (docs/ORDER_TYPES_DESIGN.md §6).
+func platformHeader(h string) (string, bool) {
+	n := strings.ReplaceAll(normHeader(h), "：", ":")
+	for _, p := range []string{"平台价:", "platformprice:"} {
+		if strings.HasPrefix(n, p) && len(n) > len(p) {
+			return strings.TrimPrefix(n, p), true
+		}
+	}
+	return "", false
 }
 
 // normHeader drops spaces, "*" and anything in brackets, and lowercases.
@@ -292,6 +308,7 @@ func parseMenuSheet(content []byte) ([]ImportRow, error) {
 		}
 	}
 	col := map[string]int{}
+	platCol := map[string]int{} // platform prefix -> column
 	out := []ImportRow{}
 	seen := map[string]int{}
 	line := 0
@@ -317,6 +334,10 @@ func parseMenuSheet(content []byte) ([]ImportRow, error) {
 				if key, ok := names[normHeader(c)]; ok {
 					if _, dup := col[key]; !dup {
 						col[key] = i
+					}
+				} else if prefix, ok := platformHeader(c); ok {
+					if _, dup := platCol[prefix]; !dup {
+						platCol[prefix] = i
 					}
 				}
 			}
@@ -445,6 +466,21 @@ func parseMenuSheet(content []byte) ([]ImportRow, error) {
 				}
 			}
 		}
+		for prefix, i := range platCol {
+			if i >= len(cells) || cells[i] == "" {
+				continue
+			}
+			if r.PlatformPrices == nil {
+				r.PlatformPrices = map[string]*int64{}
+			}
+			if isClear(cells[i]) {
+				r.PlatformPrices[prefix] = nil
+			} else if v, ok := parsePrice(cells[i]); ok {
+				r.PlatformPrices[prefix] = &v
+			} else {
+				bad("platform_price_invalid")
+			}
+		}
 		if r.Category != "" && r.Name != "" {
 			key := r.Category + "\x00" + r.Name
 			if first, dup := seen[key]; dup {
@@ -475,11 +511,27 @@ type importContext struct {
 	prices   map[int64]int64   // item id -> price
 	stations map[string]*int64 // active station name -> id
 	notes    map[string]int64  // flavour note template name -> id
+	// platforms are the delivery platforms by prefix (lower case)
+	platforms map[string]int64
 }
 
 func loadImportContext(ctx context.Context, q Querier, branchID int64) (*importContext, error) {
 	ic := &importContext{cats: map[string]int64{}, items: map[string]int64{}, prices: map[int64]int64{}, stations: map[string]*int64{},
-		notes: map[string]int64{}}
+		notes: map[string]int64{}, platforms: map[string]int64{}}
+	prows, err := q.Query(ctx, `SELECT id, lower(prefix) FROM delivery_platforms`)
+	if err != nil {
+		return nil, err
+	}
+	for prows.Next() {
+		var id int64
+		var prefix string
+		if err := prows.Scan(&id, &prefix); err != nil {
+			prows.Close()
+			return nil, err
+		}
+		ic.platforms[prefix] = id
+	}
+	prows.Close()
 	rows, err := q.Query(ctx, `SELECT id, name FROM menu_categories WHERE branch_id=$1 AND NOT archived ORDER BY id DESC`, branchID)
 	if err != nil {
 		return nil, err
@@ -556,6 +608,11 @@ func (ic *importContext) resolve(r *ImportRow) int64 {
 			r.Errors = append(r.Errors, "note_template_unknown:"+n)
 		}
 	}
+	for _, prefix := range slices.Sorted(maps.Keys(r.PlatformPrices)) {
+		if _, ok := ic.platforms[prefix]; !ok {
+			r.Errors = append(r.Errors, "platform_unknown:"+prefix)
+		}
+	}
 	r.Action, r.OldPrice, r.NewCategory = "", nil, false
 	if len(r.Errors) > 0 {
 		return 0
@@ -572,6 +629,25 @@ func (ic *importContext) resolve(r *ImportRow) int64 {
 		return id
 	}
 	return 0
+}
+
+// writePlatformPrices sets the row's platform prices on the dish; a blank
+// cell keeps what the dish has, "无" goes back to the price with the markup.
+func (ic *importContext) writePlatformPrices(ctx context.Context, tx pgx.Tx, itemID int64, r *ImportRow) error {
+	for prefix, price := range r.PlatformPrices {
+		pid := ic.platforms[prefix]
+		var err error
+		if price == nil {
+			_, err = tx.Exec(ctx, `DELETE FROM item_platform_prices WHERE item_id=$1 AND platform_id=$2`, itemID, pid)
+		} else {
+			_, err = tx.Exec(ctx, `INSERT INTO item_platform_prices (item_id, platform_id, price) VALUES ($1,$2,$3)
+				ON CONFLICT (item_id, platform_id) DO UPDATE SET price=$3`, itemID, pid, *price)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // noteIDs are the template ids of a row's 口味模板 cell, in its order.
@@ -679,7 +755,7 @@ func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Act
 			r := &rows[i]
 			kept := r.Errors[:0]
 			for _, e := range r.Errors {
-				if e != "station_unknown" && !strings.HasPrefix(e, "note_template_unknown:") {
+				if e != "station_unknown" && !strings.HasPrefix(e, "note_template_unknown:") && !strings.HasPrefix(e, "platform_unknown:") {
 					kept = append(kept, e)
 				}
 			}
@@ -733,6 +809,9 @@ func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Act
 						return err
 					}
 				}
+				if err := ic.writePlatformPrices(ctx, tx, itemID, r); err != nil {
+					return err
+				}
 				ic.items[fmt.Sprintf("%d\x00%s", catID, r.Name)] = itemID
 				created++
 				continue
@@ -766,6 +845,9 @@ func (a *App) ApplyMenuImport(ctx context.Context, branchID, id int64, actor Act
 				if err := setItemNoteTemplates(ctx, tx, branchID, itemID, ic.noteIDs(r)); err != nil {
 					return err
 				}
+			}
+			if err := ic.writePlatformPrices(ctx, tx, itemID, r); err != nil {
+				return err
 			}
 			updated++
 		}

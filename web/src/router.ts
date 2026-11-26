@@ -102,6 +102,7 @@ export const router = createRouter({
         { path: 'coupons', component: () => import('./views/admin/AdminCoupons.vue'), meta: { title: 'ad.coupons' } },
         { path: 'bills', component: () => import('./views/admin/AdminBills.vue'), meta: { title: 'bl.nav' } },
         { path: 'domains', component: () => import('./views/admin/AdminDomains.vue'), meta: { title: 'ad.dom.nav' } },
+        { path: 'platforms', component: () => import('./views/admin/AdminPlatforms.vue'), meta: { title: 'ad.pf.nav' } },
         { path: 'pay-methods', component: () => import('./views/admin/AdminPayMethods.vue'), meta: { title: 'ad.pay' } },
         { path: 'support', component: () => import('./views/admin/AdminSupport.vue'), meta: { title: 'ad.support' } },
         { path: 'chats', component: () => import('./views/admin/AdminChats.vue'), meta: { title: 'ad.chats' } },

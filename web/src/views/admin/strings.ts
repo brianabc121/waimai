@@ -174,6 +174,7 @@ extend({
   'ad.e.title': ['最近错误', 'Recent errors'], 'ad.e.all_status': ['全部状态', 'Any status'], 'ad.e.all_routes': ['全部接口', 'Any endpoint'], 'ad.e.internal': ['内部错误', 'Internal error'],
   'ad.api_foot': ['按路由模板统计，不含订单号和令牌。SSE 长连接只计连接数，不计入请求和耗时；健康检查和静态文件不计。P50、P95 由耗时分桶估算。这里只记 5xx 和 429，数据保留 7 天。', 'Counted by route template, without order numbers or tokens. Event streams count as connections, not as requests; health checks and static files are left out. P50 and P95 are estimated from latency buckets. Only 5xx and 429 responses are listed. Data is kept for 7 days.'],
   'ad.pay': ['支付方式', 'Payment methods'],
+  'ad.pf.nav': ['外卖平台', 'Delivery platforms'],
   'ad.dom.nav': ['域名申请', 'Store domains'],
   'ad.set.g.site': ['店铺专属页面', 'Store pages'], 'ad.set.g.site_hint': ['每家店的专属网址是“店铺号.主域名”，例如 67891.abcfood.com。服务器要配通配 DNS 和 Caddy 自动证书，见部署教程。', 'Each store\'s own page is <store number>.<domain>, e.g. 67891.abcfood.com. The server needs a wildcard DNS record and Caddy on-demand certificates (see the deployment guide).'],
   'ad.set.k.STORE_SITE_DOMAIN': ['店铺网址的主域名', 'Domain of store pages'],

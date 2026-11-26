@@ -47,6 +47,9 @@ export interface Item {
   note_template_ids?: number[]; notes?: NoteGroup[]
   // topping templates (加料模板) the dish uses; their groups are in groups
   topping_template_ids?: number[]
+  // delivery platform prices by platform id (minor units): set by hand, and
+  // what the store's markup gives (back office only)
+  platform_prices?: Record<number, number>; platform_auto?: Record<number, number>
 }
 export interface NoteTag { id: number; name: string; name_en: string; active: boolean; name_tr?: string }
 export interface NoteGroup { id: number; name: string; name_en: string; multi: boolean; tags: NoteTag[]; name_tr?: string }

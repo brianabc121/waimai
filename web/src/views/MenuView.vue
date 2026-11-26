@@ -9,6 +9,7 @@ import { get, patch, post, put } from '../api'
 import { both, mn, money, t } from '../i18n'
 import { can, currentRole, session } from '../session'
 import type { Category, Item, Station } from '../types'
+import type { BranchPlatform } from '../platforms'
 import ItemForm from './ItemForm.vue'
 import MenuImportDialog from './MenuImportDialog.vue'
 import MenuTranslations from './MenuTranslations.vue'
@@ -42,11 +43,12 @@ const tpls = ref<{ id: number; name: string }[]>([])
 async function loadTpls() { tpls.value = (await get<{ templates: { id: number; name: string }[] }>(`${base}/note-templates`).catch(() => ({ templates: [] }))).templates }
 onMounted(loadTpls)
 const stations = ref<Station[]>([])
+const platforms = ref<BranchPlatform[]>([])
 const error = ref('')
 
 async function load() {
   const m = await get(`${base}/menu`)
-  cats.value = m.categories; stations.value = m.stations; loaded.value = true
+  cats.value = m.categories; stations.value = m.stations; platforms.value = m.platforms ?? []; loaded.value = true
 }
 onMounted(load)
 const stationOf = (it: Item) => stations.value.find(s => s.id === it.station_id)
@@ -352,7 +354,9 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
                     <span v-if="it.topping_template_ids?.length" class="tag info" data-testid="item-toppings-tag">{{ t('tp.on', { names: it.topping_template_ids.map(toppingName).join('、') }) }}</span>
                   </div>
                 </td>
-                <td class="c-price price">{{ money(it.price, cur) }}</td>
+                <td class="c-price price">{{ money(it.price, cur) }}
+                  <div v-for="p in platforms" :key="p.id" class="pfline" :data-platform="p.prefix" :class="{ own: it.platform_prices?.[p.id] != null }">
+                    <i :style="{ background: p.color }"></i>{{ p.prefix }} {{ money(it.platform_prices?.[p.id] ?? it.platform_auto?.[p.id] ?? it.price, cur) }}</div></td>
                 <td class="c-stock"><span :class="{ lim: it.stock_qty !== null && it.stock_qty > 0, none: it.stock_qty === 0 }">{{ stockText(it) }}</span></td>
                 <td class="c-stn"><span v-if="!it.needs_prep" class="muted">{{ t('no_prep') }}</span><template v-else-if="stationOf(it)">{{ mn(stationOf(it)!) }}</template>
                   <span v-else-if="stations.length" class="tag warn">{{ t('unassigned') }}</span><span v-else class="muted">—</span></td>
@@ -439,7 +443,7 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
     <MenuImportDialog v-if="importing" :base="base" :cur="cur" @imported="load" @close="importing = false" />
     <MenuTranslations v-if="langs.open" :base="base" :cats="cats" :item="langs.item" @close="closeLangs" />
     <ItemForm v-if="form.open" :item="form.item" :category-id="form.categoryId" :cats="cats" :stations="stations" :cur="cur"
-      :base="base" @saved="saved" @close="form.open = false" @manage-notes="form.open = false; setTab('notes')" @manage-toppings="form.open = false; setTab('toppings')" />
+      :platforms="platforms" :base="base" @saved="saved" @close="form.open = false" @manage-notes="form.open = false; setTab('notes')" @manage-toppings="form.open = false; setTab('toppings')" />
   </div>
 </template>
 
@@ -510,6 +514,7 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
 .mx-row.off .c-img img { filter: grayscale(.6); opacity: .7; }
 .c-h { width: 22px; padding-inline: 4px 0 !important; } .c-ck { width: 34px; } .c-img { width: 84px; }
 .c-price { width: 100px; } .c-stock { width: 110px; } .c-stn { width: 110px; } .c-st { width: 110px; } .c-ops { width: 180px; }
+.pfline { font-size: 11.5px; color: var(--muted); font-weight: 400; white-space: nowrap; } .pfline i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-inline-end: 4px; } .pfline.own { color: var(--ink, #222); }
 .mx-handle { cursor: grab; color: #a8927f; user-select: none; display: inline-flex; }
 .mx-handle.dis { cursor: not-allowed; opacity: .35; }
 .c-img img, .mx-noimg { width: 76px; height: 56px; border-radius: 8px; object-fit: cover; display: block; }

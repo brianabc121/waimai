@@ -14,6 +14,31 @@ import (
 //
 // The store: tax 12% not included, service charge 5%, packaging 10.00,
 // delivery 69.00; chicken ×2 = 338.00, water = 30.00.
+// S9a platform prices, worked out by hand (PRICING_CHECK.md §4).
+func TestPlatformPrice(t *testing.T) {
+	for _, c := range []struct {
+		price  int64
+		markup int
+		step   int64
+		want   int64
+	}{
+		{16900, 2000, 100, 20300},  // 169.00 × 1.2 = 202.80 → 203.00
+		{3000, 2000, 100, 3600},    // 30.00 × 1.2 = 36.00
+		{16900, 2000, 0, 20280},    // not rounded: 202.80
+		{16900, 2000, 500, 20500},  // to 5: 202.80 → 205.00
+		{16900, 2000, 1000, 20000}, // to 10: 202.80 → 200.00
+		{9999, 1250, 0, 11249},     // 99.99 × 1.125 = 112.48875 → 112.49
+		{17999, 1250, 100, 20200},  // 179.99 × 1.125 = 202.48875 → 202.00 (once, not via 202.49)
+		{12750, 0, 500, 13000},     // no markup, to 5: 127.50 → 130.00 (half up)
+		{12740, 0, 500, 12500},     // 127.40 → 125.00
+		{0, 3000, 100, 0},
+	} {
+		if got := PlatformPrice(c.price, c.markup, c.step); got != c.want {
+			t.Errorf("PlatformPrice(%d, %d, %d) = %d, want %d", c.price, c.markup, c.step, got, c.want)
+		}
+	}
+}
+
 func TestPricingCheckSamples(t *testing.T) {
 	store := Fees{TaxRateBP: 1200, ServiceChargeBP: 500, Packaging: 1000, Delivery: 6900}
 	two := []Line{{Key: "chicken", Amount: 33800}, {Key: "water", Amount: 3000}}
