@@ -2,14 +2,14 @@
 // Coupons customers claim on the store's page (docs/COUPON_DESIGN.md §3.5):
 // the store makes a batch, sets how many and how many per person, and can
 // pause or end it. Coupons already claimed stay usable until they expire.
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { get, post, put } from '../api'
 import { couponTitle } from '../coupons'
 import { money, t, toMajor, toMinor } from '../i18n'
 import { session } from '../session'
 import type { CouponBatch, CouponKind } from '../types'
 
-const props = defineProps<{ currency: string }>()
+const props = defineProps<{ currency: string; brand?: number }>()
 const bid = session.branchId!
 const list = ref<CouponBatch[]>([])
 const error = ref(''), busy = ref(false), editing = ref(false)
@@ -18,8 +18,13 @@ const blank = () => ({ id: 0, name: '', kind: 'store_threshold' as CouponKind, v
 const f = reactive(blank())
 
 async function load() {
-  try { list.value = (await get<{ batches: CouponBatch[] }>(`/merchant/branches/${bid}/coupons/batches`)).batches } catch (e) { error.value = (e as Error).message }
+  try {
+    const all = (await get<{ batches: CouponBatch[] }>(`/merchant/branches/${bid}/coupons/batches`)).batches
+    // one brand's batches (docs/MULTI_BRAND_DESIGN.md §10)
+    list.value = props.brand ? all.filter(b => !b.brand_id || b.brand_id === props.brand) : all
+  } catch (e) { error.value = (e as Error).message }
 }
+watch(() => props.brand, load)
 onMounted(load)
 function edit(b: CouponBatch | null) {
   Object.assign(f, b ? { id: b.id, name: b.name, kind: b.kind, value: toMajor(b.value), threshold: toMajor(b.threshold), valid_days: b.valid_days,
@@ -32,7 +37,8 @@ async function run(fn: () => Promise<unknown>) {
 }
 async function save() {
   const body = { name: f.name, kind: f.kind, value: toMinor(f.value), threshold: f.kind === 'store_free' ? 0 : toMinor(f.threshold),
-    valid_days: Number(f.valid_days), total_quota: f.total_quota === '' ? null : Number(f.total_quota), per_customer: Number(f.per_customer) || 1 }
+    valid_days: Number(f.valid_days), total_quota: f.total_quota === '' ? null : Number(f.total_quota), per_customer: Number(f.per_customer) || 1,
+    brand_id: props.brand ?? 0 }
   const url = `/merchant/branches/${bid}/coupons/batches`
   if (await run(() => f.id ? put(`${url}/${f.id}`, body) : post(url, body))) editing.value = false
 }

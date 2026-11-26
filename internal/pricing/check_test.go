@@ -127,6 +127,25 @@ func TestPricingCheckSamples(t *testing.T) {
 				{Kind: "platform_promo", FundedBy: "platform", Stage: StagePlatform, Amount: 2000}}},
 			want{goods: 4593, tax: 3858, platform: 2000, total: 34007,
 				disc: []int64{4593}, svcs: []int64{0}, taxs: []int64{3858}}},
+		// docs/MULTI_BRAND_DESIGN.md §11.3: one cart (pork × 2, rice × 2) at two brands of one store,
+		// 12% tax included, delivery 50.00. The engine sees only each brand's prices and promotion.
+		{"S10 一品湘：库价 58.00，满100减15", Input{
+			Lines:       []Line{{Key: "pork", Amount: 11600}, {Key: "rice", Amount: 600}},
+			Fees:        Fees{TaxRateBP: 1200, TaxInclusive: true, Delivery: 5000},
+			Adjustments: []Adjustment{{Kind: "promotion", Stage: StageOrder, Amount: 1500}}},
+			want{goods: 1500, tax: 1146, total: 15700,
+				disc: []int64{1426, 74}, svcs: []int64{0, 0}, taxs: []int64{1090, 56}}},
+		{"S10 好吃党：品牌价 52.00，满100减10", Input{
+			Lines:       []Line{{Key: "pork", Amount: 10400}, {Key: "rice", Amount: 600}},
+			Fees:        Fees{TaxRateBP: 1200, TaxInclusive: true, Delivery: 5000},
+			Adjustments: []Adjustment{{Kind: "promotion", Stage: StageOrder, Amount: 1000}}},
+			want{goods: 1000, tax: 1071, total: 15000,
+				disc: []int64{945, 55}, svcs: []int64{0, 0}, taxs: []int64{1013, 58}}},
+		{"S10 好吃党没有自己的活动：一品湘的不跨品牌", Input{
+			Lines: []Line{{Key: "pork", Amount: 10400}, {Key: "rice", Amount: 600}},
+			Fees:  Fees{TaxRateBP: 1200, TaxInclusive: true, Delivery: 5000}},
+			want{tax: 1179, total: 16000,
+				disc: []int64{0, 0}, svcs: []int64{0, 0}, taxs: []int64{1115, 64}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

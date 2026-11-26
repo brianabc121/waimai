@@ -322,10 +322,10 @@ func (a *App) voidLine(ctx context.Context, tx pgx.Tx, itemID int64, in VoidInpu
 	} else {
 		if err := tx.QueryRow(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name, name_en,
 			unit_price, qty, line_total, options, note, needs_prep, prep_status, name_customer, note_tags,
-			station_id, station_name, served_at, void_reason, basket_no, prep_started_at, prep_started_by, ready_at, ready_by)
+			station_id, station_name, served_at, void_reason, basket_no, prep_started_at, prep_started_by, ready_at, ready_by, base_name)
 			SELECT order_id, branch_id, batch_id, item_id, name, name_en, unit_price, $2::int, unit_price * $2::int, options, note,
 			needs_prep, 'cancelled', name_customer, note_tags, station_id, station_name, served_at, $3, basket_no,
-			prep_started_at, prep_started_by, ready_at, ready_by
+			prep_started_at, prep_started_by, ready_at, ready_by, base_name
 			FROM order_items WHERE id=$1 RETURNING id`, itemID, qty, reason).Scan(&voidedLine); err != nil {
 			return nil, wrap("split voided line", err)
 		}

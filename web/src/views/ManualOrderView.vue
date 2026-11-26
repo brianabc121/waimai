@@ -48,13 +48,21 @@ const cur = computed(() => store.value?.branch.currency ?? currentRole()?.curren
 const m = (v: number) => money(v, cur.value)
 const items = computed<Item[]>(() => (store.value?.categories ?? []).flatMap(c => c.items))
 const dial = computed(() => dialOf(store.value?.branch.country_code))
-onMounted(async () => {
+// The menu is the brand's (docs/MULTI_BRAND_DESIGN.md §5): its dishes, names
+// and prices; dishes the brand does not sell leave the cart when it changes.
+async function loadStore(brandId: number) {
   const slug = currentRole()?.slug
   if (!slug) return
-  try { store.value = await get<Storefront>(`/stores/${slug}`) } catch (e) { loadError.value = (e as Error).message }
+  try { store.value = await get<Storefront>(`/stores/${slug}` + (brandId ? `?brand=${brandId}` : '')) } catch (e) { loadError.value = (e as Error).message }
+  const sold = new Map(items.value.map(i => [i.id, i]))
+  lines.value = lines.value.filter(l => sold.has(l.item.id)).map(l => ({ ...l, item: sold.get(l.item.id)! }))
+}
+onMounted(async () => {
+  await loadStore(appendId ? 0 : brandPick.value)
   if (store.value && !store.value.branch.delivery_enabled && store.value.branch.pickup_enabled) service.value = 'pickup'
   try { payOpts.value = await get<PayOptions>(`${base}/pay-options`) } catch { /* only cash on delivery */ }
 })
+watch(brandPick, v => { if (!appendId) void loadStore(v) })
 
 // ---------- adding to an order ----------
 // The order's own dishes are shown locked above the ones being added; the
@@ -66,6 +74,8 @@ const roundTags = ref<string[]>([])
 const aq = ref<AddonQuote | null>(null)
 async function loadTarget() {
   try { target.value = await get<Order>(`/merchant/orders/${appendId}`) } catch { targetErr.value = t('ao.m.missing') }
+  // dishes are added at the order's brand's names and prices
+  if (target.value?.brand_id && target.value.brand_id !== store.value?.brand?.id) void loadStore(target.value.brand_id)
 }
 if (appendId) {
   void loadTarget()

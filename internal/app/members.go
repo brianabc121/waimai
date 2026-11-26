@@ -526,7 +526,7 @@ func staffAdjust(ctx context.Context, q Querier, b *Branch, quote *Quote, j *Adj
 func (in *StaffOrderInput) quoteInput() QuoteInput {
 	none := []int64{}
 	qi := QuoteInput{ServiceType: in.ServiceType, ScheduledFor: in.ScheduledFor, CouponIDs: &none, ZoneID: in.ZoneID,
-		Lat: in.Member.Lat, Lng: in.Member.Lng, feeOverride: in.DeliveryFee}
+		Lat: in.Member.Lat, Lng: in.Member.Lng, feeOverride: in.DeliveryFee, BrandID: in.BrandID}
 	for _, l := range in.Items {
 		qi.Items = append(qi.Items, QuoteLineInput{ItemID: l.ItemID, Qty: l.Qty, OptionIDs: l.OptionIDs,
 			Note: strings.TrimSpace(l.Note), NoteTagIDs: l.NoteTagIDs, repeat: true})
@@ -756,9 +756,9 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 			opts, _ := json.Marshal(l.Options)
 			var lineID int64
 			if err := tx.QueryRow(ctx, `INSERT INTO order_items (order_id, branch_id, batch_id, item_id, name,
-				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer, note_tags)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,'',$13) RETURNING id`, orderID, b.ID, batchID, l.ItemID, l.Name,
-				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, noteTagsJSON(l.NoteTags)).Scan(&lineID); err != nil {
+				name_en, unit_price, qty, line_total, options, note, needs_prep, basket_no, name_customer, note_tags, base_name)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,'',$13,$14) RETURNING id`, orderID, b.ID, batchID, l.ItemID, l.Name,
+				l.NameEn, l.UnitPrice, l.Qty, l.LineTotal, opts, l.Note, l.NeedsPrep, noteTagsJSON(l.NoteTags), l.BaseName).Scan(&lineID); err != nil {
 				return wrap("insert order item", err)
 			}
 			lineIDs = append(lineIDs, lineID)

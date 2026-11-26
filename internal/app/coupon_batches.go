@@ -47,6 +47,9 @@ type CouponBatchInput struct {
 	// it to one province, "" being the whole country.
 	CountryCode string `json:"country_code"`
 	Province    string `json:"province"`
+	// BrandID is the brand a store batch gives coupons of (0 = the main
+	// brand); set when it is created.
+	BrandID int64 `json:"brand_id"`
 
 	country string // filled from the stores in that country
 }
@@ -270,12 +273,18 @@ func (a *App) SaveStoreBatch(ctx context.Context, branchID, id int64, in CouponB
 	if err != nil {
 		return 0, err
 	}
+	brand, err := loadBrand(ctx, a.DB, branchID, in.BrandID)
+	if err == ErrNotFound {
+		return 0, Err(http.StatusUnprocessableEntity, "BRAND_UNKNOWN", "no such brand in this store")
+	} else if err != nil {
+		return 0, err
+	}
 	err = a.inTx(ctx, func(tx pgx.Tx) error {
 		if id == 0 {
 			if err := tx.QueryRow(ctx, `INSERT INTO coupon_batches (issuer, branch_id, kind, source, name, name_en, currency,
-				value, threshold, valid_days, total_quota, per_customer) VALUES ('store',$1,$2,'claim',$3,$4,$5,$6,$7,$8,$9,$10)
+				value, threshold, valid_days, total_quota, per_customer, brand_id) VALUES ('store',$1,$2,'claim',$3,$4,$5,$6,$7,$8,$9,$10,$11)
 				RETURNING id`, branchID, in.Kind, in.Name, in.NameEn, b.Currency, in.Value, in.Threshold, in.ValidDays,
-				in.TotalQuota, in.PerCustomer).Scan(&id); err != nil {
+				in.TotalQuota, in.PerCustomer, brand.ID).Scan(&id); err != nil {
 				return err
 			}
 		} else {

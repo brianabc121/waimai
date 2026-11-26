@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,6 +40,8 @@ type Promotion struct {
 	LiveNow bool `json:"live_now"`
 	// ItemIDs are the dishes a dish promotion is on.
 	ItemIDs []int64 `json:"item_ids"`
+	// BrandIDs are the store's brands it applies to (docs/MULTI_BRAND_DESIGN.md §10).
+	BrandIDs []int64 `json:"brand_ids"`
 
 	phoneUsed int // redemptions by the quoting customer, when known
 }
@@ -121,7 +125,8 @@ func bestPromotion(ps []Promotion, now time.Time, loc *time.Location, service st
 
 const promoCols = `p.id, p.name, p.name_en, p.kind, p.threshold, p.value, p.max_discount, p.applies_delivery,
 	p.applies_pickup, p.starts_at, p.ends_at, p.daily_start, p.daily_end, p.total_quota, p.per_phone_limit,
-	p.used_count, p.status, p.scope, ARRAY(SELECT pi.item_id FROM promotion_items pi WHERE pi.promotion_id = p.id ORDER BY pi.item_id)`
+	p.used_count, p.status, p.scope, ARRAY(SELECT pi.item_id FROM promotion_items pi WHERE pi.promotion_id = p.id ORDER BY pi.item_id),
+	p.brand_ids`
 
 // scanDest is where a row of promoCols followed by the phone-use count goes.
 // Every query built on promoCols scans through it, so adding a column to
@@ -129,7 +134,7 @@ const promoCols = `p.id, p.name, p.name_en, p.kind, p.threshold, p.value, p.max_
 func (p *Promotion) scanDest(before ...any) []any {
 	return append(before, &p.ID, &p.Name, &p.NameEn, &p.Kind, &p.Threshold, &p.Value, &p.MaxDiscount,
 		&p.AppliesDelivery, &p.AppliesPickup, &p.StartsAt, &p.EndsAt, &p.DailyStart, &p.DailyEnd,
-		&p.TotalQuota, &p.PerPhoneLimit, &p.UsedCount, &p.Status, &p.Scope, &p.ItemIDs, &p.phoneUsed)
+		&p.TotalQuota, &p.PerPhoneLimit, &p.UsedCount, &p.Status, &p.Scope, &p.ItemIDs, &p.BrandIDs, &p.phoneUsed)
 }
 
 // loadPromotions returns a branch's promotions, oldest first. With a phone,
@@ -175,9 +180,9 @@ func (a *App) ListPromotions(ctx context.Context, branchID int64) ([]Promotion, 
 }
 
 // livePromotions is what the storefront advertises: promotions of one scope
-// (delivery or dine_in) that apply right now.
-func livePromotions(ctx context.Context, q Querier, b *Branch, scope string) ([]Promotion, error) {
-	ps, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope="+scopeSQL(scope), "")
+// (delivery or dine_in) that apply right now, at a brand (0 = the main one).
+func livePromotions(ctx context.Context, q Querier, b *Branch, brandID int64, scope string) ([]Promotion, error) {
+	ps, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope="+scopeSQL(scope)+" AND "+brandPromoSQL(brandID), "")
 	if err != nil {
 		return nil, err
 	}
@@ -219,6 +224,8 @@ type PromotionInput struct {
 	PerPhoneLimit   *int       `json:"per_phone_limit"`
 	// ItemIDs are the dishes of a dish promotion.
 	ItemIDs []int64 `json:"item_ids"`
+	// BrandIDs are the brands it applies to; none = the main brand.
+	BrandIDs []int64 `json:"brand_ids"`
 }
 
 var hhmm = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
@@ -274,14 +281,30 @@ func (a *App) SavePromotion(ctx context.Context, branchID, id int64, in Promotio
 	if err := in.validate(); err != nil {
 		return 0, err
 	}
+	if in.BrandIDs == nil {
+		in.BrandIDs = []int64{}
+	}
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
+		// the brands: this store's own (none = the main brand)
+		if len(in.BrandIDs) > 0 {
+			slices.Sort(in.BrandIDs)
+			in.BrandIDs = slices.Compact(in.BrandIDs)
+			var n int
+			if err := tx.QueryRow(ctx, `SELECT count(*) FROM brands WHERE branch_id=$1 AND id = ANY($2)`,
+				branchID, in.BrandIDs).Scan(&n); err != nil {
+				return err
+			}
+			if n != len(in.BrandIDs) {
+				return Err(http.StatusUnprocessableEntity, "BRAND_UNKNOWN", "no such brand in this store")
+			}
+		}
 		if id == 0 {
 			if err := tx.QueryRow(ctx, `INSERT INTO promotions (branch_id, name, name_en, kind, threshold, value,
 				max_discount, applies_delivery, applies_pickup, starts_at, ends_at, daily_start, daily_end,
-				total_quota, per_phone_limit, scope) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+				total_quota, per_phone_limit, scope, brand_ids) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
 				branchID, in.Name, in.NameEn, in.Kind, in.Threshold, in.Value, in.MaxDiscount, in.AppliesDelivery,
 				in.AppliesPickup, in.StartsAt, in.EndsAt, in.DailyStart, in.DailyEnd, in.TotalQuota,
-				in.PerPhoneLimit, in.Scope).Scan(&id); err != nil {
+				in.PerPhoneLimit, in.Scope, in.BrandIDs).Scan(&id); err != nil {
 				return err
 			}
 		} else {
@@ -305,10 +328,10 @@ func (a *App) SavePromotion(ctx context.Context, branchID, id int64, in Promotio
 			}
 			if _, err := tx.Exec(ctx, `UPDATE promotions SET name=$3, name_en=$4, kind=$5, threshold=$6, value=$7,
 				max_discount=$8, applies_delivery=$9, applies_pickup=$10, starts_at=$11, ends_at=$12, daily_start=$13,
-				daily_end=$14, total_quota=$15, per_phone_limit=$16, updated_at=now() WHERE id=$1 AND branch_id=$2`,
+				daily_end=$14, total_quota=$15, per_phone_limit=$16, brand_ids=$17, updated_at=now() WHERE id=$1 AND branch_id=$2`,
 				id, branchID, in.Name, in.NameEn, in.Kind, in.Threshold, in.Value, in.MaxDiscount, in.AppliesDelivery,
 				in.AppliesPickup, in.StartsAt, in.EndsAt, in.DailyStart, in.DailyEnd, in.TotalQuota,
-				in.PerPhoneLimit); err != nil {
+				in.PerPhoneLimit, in.BrandIDs); err != nil {
 				return err
 			}
 		}
@@ -388,6 +411,8 @@ type TrialInput struct {
 	Subtotal    int64      `json:"subtotal"`
 	DeliveryFee int64      `json:"delivery_fee"`
 	At          *time.Time `json:"at"` // defaults to now
+	// BrandID tries the promotions of one brand; 0 = the main brand.
+	BrandID int64 `json:"brand_id"`
 }
 
 type TrialResult struct {
@@ -419,7 +444,7 @@ func (a *App) TrialPromotions(ctx context.Context, branchID int64, in TrialInput
 	// an amount of dishes says nothing of which dishes: the trial is for
 	// promotions on the whole order
 	ps, err := loadPromotions(ctx, a.DB, branchID, "p.status <> 'ended' AND p.kind NOT IN ('dish_percent','dish_second') AND p.scope="+
-		scopeSQL(scope), "")
+		scopeSQL(scope)+" AND "+brandPromoSQL(in.BrandID), "")
 	if err != nil {
 		return nil, err
 	}
@@ -494,4 +519,14 @@ func releasePromotion(ctx context.Context, tx pgx.Tx, orderID int64) error {
 	}
 	_, err = tx.Exec(ctx, `UPDATE promotions SET used_count = used_count - 1 WHERE id=$1 AND used_count > 0`, promoID)
 	return err
+}
+
+// brandPromoSQL limits promotions (aliased p) to the ones that apply to a
+// brand (docs/MULTI_BRAND_DESIGN.md §10).
+// brandID 0 is the store's main brand.
+func brandPromoSQL(brandID int64) string {
+	if brandID == 0 {
+		return "EXISTS (SELECT 1 FROM brands br WHERE br.branch_id = p.branch_id AND br.is_main AND br.id = ANY(p.brand_ids))"
+	}
+	return strconv.FormatInt(brandID, 10) + " = ANY(p.brand_ids)"
 }

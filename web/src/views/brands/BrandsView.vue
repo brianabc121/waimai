@@ -16,6 +16,7 @@ const brands = ref<Brand[]>([])
 const error = ref('')
 const cur = computed(() => currentRole()?.currency ?? 'PHP')
 const mayEdit = computed(() => can('brand.manage'))
+const mayMenu = computed(() => can('menu.edit'))
 const LIMIT = 10
 const COLORS = ['#a02c20', '#e07a10', '#2463a6', '#2f7d4f', '#7c3aed', '#be185d', '#0f766e', '#57534e']
 
@@ -101,6 +102,7 @@ const hours = (b: Brand) => b.open_time ? `${b.open_time}–${b.close_time}` : t
           <span v-if="b.delivery" class="tag">{{ t('br.delivery') }}</span>
           <span class="tag">{{ t('br.hours') }} {{ hours(b) }}</span>
         </div>
+        <router-link v-if="mayMenu && b.status === 'active'" class="btn small" :to="'/merchant/brand-menu/' + b.id" :data-testid="'brand-menu-' + b.id">{{ t('bm.link') }}</router-link>
         <div v-if="b.is_main" class="muted small">{{ t('br.site') }} {{ storeURL({ store_no: b.store_no, slug: b.slug }) }}</div>
         <div class="row between">
           <span v-if="b.today" class="small">{{ t('br.today', { n: b.today.orders, s: money(b.today.total, cur) }) }}</span>

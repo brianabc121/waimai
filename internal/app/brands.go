@@ -23,24 +23,27 @@ import (
 const MaxDeliveryBrands = 10
 
 type Brand struct {
-	ID          int64     `json:"id"`
-	BranchID    int64     `json:"branch_id"`
-	Name        string    `json:"name"`
-	NameEn      string    `json:"name_en"`
-	Code        string    `json:"code"`
-	StoreNo     int       `json:"store_no"`
-	Slug        string    `json:"slug"`
-	DineIn      bool      `json:"dine_in"`
-	Delivery    bool      `json:"delivery"`
-	IsMain      bool      `json:"is_main"`
-	Color       string    `json:"color"`
-	OpenTime    string    `json:"open_time"`
-	CloseTime   string    `json:"close_time"`
-	Paused      bool      `json:"paused"`
-	MallVisible bool      `json:"mall_visible"`
-	Status      string    `json:"status"`
-	Sort        int       `json:"sort"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          int64  `json:"id"`
+	BranchID    int64  `json:"branch_id"`
+	Name        string `json:"name"`
+	NameEn      string `json:"name_en"`
+	Code        string `json:"code"`
+	StoreNo     int    `json:"store_no"`
+	Slug        string `json:"slug"`
+	DineIn      bool   `json:"dine_in"`
+	Delivery    bool   `json:"delivery"`
+	IsMain      bool   `json:"is_main"`
+	Color       string `json:"color"`
+	OpenTime    string `json:"open_time"`
+	CloseTime   string `json:"close_time"`
+	Paused      bool   `json:"paused"`
+	MallVisible bool   `json:"mall_visible"`
+	Status      string `json:"status"`
+	Sort        int    `json:"sort"`
+	// OwnMenu: the brand sells its own pick of the store's dishes, with its
+	// own names and prices (brand_menu.go); otherwise the store's menu as it is.
+	OwnMenu   bool      `json:"own_menu"`
+	CreatedAt time.Time `json:"created_at"`
 	// Today is the brand's orders today (the brand list only).
 	Today *BrandDay `json:"today,omitempty"`
 }
@@ -69,12 +72,12 @@ func (b *Brand) Ref() BrandRef {
 }
 
 const brandCols = `id, branch_id, name, name_en, code, store_no, slug, dine_in, delivery, is_main, color,
-	open_time, close_time, paused, mall_visible, status, sort, created_at`
+	open_time, close_time, paused, mall_visible, status, sort, own_menu, created_at`
 
 func scanBrand(row interface{ Scan(...any) error }) (*Brand, error) {
 	var b Brand
 	err := row.Scan(&b.ID, &b.BranchID, &b.Name, &b.NameEn, &b.Code, &b.StoreNo, &b.Slug, &b.DineIn, &b.Delivery,
-		&b.IsMain, &b.Color, &b.OpenTime, &b.CloseTime, &b.Paused, &b.MallVisible, &b.Status, &b.Sort, &b.CreatedAt)
+		&b.IsMain, &b.Color, &b.OpenTime, &b.CloseTime, &b.Paused, &b.MallVisible, &b.Status, &b.Sort, &b.OwnMenu, &b.CreatedAt)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	}

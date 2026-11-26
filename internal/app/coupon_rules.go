@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -11,9 +12,11 @@ import (
 
 // CouponBatch is how one kind of coupon is given out.
 type CouponBatch struct {
-	ID          int64   `json:"id"`
-	Issuer      string  `json:"issuer"`
-	BranchID    *int64  `json:"branch_id"`
+	ID       int64  `json:"id"`
+	Issuer   string `json:"issuer"`
+	BranchID *int64 `json:"branch_id"`
+	// BrandID is the brand a store coupon belongs to and only works at.
+	BrandID     *int64  `json:"brand_id"`
 	Kind        string  `json:"kind"`
 	Source      string  `json:"source"`
 	Name        string  `json:"name"`
@@ -38,12 +41,12 @@ type CouponBatch struct {
 }
 
 const batchCols = `id, issuer, branch_id, kind, source, name, name_en, currency, value, threshold, valid_days, min_order,
-	monthly_cap, total_quota, per_customer, budget, scope, scope_branch_ids, country_code, country, province, issued_count, status`
+	monthly_cap, total_quota, per_customer, budget, scope, scope_branch_ids, country_code, country, province, issued_count, status, brand_id`
 
 func (b *CouponBatch) scan() []any {
 	return []any{&b.ID, &b.Issuer, &b.BranchID, &b.Kind, &b.Source, &b.Name, &b.NameEn, &b.Currency, &b.Value,
 		&b.Threshold, &b.ValidDays, &b.MinOrder, &b.MonthlyCap, &b.TotalQuota, &b.PerCustomer, &b.Budget, &b.Scope,
-		&b.ScopeIDs, &b.CountryCode, &b.Country, &b.Province, &b.IssuedCount, &b.Status}
+		&b.ScopeIDs, &b.CountryCode, &b.Country, &b.Province, &b.IssuedCount, &b.Status, &b.BrandID}
 }
 
 func pickName(en, zh string) string {
@@ -80,6 +83,7 @@ type RepurchaseRule struct {
 	MinOrder   int64  `json:"min_order"`
 	MonthlyCap *int   `json:"monthly_cap"`
 	Currency   string `json:"currency"`
+	BrandID    int64  `json:"brand_id"`
 	Stats      struct {
 		// Coupons given this month (store's clock), and what became of them.
 		Issued  int   `json:"issued"`
@@ -94,14 +98,24 @@ type RepurchaseRule struct {
 // RepurchaseRule returns the store's setting; a store that never set it gets
 // the recommended one (₱20-style no-minimum coupon, 30 days), switched off.
 func (a *App) RepurchaseRule(ctx context.Context, branchID int64) (*RepurchaseRule, error) {
+	return a.RepurchaseRuleOf(ctx, branchID, 0)
+}
+
+// RepurchaseRuleOf is one brand's setting (0 = the main brand): each brand
+// gives its own coupon for its own customers (docs/MULTI_BRAND_DESIGN.md §10).
+func (a *App) RepurchaseRuleOf(ctx context.Context, branchID, brandID int64) (*RepurchaseRule, error) {
 	b, err := a.BranchByID(ctx, branchID)
 	if err != nil {
 		return nil, err
 	}
-	r := &RepurchaseRule{Kind: CouponStoreFree, Value: 2000, ValidDays: 30, Currency: b.Currency}
+	brand, err := loadBrand(ctx, a.DB, branchID, brandID)
+	if err != nil {
+		return nil, err
+	}
+	r := &RepurchaseRule{Kind: CouponStoreFree, Value: 2000, ValidDays: 30, Currency: b.Currency, BrandID: brand.ID}
 	var bt CouponBatch
-	err = a.DB.QueryRow(ctx, `SELECT `+batchCols+` FROM coupon_batches WHERE branch_id=$1 AND source='repurchase'`, branchID).
-		Scan(bt.scan()...)
+	err = a.DB.QueryRow(ctx, `SELECT `+batchCols+` FROM coupon_batches WHERE branch_id=$1 AND brand_id=$2 AND source='repurchase'`,
+		branchID, brand.ID).Scan(bt.scan()...)
 	if isNoRows(err) {
 		return r, nil
 	} else if err != nil {
@@ -133,6 +147,8 @@ type RepurchaseInput struct {
 	ValidDays  int    `json:"valid_days"`
 	MinOrder   int64  `json:"min_order"`
 	MonthlyCap *int   `json:"monthly_cap"`
+	// BrandID is the brand whose rule it is; 0 = the main brand.
+	BrandID int64 `json:"brand_id"`
 }
 
 func (in *RepurchaseInput) validate() error {
@@ -181,14 +197,21 @@ func (a *App) SaveRepurchaseRule(ctx context.Context, branchID int64, in Repurch
 	if in.Enabled {
 		status = "active"
 	}
+	brand, err := loadBrand(ctx, a.DB, branchID, in.BrandID)
+	if err == ErrNotFound {
+		return Err(http.StatusUnprocessableEntity, "BRAND_UNKNOWN", "no such brand in this store")
+	} else if err != nil {
+		return err
+	}
+	in.BrandID = brand.ID
 	return a.inTx(ctx, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `INSERT INTO coupon_batches (issuer, branch_id, kind, source, name, name_en, currency,
-				value, threshold, valid_days, min_order, monthly_cap, status)
-			VALUES ('store',$1,$2,'repurchase',$3,$4,$5,$6,$7,$8,$9,$10,$11)
-			ON CONFLICT (branch_id) WHERE source = 'repurchase' DO UPDATE SET kind=$2, name=$3, name_en=$4, currency=$5,
+				value, threshold, valid_days, min_order, monthly_cap, status, brand_id)
+			VALUES ('store',$1,$2,'repurchase',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+			ON CONFLICT (brand_id) WHERE source = 'repurchase' DO UPDATE SET kind=$2, name=$3, name_en=$4, currency=$5,
 				value=$6, threshold=$7, valid_days=$8, min_order=$9, monthly_cap=$10, status=$11, updated_at=now()`,
 			branchID, in.Kind, "复购礼券", "Welcome-back coupon", b.Currency, in.Value, in.Threshold,
-			in.ValidDays, in.MinOrder, in.MonthlyCap, status); err != nil {
+			in.ValidDays, in.MinOrder, in.MonthlyCap, status, brand.ID); err != nil {
 			return err
 		}
 		return audit(ctx, tx, branchID, 0, actor, "coupon.repurchase_saved", map[string]any{"input": in})

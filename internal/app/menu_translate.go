@@ -336,6 +336,10 @@ func (m *menuLocale) text(entity string, id int64, field, orig, origEn string) s
 
 func (m *menuLocale) item(it *Item) {
 	it.NameTr = m.text("item", it.ID, "name", it.Name, it.NameEn)
+	if it.BaseName != "" {
+		// a brand's own name for the dish: the store's translations are of its name
+		it.NameTr = m.text("brand_item", it.ID, "name", it.Name, it.NameEn)
+	}
 	it.DescriptionTr = m.text("item", it.ID, "description", it.Description, "")
 	it.DetailsTr = m.text("item", it.ID, "details", it.Details, "")
 	for i := range it.Groups {
@@ -367,7 +371,11 @@ func (a *App) LocalizeStorefront(ctx context.Context, sf *Storefront, lang strin
 	}
 	for i := range sf.Categories {
 		c := &sf.Categories[i]
-		c.NameTr = m.text("category", c.ID, "name", c.Name, c.NameEn)
+		entity := "category"
+		if c.brand {
+			entity = "brand_category" // a brand's own: the store's translations are not of it
+		}
+		c.NameTr = m.text(entity, c.ID, "name", c.Name, c.NameEn)
 		for j := range c.Items {
 			m.item(&c.Items[j])
 		}
@@ -403,6 +411,9 @@ func localizeLines(ctx context.Context, q Querier, b *Branch, lang string, lines
 		}
 		m.item(it)
 		l.NameTr = it.NameTr
+		if l.BaseName != "" {
+			l.NameTr = m.text("brand_item", it.ID, "name", l.Name, l.NameEn)
+		}
 		opts := map[string]string{}
 		groups := map[string]string{}
 		for _, g := range it.Groups {

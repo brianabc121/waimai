@@ -52,6 +52,7 @@ type moneyLine struct {
 // orderMoney is what an order was priced with, read under the order lock.
 type orderMoney struct {
 	ID, BranchID       int64
+	BrandID            int64
 	ServiceType, Phone string
 	// Platform orders (docs/ORDER_TYPES_DESIGN.md §7.3) never take the
 	// store's promotions: their only discounts are the two the platform
@@ -89,11 +90,11 @@ func loadMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, erro
 		COALESCE((SELECT s.opened_at FROM dining_sessions s WHERE s.id = o.session_id), o.created_at),
 		o.tax_rate_bp, o.tax_inclusive, o.service_charge_bp, o.packaging_fee, o.subtotal, o.delivery_fee, o.total,
 		o.promotion_id, o.promotion_kind, o.discount, o.platform_subsidy, o.adj_percent_bp, o.adj_mode, o.round_off,
-		o.order_type = 'platform'
+		o.order_type = 'platform', o.brand_id
 		FROM orders o WHERE o.id=$1`, orderID).Scan(&m.BranchID, &m.ServiceType, &m.Phone, &m.Created, &m.Opened,
 		&m.Fees.TaxRateBP, &m.Fees.TaxInclusive, &m.Fees.ServiceChargeBP, &m.Fees.PackagingFee, &m.Subtotal,
 		&m.DeliveryFee, &m.Total, &promoID, &promoKind, &discount, &platform, &m.StaffBP, &m.AdjMode, &m.RoundOff,
-		&m.Platform); err != nil {
+		&m.Platform, &m.BrandID); err != nil {
 		return nil, err
 	}
 	rows, err := q.Query(ctx, `SELECT id, line_total, item_id, CASE WHEN qty > 0 THEN line_total / qty ELSE 0 END
@@ -156,6 +157,11 @@ func loadMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, erro
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	for _, p := range m.Dish {
+		if !slices.Contains(p.BrandIDs, m.BrandID) {
+			p.BrandIDs = append(p.BrandIDs, m.BrandID) // held from when it applied
+		}
+	}
 	if promoID != nil {
 		ps, err := loadPromotions(ctx, q, m.BranchID, "p.id = "+strconv.FormatInt(*promoID, 10), "")
 		if err != nil {
@@ -165,6 +171,11 @@ func loadMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, erro
 			m.Promo = &ps[0]
 			if promoKind != "" {
 				m.Promo.Kind = promoKind
+			}
+			// it applied to the order's brand when the order took it, and an
+			// order keeps what it took
+			if !slices.Contains(m.Promo.BrandIDs, m.BrandID) {
+				m.Promo.BrandIDs = append(m.Promo.BrandIDs, m.BrandID)
 			}
 		}
 		// Orders from before every promotion had its row (table bills, orders
@@ -263,7 +274,8 @@ func (m *orderMoney) choosePromo(ctx context.Context, q Querier, b *Branch, sub 
 	if scope == "dine_in" {
 		phone = ""
 	}
-	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope="+scopeSQL(scope), phone)
+	// only the order's brand's promotions (docs/MULTI_BRAND_DESIGN.md §10)
+	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope="+scopeSQL(scope)+" AND "+brandPromoSQL(m.BrandID), phone)
 	if err != nil {
 		return nil, Discount{}, false, err
 	}
@@ -481,7 +493,7 @@ func (m *orderMoney) reprice(ctx context.Context, q Querier, b *Branch, lines []
 	// pol may move to a better offer, those running now on other dishes
 	dish := append([]*Promotion{}, m.Dish...)
 	if pol.pick && !m.Platform {
-		live, err := liveDishPromos(ctx, q, b, m.ServiceType, pol.at, sub)
+		live, err := liveDishPromos(ctx, q, b, m.BrandID, m.ServiceType, pol.at, sub)
 		if err != nil {
 			return nil, false, err
 		}
@@ -590,9 +602,9 @@ func saveDiscountRows(ctx context.Context, tx pgx.Tx, branchID, orderID int64, p
 		}
 	} else if p.Promo != nil && t.PromotionDiscount > 0 {
 		if _, err := tx.Exec(ctx, `INSERT INTO order_discounts (order_id, branch_id, kind, funded_by, name, name_en,
-			amount, promotion_id, per_line, created_at) VALUES ($1,$2,'promotion','store',$3,$4,$5,$6,$7,
+			amount, promotion_id, per_line, brand_ids, created_at) VALUES ($1,$2,'promotion','store',$3,$4,$5,$6,$7,$8,
 			(SELECT created_at FROM orders WHERE id=$1))`, orderID, branchID, t.PromotionName,
-			t.PromotionNameEn, t.PromotionDiscount, p.Promo.ID, perLine(p.promoShare, p.ids)); err != nil {
+			t.PromotionNameEn, t.PromotionDiscount, p.Promo.ID, perLine(p.promoShare, p.ids), p.Promo.BrandIDs); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE promotion_redemptions SET amount=$2 WHERE order_id=$1 AND status='applied'`,
@@ -602,9 +614,9 @@ func saveDiscountRows(ctx context.Context, tx pgx.Tx, branchID, orderID int64, p
 	}
 	for _, d := range p.dish {
 		if _, err := tx.Exec(ctx, `INSERT INTO order_discounts (order_id, branch_id, kind, funded_by, name, name_en,
-			amount, promotion_id, per_line, rule, created_at) VALUES ($1,$2,'dish_promotion','store',$3,$4,$5,$6,$7,$8,
+			amount, promotion_id, per_line, rule, brand_ids, created_at) VALUES ($1,$2,'dish_promotion','store',$3,$4,$5,$6,$7,$8,$9,
 			(SELECT created_at FROM orders WHERE id=$1))`, orderID, branchID, d.Promo.Name, d.Promo.NameEn, d.Off,
-			d.Promo.ID, perLine(d.Applied, p.ids), ruleOf(d.Promo)); err != nil {
+			d.Promo.ID, perLine(d.Applied, p.ids), ruleOf(d.Promo), d.Promo.BrandIDs); err != nil {
 			return fmt.Errorf("dish promotion row: %w", err)
 		}
 	}

@@ -178,7 +178,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
           <div v-if="o.note" class="banner warn small">{{ t('order_note') }}: {{ o.note }}</div>
           <div v-for="it in lines(o)" :key="it.id" class="kline" :class="it.prep_status">
             <div class="grow">
-              <div class="kname"><span v-if="baskets(o)" class="tag info" style="margin-inline-end:4px;vertical-align:middle">{{ t('basket_short', { n: it.basket }) }}</span><span v-if="it.rush_at && it.prep_status !== 'ready'" class="tag bad krush" data-testid="k-rush">{{ t('dd.k.rush') }}</span>{{ it.qty }} × {{ both(it.name, it.name_en) }}<span v-if="dine(o)" class="small muted" style="font-weight:400"> · {{ t('batch_n', { n: it.batch_seq }) }}</span><span v-else-if="it.batch_seq > 1" class="small kadd" data-testid="k-addon-line"> · {{ t('ao.k', { n: addonNo(it.batch_seq) }) }}</span></div>
+              <div class="kname"><span v-if="baskets(o)" class="tag info" style="margin-inline-end:4px;vertical-align:middle">{{ t('basket_short', { n: it.basket }) }}</span><span v-if="it.rush_at && it.prep_status !== 'ready'" class="tag bad krush" data-testid="k-rush">{{ t('dd.k.rush') }}</span>{{ it.qty }} × {{ both(it.name, it.name_en) }}<span v-if="it.base_name" class="small muted" style="font-weight:400" data-testid="k-base-name">（{{ it.base_name }}）</span><span v-if="dine(o)" class="small muted" style="font-weight:400"> · {{ t('batch_n', { n: it.batch_seq }) }}</span><span v-else-if="it.batch_seq > 1" class="small kadd" data-testid="k-addon-line"> · {{ t('ao.k', { n: addonNo(it.batch_seq) }) }}</span></div>
               <div v-if="it.round_tags?.length" class="small kround" data-testid="k-round">※ {{ it.round_tags.join(' · ') }}</div>
               <div class="small" v-if="stations.length && it.needs_prep">
                 <span class="tag" :class="it.station_id === null ? 'warn' : 'info'">{{ it.station_name || t('unassigned') }}</span>
@@ -211,7 +211,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
           <div class="row between"><h2>{{ t('table') }} {{ o.table_name }}</h2><span class="small muted">{{ o.public_no }}</span></div>
           <div v-for="it in toServe(o)" :key="it.id" class="kline ready">
             <div class="grow">
-              <div class="kname"><span v-if="it.rush_at" class="tag bad krush">{{ t('dd.k.rush') }}</span>{{ it.qty }} × {{ both(it.name, it.name_en) }}</div>
+              <div class="kname"><span v-if="it.rush_at" class="tag bad krush">{{ t('dd.k.rush') }}</span>{{ it.qty }} × {{ both(it.name, it.name_en) }}<span v-if="it.base_name" class="small muted" style="font-weight:400">（{{ it.base_name }}）</span></div>
               <div class="small" v-if="it.options.length">{{ it.options.map(x => both(x.name, x.name_en)).join(' · ') }}</div>
               <KitchenNote :it="it" />
             </div>

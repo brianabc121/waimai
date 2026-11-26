@@ -244,7 +244,7 @@ func (a *App) MyOffers(ctx context.Context, customerID int64, slug string) ([]St
 		if err != nil {
 			continue // the store is gone
 		}
-		ps, err := livePromotions(ctx, a.DB, b, "delivery")
+		ps, err := livePromotions(ctx, a.DB, b, 0, "delivery")
 		if err != nil {
 			return nil, err
 		}
