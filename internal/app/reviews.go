@@ -54,9 +54,11 @@ type ReviewInput struct {
 
 // salesCounts returns how many of each item were ordered and how many orders
 // the store has taken. Rejected, cancelled and unanswered orders do not count.
-func salesCounts(ctx context.Context, q Querier, branchID int64) (map[int64]int, int, error) {
+// With a brand, only its orders count (the brand's page shows its own sales).
+func salesCounts(ctx context.Context, q Querier, branchID, brandID int64) (map[int64]int, int, error) {
 	rows, err := q.Query(ctx, `SELECT oi.item_id, sum(oi.qty)::int FROM order_items oi JOIN orders o ON o.id = oi.order_id
-		WHERE oi.branch_id=$1 AND o.acceptance_status='accepted' AND oi.prep_status <> 'cancelled' GROUP BY 1`, branchID)
+		WHERE oi.branch_id=$1 AND o.acceptance_status='accepted' AND oi.prep_status <> 'cancelled'
+			AND ($2 = 0 OR o.brand_id = $2) GROUP BY 1`, branchID, brandID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -74,15 +76,17 @@ func salesCounts(ctx context.Context, q Querier, branchID int64) (map[int64]int,
 		return nil, 0, err
 	}
 	var orders int
-	err = q.QueryRow(ctx, `SELECT count(*) FROM orders WHERE branch_id=$1 AND acceptance_status='accepted'`, branchID).Scan(&orders)
+	err = q.QueryRow(ctx, `SELECT count(*) FROM orders WHERE branch_id=$1 AND acceptance_status='accepted'
+		AND ($2 = 0 OR brand_id = $2)`, branchID, brandID).Scan(&orders)
 	return sold, orders, err
 }
 
-func reviewSummary(ctx context.Context, q Querier, branchID int64) (*ReviewSummary, error) {
+// reviewSummary sums up the reviews of one of the store's brands (0 = all of them).
+func reviewSummary(ctx context.Context, q Querier, branchID, brandID int64) (*ReviewSummary, error) {
 	var s ReviewSummary
 	err := q.QueryRow(ctx, `SELECT count(*), coalesce(round(avg(rating), 1), 0)::float8,
 		coalesce(round(avg(taste), 1), 0)::float8, coalesce(round(avg(packaging), 1), 0)::float8,
-		coalesce(round(avg(delivery), 1), 0)::float8 FROM reviews WHERE branch_id=$1`, branchID).
+		coalesce(round(avg(delivery), 1), 0)::float8 FROM reviews WHERE branch_id=$1 AND ($2 = 0 OR brand_id = $2)`, branchID, brandID).
 		Scan(&s.Count, &s.Average, &s.Taste, &s.Packaging, &s.Delivery)
 	return &s, err
 }
@@ -118,14 +122,18 @@ func (a *App) StoreReviews(ctx context.Context, slug, filter string, offset int)
 	if offset < 0 || offset > 10000 {
 		return nil, ErrValidation("offset out of range")
 	}
-	sum, err := reviewSummary(ctx, a.DB, b.ID)
+	br, err := brandBySlug(ctx, a.DB, b.ID, slug)
+	if err != nil {
+		return nil, err
+	}
+	sum, err := reviewSummary(ctx, a.DB, b.ID, br.ID)
 	if err != nil {
 		return nil, err
 	}
 	out := &ReviewPage{Summary: *sum, Reviews: []Review{}}
 	rows, err := a.DB.Query(ctx, `SELECT r.id, r.order_id, r.display_name, r.rating, r.taste, r.packaging, r.delivery,
-		r.comment, r.created_at FROM reviews r WHERE r.branch_id=$1 AND `+cond+`
-		ORDER BY r.created_at DESC, r.id DESC LIMIT $2 OFFSET $3`, b.ID, reviewPageSize+1, offset)
+		r.comment, r.created_at FROM reviews r WHERE r.branch_id=$1 AND r.brand_id=$4 AND `+cond+`
+		ORDER BY r.created_at DESC, r.id DESC LIMIT $2 OFFSET $3`, b.ID, reviewPageSize+1, offset, br.ID)
 	if err != nil {
 		return nil, err
 	}

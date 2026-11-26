@@ -54,8 +54,9 @@ func counter(ctx context.Context, tx pgx.Tx, branchID int64, kind, period string
 	return seq, err
 }
 
-// nextOrderNo numbers a new dine-in, mall or online order.
-func nextOrderNo(ctx context.Context, tx pgx.Tx, b *Branch, typ string) (orderNo, error) {
+// nextOrderNo numbers a new dine-in, mall or online order. A brand other
+// than the main one has its own running numbers (docs/MULTI_BRAND_DESIGN.md §6).
+func nextOrderNo(ctx context.Context, tx pgx.Tx, b *Branch, brand *Brand, typ string) (orderNo, error) {
 	now := time.Now()
 	biz := b.businessDay(now).Format("2006-01-02")
 	period := biz
@@ -66,7 +67,11 @@ func nextOrderNo(ctx context.Context, tx pgx.Tx, b *Branch, typ string) (orderNo
 	if !ok {
 		return orderNo{}, fmt.Errorf("nextOrderNo: no running number for %q", typ)
 	}
-	seq, err := counter(ctx, tx, b.ID, typ, period)
+	kind := typ
+	if brand != nil && !brand.IsMain {
+		kind = fmt.Sprintf("%s:%d", typ, brand.ID)
+	}
+	seq, err := counter(ctx, tx, b.ID, kind, period)
 	if err != nil {
 		return orderNo{}, err
 	}

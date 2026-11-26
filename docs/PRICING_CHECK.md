@@ -122,7 +122,7 @@ R 这一组是最重要的：任何一条改金额的路径如果绕开了 `load
 | 15 | 币种：按店铺国家定币种，老订单保留原币种 | `TestCurrencyTableMatchesMigration` |
 | 16 | 平台订单：平台价下单（手设价优先，没设按加价取整）、商家出资 + 平台出资优惠、一律含税、佣金；店铺原因退菜商家优惠按比例保留、平台优惠不变；改了加价之后加单仍按下单时的加价；顾客原因退菜；手改佣金、其他扣费、记录平台扣款（进退款）、平台取消；不套本店活动 | 样例 S9；`TestPlatformOrder`、`TestPlatformOrderChain`、`TestPlatformOrderOverHTTP`、`TestPlatformReconciliation` |
 | 17 | 商城单和网店单：同一购物车在商城和店铺专属页面下单金额一分不差（没有平台券时）；网店单不用平台券（不列、点名要也不用），顾客多付的正好是平台券的钱；商城报价不能拿到专属页面下单 | `TestMallVsWebOrder`、`TestStoreSiteOverHTTP` |
-| 18 | 一店多品牌：同一购物车在两个品牌下单按各自的品牌价；活动、券不跨品牌（列表里不出现、点名也不用）；加单按订单品牌的菜单价；代客单号和会员按品牌 | 样例 S10；`TestBrandPricing`、`TestBrandPromoCouponScope`、`TestBrandAddonPrice`、`TestBrands` |
+| 18 | 一店多品牌：同一购物车在两个品牌下单按各自的品牌价；活动、券不跨品牌（列表里不出现、点名也不用）；加单按订单品牌的菜单价；代客单号和会员按品牌；顾客在品牌专属页面/商城品牌卡片下单按该品牌的价和活动（S10 的 150.00 / 157.00），一个品牌页面的报价不能拿到另一个品牌下单，商城单号按品牌各自编 | 样例 S10；`TestBrandPricing`、`TestBrandPromoCouponScope`、`TestBrandAddonPrice`、`TestBrands`、`TestBrandSites` |
 
 ---
 

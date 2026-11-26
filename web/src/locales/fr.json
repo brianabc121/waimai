@@ -3896,5 +3896,10 @@
  "bm.pic_hint": "Laissez vide pour la photo du plat du magasin",
  "bm.pic_store": "Photo du magasin",
  "bm.done": "OK",
- "bm.hint": "Un prix vide est celui du magasin. Un nouveau prix ne vaut que pour les nouvelles commandes ; l'écran cuisine montre le nom du plat du magasin entre parenthèses."
+ "bm.hint": "Un prix vide est celui du magasin. Un nouveau prix ne vaut que pour les nouvelles commandes ; l'écran cuisine montre le nom du plat du magasin entre parenthèses.",
+ "br.look": "Ce que voient les clients",
+ "br.look_hint": "Dans le marché et sur sa propre page, la marque est une boutique à part ; sans images, elle reprend le logo et la couverture du magasin.",
+ "br.logo": "Logo de la marque",
+ "br.cover": "Couverture de la marque",
+ "br.intro": "Présentation en une ligne (sur la carte du marché)"
 }

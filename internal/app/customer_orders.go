@@ -21,6 +21,8 @@ type OrderStore struct {
 	Phone   string `json:"phone"`
 	Address string `json:"address"`
 	LogoURL string `json:"logo_url"`
+	// main: the store's main brand, whose name the store's translations are of
+	main bool
 }
 
 // OrderCard is one order in the customer's list.
@@ -69,12 +71,13 @@ const inProgress = `(o.acceptance_status = 'pending' OR (o.acceptance_status = '
 // or aftersale; search matches the store's or a dish's name; before is the
 // cursor a previous page returned.
 func (a *App) CustomerOrders(ctx context.Context, customerID int64, tab, search string, before int64) (*OrderCardPage, error) {
-	return a.CustomerOrdersAt(ctx, customerID, 0, tab, search, before)
+	return a.CustomerOrdersAt(ctx, customerID, 0, 0, tab, search, before)
 }
 
 // CustomerOrdersAt is CustomerOrders of one store (branchID > 0): on a store's
 // own page the customer sees only the orders of that store.
-func (a *App) CustomerOrdersAt(ctx context.Context, customerID, branchID int64, tab, search string, before int64) (*OrderCardPage, error) {
+// With a brand (brandID > 0, a brand's own page), its orders only.
+func (a *App) CustomerOrdersAt(ctx context.Context, customerID, branchID, brandID int64, tab, search string, before int64) (*OrderCardPage, error) {
 	cond := "true"
 	switch tab {
 	case "", "all":
@@ -95,16 +98,16 @@ func (a *App) CustomerOrdersAt(ctx context.Context, customerID, branchID int64, 
 	like := "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(search) + "%"
 	rows, err := a.DB.Query(ctx, `SELECT o.id, o.token_nonce, o.public_no, o.service_type, o.acceptance_status,
 		o.fulfillment_status, o.release_at, o.completed_at, o.created_at, o.total, o.currency,
-		b.slug, b.name, b.name_en, b.phone, b.address, b.timezone, COALESCE(ct.published->>'logo_url', ''),
-		EXISTS (SELECT 1 FROM reviews r WHERE r.order_id = o.id), COALESCE(s.status, ''), b.id
-		FROM orders o JOIN branches b ON b.id = o.branch_id
+		br.slug, br.name, br.name_en, b.phone, b.address, b.timezone, COALESCE(NULLIF(br.logo_url, ''), ct.published->>'logo_url', ''),
+		EXISTS (SELECT 1 FROM reviews r WHERE r.order_id = o.id), COALESCE(s.status, ''), CASE WHEN br.is_main THEN b.id ELSE 0 END
+		FROM orders o JOIN branches b ON b.id = o.branch_id JOIN brands br ON br.id = o.brand_id
 		LEFT JOIN channel_templates ct ON ct.branch_id = b.id AND ct.channel = 'delivery'
 		LEFT JOIN order_aftersales s ON s.order_id = o.id
 		WHERE o.customer_id = $1 AND o.service_type <> 'dine_in' AND (`+cond+`)
-		AND ($2 = '' OR b.name ILIKE $3 OR b.name_en ILIKE $3 OR o.public_no ILIKE $3 OR EXISTS (SELECT 1 FROM order_items i
+		AND ($2 = '' OR br.name ILIKE $3 OR br.name_en ILIKE $3 OR o.public_no ILIKE $3 OR EXISTS (SELECT 1 FROM order_items i
 			WHERE i.order_id = o.id AND (i.name ILIKE $3 OR i.name_en ILIKE $3)))
-		AND ($4 = 0 OR o.id < $4) AND ($6 = 0 OR o.branch_id = $6) ORDER BY o.id DESC LIMIT $5`,
-		customerID, search, like, before, orderPageSize+1, branchID)
+		AND ($4 = 0 OR o.id < $4) AND ($6 = 0 OR o.branch_id = $6) AND ($7 = 0 OR o.brand_id = $7) ORDER BY o.id DESC LIMIT $5`,
+		customerID, search, like, before, orderPageSize+1, branchID, brandID)
 	if err != nil {
 		return nil, wrap("customer orders", err)
 	}
@@ -187,6 +190,9 @@ func (a *App) LocalizeOrderStore(ctx context.Context, o *Order, lang string) err
 	if o.Store == nil {
 		return nil
 	}
+	if !o.Store.main {
+		return nil
+	}
 	names, err := storeNames(ctx, a.DB, lang, []int64{o.BranchID})
 	o.Store.NameTr = names[o.BranchID]
 	return err
@@ -194,9 +200,11 @@ func (a *App) LocalizeOrderStore(ctx context.Context, o *Order, lang string) err
 
 func (a *App) CustomerOrderView(ctx context.Context, o *Order) error {
 	st := OrderStore{}
-	err := a.DB.QueryRow(ctx, `SELECT b.slug, b.name, b.name_en, b.phone, b.address, COALESCE(ct.published->>'logo_url', '')
-		FROM branches b LEFT JOIN channel_templates ct ON ct.branch_id = b.id AND ct.channel = 'delivery'
-		WHERE b.id = $1`, o.BranchID).Scan(&st.Slug, &st.Name, &st.NameEn, &st.Phone, &st.Address, &st.LogoURL)
+	err := a.DB.QueryRow(ctx, `SELECT br.slug, br.name, br.name_en, b.phone, b.address,
+			COALESCE(NULLIF(br.logo_url, ''), ct.published->>'logo_url', ''), br.is_main
+		FROM branches b JOIN brands br ON br.id = (SELECT brand_id FROM orders WHERE id = $2)
+		LEFT JOIN channel_templates ct ON ct.branch_id = b.id AND ct.channel = 'delivery'
+		WHERE b.id = $1`, o.BranchID, o.ID).Scan(&st.Slug, &st.Name, &st.NameEn, &st.Phone, &st.Address, &st.LogoURL, &st.main)
 	if err != nil {
 		return err
 	}

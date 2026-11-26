@@ -119,8 +119,9 @@ type MallStore struct {
 	// NameTr is the store's name in the customer's language, when it differs.
 	NameTr string `json:"name_tr,omitempty"`
 
-	id       int64
+	id       int64 // the store's
 	branch   *Branch
+	brand    *Brand
 	lastUsed *time.Time
 }
 
@@ -205,6 +206,41 @@ func (a *App) mallCandidates(ctx context.Context, where string, args ...any) ([]
 	if len(ids) == 0 {
 		return out, nil
 	}
+	// Each delivery brand the store shows in the mall is a card of its own
+	// (docs/MULTI_BRAND_DESIGN.md §9): its name, logo, reviews and sales; the
+	// distance, delivery areas and fees are the store's.
+	type brandCard struct {
+		brand          *Brand
+		reviews, sales int
+		rating         float64
+	}
+	cards := map[int64][]brandCard{}
+	crows, err := a.DB.Query(ctx, `SELECT `+brandCols+`,
+			(SELECT count(*) FROM reviews r WHERE r.brand_id = brands.id),
+			coalesce((SELECT round(avg(r.rating), 1) FROM reviews r WHERE r.brand_id = brands.id), 0)::float8,
+			(SELECT count(*) FROM orders o WHERE o.brand_id = brands.id AND o.acceptance_status = 'accepted'
+				AND o.created_at > now() - interval '30 days')
+		FROM brands WHERE branch_id = ANY($1) AND status = 'active' AND delivery AND mall_visible
+		ORDER BY branch_id, is_main DESC, sort, id`, ids)
+	if err != nil {
+		return nil, err
+	}
+	for crows.Next() {
+		var br Brand
+		var c brandCard
+		if err := crows.Scan(&br.ID, &br.BranchID, &br.Name, &br.NameEn, &br.Code, &br.StoreNo, &br.Slug, &br.DineIn, &br.Delivery,
+			&br.IsMain, &br.Color, &br.OpenTime, &br.CloseTime, &br.Paused, &br.MallVisible, &br.Status, &br.Sort, &br.OwnMenu,
+			&br.LogoURL, &br.CoverURL, &br.Intro, &br.CreatedAt, &c.reviews, &c.rating, &c.sales); err != nil {
+			crows.Close()
+			return nil, err
+		}
+		c.brand = &br
+		cards[br.BranchID] = append(cards[br.BranchID], c)
+	}
+	crows.Close()
+	if err := crows.Err(); err != nil {
+		return nil, err
+	}
 	brows, err := a.DB.Query(ctx, `SELECT `+branchCols+` FROM branches WHERE id = ANY($1) ORDER BY id`, ids)
 	if err != nil {
 		return nil, err
@@ -212,33 +248,47 @@ func (a *App) mallCandidates(ctx context.Context, where string, args ...any) ([]
 	defer brows.Close()
 	now := time.Now()
 	for brows.Next() {
-		b, err := scanBranch(brows)
+		store, err := scanBranch(brows)
 		if err != nil {
 			return nil, err
 		}
-		e := byID[b.ID]
-		s := &MallStore{id: b.ID, branch: b, Slug: b.Slug, Name: b.Name, NameEn: b.NameEn, LogoURL: e.logo, CoverURL: e.cover,
-			Tagline: e.tagline, Categories: e.cats, Currency: b.Currency, City: b.City, District: b.District,
-			MonthlySales: e.sales, Scheduling: b.SchedulingEnabled, Pickup: b.PickupEnabled,
-			Promos: []MallPromo{}, Dishes: []MallDish{}, MinOrderFrom: b.MinOrderAmount}
-		if s.Categories == nil {
-			s.Categories = []string{}
+		e := byID[store.ID]
+		for _, c := range cards[store.ID] {
+			bc := *store
+			b := bc.forBrand(c.brand)
+			logo, cover, tagline := e.logo, e.cover, e.tagline
+			if c.brand.LogoURL != "" {
+				logo = c.brand.LogoURL
+			}
+			if c.brand.CoverURL != "" {
+				cover = c.brand.CoverURL
+			}
+			if !c.brand.IsMain {
+				tagline = c.brand.Intro
+			}
+			s := &MallStore{id: b.ID, branch: b, brand: c.brand, Slug: b.Slug, Name: b.Name, NameEn: b.NameEn, LogoURL: logo, CoverURL: cover,
+				Tagline: tagline, Categories: e.cats, Currency: b.Currency, City: b.City, District: b.District,
+				MonthlySales: c.sales, Scheduling: b.SchedulingEnabled, Pickup: b.PickupEnabled,
+				Promos: []MallPromo{}, Dishes: []MallDish{}, MinOrderFrom: b.MinOrderAmount}
+			if s.Categories == nil {
+				s.Categories = []string{}
+			}
+			if c.reviews >= mallMinReviews {
+				r := c.rating
+				s.Rating = &r
+			}
+			switch {
+			case !b.takesOrders():
+				s.Status = "paused"
+			case b.isOpen(now):
+				s.Status = "open"
+			default:
+				s.Status = "closed"
+				s.OpensAt = b.OpenTime
+				s.OpensTomorrow = now.In(b.location()).Format("15:04") >= b.OpenTime
+			}
+			out = append(out, s)
 		}
-		if e.reviews >= mallMinReviews {
-			r := e.rating
-			s.Rating = &r
-		}
-		switch {
-		case !b.takesOrders():
-			s.Status = "paused"
-		case b.isOpen(now):
-			s.Status = "open"
-		default:
-			s.Status = "closed"
-			s.OpensAt = b.OpenTime
-			s.OpensTomorrow = now.In(b.location()).Format("15:04") >= b.OpenTime
-		}
-		out = append(out, s)
 	}
 	return out, brows.Err()
 }
@@ -270,6 +320,15 @@ func (a *App) mallZones(ctx context.Context, ids []int64) (map[int64][]Zone, err
 		out[bid] = append(out[bid], z)
 	}
 	return out, rows.Err()
+}
+
+// cardsByStore groups the cards by the store behind them.
+func cardsByStore(list []*MallStore) map[int64][]*MallStore {
+	out := map[int64][]*MallStore{}
+	for _, s := range list {
+		out[s.id] = append(out[s.id], s)
+	}
+	return out
 }
 
 func storeIDs(list []*MallStore) []int64 {
@@ -441,7 +500,10 @@ func (a *App) mallNames(ctx context.Context, list []*MallStore, lang string) err
 		return err
 	}
 	for _, s := range list {
-		s.NameTr = t[s.id].Name
+		// the store's translations are of the main brand's name
+		if s.brand == nil || s.brand.IsMain {
+			s.NameTr = t[s.id].Name
+		}
 	}
 	return nil
 }
@@ -507,10 +569,7 @@ func (a *App) mallPromos(ctx context.Context, list []*MallStore) error {
 	if len(list) == 0 {
 		return nil
 	}
-	byID := map[int64]*MallStore{}
-	for _, s := range list {
-		byID[s.id] = s
-	}
+	byID := cardsByStore(list)
 	rows, err := a.DB.Query(ctx, `SELECT p.branch_id, `+promoCols+`, 0 FROM promotions p
 		WHERE p.branch_id = ANY($1) AND p.status = 'active' AND p.scope = 'delivery' ORDER BY p.branch_id, p.id`, storeIDs(list))
 	if err != nil {
@@ -524,10 +583,15 @@ func (a *App) mallPromos(ctx context.Context, list []*MallStore) error {
 		if err := rows.Scan(p.scanDest(&bid)...); err != nil {
 			return err
 		}
-		s := byID[bid]
-		p.setLive(now, s.branch.location())
-		if p.LiveNow && len(s.Promos) < 2 {
-			s.Promos = append(s.Promos, MallPromo{Kind: p.Kind, Threshold: p.Threshold, Value: p.Value, MaxDiscount: p.MaxDiscount, Name: p.Name, NameEn: p.NameEn})
+		for _, s := range byID[bid] {
+			// a promotion works at the brands it lists only
+			if s.brand != nil && !slices.Contains(p.BrandIDs, s.brand.ID) {
+				continue
+			}
+			p.setLive(now, s.branch.location())
+			if p.LiveNow && len(s.Promos) < 2 {
+				s.Promos = append(s.Promos, MallPromo{Kind: p.Kind, Threshold: p.Threshold, Value: p.Value, MaxDiscount: p.MaxDiscount, Name: p.Name, NameEn: p.NameEn})
+			}
 		}
 	}
 	return rows.Err()
@@ -540,14 +604,13 @@ func (a *App) mallSearch(ctx context.Context, list []*MallStore, q, lang string)
 	if len(list) == 0 {
 		return nil
 	}
-	byID := map[int64]*MallStore{}
-	for _, s := range list {
-		byID[s.id] = s
-	}
+	byID := cardsByStore(list)
 	if !IsLang(lang) {
 		lang = "en"
 	}
-	rows, err := a.DB.Query(ctx, `SELECT i.branch_id, i.name, i.name_en, i.price, i.image_url,
+	rows, err := a.DB.Query(ctx, `SELECT i.branch_id, i.id, i.name ILIKE $2 OR i.name_en ILIKE $2 OR EXISTS (SELECT 1 FROM content_translations x
+			WHERE x.entity='item' AND x.entity_id=i.id AND x.field='name' AND x.text ILIKE $2),
+			i.name, i.name_en, i.price, i.image_url,
 			CASE WHEN b.menu_lang = $3 THEN '' ELSE COALESCE(
 				(SELECT t.text FROM content_translations t WHERE t.entity='item' AND t.entity_id=i.id AND t.field='name'
 					AND t.lang = CASE WHEN $3 = ANY(b.menu_langs_off) THEN 'en' ELSE $3 END),
@@ -556,35 +619,102 @@ func (a *App) mallSearch(ctx context.Context, list []*MallStore, q, lang string)
 		FROM menu_items i JOIN branches b ON b.id = i.branch_id
 		WHERE i.branch_id = ANY($1) AND i.published AND NOT i.archived AND (i.delivery_available OR i.pickup_available)
 		AND (i.name ILIKE $2 OR i.name_en ILIKE $2 OR EXISTS (SELECT 1 FROM content_translations x
-			WHERE x.entity='item' AND x.entity_id=i.id AND x.field='name' AND x.text ILIKE $2))
+			WHERE x.entity='item' AND x.entity_id=i.id AND x.field='name' AND x.text ILIKE $2)
+			-- a brand's own name for the dish
+			OR EXISTS (SELECT 1 FROM brand_items bi WHERE bi.item_id = i.id AND (bi.name ILIKE $2 OR bi.name_en ILIKE $2)))
 		ORDER BY i.branch_id, i.sort, i.id`, storeIDs(list), like(q), lang)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	type found struct {
+		bid, item int64
+		lib       bool // the store's own names matched, not only a brand's
+		d         MallDish
+	}
+	low := strings.ToLower(strings.TrimSpace(q))
+	has := func(xs ...string) bool {
+		for _, x := range xs {
+			if x != "" && strings.Contains(strings.ToLower(x), low) {
+				return true
+			}
+		}
+		return false
+	}
+	hits := []found{}
 	for rows.Next() {
-		var bid int64
-		var d MallDish
-		if err := rows.Scan(&bid, &d.Name, &d.NameEn, &d.Price, &d.ImageURL, &d.NameTr); err != nil {
+		var f found
+		if err := rows.Scan(&f.bid, &f.item, &f.lib, &f.d.Name, &f.d.NameEn, &f.d.Price, &f.d.ImageURL, &f.d.NameTr); err != nil {
+			rows.Close()
 			return err
 		}
-		if s := byID[bid]; len(s.Dishes) < 3 {
-			s.Dishes = append(s.Dishes, d)
+		hits = append(hits, f)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	// A brand with its own menu shows the dishes it sells, as it sells them.
+	own := map[int64]map[int64]BrandItem{}
+	for _, s := range list {
+		if s.brand != nil && s.brand.OwnMenu && own[s.brand.ID] == nil {
+			m, err := loadBrandMenu(ctx, a.DB, s.brand.ID)
+			if err != nil {
+				return err
+			}
+			own[s.brand.ID] = map[int64]BrandItem{}
+			for _, bi := range m.Items {
+				if bi.Published {
+					own[s.brand.ID][bi.ItemID] = bi
+				}
+			}
 		}
 	}
-	return rows.Err()
+	for _, f := range hits {
+		for _, s := range byID[f.bid] {
+			d := f.d
+			if s.brand != nil && s.brand.OwnMenu {
+				bi, ok := own[s.brand.ID][f.item]
+				if !ok {
+					continue
+				}
+				if bi.Name != "" {
+					if !has(bi.Name, bi.NameEn) {
+						continue
+					}
+					d.Name, d.NameEn, d.NameTr = bi.Name, bi.NameEn, ""
+				} else if !f.lib {
+					continue
+				}
+				if bi.ImageURL != "" {
+					d.ImageURL = bi.ImageURL
+				}
+				if bi.Price != nil {
+					d.Price = *bi.Price
+				}
+			} else if !f.lib {
+				continue
+			}
+			if len(s.Dishes) < 3 {
+				s.Dishes = append(s.Dishes, d)
+			}
+		}
+	}
+	return nil
 }
 
 // mallMine marks the stores a customer keeps or has ordered from.
 func (a *App) mallMine(ctx context.Context, customerID int64, list []*MallStore) error {
 	byID := map[int64]*MallStore{}
 	for _, s := range list {
-		byID[s.id] = s
+		if s.brand != nil {
+			byID[s.brand.ID] = s
+		}
 	}
-	rows, err := a.DB.Query(ctx, `SELECT branch_id, max(at) FROM (
-			SELECT branch_id, created_at AS at FROM customer_favorites WHERE customer_id = $1 AND branch_id = ANY($2)
+	rows, err := a.DB.Query(ctx, `SELECT brand_id, max(at) FROM (
+			SELECT brand_id, created_at AS at FROM customer_favorites WHERE customer_id = $1 AND branch_id = ANY($2)
 			UNION ALL
-			SELECT branch_id, created_at FROM orders WHERE customer_id = $1 AND branch_id = ANY($2)) u GROUP BY 1`,
+			SELECT brand_id, created_at FROM orders WHERE customer_id = $1 AND branch_id = ANY($2)) u
+		WHERE brand_id IS NOT NULL GROUP BY 1`,
 		customerID, storeIDs(list))
 	if err != nil {
 		return err
@@ -596,7 +726,9 @@ func (a *App) mallMine(ctx context.Context, customerID int64, list []*MallStore)
 		if err := rows.Scan(&bid, &at); err != nil {
 			return err
 		}
-		byID[bid].lastUsed = &at
+		if s := byID[bid]; s != nil {
+			s.lastUsed = &at
+		}
 	}
 	return rows.Err()
 }

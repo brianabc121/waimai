@@ -374,11 +374,15 @@ func (a *App) StoreCoupons(ctx context.Context, slug string, customerID int64) (
 	if err != nil {
 		return nil, err
 	}
+	br, err := brandBySlug(ctx, a.DB, b.ID, slug)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := a.DB.Query(ctx, `SELECT id, kind, name, name_en, value, threshold, valid_days,
 			(SELECT count(*) FROM customer_coupons c WHERE c.batch_id = b.id AND c.customer_id = $2) >= COALESCE(per_customer, 1),
 			total_quota IS NOT NULL AND issued_count >= total_quota
-		FROM coupon_batches b WHERE branch_id=$1 AND source='claim' AND status='active'
-		ORDER BY value DESC, id`, b.ID, customerID)
+		FROM coupon_batches b WHERE branch_id=$1 AND brand_id=$3 AND source='claim' AND status='active'
+		ORDER BY value DESC, id`, b.ID, customerID, br.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -400,11 +404,15 @@ func (a *App) ClaimCoupon(ctx context.Context, slug string, batchID, customerID 
 	if err != nil {
 		return nil, err
 	}
+	br, err := brandBySlug(ctx, a.DB, b.ID, slug)
+	if err != nil {
+		return nil, err
+	}
 	var id int64
 	err = a.inTx(ctx, func(tx pgx.Tx) error {
 		var ok bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM coupon_batches WHERE id=$1 AND branch_id=$2 AND source='claim')`,
-			batchID, b.ID).Scan(&ok); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM coupon_batches WHERE id=$1 AND branch_id=$2 AND brand_id=$3 AND source='claim')`,
+			batchID, b.ID, br.ID).Scan(&ok); err != nil {
 			return err
 		}
 		if !ok {

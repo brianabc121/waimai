@@ -98,7 +98,7 @@ func TestMallVsWebOrder(t *testing.T) {
 	noErr(t, err)
 	all, err := a.CustomerOrders(ctx, cust, "all", "", 0)
 	noErr(t, err)
-	here, err := a.CustomerOrdersAt(ctx, cust, s.branchID, "all", "", 0)
+	here, err := a.CustomerOrdersAt(ctx, cust, s.branchID, 0, "all", "", 0)
 	noErr(t, err)
 	if len(all.Orders) != 3 || len(here.Orders) != 2 {
 		t.Fatalf("orders: all %d, this store %d", len(all.Orders), len(here.Orders))

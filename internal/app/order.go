@@ -571,8 +571,16 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			}
 		}
 
+		// The quote was for the brand whose page this is.
+		br, err := brandBySlug(ctx, tx, b.ID, slug)
+		if err != nil {
+			return err
+		}
+		if quoted.Input.BrandID != br.ID {
+			return Err(http.StatusConflict, "QUOTE_EXPIRED", "the quote expired, please review the amount again")
+		}
 		// Re-price against the live menu; anything that moved needs a new confirmation.
-		a.forCustomer(b)
+		a.forCustomer(b.forBrand(br))
 		cur, err := computeQuote(ctx, tx, b, quoted.Input, phone)
 		if err != nil {
 			return err
@@ -589,7 +597,7 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		if in.OwnSite {
 			typ = TypeWeb
 		}
-		no, err := nextOrderNo(ctx, tx, b, typ)
+		no, err := nextOrderNo(ctx, tx, b, br, typ)
 		if err != nil {
 			return err
 		}

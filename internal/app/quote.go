@@ -500,7 +500,13 @@ func (a *App) CreateQuote(ctx context.Context, slug string, in QuoteInput, phone
 	if err != nil {
 		return nil, err
 	}
-	quote, err := computeQuote(ctx, a.DB, a.forCustomer(b), in, phone)
+	// the brand is the one whose page the customer orders on
+	br, err := brandBySlug(ctx, a.DB, b.ID, slug)
+	if err != nil {
+		return nil, err
+	}
+	in.BrandID = br.ID
+	quote, err := computeQuote(ctx, a.DB, a.forCustomer(b.forBrand(br)), in, phone)
 	if err != nil {
 		return nil, err
 	}

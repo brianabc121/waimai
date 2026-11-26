@@ -3896,5 +3896,10 @@
  "bm.pic_hint": "Déjala vacía para usar la foto del plato de la tienda",
  "bm.pic_store": "Usar la foto de la tienda",
  "bm.done": "Listo",
- "bm.hint": "Un precio vacío es el de la tienda. Un precio nuevo solo vale para pedidos nuevos; la pantalla de cocina muestra el nombre del plato de la tienda entre paréntesis."
+ "bm.hint": "Un precio vacío es el de la tienda. Un precio nuevo solo vale para pedidos nuevos; la pantalla de cocina muestra el nombre del plato de la tienda entre paréntesis.",
+ "br.look": "Lo que ven los clientes",
+ "br.look_hint": "En el mercado y en su propia página la marca es una tienda aparte; sin fotos usa el logo y la portada de la tienda.",
+ "br.logo": "Logo de la marca",
+ "br.cover": "Portada de la marca",
+ "br.intro": "Presentación de una línea (en la tarjeta del mercado)"
 }

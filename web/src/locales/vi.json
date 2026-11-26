@@ -3896,5 +3896,10 @@
  "bm.pic_hint": "Để trống để dùng ảnh món của cửa hàng",
  "bm.pic_store": "Dùng ảnh cửa hàng",
  "bm.done": "Xong",
- "bm.hint": "Giá trống là giá cửa hàng. Giá mới chỉ áp dụng cho đơn sau; màn hình bếp hiện tên món của cửa hàng trong ngoặc."
+ "bm.hint": "Giá trống là giá cửa hàng. Giá mới chỉ áp dụng cho đơn sau; màn hình bếp hiện tên món của cửa hàng trong ngoặc.",
+ "br.look": "Khách hàng nhìn thấy gì",
+ "br.look_hint": "Trong chợ và trên trang riêng, thương hiệu là một cửa hàng độc lập; không có ảnh thì dùng logo và ảnh bìa của cửa hàng.",
+ "br.logo": "Logo thương hiệu",
+ "br.cover": "Ảnh bìa thương hiệu",
+ "br.intro": "Giới thiệu một dòng (hiện trên thẻ ở chợ)"
 }

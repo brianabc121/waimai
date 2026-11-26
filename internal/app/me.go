@@ -57,6 +57,7 @@ func (a *App) CustomerProfile(ctx context.Context, customerID int64) (*Profile, 
 	err := a.DB.QueryRow(ctx, `SELECT phone, nickname, avatar_at,
 		(SELECT count(*) FROM customer_messages m WHERE m.customer_id = c.id AND m.read_at IS NULL),
 		(SELECT count(*) FROM customer_favorites f JOIN branches b ON b.id = f.branch_id
+			JOIN brands br ON br.id = f.brand_id AND br.status = 'active'
 			WHERE f.customer_id = c.id AND b.deleted_at IS NULL),
 		(SELECT COALESCE(sum(t.customer_unread), 0) FROM chat_threads t WHERE t.customer_id = c.id)
 		+ (SELECT COALESCE(sum(s.party_unread), 0) FROM support_threads s WHERE s.customer_id = c.id)
@@ -130,6 +131,11 @@ type StoreRef struct {
 const storeRefCols = `b.slug, b.name, b.name_en, coalesce((SELECT t.published->>'logo_url' FROM channel_templates t
 	WHERE t.branch_id = b.id AND t.channel = 'delivery'), '')`
 
+// brandRefCols is storeRefCols for a brand (br) of a store (b): each brand
+// is a shop of its own to customers.
+const brandRefCols = `br.slug, br.name, br.name_en, coalesce(NULLIF(br.logo_url, ''), (SELECT t.published->>'logo_url' FROM channel_templates t
+	WHERE t.branch_id = b.id AND t.channel = 'delivery'), '')`
+
 const myPageSize = 20
 
 // orderItems reads the dishes of the listed orders.
@@ -170,11 +176,11 @@ type MyStore struct {
 // MyStores lists the stores the customer keeps and those they ordered from,
 // the most recently used first. With favoritesOnly, only the kept ones.
 func (a *App) MyStores(ctx context.Context, customerID int64, favoritesOnly bool) ([]MyStore, error) {
-	rows, err := a.DB.Query(ctx, `SELECT `+storeRefCols+`, b.phone, b.address, b.currency, f.customer_id IS NOT NULL, lo.at
-		FROM branches b
-		LEFT JOIN customer_favorites f ON f.branch_id = b.id AND f.customer_id = $1
-		LEFT JOIN (SELECT branch_id, max(created_at) AS at FROM orders WHERE customer_id = $1 GROUP BY 1) lo ON lo.branch_id = b.id
-		WHERE b.deleted_at IS NULL AND EXISTS (SELECT 1 FROM merchants m WHERE m.id = b.merchant_id AND m.deleted_at IS NULL)
+	rows, err := a.DB.Query(ctx, `SELECT `+brandRefCols+`, b.phone, b.address, b.currency, f.customer_id IS NOT NULL, lo.at
+		FROM brands br JOIN branches b ON b.id = br.branch_id
+		LEFT JOIN customer_favorites f ON f.brand_id = br.id AND f.customer_id = $1
+		LEFT JOIN (SELECT brand_id, max(created_at) AS at FROM orders WHERE customer_id = $1 GROUP BY 1) lo ON lo.brand_id = br.id
+		WHERE b.deleted_at IS NULL AND br.status = 'active' AND EXISTS (SELECT 1 FROM merchants m WHERE m.id = b.merchant_id AND m.deleted_at IS NULL)
 			AND (f.customer_id IS NOT NULL OR (lo.at IS NOT NULL AND NOT $2))
 		ORDER BY greatest(lo.at, f.created_at) DESC NULLS LAST LIMIT 50`, customerID, favoritesOnly)
 	if err != nil {
@@ -192,8 +198,8 @@ func (a *App) MyStores(ctx context.Context, customerID int64, favoritesOnly bool
 
 func (a *App) IsFavorite(ctx context.Context, customerID int64, slug string) (bool, error) {
 	var on bool
-	err := a.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM customer_favorites f JOIN branches b ON b.id = f.branch_id
-		WHERE f.customer_id=$1 AND b.slug=$2)`, customerID, slug).Scan(&on)
+	err := a.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM customer_favorites f JOIN brands br ON br.id = f.brand_id
+		WHERE f.customer_id=$1 AND br.slug=$2)`, customerID, slug).Scan(&on)
 	return on, err
 }
 
@@ -203,11 +209,15 @@ func (a *App) SetFavorite(ctx context.Context, customerID int64, slug string, on
 	if err != nil {
 		return err
 	}
+	br, err := brandBySlug(ctx, a.DB, b.ID, slug)
+	if err != nil {
+		return err
+	}
 	if on {
-		_, err = a.DB.Exec(ctx, `INSERT INTO customer_favorites (customer_id, branch_id) VALUES ($1,$2)
-			ON CONFLICT DO NOTHING`, customerID, b.ID)
+		_, err = a.DB.Exec(ctx, `INSERT INTO customer_favorites (customer_id, branch_id, brand_id) VALUES ($1,$2,$3)
+			ON CONFLICT DO NOTHING`, customerID, b.ID, br.ID)
 	} else {
-		_, err = a.DB.Exec(ctx, `DELETE FROM customer_favorites WHERE customer_id=$1 AND branch_id=$2`, customerID, b.ID)
+		_, err = a.DB.Exec(ctx, `DELETE FROM customer_favorites WHERE customer_id=$1 AND brand_id=$2`, customerID, br.ID)
 	}
 	return err
 }
@@ -244,7 +254,11 @@ func (a *App) MyOffers(ctx context.Context, customerID int64, slug string) ([]St
 		if err != nil {
 			continue // the store is gone
 		}
-		ps, err := livePromotions(ctx, a.DB, b, 0, "delivery")
+		br, err := brandBySlug(ctx, a.DB, b.ID, sl)
+		if err != nil {
+			return nil, err
+		}
+		ps, err := livePromotions(ctx, a.DB, b, br.ID, "delivery")
 		if err != nil {
 			return nil, err
 		}
@@ -253,6 +267,7 @@ func (a *App) MyOffers(ctx context.Context, customerID int64, slug string) ([]St
 		}
 		ref, ok := refs[sl]
 		if !ok {
+			b.forBrand(br)
 			ref = StoreRef{Slug: b.Slug, Name: b.Name, NameEn: b.NameEn}
 		}
 		out = append(out, StoreOffers{Store: ref, Currency: b.Currency, Promotions: ps})
@@ -270,8 +285,8 @@ type MyReview struct {
 
 func (a *App) MyReviews(ctx context.Context, customerID int64) ([]MyReview, error) {
 	rows, err := a.DB.Query(ctx, `SELECT r.id, r.order_id, r.display_name, r.rating, r.taste, r.packaging, r.delivery,
-		r.comment, r.created_at, o.token_nonce, `+storeRefCols+`
-		FROM reviews r JOIN orders o ON o.id = r.order_id JOIN branches b ON b.id = r.branch_id
+		r.comment, r.created_at, o.token_nonce, `+brandRefCols+`
+		FROM reviews r JOIN orders o ON o.id = r.order_id JOIN branches b ON b.id = r.branch_id JOIN brands br ON br.id = r.brand_id
 		WHERE o.customer_id=$1 ORDER BY r.id DESC LIMIT 100`, customerID)
 	if err != nil {
 		return nil, err
