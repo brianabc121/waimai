@@ -13,6 +13,8 @@ import { currentRole, session } from '../session'
 import type { Item, OptionGroup, Order, PlatformQuote, QuoteLine, Storefront } from '../types'
 import { type BranchPlatform, bpToPct, platformName } from '../platforms'
 import '../platformOrders'
+import { multiBrand } from '../brands'
+import type { BrandRef } from '../types'
 import NotePicker from './NotePicker.vue'
 import { cartTags, hasNotes } from '../notes'
 
@@ -21,33 +23,51 @@ const bid = session.branchId!
 const base = `/merchant/branches/${bid}`
 
 const store = ref<Storefront | null>(null)
-const platforms = ref<BranchPlatform[]>([])
+// Each brand has its own shops on the platforms (一品湘 Grab, 好吃党 Grab,
+// docs/MULTI_BRAND_DESIGN.md §7): staff pick the shop the order came in on.
+interface Shop { key: string; brand: BrandRef; p: BranchPlatform }
+const shops = ref<Shop[]>([])
+const platforms = computed(() => shops.value.map(s => s.p))
 const loaded = ref(false)
 const loadError = ref('')
 const cur = computed(() => quote.value?.currency ?? store.value?.branch.currency ?? currentRole()?.currency ?? 'PHP')
 const m = (v: number) => money(v, cur.value)
 const items = computed<Item[]>(() => (store.value?.categories ?? []).flatMap(c => c.items))
 onMounted(async () => {
-  const slug = currentRole()?.slug
   try {
-    const [s, p] = await Promise.all([slug ? get<Storefront>(`/stores/${slug}`) : Promise.resolve(null),
-      get<{ platforms: BranchPlatform[] }>(`${base}/platform-orders/platforms`)])
-    store.value = s; platforms.value = p.platforms
-    let last = 0
-    try { last = Number(localStorage.getItem(`po-platform-${bid}`)) || 0 } catch { /* private window */ }
-    f.platform = (platforms.value.find(x => x.id === last) ?? platforms.value[0])?.id ?? 0
+    const p = await get<{ shops: { brand: BrandRef; platforms: BranchPlatform[] }[] }>(`${base}/platform-orders/platforms`)
+    shops.value = (p.shops ?? []).flatMap(x => x.platforms.map(pl => ({ key: `${x.brand.id}-${pl.id}`, brand: x.brand, p: pl })))
+    let last = ''
+    try { last = localStorage.getItem(`po-shop-${bid}`) || '' } catch { /* private window */ }
+    f.shop = (shops.value.find(x => x.key === last) ?? shops.value[0])?.key ?? ''
+    await loadMenu()
   } catch (e) { loadError.value = (e as Error).message }
   loaded.value = true
 })
 
 // ---------- the form ----------
 const f = reactive({
-  platform: 0, no: '', pickup: 'rider' as 'rider' | 'customer', when: '', customer: '', note: '', staffNote: '',
+  shop: '', no: '', pickup: 'rider' as 'rider' | 'customer', when: '', customer: '', note: '', staffNote: '',
   merchant: '', platformPromo: '', packaging: '', check: '',
   editCommission: false, commission: '', commissionReason: '',
 })
-const platform = computed(() => platforms.value.find(p => p.id === f.platform) ?? null)
-watch(() => f.platform, id => { try { if (id) localStorage.setItem(`po-platform-${bid}`, String(id)) } catch { /* private window */ } })
+const shop = computed(() => shops.value.find(s => s.key === f.shop) ?? null)
+const platform = computed(() => shop.value?.p ?? null)
+const shopName = (s: Shop) => multiBrand() ? `${s.brand.name} ${platformName(s.p)}` : platformName(s.p)
+// the brand's menu: its dishes, names and prices; dishes it does not sell leave the order
+let menuBrand = -1
+async function loadMenu() {
+  const slug = currentRole()?.slug, brand = shop.value?.brand.id ?? 0
+  if (!slug || brand === menuBrand) return
+  menuBrand = brand
+  store.value = await get<Storefront>(`/stores/${slug}?brand=${brand}`)
+  const ids = new Set(items.value.map(i => i.id))
+  lines.value = lines.value.filter(l => ids.has(l.item.id)).map(l => ({ ...l, item: items.value.find(i => i.id === l.item.id)! }))
+}
+watch(() => f.shop, k => {
+  try { if (k) localStorage.setItem(`po-shop-${bid}`, k) } catch { /* private window */ }
+  loadMenu().catch(e => { loadError.value = (e as Error).message })
+})
 // a number that does not look like the platform's numbers (a typo, the wrong platform)
 const noOdd = computed(() => {
   const p = platform.value, no = f.no.trim()
@@ -145,7 +165,7 @@ const error = ref('')
 const amount = (s: string) => s.trim() === '' ? 0 : toMinor(s)
 const commissionTyped = computed(() => f.editCommission && f.commission.trim() !== '' && !isNaN(Number(f.commission)))
 const body = () => ({
-  platform_id: f.platform, platform_no: f.no.trim(), pickup: f.pickup, scheduled_for: f.when || null,
+  platform_id: platform.value?.id ?? 0, brand_id: shop.value?.brand.id ?? 0, platform_no: f.no.trim(), pickup: f.pickup, scheduled_for: f.when || null,
   customer_name: f.customer.trim(), note: f.note.trim(), staff_note: f.staffNote.trim(),
   items: lines.value.map(l => ({ item_id: l.item.id, qty: l.qty, note: l.note, note_tag_ids: l.tags,
     option_ids: Object.entries(l.picks).flatMap(([id, n]) => Array(n).fill(Number(id))) })),
@@ -160,7 +180,7 @@ watch(() => JSON.stringify(body()), () => {
 })
 async function requote() {
   const seq = ++quoteSeq
-  if (!f.platform || !lines.value.length) { quote.value = null; quoteError.value = ''; return }
+  if (!f.shop || !lines.value.length) { quote.value = null; quoteError.value = ''; return }
   try {
     // the reason is asked for when placing: a commission being typed is still priced
     const b = body()
@@ -206,7 +226,7 @@ const done = ref<Order | null>(null)
 const dupGone = ref(false)
 async function place() {
   error.value = ''
-  if (!f.platform) { error.value = t('po.need_platform'); return }
+  if (!f.shop) { error.value = t('po.need_platform'); return }
   if (!f.no.trim()) { error.value = t('po.need_no'); return }
   if (!lines.value.length) { error.value = t('po.need_items'); return }
   if (commissionTyped.value && !f.commissionReason.trim()) { error.value = t('po.need_reason'); return }
@@ -298,9 +318,9 @@ const publicNo = computed(() => platform.value && f.no.trim() ? `${platform.valu
           <div class="fld">
             <label class="k">{{ t('po.platform') }}</label>
             <div class="pfs" role="radiogroup">
-              <button v-for="p in platforms" :key="p.id" type="button" class="pf" :class="{ on: f.platform === p.id }" :style="{ '--pc': p.color }"
-                role="radio" :aria-checked="f.platform === p.id" :data-platform="p.prefix" data-testid="po-platform" @click="f.platform = p.id">
-                <img v-if="p.logo_url" :src="p.logo_url" alt="" /><span>{{ platformName(p) }}</span></button>
+              <button v-for="x in shops" :key="x.key" type="button" class="pf" :class="{ on: f.shop === x.key }" :style="{ '--pc': x.p.color }"
+                role="radio" :aria-checked="f.shop === x.key" :data-platform="x.p.prefix" :data-brand="x.brand.id" data-testid="po-platform" @click="f.shop = x.key">
+                <img v-if="x.p.logo_url" :src="x.p.logo_url" alt="" /><span>{{ shopName(x) }}</span></button>
             </div>
           </div>
           <div class="fld">

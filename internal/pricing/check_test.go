@@ -32,6 +32,11 @@ func TestPlatformPrice(t *testing.T) {
 		{12750, 0, 500, 13000},     // no markup, to 5: 127.50 → 130.00 (half up)
 		{12740, 0, 500, 12500},     // 127.40 → 125.00
 		{0, 3000, 100, 0},
+		// S10a (docs/MULTI_BRAND_DESIGN.md §11.4): each brand's price with its own markup on Grab
+		{5200, 1500, 100, 6000}, // 好吃党 Grab: 辣椒炒肉 52.00 × 1.15 = 59.80 → 60.00
+		{300, 1500, 100, 300},   // 好吃党 Grab: 米饭 3.00 × 1.15 = 3.45 → 3.00
+		{5800, 2000, 100, 7000}, // 一品湘 Grab: 小炒肉 58.00 × 1.2 = 69.60 → 70.00
+		{300, 2000, 100, 400},   // 一品湘 Grab: 米饭 3.00 × 1.2 = 3.60 → 4.00
 	} {
 		if got := PlatformPrice(c.price, c.markup, c.step); got != c.want {
 			t.Errorf("PlatformPrice(%d, %d, %d) = %d, want %d", c.price, c.markup, c.step, got, c.want)
@@ -54,6 +59,9 @@ func TestPlatformCommission(t *testing.T) {
 		{100, 5000, 50},
 		{0, 3000, 0},
 		{50000, 0, 0},
+		// S10a: 好吃党 Grab 25% of 126.00 = 31.50, payout 94.50; 一品湘 Grab 30% of 148.00 = 44.40, payout 103.60
+		{12600, 2500, 3150},
+		{14800, 3000, 4440},
 	} {
 		if got := Commission(c.base, c.rate); got != c.want {
 			t.Errorf("Commission(%d, %d) = %d, want %d", c.base, c.rate, got, c.want)

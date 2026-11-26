@@ -3901,5 +3901,6 @@
  "br.look_hint": "En el mercado y en su propia página la marca es una tienda aparte; sin fotos usa el logo y la portada de la tienda.",
  "br.logo": "Logo de la marca",
  "br.cover": "Portada de la marca",
- "br.intro": "Presentación de una línea (en la tarjeta del mercado)"
+ "br.intro": "Presentación de una línea (en la tarjeta del mercado)",
+ "br.pf_hint": "Cada marca es una tienda aparte en las plataformas, con su propio ID de tienda, comisión y recargo. Los precios de plataforma escritos a mano son de la marca principal; las demás recargan sus propios precios."
 }
