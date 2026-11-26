@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>一店多品牌 原型</title>
+<style>
+:root{--brand:#a02c20;--brand-dark:#86231a;--gold:#f0c46a;--ink:#3b1f14;--muted:#7b6657;--line:#e6d8c4;--bg:#f8efe1;--card:#fffaf2;--head:#f4ebde;--ok:#18794e;--warn:#b45309;--bad:#b42318;
+--ypx:#a02c20;--hcd:#e07a10;--jx:#2463a6;--grab:#00b14f;--fp:#d70f64}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);font-size:14px}
+.shell{display:grid;grid-template-columns:200px minmax(0,1fr);min-height:100vh}
+.side{background:#20252b;color:#d7dbe0;padding:14px 10px}
+.side .shop{font-weight:700;font-size:17px;color:#fff;padding:4px 10px}
+.side .who{font-size:12px;color:#9aa3ad;padding:4px 10px 12px}
+.side .g{padding:9px 10px;font-weight:600;color:#fff}
+.side .s{padding:8px 10px 8px 24px;color:#c9ced5;border-radius:8px}
+.side .s.on{background:#353b44;color:#fff;border-left:3px solid var(--brand)}
+.top{height:48px;background:var(--brand) repeating-radial-gradient(circle at 0 0,transparent 0 10px,rgba(255,255,255,.06) 10px 11px);color:#fff;display:flex;align-items:center;gap:14px;padding:0 18px}
+.top h1{font-size:18px;margin:0}.top .st{color:var(--gold);font-size:13px}
+.main{display:flex;flex-direction:column;min-width:0}
+.body{padding:16px 18px;display:grid;gap:14px;align-content:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h3{margin:0 0 10px;font-size:15px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.mini{font-size:12px;color:var(--muted)}
+.tag{display:inline-flex;align-items:center;gap:4px;border-radius:5px;padding:1px 7px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+.t-ypx{background:var(--ypx)}.t-hcd{background:var(--hcd)}.t-jx{background:var(--jx)}.t-grab{background:var(--grab)}.t-fp{background:var(--fp)}
+.t-line{background:#fff;color:var(--ink);border:1px solid var(--line);font-weight:600}
+.t-gold{background:#f8e3b2;color:#7a3e00}
+.btn{border:1px solid var(--brand);color:var(--brand);background:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer}
+.btn.p{background:var(--brand);color:#fff}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.seg span{padding:7px 14px;border-inline-end:1px solid var(--line);display:flex;gap:6px;align-items:center;font-weight:600}
+.seg span:last-child{border:0}
+.seg span.on{background:var(--brand);color:#fff}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+table{border-collapse:collapse;width:100%}
+th{background:var(--head);text-align:left;padding:8px 10px;font-size:13px;color:var(--muted);font-weight:600}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.logo{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:18px;flex:none}
+.bcard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:8px;border-top:4px solid var(--c)}
+.f{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:center;margin-bottom:10px}
+.f>label{font-weight:600;font-size:13px}
+.inp{border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:#fff;min-height:34px;display:flex;align-items:center;gap:8px}
+.note{background:#fff7e0;border:1px solid #f0d99a;border-radius:10px;padding:10px 12px;font-size:13px;color:#6b4a00;display:grid;gap:4px}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.code{background:#f8e3b2;color:#7a3e00;border-radius:4px;padding:1px 6px;font-size:12px;font-weight:700}
+.big{font-size:22px;font-weight:800}
+.phone{width:340px;border:8px solid #222;border-radius:28px;background:#fff;overflow:hidden}
+.url{background:#eee;font-size:11px;padding:5px 10px;color:#444}
+.ctop{background:var(--brand);color:#fff;padding:10px 12px;display:flex;align-items:center;gap:8px}
+.shopc{display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.shopc .im{width:64px;height:64px;border-radius:10px;flex:none;display:grid;place-items:center;color:#fff;font-weight:800;font-size:20px}
+.bnav{display:flex;justify-content:space-around;border-top:1px solid var(--line);padding:8px 0;font-size:12px;color:var(--muted)}
+.bnav .on{color:var(--brand);font-weight:700}
+.dish{display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.dish .im{width:56px;height:56px;border-radius:8px;background:linear-gradient(135deg,#f3c9a0,#d97b4a);flex:none}
+.map{position:relative;height:380px;border-radius:12px;overflow:hidden;background:#e9eef0;
+ background-image:linear-gradient(#d9e1e4 1px,transparent 1px),linear-gradient(90deg,#d9e1e4 1px,transparent 1px);background-size:40px 40px}
+.map .p{position:absolute;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.map .h{position:absolute;border-radius:50%;filter:blur(18px);opacity:.55}
+.map .home{position:absolute;left:46%;top:46%;background:var(--ink);color:#fff;border-radius:8px;padding:3px 8px;font-size:12px;font-weight:700}
+.chk{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:4px;border:1.5px solid var(--brand);font-size:12px;color:#fff;background:var(--brand)}
+.chk.off{background:#fff;color:#fff}
+.cap{font-size:12px;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const s = new URLSearchParams(location.search).get('s') || '1';
+const B = {ypx:{n:'一品湘',c:'YPX',cls:'t-ypx',col:'var(--ypx)'},hcd:{n:'好吃党',c:'HCD',cls:'t-hcd',col:'var(--hcd)'},jx:{n:'江西小吃',c:'JXX',cls:'t-jx',col:'var(--jx)'}};
+const tag = k => `<span class="tag ${B[k].cls}">${B[k].n}</span>`;
+function shell(active, title, sub, body){
+  const menu = [['点单',['堂食下单','外卖下单','平台下单']],['订单',['订单列表','烹饪进度']],['菜单',null],['客户管理',['会员列表','送餐地址']],['财务',['核款','账单','对账']],['员工',null],['店铺设置',['品牌','订单编号','店铺链接']]];
+  let side = `<div class="side"><div class="shop">一品湘 · 马卡蒂店</div><div class="who">门店 · 店主 brian</div>`;
+  for (const [g,subs] of menu){
+    side += `<div class="g${!subs&&g===active?' on':''}" ${!subs&&g===active?'style="background:#353b44;border-radius:8px"':''}>${g}</div>`;
+    if(subs) for(const x of subs) side += `<div class="s${x===active?' on':''}">${x}</div>`;
+  }
+  side += `</div>`;
+  return `<div class="shell">${side}<div class="main"><div class="top"><h1>${title}</h1><span class="st">${sub||''}</span></div><div class="body">${body}</div></div></div>`;
+}
+function brandSeg(on, all=true){
+  let h = `<div class="seg">`;
+  if(all) h += `<span class="${on==='all'?'on':''}">全部品牌（合并）</span>`;
+  for(const k of ['ypx','hcd','jx']) h += `<span class="${on===k?'on':''}"><i class="dot" style="background:${B[k].col}"></i>${B[k].n}</span>`;
+  return h + `</div>`;
+}
+const screens = {
+'1': () => shell('品牌','品牌','一个门店 = 一个厨房；下面挂 1 个堂食品牌 + 多个外卖品牌', `
+<div class="row" style="justify-content:space-between"><div class="mini">门店：一品湘 · 马卡蒂店（厨房、员工、桌台、骑手、钱箱、配送范围共用）</div><button class="btn p">＋ 新建外卖品牌</button></div>
+<div class="grid3">
+ <div class="bcard" style="--c:var(--ypx)"><div class="row"><div class="logo" style="background:var(--ypx)">湘</div><div><b style="font-size:16px">一品湘</b> <span class="tag t-gold">主品牌</span><div class="mini">代码 <span class="code">YPX</span> · 代客单号 YPX000112</div></div></div>
+  <div class="row"><span class="tag t-line">堂食</span><span class="tag t-line">外卖</span><span class="tag t-line">自取</span></div>
+  <div class="mini">专属网址 10001.abcfood.com · 自有域名 order.yipinxiang.ph</div>
+  <div class="row"><span class="tag t-grab">Grab</span><span class="tag t-fp">foodpanda</span><span class="mini">商城显示</span></div>
+  <div class="row" style="justify-content:space-between"><span>今日 <b>86</b> 单 · ₱24,380</span><span class="ok">● 营业中</span></div></div>
+ <div class="bcard" style="--c:var(--hcd)"><div class="row"><div class="logo" style="background:var(--hcd)">好</div><div><b style="font-size:16px">好吃党</b><div class="mini">代码 <span class="code">HCD</span> · 代客单号 HCD000223</div></div></div>
+  <div class="row"><span class="tag t-line">外卖</span><span class="tag t-line">自取</span></div>
+  <div class="mini">专属网址 10087.abcfood.com</div>
+  <div class="row"><span class="tag t-grab">Grab</span><span class="tag t-fp">foodpanda</span><span class="mini">商城显示</span></div>
+  <div class="row" style="justify-content:space-between"><span>今日 <b>41</b> 单 · ₱9,870</span><span class="ok">● 营业中</span></div></div>
+ <div class="bcard" style="--c:var(--jx)"><div class="row"><div class="logo" style="background:var(--jx)">赣</div><div><b style="font-size:16px">江西小吃</b><div class="mini">代码 <span class="code">JXX</span> · 代客单号 JXX000017</div></div></div>
+  <div class="row"><span class="tag t-line">外卖</span></div>
+  <div class="mini">专属网址 10088.abcfood.com · 营业 17:00–23:00（品牌自己设）</div>
+  <div class="row"><span class="tag t-grab">Grab</span><span class="mini">商城显示</span></div>
+  <div class="row" style="justify-content:space-between"><span>今日 <b>12</b> 单 · ₱2,640</span><span class="bad">⏸ 暂停接单</span></div></div>
+</div>
+<div class="note"><b>规则</b><div>· 一个门店最多 1 个堂食品牌；外卖品牌最多 10 个（平台可放宽）。一品湘同时做堂食和外卖。</div><div>· 品牌代码全平台唯一；改代码只影响以后的单。有订单的品牌只能停用不能删，主品牌不能停用。</div><div>· 老店升级后自动变成“主品牌”：店名、代码、网址、会员号、订单号都不变。</div></div>
+`),
+'2': () => shell('品牌','新建外卖品牌','', `
+<div class="grid2">
+<div class="card"><h3>基本信息</h3>
+ <div class="f"><label>品牌名</label><div class="inp">好吃党 <span class="mini" style="margin-inline-start:auto">English: Haochidang · 自动翻译 12 种语言</span></div></div>
+ <div class="f"><label>品牌代码</label><div class="inp"><b>HCD</b><span class="mini" style="margin-inline-start:auto">按拼音首字母自动给，可改 · <span class="ok">✓ 可用</span></span></div></div>
+ <div class="f"><label></label><div class="mini">代客单号预览：<span class="code">HCD000001</span> 、同日第二单 <span class="code">HCD000001-2</span></div></div>
+ <div class="f"><label>标志 / 封面</label><div class="row"><div class="logo" style="background:var(--hcd)">好</div><div class="inp" style="flex:1">封面 16:9 已裁剪 ✓</div></div></div>
+ <div class="f"><label>标签颜色</label><div class="row"><i class="dot" style="background:var(--hcd);width:22px;height:22px"></i><span class="mini">后台订单、后厨、地图上用这个颜色</span></div></div>
+ <div class="f"><label>类型</label><div class="row"><span class="chk off">✓</span>堂食 <span class="mini">（本店已有堂食品牌“一品湘”）</span><span class="chk">✓</span>外卖<span class="chk">✓</span>自取</div></div>
+ <div class="f"><label>营业时间</label><div class="row"><span class="chk off">✓</span>跟门店（10:00–23:00）<span class="chk">✓</span>单独设 <div class="inp">11:00–22:00</div></div></div>
+ <div class="f"><label>菜单</label><div class="inp">从“一品湘”复制菜单，之后再改 ▾</div></div>
+ <div class="f"><label>河马商城</label><div class="row"><span class="chk">✓</span>在商城显示为一家独立的店</div></div>
+</div>
+<div class="card"><h3>外卖平台（按品牌开通）</h3>
+ <table><tr><th>平台</th><th>平台店铺号</th><th class="num">佣金</th><th class="num">加价</th><th>取整</th></tr>
+ <tr><td><span class="chk">✓</span> <span class="tag t-grab">Grab</span></td><td>好吃党 · GF-PH-88213</td><td class="num">25%</td><td class="num">15%</td><td>到 1</td></tr>
+ <tr><td><span class="chk">✓</span> <span class="tag t-fp">foodpanda</span></td><td>好吃党 · p4ka</td><td class="num">28%</td><td class="num">15%</td><td>到 1</td></tr></table>
+ <div class="cap">一品湘 Grab、好吃党 Grab 是平台上的两家店：店铺号、佣金合同、到账都分开。</div>
+ <h3 style="margin-top:16px">专属页面</h3>
+ <div class="f"><label>店铺号网址</label><div class="inp">https://<b>10087</b>.abcfood.com <span class="mini" style="margin-inline-start:auto">保存后生成</span></div></div>
+ <div class="f"><label>自有域名</label><div class="inp mini">保存后可在“店铺链接”绑定或申请购买</div></div>
+ <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn">取消</button><button class="btn p">保存品牌</button></div>
+</div></div>
+`),
+'3': () => shell('菜单','菜单','菜品库门店共用（后厨按它做、估清一处生效），品牌菜单挑菜并可改名改价', `
+<div class="seg"><span>菜品库</span><span><i class="dot" style="background:var(--ypx)"></i>一品湘</span><span class="on"><i class="dot" style="background:#fff"></i>好吃党</span><span><i class="dot" style="background:var(--jx)"></i>江西小吃</span></div>
+<div class="grid2" style="grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)">
+<div class="card"><h3>门店菜品库 <span class="mini">勾选加入“好吃党”</span></h3>
+<table><tr><th></th><th>编号</th><th>菜名（后厨看）</th><th class="num">库价</th></tr>
+<tr><td><span class="chk">✓</span></td><td><span class="code">A1</span></td><td>小炒肉</td><td class="num">58.00</td></tr>
+<tr><td><span class="chk">✓</span></td><td><span class="code">A2</span></td><td>剁椒鱼头</td><td class="num">168.00</td></tr>
+<tr><td><span class="chk off">✓</span></td><td><span class="code">A3</span></td><td>毛氏红烧肉</td><td class="num">88.00</td></tr>
+<tr><td><span class="chk">✓</span></td><td><span class="code">B1</span></td><td>米饭</td><td class="num">3.00</td></tr>
+<tr><td><span class="chk off">✓</span></td><td><span class="code">C4</span></td><td>瓦罐汤 <span class="tag" style="background:#999">估清</span></td><td class="num">28.00</td></tr>
+</table><div class="cap">估清在菜品库点一次，三个品牌里这道菜一起售罄。</div></div>
+<div class="card"><h3>好吃党菜单 <span class="mini">品牌自己的分类和排序</span></h3>
+<table><tr><th>分类</th><th>品牌菜名（顾客看）</th><th>图片</th><th class="num">品牌价</th><th>上架</th></tr>
+<tr><td>招牌下饭</td><td><b>辣椒炒肉</b><div class="mini">库：小炒肉 A1</div></td><td>换图 ✓</td><td class="num"><b>52.00</b><div class="mini">库价 58.00</div></td><td class="ok">上架</td></tr>
+<tr><td>招牌下饭</td><td><b>剁椒鱼头</b><div class="mini">库：剁椒鱼头 A2</div></td><td>跟库</td><td class="num">168.00<div class="mini">跟库价</div></td><td class="ok">上架</td></tr>
+<tr><td>主食</td><td><b>米饭</b><div class="mini">库：米饭 B1</div></td><td>跟库</td><td class="num">3.00<div class="mini">跟库价</div></td><td class="ok">上架</td></tr>
+</table>
+<div class="note" style="margin-top:10px"><div>· 规格、加料、口味跟菜品库走，品牌里不单独改。</div><div>· 后厨单显示“小炒肉 A1”，小字带“好吃党：辣椒炒肉”；顾客小票显示“辣椒炒肉”。</div><div>· Grab 平台价按<b>品牌价</b>算：52.00 × 1.15 = 59.80 → <b>60.00</b>。</div></div></div>
+</div>
+`),
+'4': () => shell('外卖下单','外卖下单','先选品牌：会员、单号、菜单、活动、券都跟着品牌走', `
+<div class="row"><b>品牌</b>${brandSeg('hcd',false)}<span class="mini">记住这台设备上次选的品牌</span></div>
+<div class="grid2" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)">
+<div class="card"><h3>点菜 <span class="mini">输入编号或菜名</span></h3>
+<div class="inp">A1</div>
+<table style="margin-top:8px"><tr><th>菜品</th><th class="num">数量</th><th class="num">金额</th></tr>
+<tr><td><span class="code">A1</span> 辣椒炒肉</td><td class="num">2</td><td class="num">104.00</td></tr>
+<tr><td><span class="code">B1</span> 米饭</td><td class="num">2</td><td class="num">6.00</td></tr></table>
+<div style="margin-top:10px;display:grid;gap:4px">
+<div class="row" style="justify-content:space-between"><span>小计</span><span>₱110.00</span></div>
+<div class="row" style="justify-content:space-between"><span>好吃党 满 100 减 10</span><span class="ok">−₱10.00</span></div>
+<div class="row" style="justify-content:space-between"><span>配送费</span><span>₱50.00</span></div>
+<div class="row" style="justify-content:space-between"><b>应付</b><span class="big" style="color:var(--brand)">₱150.00</span></div>
+<div class="mini">一品湘的“满 100 减 15”不适用于好吃党，列表里也不出现。</div></div></div>
+<div class="card"><h3>会员（只查好吃党）</h3>
+<div class="inp">0917 555 0101</div>
+<div style="margin-top:10px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:4px">
+<div class="row"><span class="tag t-hcd">好吃党</span><b>HCD000223</b> 陈小姐</div>
+<div class="mini">Salcedo Village, Makati · 门牌 12F 1203</div><div class="mini">好吃党累计 9 单 · ₱1,320</div></div>
+<div class="note" style="margin-top:10px"><div>这个电话在一品湘也是会员，但<b>这里不显示</b>一品湘的资料——会员按品牌独立。</div></div>
+<div style="margin-top:12px" class="row"><span>本单号</span><span class="code" style="font-size:16px">HCD000223</span><span class="mini">今天第二单会是 HCD000223-2</span></div>
+<div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn p">下单（好吃党）</button></div></div>
+</div>
+`),
+'5': () => shell('订单列表','订单列表','一个厨房：默认所有品牌的单在一起，品牌色块区分', `
+<div class="row">${brandSeg('all')}<span class="mini">类型：全部 ▾</span></div>
+<div class="card" style="padding:0;overflow:hidden"><table>
+<tr><th>订单号</th><th>品牌</th><th>类型</th><th>顾客 / 桌</th><th class="num">金额</th><th>状态</th></tr>
+<tr><td><b>Grab GF-482</b></td><td>${tag('hcd')}</td><td><span class="tag t-grab">好吃党 Grab</span></td><td>平台顾客</td><td class="num">₱126.00</td><td>备餐中</td></tr>
+<tr><td><b>HCD000223</b></td><td>${tag('hcd')}</td><td>代客 · 微信</td><td>陈小姐</td><td class="num">₱150.00</td><td>待接单</td></tr>
+<tr><td><b>Online-3</b></td><td>${tag('hcd')}</td><td>网店</td><td>Mark R.</td><td class="num">₱238.00</td><td>配送中</td></tr>
+<tr><td><b>Online-3</b></td><td>${tag('ypx')}</td><td>网店</td><td>Ana L.</td><td class="num">₱157.00</td><td>已送达</td></tr>
+<tr><td><b>Grab GF-475</b></td><td>${tag('ypx')}</td><td><span class="tag t-grab">一品湘 Grab</span></td><td>平台顾客</td><td class="num">₱148.00</td><td>已取餐</td></tr>
+<tr><td><b>foodpanda #a8kx</b></td><td>${tag('ypx')}</td><td><span class="tag t-fp">一品湘 foodpanda</span></td><td>平台顾客</td><td class="num">₱312.00</td><td>备餐中</td></tr>
+<tr><td><b>YPX000112</b></td><td>${tag('ypx')}</td><td>代客 · 电话</td><td>王先生</td><td class="num">₱157.00</td><td>备餐中</td></tr>
+<tr><td><b>Hippo-7</b></td><td>${tag('jx')}</td><td>商城</td><td>Joy C.</td><td class="num">₱220.00</td><td>待接单</td></tr>
+<tr><td><b>DineIn-21</b></td><td>${tag('ypx')}</td><td>堂食 · 店员</td><td>A5 桌</td><td class="num">₱864.00</td><td>用餐中</td></tr>
+</table></div>
+<div class="grid2">
+<div class="card"><h3>后厨单</h3><div style="background:#fff;border:1px dashed #aaa;border-radius:6px;padding:10px;font-family:monospace;font-size:13px;line-height:1.6">
+<b style="font-size:16px">【好吃党】 Online-3</b><br>外卖 · 11:42<br>-----------------<br><b>小炒肉 A1 × 2</b><br>&nbsp;&nbsp;好吃党：辣椒炒肉<br><b>米饭 B1 × 2</b><br>-----------------<br>出餐目标 12:02</div></div>
+<div class="card"><h3>取餐屏 / 骑手端</h3><div class="row" style="gap:8px"><span class="tag t-hcd" style="font-size:16px;padding:6px 10px">好吃党 Online-3</span><span class="tag t-ypx" style="font-size:16px;padding:6px 10px">一品湘 Online-3</span><span class="tag t-grab" style="font-size:16px;padding:6px 10px">好吃党 Grab GF-482</span></div>
+<div class="cap">号码按品牌各自从 1 编，所以两个品牌都有 Online-3；后台、后厨、取餐屏一律带品牌名，不会拿错。顾客那边只看到 Online-3。</div></div></div>
+`),
+'6': () => shell('会员列表','会员列表','会员按品牌独立：没有“全部品牌”合并', `
+<div class="row">${brandSeg('hcd',false)}<div class="inp" style="width:240px">搜索电话 / 会员号 / 姓名</div></div>
+<div class="card" style="padding:0;overflow:hidden"><table>
+<tr><th>会员号</th><th>姓名</th><th>电话</th><th>常用地址</th><th class="num">好吃党消费</th><th>最近下单</th></tr>
+<tr><td><b>HCD000223</b></td><td>陈小姐</td><td>0917 555 0101</td><td>Salcedo Village 12F</td><td class="num">9 单 · ₱1,320</td><td>今天</td></tr>
+<tr><td><b>HCD000222</b></td><td>Mark R.</td><td>0918 222 3344</td><td>Legaspi Village</td><td class="num">3 单 · ₱610</td><td>昨天</td></tr>
+<tr><td><b>HCD000221</b></td><td>Liza</td><td>0927 880 1212</td><td>Poblacion</td><td class="num">1 单 · ₱238</td><td>11-24</td></tr>
+</table></div>
+<div class="grid2">
+<div class="card"><h3>同一个电话，两个品牌</h3>
+<table><tr><th>品牌</th><th>会员号</th><th>名字</th><th>地址簿</th></tr>
+<tr><td>${tag('ypx')}</td><td>YPX000112</td><td>陈太</td><td>2 个</td></tr>
+<tr><td>${tag('hcd')}</td><td>HCD000223</td><td>陈小姐</td><td>1 个</td></tr></table>
+<div class="cap">两条独立的会员：号码、名字、地址、消费各记各的。好吃党的员工看不到一品湘那一条。</div></div>
+<div class="note"><b>为什么没有“全部品牌”</b><div>brian 要求不同外卖品牌的会员互相独立、彼此不相干。平台后台按“商家 → 门店 → 品牌”筛选。</div><div>以后如果想知道两个品牌的老客重合多少，可以加一个只给数字、不给名单的统计。</div></div></div>
+`),
+'7': () => shell('送餐地址','送餐地址和热力图','可以合并看，也可以分品牌看', `
+<div class="row">${brandSeg('all')}<div class="seg"><span>地址列表</span><span>排行</span><span class="on">地图</span><span>热力图</span></div><span class="mini">近 31 天</span></div>
+<div class="grid2" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)">
+<div class="map">
+ <div class="h" style="left:30%;top:30%;width:180px;height:140px;background:#ff5a2a"></div>
+ <div class="h" style="left:58%;top:52%;width:140px;height:120px;background:#ff9b2a"></div>
+ <div class="home">🏠 门店（一个厨房）</div>
+ ${[[34,30,'ypx'],[38,36,'ypx'],[30,42,'hcd'],[42,28,'hcd'],[36,40,'ypx'],[60,56,'hcd'],[64,60,'jx'],[58,64,'hcd'],[70,52,'jx'],[22,62,'ypx'],[74,30,'hcd'],[48,70,'ypx'],[40,33,'jx'],[62,48,'ypx']].map(([x,y,k])=>`<span class="p" style="left:${x}%;top:${y}%;background:${B[k].col}"></span>`).join('')}
+ <div style="position:absolute;left:10px;bottom:10px;background:#fff;border-radius:8px;padding:6px 10px;font-size:12px;display:flex;gap:10px">${['ypx','hcd','jx'].map(k=>`<span><i class="dot" style="background:${B[k].col}"></i> ${B[k].n}</span>`).join('')}</div>
+</div>
+<div class="card"><h3>合并视图：送餐最多的地址</h3>
+<table><tr><th>地址</th><th class="num">单数</th><th>品牌构成</th></tr>
+<tr><td>Salcedo Village, Tower 1</td><td class="num">38</td><td>${tag('ypx')} 21 ${tag('hcd')} 17</td></tr>
+<tr><td>Legaspi Village, Ayala Tower</td><td class="num">26</td><td>${tag('hcd')} 19 ${tag('jx')} 7</td></tr>
+<tr><td>Poblacion, Jupiter St</td><td class="num">14</td><td>${tag('ypx')} 14</td></tr></table>
+<div class="cap">合并时同一地址的单合起来算，热力图按总单量；“客户数”按电话去重（不涉及会员资料）。切到“好吃党”只算好吃党的单。</div></div></div>
+`),
+'8': () => shell('对账','对账','营业额可以按品牌拆；钱箱是门店的，只在合并视图里', `
+<div class="row">${brandSeg('all')}<span class="mini">2026-11-26 · 营业日</span></div>
+<div class="grid2">
+<div class="card"><h3>营业额 · 按品牌</h3>
+<table><tr><th>品牌</th><th class="num">单数</th><th class="num">营业额</th><th class="num">优惠</th><th class="num">平台佣金</th></tr>
+<tr><td>${tag('ypx')}</td><td class="num">86</td><td class="num">24,380.00</td><td class="num">1,215.00</td><td class="num">1,932.60</td></tr>
+<tr><td>${tag('hcd')}</td><td class="num">41</td><td class="num">9,870.00</td><td class="num">410.00</td><td class="num">1,027.20</td></tr>
+<tr><td>${tag('jx')}</td><td class="num">12</td><td class="num">2,640.00</td><td class="num">0.00</td><td class="num">396.00</td></tr>
+<tr><td><b>合计（= 收款合计）</b></td><td class="num"><b>139</b></td><td class="num"><b>36,890.00</b></td><td class="num"><b>1,625.00</b></td><td class="num"><b>3,355.80</b></td></tr></table>
+<div class="cap">验算规则 R：各品牌之和 = 合并视图合计 = 按门店算的收款合计。</div></div>
+<div class="card"><h3>平台订单 · 按“品牌 + 平台”</h3>
+<table><tr><th>品牌 · 平台</th><th class="num">单数</th><th class="num">商家应收</th><th class="num">预计到账</th></tr>
+<tr><td><span class="tag t-grab">一品湘 Grab</span></td><td class="num">18</td><td class="num">4,212.00</td><td class="num">2,948.40</td></tr>
+<tr><td><span class="tag t-fp">一品湘 foodpanda</span></td><td class="num">9</td><td class="num">2,230.00</td><td class="num">1,561.00</td></tr>
+<tr><td><span class="tag t-grab">好吃党 Grab</span></td><td class="num">15</td><td class="num">2,664.00</td><td class="num">1,998.00</td></tr>
+<tr><td><span class="tag t-fp">好吃党 foodpanda</span></td><td class="num">7</td><td class="num">1,290.00</td><td class="num">928.80</td></tr>
+<tr><td><span class="tag t-grab">江西小吃 Grab</span></td><td class="num">6</td><td class="num">1,320.00</td><td class="num">924.00</td></tr></table>
+<div class="cap">平台到账按“品牌 + 平台 + 日期段”录（Grab 给两家平台店分别打款）。</div></div>
+<div class="card"><h3>钱箱 · 门店</h3>
+<div class="row" style="justify-content:space-between"><span>应有现金（店里收 + 骑手交回）</span><b>₱8,460.00</b></div>
+<div class="row" style="justify-content:space-between;margin-top:6px"><span>实点</span><b>₱8,460.00</b></div>
+<div class="cap">现金都在一个抽屉，钱箱不分品牌。切到单个品牌时这里显示“钱箱按门店，请切回全部品牌”。</div></div>
+<div class="card"><h3>账单（券账单 / 平台结算）</h3>
+<table><tr><th>品牌</th><th class="num">平台券补贴</th><th class="num">平台服务费</th></tr>
+<tr><td>${tag('ypx')}</td><td class="num">320.00</td><td class="num">0.00</td></tr>
+<tr><td>${tag('hcd')}</td><td class="num">90.00</td><td class="num">0.00</td></tr>
+<tr><td><b>门店合计</b></td><td class="num"><b>410.00</b></td><td class="num"><b>0.00</b></td></tr></table></div>
+</div>
+`),
+'9': () => `<div style="padding:20px;display:flex;gap:28px;flex-wrap:wrap;justify-content:center">
+<div style="display:grid;gap:8px;justify-items:center"><b>河马商城：三个品牌是三家店</b>
+<div class="phone"><div class="url">🔒 order.abcfood.com</div><div class="ctop"><b style="flex:1">📍 Makati</b><span>💬</span></div>
+<div class="shopc"><div class="im" style="background:var(--ypx)">湘</div><div><b>一品湘</b><div class="mini">4.8 分 · 1.2 km · 30 分钟</div><div class="mini">满 100 减 15</div></div></div>
+<div class="shopc"><div class="im" style="background:var(--hcd)">好</div><div><b>好吃党</b><div class="mini">4.7 分 · 1.2 km · 30 分钟</div><div class="mini">满 100 减 10 · 辣椒炒肉 ₱52</div></div></div>
+<div class="shopc"><div class="im" style="background:var(--jx)">赣</div><div><b>江西小吃</b><div class="mini">4.6 分 · 1.2 km · 17:00 开始营业</div><div class="mini">南昌拌粉</div></div></div>
+<div class="shopc"><div class="im" style="background:#999">面</div><div><b>别家面馆</b><div class="mini">4.5 分 · 2.0 km</div></div></div>
+<div class="bnav"><span class="on">首页</span><span>订单</span><span>我的</span></div></div>
+<div class="cap" style="max-width:340px">距离、配送费是门店的（同一个厨房）；店名、标志、评分、菜单、活动是品牌的。商城里不写“同一家店”。</div></div>
+<div style="display:grid;gap:8px;justify-items:center"><b>好吃党专属页面：只看得到好吃党</b>
+<div class="phone"><div class="url">🔒 <b>10087.abcfood.com</b></div><div class="ctop"><div class="logo" style="width:30px;height:30px;font-size:13px;background:#fff;color:var(--hcd)">好</div><b style="flex:1">好吃党</b><span>💬</span></div>
+<div style="height:110px;background:linear-gradient(135deg,var(--hcd),#f5b041);color:#fff;display:grid;place-items:center;font-size:22px;font-weight:800">好吃党 · 湘味下饭</div>
+<div class="dish"><div class="im"></div><div style="flex:1"><b>辣椒炒肉</b><div class="mini">月售 420</div><b style="color:var(--brand)">₱52</b></div></div>
+<div class="dish"><div class="im"></div><div style="flex:1"><b>剁椒鱼头</b><div class="mini">月售 96</div><b style="color:var(--brand)">₱168</b></div></div>
+<div class="dish"><div class="im" style="background:#eee"></div><div style="flex:1"><b>米饭</b><b style="color:var(--brand);display:block">₱3</b></div></div>
+<div style="padding:8px;text-align:center;font-size:11px;color:var(--muted)">由河马点餐系统提供</div>
+<div class="bnav"><span class="on">点餐</span><span>订单</span><span>我的</span></div></div>
+<div class="cap" style="max-width:340px">订单、券、消息、评价都只在好吃党；好吃党的复购券在一品湘用不了。小票、短信写“好吃党”。</div></div>
+</div>`,
+'10': () => shell('员工','员工 · 可管品牌','员工属于门店；店主可以限定某人只管某几个品牌', `
+<div class="card" style="padding:0;overflow:hidden"><table>
+<tr><th>员工</th><th>角色</th><th>可管品牌</th><th>说明</th></tr>
+<tr><td><b>brian</b></td><td>店主</td><td>全部品牌</td><td class="mini">含“品牌管理”权限</td></tr>
+<tr><td><b>Lina</b></td><td>经理</td><td>全部品牌</td><td class="mini">看合并对账、钱箱</td></tr>
+<tr><td><b>阿杰</b></td><td>接单员</td><td>${tag('hcd')} ${tag('jx')}</td><td class="mini">只运营两个外卖品牌</td></tr>
+<tr><td><b>Rose</b></td><td>接单员</td><td>${tag('ypx')}</td><td class="mini">前台，只做一品湘</td></tr>
+<tr><td><b>老周</b></td><td>后厨</td><td><span class="mini">不受限</span></td><td class="mini">一个厨房，什么单都做</td></tr>
+<tr><td><b>Jun</b></td><td>骑手</td><td><span class="mini">不受限</span></td><td class="mini">取件地址都是门店</td></tr>
+</table></div>
+<div class="grid2">
+<div class="card"><h3>编辑 阿杰 的可管品牌</h3>
+<div class="row"><span class="chk off">✓</span>全部品牌</div>
+<div class="row" style="margin-top:8px"><span class="chk off">✓</span>${tag('ypx')}<span class="chk">✓</span>${tag('hcd')}<span class="chk">✓</span>${tag('jx')}</div>
+<div class="cap">限定后：外卖下单、平台下单只出现这两个品牌；会员、券、活动、品牌菜单只看这两个；送餐地址、账单、对账的“全部品牌”只合并这两个；钱箱不显示。</div></div>
+<div class="note"><b>新权限</b><div>· <b>品牌管理</b>（新建、改名、改代码、停用品牌）：默认只有店主。</div><div>· 角色和其他权限不变（STAFF_ACCESS_DESIGN.md）。</div></div></div>
+`)
+};
+document.getElementById('app').innerHTML = (screens[s] || screens['1'])();
+</script>
+</body>
+</html>
