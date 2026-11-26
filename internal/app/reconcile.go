@@ -20,19 +20,25 @@ import (
 // were cash, unless they were paid online before they were placed.
 const payTypeSQL = `COALESCE(NULLIF(o.pay_type, ''), CASE WHEN o.payment_method = 'prepaid' THEN 'online' ELSE 'cash' END)`
 
+// A platform order the platform cancelled brings nothing: the platform does
+// not pay for it (docs/ORDER_TYPES_DESIGN.md §7.4).
 const paidInPeriod = `o.branch_id = $1 AND o.payment_status = 'paid' AND o.paid_at IS NOT NULL
-	AND (o.paid_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date`
+	AND (o.paid_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date
+	AND NOT (o.order_type = 'platform' AND o.acceptance_status IN ('cancelled', 'rejected'))`
 
 // ReconRow is one payment method's takings.
 type ReconRow struct {
-	PayType   string            `json:"pay_type"`
-	ChannelID int64             `json:"channel_id"`
-	Name      string            `json:"name"`
-	Names     map[string]string `json:"names"`
-	Count     int               `json:"count"`
-	Amount    int64             `json:"amount"`
-	Dine      int64             `json:"dine"`
-	Takeaway  int64             `json:"takeaway"` // delivery and pickup
+	PayType   string `json:"pay_type"`
+	ChannelID int64  `json:"channel_id"`
+	// PlatformID is the delivery platform of a "platform" row, whose amount is
+	// what the platform owes the store (receivableSQL).
+	PlatformID int64             `json:"platform_id"`
+	Name       string            `json:"name"`
+	Names      map[string]string `json:"names"`
+	Count      int               `json:"count"`
+	Amount     int64             `json:"amount"`
+	Dine       int64             `json:"dine"`
+	Takeaway   int64             `json:"takeaway"` // delivery and pickup
 	// online only: how many the owner found arrived, found wrong, or has not checked
 	OK        int `json:"ok"`
 	Problem   int `json:"problem"`
@@ -76,7 +82,12 @@ type ReconDiscounts struct {
 	Coupon    int64 `json:"coupon"`
 	Staff     int64 `json:"staff"`     // percentage off at checkout
 	RoundOff  int64 `json:"round_off"` // round-offs and typed amounts
-	Total     int64 `json:"total"`
+	// PlatformMerchant is the store's own offers on delivery platforms;
+	// PlatformSubsidy the platforms' discounts on them, which the platforms pay
+	// and so are not part of Total.
+	PlatformMerchant int64 `json:"platform_merchant"`
+	PlatformSubsidy  int64 `json:"platform_subsidy"`
+	Total            int64 `json:"total"`
 }
 
 type Reconcile struct {
@@ -96,6 +107,9 @@ type Reconcile struct {
 	Problems int `json:"problems"`
 	// CashCount is the day's count when the period is one day.
 	CashCount *CashCount `json:"cash_count"`
+	// Platforms is the delivery platforms' block; Types the takings by order type.
+	Platforms []ReconPlatform `json:"platforms"`
+	Types     []ReconType     `json:"types"`
 }
 
 // Reconciliation sums up a period's takings by payment method.
@@ -109,32 +123,37 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, from, to strin
 	}
 	out := &Reconcile{Timezone: b.Timezone, From: from, To: to, Currency: b.Currency, Rows: []ReconRow{}}
 	rows, err := a.DB.Query(ctx, `SELECT `+payTypeSQL+` AS pt, COALESCE(o.pay_channel_id, 0),
-			COALESCE(max(c.name), max(o.pay_method), ''), COALESCE(max(c.names::text), '{}'),
-			count(*), COALESCE(sum(o.total), 0),
-			COALESCE(sum(o.total) FILTER (WHERE o.service_type = 'dine_in'), 0),
-			COALESCE(sum(o.total) FILTER (WHERE o.service_type <> 'dine_in'), 0),
+			CASE WHEN `+payTypeSQL+` = 'platform' THEN COALESCE(o.platform_id, 0) ELSE 0 END,
+			COALESCE(max(c.name), max(dp.name), max(o.pay_method), ''), COALESCE(max(c.names::text), max(dp.names::text), '{}'),
+			count(*), COALESCE(sum(`+receivableSQL+`), 0),
+			COALESCE(sum(`+receivableSQL+`) FILTER (WHERE o.service_type = 'dine_in'), 0),
+			COALESCE(sum(`+receivableSQL+`) FILTER (WHERE o.service_type <> 'dine_in'), 0),
 			count(*) FILTER (WHERE pc.status = 'ok'), count(*) FILTER (WHERE pc.status = 'problem'),
 			count(*) FILTER (WHERE pc.status IS NULL)
 		FROM orders o JOIN branches b ON b.id = o.branch_id
 			LEFT JOIN pay_channels c ON c.id = o.pay_channel_id
 			LEFT JOIN payment_checks pc ON pc.order_id = o.id
+			LEFT JOIN delivery_platforms dp ON dp.id = o.platform_id
 		WHERE `+paidInPeriod+`
-		GROUP BY 1, 2 ORDER BY CASE `+payTypeSQL+` WHEN 'cash' THEN 0 WHEN 'card' THEN 1 ELSE 2 END,
-			min(COALESCE(c.sort, 999)), 2`, branchID, from, to)
+		GROUP BY 1, 2, 3 ORDER BY CASE `+payTypeSQL+` WHEN 'cash' THEN 0 WHEN 'card' THEN 1 WHEN 'online' THEN 2 ELSE 3 END,
+			min(COALESCE(c.sort, dp.sort, 999)), 2, 3`, branchID, from, to)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		var r ReconRow
 		var names string
-		if err := rows.Scan(&r.PayType, &r.ChannelID, &r.Name, &names, &r.Count, &r.Amount, &r.Dine, &r.Takeaway,
+		if err := rows.Scan(&r.PayType, &r.ChannelID, &r.PlatformID, &r.Name, &names, &r.Count, &r.Amount, &r.Dine, &r.Takeaway,
 			&r.OK, &r.Problem, &r.Unchecked); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		r.Names = jsonNames(names)
 		if r.PayType != "online" {
-			r.Name, r.OK, r.Problem, r.Unchecked = "", 0, 0, 0
+			r.OK, r.Problem, r.Unchecked = 0, 0, 0
+			if r.PayType != "platform" {
+				r.Name = ""
+			}
 		}
 		out.Count += r.Count
 		out.Total += r.Amount
@@ -172,10 +191,26 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, from, to strin
 	// coupons the store paid for
 	if err := a.DB.QueryRow(ctx, `SELECT COALESCE(sum(d.amount), 0) FROM order_discounts d
 		JOIN orders o ON o.id = d.order_id JOIN branches b ON b.id = o.branch_id
-		WHERE `+paidInPeriod+` AND d.kind NOT IN ('promotion','dish_promotion') AND d.funded_by = 'store'`, branchID, from, to).Scan(&out.Discounts.Coupon); err != nil {
+		WHERE `+paidInPeriod+` AND d.kind NOT IN ('promotion','dish_promotion','platform_merchant_promo') AND d.funded_by = 'store'`,
+		branchID, from, to).Scan(&out.Discounts.Coupon); err != nil {
 		return nil, err
 	}
-	out.Discounts.Total = out.Discounts.Promotion + out.Discounts.Coupon + out.Discounts.Staff + out.Discounts.RoundOff
+	// the two discounts of platform orders
+	if err := a.DB.QueryRow(ctx, `SELECT COALESCE(sum(d.amount) FILTER (WHERE d.kind = 'platform_merchant_promo'), 0),
+			COALESCE(sum(d.amount) FILTER (WHERE d.kind = 'platform_promo'), 0)
+		FROM order_discounts d JOIN orders o ON o.id = d.order_id JOIN branches b ON b.id = o.branch_id
+		WHERE `+paidInPeriod+` AND o.order_type = 'platform'`, branchID, from, to).
+		Scan(&out.Discounts.PlatformMerchant, &out.Discounts.PlatformSubsidy); err != nil {
+		return nil, err
+	}
+	out.Discounts.Total = out.Discounts.Promotion + out.Discounts.Coupon + out.Discounts.Staff + out.Discounts.RoundOff +
+		out.Discounts.PlatformMerchant
+	if out.Platforms, err = platformRecon(ctx, a.DB, branchID, from, to); err != nil {
+		return nil, err
+	}
+	if out.Types, err = typeRecon(ctx, a.DB, branchID, from, to); err != nil {
+		return nil, err
+	}
 	if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM payment_checks WHERE branch_id=$1 AND status='problem'`, branchID).
 		Scan(&out.Problems); err != nil {
 		return nil, err

@@ -3806,5 +3806,19 @@
  "po.o.save": "儲存",
  "po.o.delete": "刪除",
  "po.o.until_rider": "平台騎手取走前都能加",
- "po.o.deduct_row": "平台扣款 {s} · {r} · {at}"
+ "po.o.deduct_row": "平台扣款 {s} · {r} · {at}",
+ "rc.ty.title": "營業額按類型",
+ "rc.ty.hint": "平台單按商家應收算（顧客實付 + 平台出資）",
+ "rc.ty.share": "占比",
+ "rc.pf.title": "平台訂單",
+ "rc.pf.hint": "預計到帳 = 商家應收 − 佣金 − 其他扣費 − 平台扣款。實際到帳照平台結算單填，只算結算週期在所選日期內的。",
+ "rc.pf.orders": "單數",
+ "rc.pf.subtotal": "平台價營業額",
+ "rc.pf.actual": "實際到帳",
+ "rc.pf.diff": "差額",
+ "rc.pf.enter": "填寫",
+ "rc.pf.period": "結算週期 {f} ~ {t}",
+ "rc.pf.note_ph": "備註，如結算單號",
+ "rc.pf.detail": "逐單明細",
+ "rc.pf.detail_hint": "逐單的平台扣款是這張單的全部扣款，不分日期"
 }

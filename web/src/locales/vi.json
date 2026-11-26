@@ -3806,5 +3806,19 @@
  "po.o.save": "Lưu",
  "po.o.delete": "Xóa",
  "po.o.until_rider": "Có thể thêm món đến khi tài xế nền tảng lấy hàng",
- "po.o.deduct_row": "Nền tảng đã trừ {s} · {r} · {at}"
+ "po.o.deduct_row": "Nền tảng đã trừ {s} · {r} · {at}",
+ "rc.ty.title": "Doanh thu theo loại đơn",
+ "rc.ty.hint": "Đơn nền tảng tính số cửa hàng được nhận (khách trả + nền tảng chi)",
+ "rc.ty.share": "Tỷ lệ",
+ "rc.pf.title": "Đơn nền tảng",
+ "rc.pf.hint": "Dự kiến nhận = được nhận − hoa hồng − phí khác − nền tảng trừ. Nhập số thực nhận theo bảng quyết toán; chỉ tính các kỳ nằm trong khoảng ngày đã chọn.",
+ "rc.pf.orders": "Số đơn",
+ "rc.pf.subtotal": "Doanh thu giá nền tảng",
+ "rc.pf.actual": "Thực nhận",
+ "rc.pf.diff": "Chênh lệch",
+ "rc.pf.enter": "Nhập",
+ "rc.pf.period": "Kỳ quyết toán {f} ~ {t}",
+ "rc.pf.note_ph": "Ghi chú, ví dụ số bảng quyết toán",
+ "rc.pf.detail": "Chi tiết từng đơn",
+ "rc.pf.detail_hint": "Khoản trừ của từng đơn là toàn bộ khoản trừ của đơn đó, không theo ngày"
 }
