@@ -6,6 +6,7 @@
 import { onMounted, ref } from 'vue'
 import { get, put } from '../api'
 import { t } from '../i18n'
+import { session } from '../session'
 import { type BranchPlatform, bpToPct, pctToBp, platformName } from '../platforms'
 
 
@@ -29,7 +30,11 @@ async function save() {
   try {
     const body = { platforms: rows.value.map(r => ({ platform_id: r.p.id, enabled: r.enabled, shop_ref: r.shop_ref,
       own_commission_bp: pctToBp(r.commission), own_markup_bp: pctToBp(r.markup), round_step: r.round_step })) }
-    fill((await put<{ platforms: BranchPlatform[] }>(`/merchant/branches/${props.branchId}/platforms`, body)).platforms)
+    const list = (await put<{ platforms: BranchPlatform[] }>(`/merchant/branches/${props.branchId}/platforms`, body)).platforms
+    fill(list)
+    // the 平台下单 menu follows at once
+    const role = session.user?.roles.find(r => r.branch_id === props.branchId)
+    if (role) role.platforms = list.some(p => p.enabled)
     ok.value = true
   } catch (e) { error.value = (e as Error).message }
 }
@@ -50,7 +55,7 @@ async function save() {
       <template v-if="r.enabled">
         <label class="field"><span>{{ t('pf.set.shop') }}</span><input v-model.trim="r.shop_ref" maxlength="60" /></label>
         <label class="field"><span>{{ t('pf.set.commission') }}</span>
-          <input v-model="r.commission" type="number" min="0" max="100" step="0.01" :placeholder="t('pf.set.default', { v: bpToPct(r.p.commission_bp) + '%' })" /></label>
+          <input v-model="r.commission" type="number" min="0" max="100" step="0.01" :placeholder="t('pf.set.default', { v: bpToPct(r.p.commission_bp) + '%' })" :data-testid="'pf-commission-' + r.p.prefix" /></label>
         <label class="field"><span>{{ t('pf.set.markup') }}</span>
           <input v-model="r.markup" type="number" min="0" max="100" step="0.01" :placeholder="t('pf.set.default', { v: bpToPct(r.p.markup_bp) + '%' })" :data-testid="'pf-markup-' + r.p.prefix" /></label>
         <label class="field"><span>{{ t('pf.set.round') }}</span>

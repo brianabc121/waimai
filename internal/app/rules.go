@@ -32,6 +32,13 @@ type promoRule struct {
 }
 
 var promoRules = map[string]promoRule{
+	// The store's own offer on a delivery platform, entered with a platform
+	// order (docs/ORDER_TYPES_DESIGN.md §9.2): a fixed amount off the whole
+	// order, paid by the store, with no minimum. Never set up as a promotion.
+	KindPlatformMerchantPromo: {
+		order: func(p *Promotion, sub, _ int64) Discount { return Discount{Goods: min(p.Value, max(sub, 0))} },
+		check: func(*PromotionInput) error { return ErrValidation("unknown promotion kind") },
+	},
 	"amount_off": {
 		order: func(p *Promotion, sub, _ int64) Discount { return Discount{Goods: min(p.Value, sub)} },
 		check: func(in *PromotionInput) error {

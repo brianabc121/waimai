@@ -53,6 +53,7 @@ export const router = createRouter({
         // who send their order. The old /merchant/orders/new is sent on below.
         { path: 'order/dine', component: () => import('./views/DineOrderView.vue') },
         { path: 'order/delivery', component: () => import('./views/ManualOrderView.vue') },
+        { path: 'order/platform', component: () => import('./views/PlatformOrderView.vue') },
         { path: 'queue', component: () => import('./views/queue/QueueView.vue') },
         { path: 'orders/new', component: () => import('./views/NotFound.vue') },
         { path: 'progress', component: () => import('./views/ProgressView.vue') },

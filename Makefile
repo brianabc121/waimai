@@ -8,7 +8,7 @@ test:
 # 金额验算（docs/PRICING_CHECK.md）：凡是改动商品价格、订单金额都必须跑通。
 # 需要 TEST_DATABASE_URL；app 包要整包跑，最后的重放验算会检查前面所有测试建的订单。
 pricing-check:
-	go test -count=1 -v -run 'TestPricingCheck|TestPriceMatchesLegacy|TestItemDiscount|TestShare|TestPlatformPrice' ./internal/pricing/
+	go test -count=1 -v -run 'TestPricingCheck|TestPriceMatchesLegacy|TestItemDiscount|TestShare|TestPlatformPrice|TestPlatformCommission' ./internal/pricing/
 	go test -count=1 -p 1 ./internal/app/
 	cd web && node --test tests/dishpromo.test.mjs
 

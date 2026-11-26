@@ -39,6 +39,28 @@ func TestPlatformPrice(t *testing.T) {
 	}
 }
 
+// TestPlatformCommission: S9's commission (docs/ORDER_TYPES_DESIGN.md §10.3), hand worked.
+func TestPlatformCommission(t *testing.T) {
+	for _, c := range []struct {
+		base int64
+		rate int
+		want int64
+	}{
+		{39200, 3000, 11760}, // 30% × 392.00 = 117.60; payout 392.00 − 117.60 = 274.40
+		{36007, 3000, 10802}, // 30% × 360.07 = 108.021 → 108.02; payout 252.05
+		{44200, 3000, 13260}, // on the original amount: 30% × 442.00 = 132.60
+		{33333, 1550, 5167},  // 15.5% × 333.33 = 51.666 → 51.67
+		{10001, 2250, 2250},  // 22.5% × 100.01 = 22.50225 → 22.50
+		{100, 5000, 50},
+		{0, 3000, 0},
+		{50000, 0, 0},
+	} {
+		if got := Commission(c.base, c.rate); got != c.want {
+			t.Errorf("Commission(%d, %d) = %d, want %d", c.base, c.rate, got, c.want)
+		}
+	}
+}
+
 func TestPricingCheckSamples(t *testing.T) {
 	store := Fees{TaxRateBP: 1200, ServiceChargeBP: 500, Packaging: 1000, Delivery: 6900}
 	two := []Line{{Key: "chicken", Amount: 33800}, {Key: "water", Amount: 3000}}
@@ -86,6 +108,25 @@ func TestPricingCheckSamples(t *testing.T) {
 			Fees:        Fees{TaxRateBP: 1200, TaxInclusive: true, Packaging: 500, Delivery: 6900},
 			Adjustments: []Adjustment{{Kind: "promotion", Stage: StageDelivery, Whole: true}}},
 			want{ship: 6900, tax: 1125, total: 10500, disc: []int64{0}, svcs: []int64{0}, taxs: []int64{1071}}},
+		// docs/ORDER_TYPES_DESIGN.md §10.3: a Grab order at platform prices (chicken 203.00 × 2, water 36.00),
+		// tax included, the store's offer 50.00 on the whole order, Grab's own 20.00 after tax.
+		{"S9 平台单：商家出资50 + 平台出资20，含税", Input{
+			Lines: []Line{{Key: "chicken", Amount: 40600}, {Key: "water", Amount: 3600}},
+			Fees:  Fees{TaxRateBP: 1200, TaxInclusive: true},
+			Adjustments: []Adjustment{
+				{Kind: "platform_promo", FundedBy: "platform", Stage: StagePlatform, Amount: 2000},
+				{Kind: "platform_merchant_promo", FundedBy: "store", Stage: StageOrder, Amount: 5000}}},
+			want{goods: 5000, tax: 4200, platform: 2000, total: 37200,
+				disc: []int64{4593, 407}, svcs: []int64{0, 0}, taxs: []int64{3858, 342}}},
+		// The water voided by the store: the store's offer keeps the chicken's share, 45.93.
+		{"S9 店铺原因退一瓶水", Input{
+			Lines: []Line{{Key: "chicken", Amount: 40600}},
+			Fees:  Fees{TaxRateBP: 1200, TaxInclusive: true},
+			Adjustments: []Adjustment{
+				{Kind: "platform_merchant_promo", FundedBy: "store", Stage: StageOrder, Amount: 4593},
+				{Kind: "platform_promo", FundedBy: "platform", Stage: StagePlatform, Amount: 2000}}},
+			want{goods: 4593, tax: 3858, platform: 2000, total: 34007,
+				disc: []int64{4593}, svcs: []int64{0}, taxs: []int64{3858}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

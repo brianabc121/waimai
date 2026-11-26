@@ -207,6 +207,9 @@ type Order struct {
 	VoidOpen   bool          `json:"void_open"`
 	RefundOpen bool          `json:"refund_open"`
 	Refunded   int64         `json:"refunded"`
+	// Platform is a platform order's platform, its number there and what the
+	// store pays the platform for it (docs/ORDER_TYPES_DESIGN.md §7, §9).
+	Platform   *PlatformInfo `json:"platform,omitempty"`
 	tokenNonce []byte
 }
 
@@ -386,6 +389,21 @@ func queryOrders(ctx context.Context, q Querier, where string, args ...any) ([]*
 	}
 	for _, o := range orders {
 		o.voidState()
+	}
+	var platformIDs []int64
+	for _, o := range orders {
+		if o.OrderType == TypePlatform {
+			platformIDs = append(platformIDs, o.ID)
+		}
+	}
+	plat, err := platformInfo(ctx, q, platformIDs)
+	if err != nil {
+		return nil, err
+	}
+	for id, x := range plat {
+		byID[id].Platform = x
+		// the platform refunds the customer itself: nothing is refunded here by dish
+		byID[id].RefundOpen = false
 	}
 	cash, err := queryCash(ctx, q, `c.order_id = ANY($1)`, ids)
 	if err != nil {

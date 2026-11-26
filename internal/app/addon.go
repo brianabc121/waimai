@@ -170,7 +170,25 @@ func quoteAddon(ctx context.Context, q Querier, b *Branch, o *lockedOrder, in Ad
 	if len(in.Items) == 0 {
 		return nil, ErrValidation("add at least one dish")
 	}
-	lines, sub, err := priceLines(ctx, q, b.ID, o.ServiceType, in.Items)
+	// a platform order's dishes are at that platform's prices, with the
+	// markup the order was placed with (docs/ORDER_TYPES_DESIGN.md §9.3)
+	pp, err := orderPlatformPricer(ctx, q, o.ID)
+	if err != nil {
+		return nil, err
+	}
+	service := o.ServiceType
+	if pp != nil && !customer {
+		var pickup string
+		if err := q.QueryRow(ctx, `SELECT platform_pickup FROM orders WHERE id=$1`, o.ID).Scan(&pickup); err != nil {
+			return nil, err
+		}
+		if pickup == "rider" {
+			service = "delivery"
+		}
+	} else if pp != nil {
+		return nil, ErrInvalidState("a platform order is changed on the platform")
+	}
+	lines, sub, err := priceLinesOn(ctx, q, b.ID, service, in.Items, pp)
 	if err != nil {
 		return nil, err
 	}

@@ -141,6 +141,7 @@ const dict: Record<string, [string, string]> = {
   // 点单: the two ordering pages of the back office (dine-in, delivery and pickup)
   'pos.nav': ['点单', 'Ordering'], 'pos.dine': ['堂食下单', 'Dine-in order'], 'pos.delivery': ['外卖下单', 'Delivery order'],
   'pos.new_delivery': ['＋ 外卖下单', '+ Delivery order'], 'pos.delivery_hint': ['外卖和自取', 'Delivery and pickup'],
+  'pos.platform': ['平台下单', 'Platform order'], 'pos.platform_hint': ['录入 Grab、foodpanda 等平台的订单', 'Enter orders from Grab, foodpanda and other platforms'],
   // 消息: customers' chats and the platform's support, two pages under one group
   'msg.nav': ['消息', 'Messages'], 'msg.customer': ['客户消息', 'Customer messages'], 'msg.platform': ['平台消息', 'Platform messages'],
   // more groups of the back office menu

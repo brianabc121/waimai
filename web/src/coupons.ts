@@ -10,6 +10,10 @@ extend({
   'cp.kind.platform_free': ['平台无门槛券', 'Platform coupon, no minimum'],
   'cp.kind.promotion': ['门店活动', 'Store promotion'],
   'cp.kind.dish_promotion': ['菜品活动', 'Dish promotion'],
+  // the two discounts of an order from a delivery platform (docs/ORDER_TYPES_DESIGN.md §9)
+  'cp.kind.platform_merchant_promo': ['平台活动（商家出资）', 'Platform offer (store-funded)'],
+  'cp.kind.platform_promo': ['平台优惠（平台出资）', 'Platform discount (platform-funded)'],
+  'cp.short.platform_merchant_promo': ['商家', 'Store'], 'cp.short.platform_promo': ['平台', 'P'],
   'cp.short.store_threshold': ['店', 'S'], 'cp.short.store_free': ['店', 'S'], 'cp.short.store_delivery': ['运', 'D'],
   'cp.short.platform_free': ['平台', 'P'], 'cp.short.promotion': ['活动', 'Promo'], 'cp.short.dish_promotion': ['菜', 'Dish'],
   'cp.no_min': ['无门槛', 'No minimum'], 'cp.over': ['满{amt}', 'Over {amt}'], 'cp.fee': ['配送费', 'Delivery'],
@@ -72,8 +76,8 @@ extend({
   'cb.strip': ['店铺优惠券', 'Store coupons'], 'cb.got': ['已领取，下单时自动使用', 'Claimed. It applies by itself at checkout'],
 })
 
-export const kindName = (k: CouponKind | 'promotion' | 'dish_promotion') => t('cp.kind.' + k)
-export const kindBadge = (k: CouponKind | 'promotion' | 'dish_promotion') => t('cp.short.' + k)
+export const kindName = (k: OrderDiscount['kind']) => t('cp.kind.' + k)
+export const kindBadge = (k: OrderDiscount['kind']) => t('cp.short.' + k)
 
 // title says what the coupon takes off: "满₱400减₱40", "配送费减₱30".
 export function couponTitle(c: { kind: string; value: number; threshold: number }, currency: string): string {

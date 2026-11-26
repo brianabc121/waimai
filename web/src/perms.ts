@@ -7,6 +7,7 @@ import { extend } from './i18n'
 const pages: [string, string[]][] = [
   ['/merchant/order/dine', ['table.use']],
   ['/merchant/order/delivery', ['order.manual']],
+  ['/merchant/order/platform', ['order.platform']],
   ['/merchant/queue', ['queue.use']],
   ['/merchant/progress', ['order.progress']],
   ['/merchant/voids', ['order.void']],
@@ -93,6 +94,8 @@ extend({
   'rp.d.order.handle': ['接单、拒单、交给骑手、指派和改派骑手、重新配送', 'Accept, reject, hand over, assign riders, redeliver'],
   'rp.p.order.manual': ['代客下单', 'Order for customers'],
   'rp.d.order.manual': ['在后台替顾客下外卖单', 'Place delivery orders for customers in the back office'],
+  'rp.p.order.platform': ['平台下单', 'Enter platform orders'],
+  'rp.d.order.platform': ['把 Grab、foodpanda 等平台上的订单录进来，改佣金、记平台扣款', 'Enter orders from Grab, foodpanda and other platforms, adjust commission, record deductions'],
   'rp.p.order.cancel': ['取消订单', 'Cancel orders'],
   'rp.d.order.cancel': ['取消已经接了的单', 'Cancel orders already accepted'],
   'rp.p.order.aftersale': ['售后和退款', 'After-sales and refunds'],

@@ -139,6 +139,7 @@ var (
 	pCancel       = need(app.PermOrderCancel)
 	pAftersale    = need(app.PermOrderAftersale)
 	pManual       = need(app.PermOrderManual)
+	pPlatform     = need(app.PermOrderPlatform)
 	pHandoff      = need(app.PermOrderHandle, needKitchen)
 	pRiders       = need(app.PermRiderView, app.PermOrderHandle)
 	pTable        = need(app.PermTableUse)

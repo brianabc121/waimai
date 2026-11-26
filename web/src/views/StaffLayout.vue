@@ -25,6 +25,8 @@ const role = computed(() => currentRole()?.role ?? '')
 // a page the person's role may not open (docs/STAFF_ACCESS_DESIGN.md §6.4)
 const blocked = computed(() => { const p = pagePerms(route.path); return !!p && !can(...p) })
 const show = (path: string) => { const p = pagePerms(path); return !p || can(...p) }
+// 平台下单 only once the store is on a delivery platform (docs/ORDER_TYPES_DESIGN.md §7.1)
+const showPlatform = computed(() => show('/merchant/order/platform') && !!currentRole()?.platforms)
 // Menu groups with pages under them fold; all start folded except the one the
 // open page is in, which opens by itself.
 const groupPages: Record<string, string[]> = {
@@ -110,11 +112,12 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
       </div>
       <div v-if="role && !viewing" class="shell-role" data-testid="nav-role"><span class="rtag" :class="role">{{ t('role.' + role) }}</span><span class="who">{{ session.user?.display_name }}</span></div>
       <div class="shell-links">
-        <template v-if="show('/merchant/order/dine') || show('/merchant/order/delivery') || show('/merchant/queue')">
+        <template v-if="show('/merchant/order/dine') || show('/merchant/order/delivery') || showPlatform || show('/merchant/queue')">
           <button class="navgrp" :class="{ open: isOpen('pos') }" :aria-expanded="isOpen('pos')" data-testid="nav-pos" @click="toggleGrp('pos')"><span class="grow">{{ t('pos.nav') }}</span><i class="caret"></i></button>
           <template v-if="isOpen('pos')">
             <router-link v-if="show('/merchant/order/dine')" to="/merchant/order/dine" class="navsub" data-testid="nav-pos-dine">{{ t('pos.dine') }}</router-link>
             <router-link v-if="show('/merchant/order/delivery')" to="/merchant/order/delivery" class="navsub" data-testid="nav-pos-delivery" :title="t('pos.delivery_hint')">{{ t('pos.delivery') }}</router-link>
+            <router-link v-if="showPlatform" to="/merchant/order/platform" class="navsub" data-testid="nav-pos-platform" :title="t('pos.platform_hint')">{{ t('pos.platform') }}</router-link>
             <router-link v-if="show('/merchant/queue')" to="/merchant/queue" class="navsub" data-testid="nav-queue">{{ t('qu.nav') }}</router-link>
           </template>
         </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { typeColor, typeLabel } from '../orderTypes'
+import { colorOf, typeLabel } from '../orderTypes'
 import './dine/strings'
 import '../officeStrings'
 import KitchenNote from './KitchenNote.vue'
@@ -168,7 +168,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
       <div class="cols">
         <div v-for="o in shown" :key="o.id" class="card stack" :class="{ kfresh: freshAdd(o), kvoid: hasUnacked(o) }">
           <div class="row between">
-            <h2><template v-if="dine(o)">{{ t('table') }} {{ o.table_name }}<span v-for="g in o.table_tags ?? []" :key="g" class="tag warn" style="margin-inline-start:4px">{{ g }}</span></template><template v-else>{{ o.public_no }} <span class="tag" style="color:#fff;border:0" :style="{ background: typeColor[o.order_type || 'web'] }">{{ typeLabel(o) }}</span></template>
+            <h2><template v-if="dine(o)">{{ t('table') }} {{ o.table_name }}<span v-for="g in o.table_tags ?? []" :key="g" class="tag warn" style="margin-inline-start:4px">{{ g }}</span></template><template v-else>{{ o.public_no }} <span class="tag" style="color:#fff;border:0" :style="{ background: colorOf(o) }">{{ typeLabel(o) }}</span></template>
               <span class="tag brand" style="margin-inline-start:4px">{{ t(o.service_type) }}</span>
               <span v-if="addedTo(o)" class="tag kaddtag" style="margin-inline-start:4px" data-testid="k-addon">{{ t('ao.tag') }}</span>
               <span class="tag info" v-if="o.scheduled_for" style="margin-inline-start:4px">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span></h2>

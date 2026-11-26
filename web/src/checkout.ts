@@ -55,6 +55,7 @@ extend({
   'ck.pt.cash': ['现金', 'Cash'],
   'ck.pt.card': ['刷卡', 'Card'],
   'ck.pt.online': ['在线支付', 'Online'],
+  'ck.pt.platform': ['平台付款', 'Paid on the platform'],
   'ck.no_channels': ['这家店还没有可用的在线方式，请在门店设置的“收款方式”里打开', 'No online methods are on. Turn them on under Settings > Payment methods.'],
   'ck.no_types': ['收款方式都关了，请在门店设置里打开', 'Every payment method is off. Turn one on in Settings.'],
   'ck.cod': ['货到付款', 'Cash on delivery'],
@@ -104,7 +105,7 @@ export function channelName(c: PayChannel | undefined, fallback = ''): string {
 // payText says how an order was paid: "现金", "在线支付 · GCash".
 export function payText(o: { pay_type?: string; pay_method?: string; payment_method?: string }): string {
   if (o.pay_type === 'online') return t('ck.pt.online') + (o.pay_method ? ' · ' + o.pay_method : '')
-  if (o.pay_type === 'cash' || o.pay_type === 'card') return t('ck.pt.' + o.pay_type)
+  if (o.pay_type === 'cash' || o.pay_type === 'card' || o.pay_type === 'platform') return t('ck.pt.' + o.pay_type)
   return o.pay_method ?? ''
 }
 
