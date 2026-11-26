@@ -13,7 +13,7 @@ import (
 // docs/PRICING_CHECK.md §2 and returns one line per broken rule (nil when
 // all hold). It only reads.
 //
-// Besides the sums on the order (D1–D9, D12), it replays the order (R1–R3): it
+// Besides the sums on the order (D1–D9, D12, D15), it replays the order (R1–R3): it
 // prices the order again from nothing but what the order itself holds — its
 // fee rates, its live dishes, the rules of its dish promotions, what its
 // promotion and coupons took off, the discount at checkout — and the result
@@ -63,6 +63,27 @@ func (a *App) CheckOrderMoney(ctx context.Context, orderID int64) ([]string, err
 	// has no platform-funded discount (docs/ORDER_TYPES_DESIGN.md §9.4)
 	if o.otype == "web" && (o.platf != 0 || o.platfRows != 0) {
 		fail("D12 order on the store's own page has platform discount %d (%d rows)", o.platf, o.platfRows)
+	}
+	// D15 a staff order and its member are of one brand, and its number ends
+	// with the member's number (docs/MULTI_BRAND_DESIGN.md §11.2). Orders
+	// numbered before store codes (docs/ORDER_TYPES_DESIGN.md) keep their old
+	// numbers and are only held to the brand.
+	if o.otype == TypeStaff {
+		var sameBrand, numbered bool
+		err := a.DB.QueryRow(ctx, `SELECT m.brand_id = o.brand_id,
+			o.public_no !~ '^[A-Z0-9]{2,8}[0-9]{6}' OR o.public_no ~ ('^[A-Z0-9]{2,8}'
+				|| CASE WHEN m.member_no < 1000000 THEN lpad(m.member_no::text, 6, '0') ELSE m.member_no::text END
+				|| '(-[0-9]+)?$')
+			FROM orders o JOIN store_members m ON m.id = o.member_id WHERE o.id = $1`, orderID).Scan(&sameBrand, &numbered)
+		switch {
+		case isNoRows(err): // no member on it
+		case err != nil:
+			return nil, err
+		case !sameBrand:
+			fail("D15 staff order's member is of another brand")
+		case !numbered:
+			fail("D15 staff order's number does not end with its member's number")
+		}
 	}
 	// D7 never more given back than was paid
 	if o.refunded > o.total {

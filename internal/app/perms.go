@@ -54,6 +54,9 @@ const (
 	PermStaffReports  = "staff.reports"
 	PermSettings      = "settings"
 	PermKitchenScreen = "kitchen.screen"
+	// PermBrandManage: add, rename and switch off the store's brands
+	// (docs/MULTI_BRAND_DESIGN.md §13); the owner's unless given.
+	PermBrandManage = "brand.manage"
 )
 
 // PermDef is one line of the role permissions table.
@@ -108,6 +111,7 @@ var PermCatalog = []PermDef{
 	{Code: PermStaffReports, Group: "staff", Cashier: false, Manager: true, Requires: []string{PermStaffView}},
 	{Code: PermSettings, Group: "branch", Cashier: false, Manager: true},
 	{Code: PermKitchenScreen, Group: "branch", Cashier: true, Manager: true},
+	{Code: PermBrandManage, Group: "branch", Cashier: false, Manager: false},
 }
 
 func permDef(code string) (PermDef, bool) {

@@ -103,8 +103,13 @@ type Order struct {
 	Channel    string `json:"channel"`
 	// OrderType is dine_in, staff, platform, mall or web (docs/ORDER_TYPES_DESIGN.md);
 	// DineSource says who opened a table: staff or self.
-	OrderType     string `json:"order_type"`
-	DineSource    string `json:"dine_source"`
+	OrderType  string `json:"order_type"`
+	DineSource string `json:"dine_source"`
+	// The brand the order was placed under (docs/MULTI_BRAND_DESIGN.md §6):
+	// its name then, and the tag colour back-office pages show.
+	BrandID       int64  `json:"brand_id"`
+	BrandName     string `json:"brand_name"`
+	BrandColor    string `json:"brand_color"`
 	ServiceType   string `json:"service_type"`
 	CustomerName  string `json:"customer_name"`
 	CustomerPhone string `json:"customer_phone"`
@@ -262,7 +267,8 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.adj_by), ''),
 	COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.adj_approved_by), ''), o.adj_at, o.pay_type,
 	COALESCE(o.pay_channel_id, 0), COALESCE((SELECT pc.status FROM payment_checks pc WHERE pc.order_id = o.id), ''),
-	COALESCE((SELECT pc.note FROM payment_checks pc WHERE pc.order_id = o.id), ''), o.order_type, o.dine_source`
+	COALESCE((SELECT pc.note FROM payment_checks pc WHERE pc.order_id = o.id), ''), o.order_type, o.dine_source,
+	o.brand_id, o.brand_name, COALESCE((SELECT br.color FROM brands br WHERE br.id = o.brand_id), '')`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}, Discounts: []OrderDiscount{}, Voids: []OrderVoid{}, Refunds: []OrderRefund{}}
@@ -279,7 +285,8 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.ContactWhatsapp, &o.AddressPhoto, &t.MerchantDiscount, &t.PlatformSubsidy, &o.MemberNo, &o.OrderSource,
 		&o.PlacedBy, &o.StaffNote, &o.PayMethod, &o.TableTags,
 		&t.AdjPercentBP, &t.StaffDiscount, &t.AdjMode, &t.RoundOff, &o.AdjReason, &o.AdjBy, &o.AdjApprovedBy, &o.AdjAt,
-		&o.PayType, &o.PayChannelID, &o.PayCheck, &o.PayCheckNote, &o.OrderType, &o.DineSource)
+		&o.PayType, &o.PayChannelID, &o.PayCheck, &o.PayCheckNote, &o.OrderType, &o.DineSource,
+		&o.BrandID, &o.BrandName, &o.BrandColor)
 	if err != nil {
 		return nil, err
 	}

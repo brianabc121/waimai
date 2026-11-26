@@ -67,6 +67,7 @@ export const router = createRouter({
         { path: 'templates', component: () => import('./views/TemplatesView.vue') },
         { path: 'media', component: () => import('./views/MediaView.vue') },
         { path: 'site-link', component: () => import('./views/SiteLinkView.vue') },
+        { path: 'brands', component: () => import('./views/brands/BrandsView.vue') },
         { path: 'promos', component: () => import('./views/PromosView.vue') },
         { path: 'cash', component: () => import('./views/CashView.vue') },
         { path: 'bills', component: () => import('./views/BillsView.vue') },

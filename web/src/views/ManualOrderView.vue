@@ -22,6 +22,8 @@ import './manualStrings'
 import './dine/strings'
 import NotePicker from './NotePicker.vue'
 import { cartTags, hasNotes, toggleTag } from '../notes'
+import { deliveryBrands, useBrandPick } from '../brands'
+import BrandSeg from './brands/BrandSeg.vue'
 
 const PlacePicker = defineAsyncComponent(() => import('./PlacePicker.vue'))
 const router = useRouter()
@@ -35,6 +37,10 @@ try { localStorage.setItem('mo-mode', 'delivery') } catch { /* private window */
 const bid = session.branchId!
 const base = `/merchant/branches/${bid}`
 const SOURCES = ['wechat', 'line', 'whatsapp', 'phone', 'other']
+// The brand the order is placed under (docs/MULTI_BRAND_DESIGN.md §7): the
+// member, the order number (HCD000223) and the order follow it.
+const { pick: brandPick, brand } = useBrandPick('delivery', deliveryBrands)
+const bq = () => `brand=${brandPick.value}`
 
 const store = ref<Storefront | null>(null)
 const loadError = ref('')
@@ -236,7 +242,7 @@ watch(memberQ, q => {
   memberAt.value = 0; memberHits.value = []
   if (!q.trim() || quietQ) return
   memberTimer = window.setTimeout(async () => {
-    const r = await get<{ members: StoreMember[] }>(`${base}/members?q=${encodeURIComponent(q.trim())}`).catch(() => ({ members: [] }))
+    const r = await get<{ members: StoreMember[] }>(`${base}/members?q=${encodeURIComponent(q.trim())}&${bq()}`).catch(() => ({ members: [] }))
     if (memberQ.value === q) { memberHits.value = r.members; memberOpen.value = true }
   }, 200)
 })
@@ -257,7 +263,7 @@ function fill(x: StoreMember) {
 }
 async function openMember(no: number) {
   try {
-    fill(await get<StoreMember>(`${base}/members/${no}`))
+    fill(await get<StoreMember>(`${base}/members/${no}?${bq()}`))
     memberMsg.value = 'found'
   } catch {
     // another customer is being looked for: forget the one shown
@@ -277,7 +283,7 @@ async function findMember() {
 async function newMember() {
   error.value = ''
   try {
-    const x = await post<StoreMember>(`${base}/members`)
+    const x = await post<StoreMember>(`${base}/members?${bq()}`)
     // a new number for the customer being typed in: keep what is already filled
     Object.assign(f, { no: x.no, status: x.status, expires: x.expires_at })
     stats.value = null; memberMsg.value = ''
@@ -301,7 +307,7 @@ const saved = ref(false)
 async function saveMember() {
   error.value = ''
   try {
-    fill(await put<StoreMember>(`${base}/members/${f.no}`, memberBody()))
+    fill(await put<StoreMember>(`${base}/members/${f.no}?${bq()}`, memberBody()))
     saved.value = true; setTimeout(() => (saved.value = false), 2500)
   } catch (e) { error.value = errText(e) }
 }
@@ -345,7 +351,7 @@ function lineInput() {
 }
 async function loadHints() {
   const n = ++hintSeq
-  const r = await get<{ addresses: AddressHint[] }>(`${base}/address-hints?q=${encodeURIComponent(f.line.trim())}&phone=${encodeURIComponent(phoneE164.value)}`)
+  const r = await get<{ addresses: AddressHint[] }>(`${base}/address-hints?q=${encodeURIComponent(f.line.trim())}&phone=${encodeURIComponent(phoneE164.value)}&${bq()}`)
     .catch(() => ({ addresses: [] }))
   if (n !== hintSeq) return
   hints.value = r.addresses
@@ -422,7 +428,7 @@ const quote = ref<Quote | null>(null)
 const quoteError = ref('')
 const error = ref('')
 const orderBody = () => ({
-  member: memberBody(), service_type: service.value, zone_id: listMode.value ? zoneId.value : null,
+  brand_id: brandPick.value, member: memberBody(), service_type: service.value, zone_id: listMode.value ? zoneId.value : null,
   items: lines.value.map(l => ({ item_id: l.item.id, qty: l.qty, note: l.note, note_tag_ids: l.tags,
     option_ids: Object.entries(l.picks).flatMap(([id, n]) => Array(n).fill(Number(id))) })),
   scheduled_for: when.value || null, delivery_fee: service.value === 'delivery' ? feeOverride.value : null,
@@ -464,7 +470,7 @@ const adjLabel = computed(() => {
   return parts.join(' · ') + (a.reason ? ` · ${a.reason}` : '')
 })
 let quoteTimer = 0, quoteSeq = 0
-watch(() => JSON.stringify([orderBody().items, service.value, zoneId.value, f.lat, f.lng, feeOverride.value, when.value, phoneE164.value, roundTags.value, adjust.value]), () => {
+watch(() => JSON.stringify([brandPick.value, orderBody().items, service.value, zoneId.value, f.lat, f.lng, feeOverride.value, when.value, phoneE164.value, roundTags.value, adjust.value]), () => {
   clearTimeout(quoteTimer)
   quoteTimer = window.setTimeout(requote, 300)
 })
@@ -528,7 +534,7 @@ function flash(s: string) { toast.value = s; setTimeout(() => { if (toast.value 
 
 // The message for the customer. Before ordering it lists what was put in; after, it is the order itself.
 function message(o?: Order, token?: string): string {
-  const name = store.value ? store.value.branch.name : ''
+  const name = brand.value && deliveryBrands().length > 1 ? brand.value.name : store.value ? store.value.branch.name : ''
   const out: string[] = []
   if (o) out.push(t('vo.msg.head', { store: name, no: o.public_no }))
   const rows = o ? o.items.map(i => ({ code: items.value.find(x => x.id === i.item_id)?.code ?? '', name: i.name, qty: i.qty, sum: i.line_total,
@@ -558,7 +564,7 @@ async function copyDraft() { await copy(message()); flash(t('vo.copied')) }
 
 // ---------- replies (话术) ----------
 const scriptsOpen = ref(false), scriptsEditing = ref(false), scriptsText = ref('')
-const scripts = computed(() => (localStorage.getItem('mo-scripts') ?? t('vo.scripts_default', { store: store.value?.branch.name ?? '' }))
+const scripts = computed(() => (localStorage.getItem('mo-scripts') ?? t('vo.scripts_default', { store: (deliveryBrands().length > 1 ? brand.value?.name : '') || store.value?.branch.name || '' }))
   .split('\n').map(s => s.trim()).filter(Boolean))
 const scriptsVer = ref(0)
 const scriptList = computed(() => { void scriptsVer.value; return scripts.value })
@@ -649,6 +655,8 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
       <h1 v-if="appendId" data-testid="ao-title">{{ t('ao.m.title', { no: target?.public_no ?? '' }) }}</h1>
       <h1 v-else data-testid="mo-title">{{ t('pos.delivery') }}</h1>
       <span v-if="appendId && target" class="tstate">{{ targetState }}</span>
+      <BrandSeg v-if="!appendId && deliveryBrands().length > 1" v-model="brandPick" :brands="deliveryBrands()" class="mo-brands" data-testid="mo-brands"
+        @update:model-value="clearMember()" />
       <span class="store">{{ store?.branch.name }}</span>
     </div>
     <div v-if="loadError || targetErr" class="banner bad" style="margin:12px">{{ loadError || targetErr }}</div>
@@ -994,6 +1002,8 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 .mo-top { background: var(--red-bg); color: #fff; display: flex; align-items: center; gap: 12px; padding: 10px 16px; flex: none; }
 .mo-top .back { background: none; border: 0; color: var(--gold-soft); font-weight: 600; }
 .mo-top h1 { font-size: 17px; margin: 0; }
+.mo-top .mo-brands { color: var(--ink, #3b1f14); }
+@media (max-width: 760px) { .mo-top { flex-wrap: wrap; } .mo-top .mo-brands { order: 9; width: 100%; } }
 .mo-top .store { color: var(--gold); }
 .mo-body { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 470px 190px; min-height: 0; }
 .c { text-align: center; } .r { text-align: right; } .b { font-weight: 700; } .red { color: #b42318; } .okc { color: #18794e; }

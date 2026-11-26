@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ApiError, del, get, patch, post } from '../api'
+import { ApiError, del, get, patch, post, put } from '../api'
+import { brandsHere, multiBrand } from '../brands'
 import { pick, t } from '../i18n'
 import { currentRole, isOwner, session } from '../session'
 import '../perms'
@@ -67,11 +68,11 @@ const editable = (m: StaffMember) => !['owner', 'manager'].includes(m.role) || m
 
 // ---- drawer ----
 const f = reactive({ open: false, id: 0, username: '', display_name: '', phone: '', password: '', role: 'staff', stations: [] as number[], packing: false, rider: false,
-  active: true, error: '', busy: false, pw: false, newPw: '' })
+  active: true, error: '', busy: false, pw: false, newPw: '', brands: [] as number[] })
 function edit(m: StaffMember | null) {
   Object.assign(f, { open: true, id: m?.id ?? 0, username: m?.username ?? '', display_name: m?.display_name ?? '', phone: m?.phone ?? '', password: '',
     role: m?.role ?? 'staff', stations: m ? m.posts.filter(p => p.kind === 'station').map(p => p.station_id!) : [], packing: !!m && has(m, 'packing'), rider: !!m && has(m, 'rider'),
-    active: m?.active ?? true, error: '', busy: false, pw: false, newPw: '' })
+    active: m?.active ?? true, error: '', busy: false, pw: false, newPw: '', brands: m?.brand_ids ? [...m.brand_ids] : [] })
   notice.value = ''
   void loadPerms()
 }
@@ -81,6 +82,10 @@ const formStations = computed(() => {
   const held = staff.value.find(m => m.id === f.id)?.posts.filter(p => p.kind === 'station' && !stations.value.some(s => s.id === p.station_id)) ?? []
   return [...stations.value.map(s => ({ id: s.id, name: pick(s.name, s.name_en) })), ...held.map(p => ({ id: p.station_id!, name: postName(p) }))]
 })
+// Brands they work on (docs/MULTI_BRAND_DESIGN.md §10); none ticked = all.
+const showBrands = computed(() => multiBrand() && f.role !== 'owner' && !self.value)
+const toggleBrand = (id: number) => { const i = f.brands.indexOf(id); i < 0 ? f.brands.push(id) : f.brands.splice(i, 1) }
+const brandNames = (m: StaffMember) => m.brand_ids ? brandsHere().filter(b => m.brand_ids!.includes(b.id)).map(b => b.name).join('、') : ''
 const toggleStation = (id: number) => { const i = f.stations.indexOf(id); i < 0 ? f.stations.push(id) : f.stations.splice(i, 1) }
 const roles = computed(() => myRole.value === 'owner' || self.value ? ['staff', 'cashier', 'manager', 'owner'] : ['staff', 'cashier'])
 const roleHint = (r: string) => r === 'staff' ? t('rp.role.staff_hint') : r === 'owner' ? t('rp.role.owner_hint') : r === 'manager' ? t('rp.manager_only_owner') : t('rp.role.cashier_hint')
@@ -105,8 +110,14 @@ function save() {
   const posts = [...f.stations.map(id => ({ kind: 'station', station_id: id })), ...(f.packing ? [{ kind: 'packing' }] : []), ...(f.rider ? [{ kind: 'rider' }] : [])]
   const body: Record<string, unknown> = { username: f.username, display_name: f.display_name, phone: f.phone, posts }
   if (!self.value) body.role = f.role
-  return act(() => f.id ? patch(`/merchant/branches/${bid}/staff/${f.id}`, body)
-    : post(`/merchant/branches/${bid}/staff`, { ...body, role: f.role, password: f.password }))
+  return act(async () => {
+    let id = f.id
+    if (id) await patch(`/merchant/branches/${bid}/staff/${id}`, body)
+    else id = (await post<{ id: number }>(`/merchant/branches/${bid}/staff`, { ...body, role: f.role, password: f.password })).id
+    const was = staff.value.find(m => m.id === id)?.brand_ids ?? []
+    const now = showBrands.value ? f.brands : []
+    if ([...was].sort().join() !== [...now].sort().join()) await put(`/merchant/branches/${bid}/staff/${id}/brands`, { brand_ids: now })
+  })
 }
 const setActive = (id: number, on: boolean) => act(() => patch(`/merchant/branches/${bid}/staff/${id}`, { active: on }))
 const restore = async (m: StaffMember) => { f.id = m.id; await setActive(m.id, true); if (f.error) { error.value = f.error } }
@@ -155,7 +166,8 @@ const resetPw = () => act(() => post(`/merchant/branches/${bid}/staff/${f.id}/pa
                 <td data-col="posts">
                   <span v-for="p in m.posts" :key="p.kind + (p.station_id ?? '')" class="post" :class="p.kind">{{ postName(p) }}</span>
                   <span v-if="!m.posts.length" class="post none">{{ t('st.no_posts') }}</span></td>
-                <td><span class="rtag" :class="m.role" :data-role="m.role">{{ m.role === 'staff' ? t('st.role.none') : t('role.' + m.role) }}</span></td>
+                <td><span class="rtag" :class="m.role" :data-role="m.role">{{ m.role === 'staff' ? t('st.role.none') : t('role.' + m.role) }}</span>
+                  <div v-if="multiBrand() && m.brand_ids" class="muted small" data-testid="staff-brand-names">{{ brandNames(m) }}</div></td>
                 <td><span class="ox-pill" :class="!m.active ? 'bad' : busy(m) ? 'ok' : ''">{{ nowText(m) }}</span></td>
                 <td class="right"><span class="ox-ops">
                   <button v-if="!m.active && editable(m)" class="op red" @click="restore(m)">{{ t('st.restore') }}</button>
@@ -211,6 +223,14 @@ const resetPw = () => act(() => post(`/merchant/branches/${bid}/staff/${f.id}/pa
               <router-link class="small" to="/merchant/staff/roles">{{ t('rp.edit_link') }} ›</router-link></div>
             <div class="y">✓ {{ summary.yes.join('、') }}</div>
             <div v-if="summary.no.length" class="n">✗ {{ summary.no.join('、') }}</div>
+          </div>
+        </div>
+
+        <div v-if="showBrands" class="grp" data-testid="staff-brands">
+          <div class="gh"><b>{{ t('br.staff') }}</b> <span class="muted small">{{ t('br.staff_hint') }}</span></div>
+          <div class="opts">
+            <button type="button" class="opt radio" :class="{ on: !f.brands.length }" data-brand="all" @click="f.brands = []"><i></i>{{ t('br.staff_all') }}</button>
+            <button v-for="b in brandsHere()" :key="b.id" type="button" class="opt" :class="{ on: f.brands.includes(b.id) }" :data-brand="b.id" @click="toggleBrand(b.id)"><i></i>{{ b.name }}</button>
           </div>
         </div>
 

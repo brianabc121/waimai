@@ -135,6 +135,8 @@ export interface Order {
   id: number; branch_id: number; public_no: string; pickup_code: string; service_type: 'delivery' | 'pickup' | 'dine_in'
   // dine_in, staff, platform, mall or web; who opened a table: staff or self
   order_type?: string; dine_source?: string
+  // the brand it was placed under (docs/MULTI_BRAND_DESIGN.md §6)
+  brand_id?: number; brand_name?: string; brand_color?: string
   customer_name: string; customer_phone: string; zone_name: string; address_line: string; address_unit: string
   // from the saved address: who to call (may differ from the account that ordered), other ways to reach them, a photo of the door
   contact_phone: string; contact_title: '' | 'mr' | 'ms'; contact_wechat: string; contact_telegram: string; contact_line: string; contact_whatsapp: string; address_photo: boolean
@@ -199,7 +201,7 @@ export interface AddonState { open: boolean; why?: '' | 'handed_off' | 'closed' 
 export interface AddonQuote { currency: string; lines: QuoteLine[]; subtotal: number; before: Totals; after: Totals; extra: number; promo_up: boolean; state: AddonState }
 // a customer of one store, kept by the store (orders placed for a customer)
 export interface StoreMember {
-  id: number; no: number; status: 'temp' | 'active'; phone: string; name: string; source: string; contact: string
+  id: number; brand_id?: number; no: number; status: 'temp' | 'active'; phone: string; name: string; source: string; contact: string
   address_line: string; address_unit: string; address_note: string; lat: number | null; lng: number | null; note: string
   expires_at: string | null; created_at: string
   stats?: { week: number; month: number; quarter: number; orders: number; spent: number; last_at: string | null; favorites: string[] }
@@ -237,8 +239,11 @@ export interface MenuImport {
 // A post is one job in a branch: a kitchen station, the packing counter, or rider.
 export interface Post { kind: 'station' | 'packing' | 'rider'; station_id: number | null; station_name?: string; station_name_en?: string; station_active?: boolean }
 // role is back-office access (owner, manager, cashier, staff); posts say what the person works on.
-export interface BranchRole { branch_id: number; branch_name: string; slug: string; currency: string; role: string; posts: Post[]; perms?: string[]; platforms?: boolean }
-export interface StaffMember { id: number; username: string; display_name: string; phone: string; role: string; active: boolean; posts: Post[]; open_tasks: number; active_deliveries: number; on_duty: boolean }
+export interface BranchRole { branch_id: number; branch_name: string; slug: string; currency: string; role: string; posts: Post[]; perms?: string[]; platforms?: boolean; brand_ids?: number[] | null; brands?: BrandRef[] }
+// A brand of a store (docs/MULTI_BRAND_DESIGN.md).
+export interface BrandRef { id: number; name: string; code: string; color: string; is_main: boolean; dine_in: boolean; delivery: boolean; active: boolean }
+export interface Brand { id: number; branch_id: number; name: string; name_en: string; code: string; store_no: number; slug: string; dine_in: boolean; delivery: boolean; is_main: boolean; color: string; open_time: string; close_time: string; paused: boolean; mall_visible: boolean; status: 'active' | 'disabled'; sort: number; today?: { orders: number; total: number } }
+export interface StaffMember { id: number; username: string; display_name: string; phone: string; role: string; active: boolean; posts: Post[]; open_tasks: number; active_deliveries: number; on_duty: boolean; brand_ids?: number[] | null }
 export interface RiderInfo extends StaffMember { lat: number | null; lng: number | null; accuracy: number | null; battery: number | null; located_at: string | null; contact: '' | 'ok' | 'none' | 'lost'; distance_m: number | null }
 export interface Tracking { active: boolean; rider_name?: string; rider_phone?: string; lat: number | null; lng: number | null; located_at: string | null; dest_lat: number | null; dest_lng: number | null; distance_m: number | null }
 export interface User { id: number; username: string; display_name: string; is_platform_admin: boolean; roles: BranchRole[]; entry?: Entry; has_approve_pin?: boolean }

@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ORDER_TYPES, colorOf, typeLabel } from '../orderTypes'
+import { brandsHere, multiBrand, useBrandPick } from '../brands'
+import BrandSeg from './brands/BrandSeg.vue'
+import BrandTag from './brands/BrandTag.vue'
 import KitchenNote from './KitchenNote.vue'
 import { computed, ref } from 'vue'
 import { ApiError, api, get, post } from '../api'
@@ -97,8 +100,11 @@ const orders = ref<Order[]>([])
 // the type tabs over the list (docs/ORDER_TYPES_DESIGN.md §8); dine-in bills live on the tables page
 const typeFilter = ref('')
 const typeTabs = computed(() => ORDER_TYPES.filter(x => x !== 'dine_in')
-  .map(x => ({ id: x, n: orders.value.filter(o => (o.order_type || 'web') === x).length })))
-const shown = computed(() => typeFilter.value ? orders.value.filter(o => (o.order_type || 'web') === typeFilter.value) : orders.value)
+  .map(x => ({ id: x, n: byBrand.value.filter(o => (o.order_type || 'web') === x).length })))
+// one kitchen: every brand's orders together unless one brand is picked (docs/MULTI_BRAND_DESIGN.md §12)
+const { pick: brandFilter } = useBrandPick('orders', brandsHere, true)
+const byBrand = computed(() => brandFilter.value && multiBrand() ? orders.value.filter(o => o.brand_id === brandFilter.value) : orders.value)
+const shown = computed(() => typeFilter.value ? byBrand.value.filter(o => (o.order_type || 'web') === typeFilter.value) : byBrand.value)
 const riders = ref<RiderInfo[]>([])
 // ?order=ID opens that order (from the cooking progress page)
 const selectedId = ref<number | null>(Number(useRoute().query.order) || null)
@@ -279,8 +285,9 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
 
     <div class="desk" :class="{ picked: !!selected }">
       <div class="list">
+        <BrandSeg v-if="multiBrand()" v-model="brandFilter" :brands="brandsHere()" all class="ord-brands" />
         <div class="ottabs" data-testid="ot-tabs">
-          <button :class="{ on: !typeFilter }" @click="typeFilter = ''">{{ t('ot.all') }} {{ orders.length }}</button>
+          <button :class="{ on: !typeFilter }" @click="typeFilter = ''">{{ t('ot.all') }} {{ byBrand.length }}</button>
           <button v-for="x in typeTabs" :key="x.id" :class="{ on: typeFilter === x.id }" :data-testid="'ot-tab-' + x.id" @click="typeFilter = x.id">{{ t('ot.t.' + x.id) }} {{ x.n }}</button>
         </div>
         <div v-if="shown.length === 0" class="card muted">{{ t('no_orders') }}</div>
@@ -291,6 +298,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
             <span class="muted" v-if="scope === 'active'">{{ t('waiting') }} {{ waited(o) }} {{ t('min') }}</span>
           </div>
           <div class="row wrap" style="margin-top:8px;gap:6px">
+            <BrandTag :name="o.brand_name" :color="o.brand_color" />
             <span class="tag ottag" :style="{ background: colorOf(o) }" data-testid="ot-tag">{{ typeLabel(o) }}</span>
             <span v-if="o.order_source" class="tag info" data-testid="by-staff-tag">{{ t('vo.tag', { s: srcText(o.order_source) }) }}</span>
             <span class="tag brand" v-if="o.scheduled_for">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span>
@@ -312,7 +320,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
         <div class="stack">
           <button class="btn link backlist" data-testid="order-back" @click="selectedId = null">‹ {{ t('back') }}</button>
           <div class="row between">
-            <h2>{{ selected.public_no }}<template v-if="!selected.platform"> · {{ typeLabel(selected) }}</template> · {{ svcText(selected) }}</h2>
+            <h2><BrandTag :name="selected.brand_name" :color="selected.brand_color" big /> {{ selected.public_no }}<template v-if="!selected.platform"> · {{ typeLabel(selected) }}</template> · {{ svcText(selected) }}</h2>
             <a class="btn small" :href="`/ticket/${selected.id}`" target="_blank">{{ t('print') }}</a>
           </div>
           <div class="row wrap" style="gap:6px">
@@ -506,6 +514,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
 </template>
 
 <style scoped>
+.ord-brands { margin-bottom: 8px; }
 .ottabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .ottabs button { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .ottabs button.on { border-color: var(--brand); color: var(--brand); }

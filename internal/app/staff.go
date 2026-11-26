@@ -152,6 +152,8 @@ type StaffMember struct {
 	ActiveDeliveries int `json:"active_deliveries"` // deliveries not finished yet
 	// OnDuty is set for people who clocked on and have not clocked off.
 	OnDuty bool `json:"on_duty"`
+	// BrandIDs are the brands they work on; nil = all (docs/MULTI_BRAND_DESIGN.md §10).
+	BrandIDs []int64 `json:"brand_ids"`
 }
 
 // ListStaff returns everyone with a role in the branch, active people first.
@@ -175,7 +177,8 @@ func (a *App) listStaff(ctx context.Context, branchID int64, extra string) ([]St
 		EXISTS (SELECT 1 FROM staff_shifts sh WHERE sh.user_id = u.id AND sh.branch_id = r.branch_id
 			AND sh.ended_at IS NULL AND NOT sh.voided)
 		OR (coalesce((SELECT rs.on_duty FROM rider_status rs WHERE rs.user_id = u.id), false) AND EXISTS (SELECT 1
-			FROM staff_posts p WHERE p.user_id = u.id AND p.branch_id = r.branch_id AND p.kind = 'rider'))
+			FROM staff_posts p WHERE p.user_id = u.id AND p.branch_id = r.branch_id AND p.kind = 'rider')),
+		r.brand_ids
 		FROM user_branch_roles r JOIN users u ON u.id = r.user_id
 		WHERE r.branch_id=$1 AND u.deleted_at IS NULL`+extra+` ORDER BY u.active DESC, u.id`, branchID)
 	if err != nil {
@@ -185,7 +188,7 @@ func (a *App) listStaff(ctx context.Context, branchID int64, extra string) ([]St
 	out := []StaffMember{}
 	for rows.Next() {
 		s := StaffMember{Posts: []Post{}}
-		if err := rows.Scan(&s.ID, &s.Username, &s.DisplayName, &s.Phone, &s.Role, &s.Active, &s.OpenTasks, &s.ActiveDeliveries, &s.OnDuty); err != nil {
+		if err := rows.Scan(&s.ID, &s.Username, &s.DisplayName, &s.Phone, &s.Role, &s.Active, &s.OpenTasks, &s.ActiveDeliveries, &s.OnDuty, &s.BrandIDs); err != nil {
 			return nil, err
 		}
 		out = append(out, s)

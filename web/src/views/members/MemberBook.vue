@@ -10,15 +10,19 @@ import OxPager from '../OxPager.vue'
 import '../../officeStrings'
 import '../manualStrings'
 import './memberStrings'
+import { brandsHere, multiBrand, useBrandPick } from '../../brands'
+import BrandSeg from '../brands/BrandSeg.vue'
 
 const props = defineProps<{ admin?: boolean }>()
+// Members are kept per brand and never shown merged (docs/MULTI_BRAND_DESIGN.md §8).
+const { pick: brandPick } = useBrandPick('members')
 
 interface Stats { week: number; month: number; quarter: number; orders: number; spent: number; last_at: string | null; favorites: string[] }
 interface Member {
-  id: number; no: number; status: string; phone: string; name: string; source: string; contact: string
+  id: number; brand_id: number; no: number; status: string; phone: string; name: string; source: string; contact: string
   address_line: string; address_unit: string; address_note: string; lat: number | null; lng: number | null; note: string
   expires_at: string | null; created_at: string
-  branch_id: number; branch_name: string; merchant_name: string; currency: string; orders: number; spent: number; last_at: string | null
+  branch_id: number; branch_name: string; brand_name: string; brand_code: string; merchant_name: string; currency: string; orders: number; spent: number; last_at: string | null
   stats?: Stats
   address_count: number; addresses?: Address[]
 }
@@ -75,7 +79,7 @@ async function load() {
   try {
     const r = props.admin
       ? await get('/admin/members' + query({ ...q, branch_id: f.branch }))
-      : await get(base() + '/member-list' + query(q))
+      : await get(base() + '/member-list' + query({ ...q, brand: brandPick.value }))
     Object.assign(list, r, { loaded: true })
     error.value = ''
   } catch (e) { error.value = errText(e) }
@@ -95,7 +99,8 @@ const merchants = computed(() => {
 })
 
 // ---- one member ----
-const memberPath = (m: Member) => props.admin ? `/admin/members/${m.id}` : `${base()}/members/${m.no}`
+const memberPath = (m: Member, sub = '') => props.admin ? `/admin/members/${m.id}${sub}` : `${base()}/members/${m.no}${sub}?brand=${m.brand_id || brandPick.value}`
+const withQ = (url: string, extra: Record<string, string | number>) => url + (url.includes('?') ? '&' + query(extra).slice(1) : query(extra))
 const open = reactive({ m: null as Member | null, orders: [] as MemberOrder[], total: 0, page: 1, error: '' })
 async function show(m: Member) {
   Object.assign(open, { m, orders: [], total: 0, page: 1, error: '' })
@@ -106,7 +111,7 @@ async function show(m: Member) {
 }
 async function loadOrders() {
   if (!open.m) return
-  const r = await get<{ items: MemberOrder[]; total: number }>(memberPath(open.m) + '/orders' + query({ page: open.page, page_size: 10 }))
+  const r = await get<{ items: MemberOrder[]; total: number }>(withQ(memberPath(open.m, '/orders'), { page: open.page, page_size: 10 }))
   open.orders = r.items; open.total = r.total
 }
 function ordersGo(p: number) { open.page = p; void loadOrders().catch(e => { open.error = errText(e) }) }
@@ -116,7 +121,7 @@ async function dropAddress(a: Address) {
   const m = open.m
   if (!m || !confirm(t('sm.a.delete_confirm', { s: [a.line, a.unit].filter(Boolean).join(' · ') }))) return
   try {
-    await del(`${memberPath(m)}/addresses/${a.id}`)
+    await del(memberPath(m, `/addresses/${a.id}`))
     m.addresses = (m.addresses ?? []).filter(x => x.id !== a.id)
     const row = list.items.find(x => x.id === m.id)
     if (row) row.address_count = Math.max(0, row.address_count - 1)
@@ -158,6 +163,10 @@ async function save() {
   <div class="mbook" data-testid="members-page">
     <div v-if="!admin" class="ox-head">
       <div><h1>{{ t('cm.members') }}</h1><p class="ox-sub">{{ t('ox.sm.sub') }}</p></div>
+    </div>
+    <div v-if="!admin && multiBrand()" class="mb-brands" data-testid="members-brands">
+      <BrandSeg v-model="brandPick" :brands="brandsHere()" @update:model-value="search" />
+      <span class="muted small">{{ t('br.members_note') }}</span>
     </div>
 
     <div class="ox-stats" data-testid="members-stats">
@@ -207,12 +216,12 @@ async function save() {
           </tr></thead>
           <tbody>
             <tr v-for="m in list.items" :key="m.id" :data-member="m.no" :class="{ temp: m.status === 'temp' }" data-testid="member-row">
-              <td><a href="#" class="mono mb-no ox-code" @click.prevent="show(m)">{{ pad(m.no) }}</a>
+              <td><a href="#" class="mono mb-no ox-code" @click.prevent="show(m)">{{ (multiBrand() && !admin ? m.brand_code : '') + pad(m.no) }}</a>
                 <span v-if="m.status === 'temp'" class="tag warn ox-pill" :title="t('sm.temp_hint')">{{ t('sm.temp') }} · {{ t('sm.temp_left', { n: minutesLeft(m) }) }}</span></td>
               <td><span class="ox-strong">{{ m.name || '—' }}</span></td>
               <td class="nowrap">{{ m.phone || '—' }}</td>
               <td><span v-if="m.source" class="ox-tag" :class="srcTone(m.source)">{{ srcText(m.source) }}</span><span v-else>—</span><span v-if="m.contact" class="muted small"> {{ m.contact }}</span></td>
-              <td v-if="admin"><a href="#" @click.prevent="onlyStore(m.branch_id)">{{ m.branch_name }}</a><div v-if="m.merchant_name !== m.branch_name" class="muted small">{{ m.merchant_name }}</div></td>
+              <td v-if="admin"><a href="#" @click.prevent="onlyStore(m.branch_id)">{{ m.branch_name }}</a><span v-if="m.brand_name && m.brand_name !== m.branch_name" class="small"> · {{ m.brand_name }}</span><div v-if="m.merchant_name !== m.branch_name" class="muted small">{{ m.merchant_name }}</div></td>
               <td class="mb-addr">{{ address(m) || '—' }}<span v-if="m.address_count > 1" class="tag" :title="t('sm.a.more_title')">{{ t('sm.a.more', { n: m.address_count - 1 }) }}</span></td>
               <td class="num">{{ m.orders }}</td>
               <td class="num"><span class="ox-money">{{ money(m.spent, m.currency) }}</span></td>
@@ -245,7 +254,7 @@ async function save() {
           <div v-if="open.error" class="banner bad">{{ open.error }}</div>
           <div v-if="open.m.status === 'temp'" class="banner warn small">{{ t('sm.temp_hint') }}</div>
           <dl class="mb-info">
-            <template v-if="admin"><dt>{{ t('sm.col.store') }}</dt><dd>{{ open.m.branch_name }} <span v-if="open.m.merchant_name !== open.m.branch_name" class="muted small">· {{ open.m.merchant_name }}</span></dd></template>
+            <template v-if="admin"><dt>{{ t('sm.col.store') }}</dt><dd>{{ open.m.branch_name }}<template v-if="open.m.brand_name && open.m.brand_name !== open.m.branch_name"> · {{ open.m.brand_name }}</template> <span v-if="open.m.merchant_name !== open.m.branch_name" class="muted small">· {{ open.m.merchant_name }}</span></dd></template>
             <dt>{{ t('sm.col.phone') }}</dt><dd>{{ open.m.phone || '—' }}</dd>
             <dt>{{ t('sm.col.source') }}</dt><dd>{{ srcText(open.m.source) }}</dd>
             <template v-if="open.m.contact"><dt>{{ t('sm.d.contact') }}</dt><dd>{{ open.m.contact }}</dd></template>
@@ -372,6 +381,7 @@ td .tag { white-space: nowrap; }
 .mb-stats span { font-size: 12px; color: var(--muted); }
 .mb-orders, .mb-addrs { display: grid; gap: 8px; }
 .mb-addr-item { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: grid; gap: 3px; overflow-wrap: anywhere; }
+.mb-brands { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
 .mb-addr-item.cur { border-color: var(--brand); background: var(--brand-soft); }
 .mb-addr .tag { margin-inline-start: 6px; }
 .mb-order { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: grid; gap: 4px; }
