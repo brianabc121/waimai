@@ -19,6 +19,9 @@ type AdminMenu struct {
 	Zones      []Zone     `json:"zones"`
 	Stations   []Station  `json:"stations"`
 	Categories []Category `json:"categories"`
+	// Platforms are the delivery platforms the store sells on; each dish
+	// carries its hand-set prices on them (docs/ORDER_TYPES_DESIGN.md §6).
+	Platforms []BranchPlatform `json:"platforms"`
 }
 
 func (a *App) AdminMenu(ctx context.Context, branchID int64) (*AdminMenu, error) {
@@ -38,7 +41,28 @@ func (a *App) AdminMenu(ctx context.Context, branchID int64) (*AdminMenu, error)
 	if err != nil {
 		return nil, err
 	}
-	return &AdminMenu{Branch: b, Zones: zones, Stations: stations, Categories: cats}, nil
+	platforms, err := a.BranchPlatforms(ctx, a.DB, branchID, true)
+	if err != nil {
+		return nil, err
+	}
+	own, err := itemPlatformPrices(ctx, a.DB, branchID)
+	if err != nil {
+		return nil, err
+	}
+	for ci := range cats {
+		for ii := range cats[ci].Items {
+			it := &cats[ci].Items[ii]
+			it.PlatformPrices = own[it.ID]
+			// what each platform charges when no price is set by hand
+			for _, p := range platforms {
+				if it.PlatformAuto == nil {
+					it.PlatformAuto = map[int64]int64{}
+				}
+				it.PlatformAuto[p.ID] = p.PlatformPrice(it.Price, nil)
+			}
+		}
+	}
+	return &AdminMenu{Branch: b, Zones: zones, Stations: stations, Categories: cats, Platforms: platforms}, nil
 }
 
 func branchChanged(ctx context.Context, q Querier, branchID int64) error {
@@ -116,6 +140,10 @@ type ItemInput struct {
 	// Groups are the dish's own groups only: template groups follow the
 	// templates.
 	ToppingTemplateIDs *[]int64 `json:"topping_template_ids"`
+	// PlatformPrices are the prices set by hand on delivery platforms, by
+	// platform id; a platform left out takes the store price with its markup.
+	// nil keeps them.
+	PlatformPrices *map[int64]int64 `json:"platform_prices"`
 }
 
 // The dish page holds the main picture and up to this many more.
@@ -226,6 +254,11 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 		}
 		if _, err := tx.Exec(ctx, `DELETE FROM option_groups WHERE item_id=$1 AND topping_template_id IS NULL`, id); err != nil {
 			return err
+		}
+		if in.PlatformPrices != nil {
+			if err := setItemPlatformPrices(ctx, tx, id, *in.PlatformPrices); err != nil {
+				return err
+			}
 		}
 		if in.ToppingTemplateIDs != nil {
 			if err := setItemToppingTemplates(ctx, tx, branchID, id, *in.ToppingTemplateIDs); err != nil {

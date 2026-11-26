@@ -4,15 +4,16 @@
 // /merchant/branches/3 or /admin/branches/3.
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ApiError, get, post, put } from '../api'
-import { both, t, toMajor, toMinor } from '../i18n'
+import { both, money, t, toMajor, toMinor } from '../i18n'
 import type { Item, NoteTemplate, Station, ToppingTemplate } from '../types'
+import { type BranchPlatform, platformName } from '../platforms'
 import '../notes'
 import '../toppings'
 import ImageUpload from './ImageUpload.vue'
 import PhotoList from './PhotoList.vue'
 import './manualStrings'
 
-const props = defineProps<{ item: Item | null; categoryId?: number; cats: { id: number; name: string }[]; stations: Station[]; cur: string; base: string }>()
+const props = defineProps<{ item: Item | null; categoryId?: number; cats: { id: number; name: string }[]; stations: Station[]; cur: string; base: string; platforms?: BranchPlatform[] }>()
 const emit = defineEmits<{ saved: []; close: []; 'manage-notes': []; 'manage-toppings': [] }>()
 
 interface OptForm { name: string; name_en: string; extra: number; sold_out: boolean }
@@ -43,6 +44,26 @@ const f = reactive<Form>(it ? {
 } : { ...blank(), category_id: props.categoryId || props.cats[0]?.id || 0 })
 const error = ref('')
 const busy = ref(false)
+
+// Platform prices (docs/ORDER_TYPES_DESIGN.md §6.2), in major units; empty
+// means the server works it out from the store's markup. Prices kept for a
+// platform the store no longer sells on are sent back unchanged.
+const pp = reactive<Record<number, number | ''>>({})
+for (const p of props.platforms ?? []) {
+  const own = it?.platform_prices?.[p.id]
+  pp[p.id] = own == null ? '' : toMajor(own)
+}
+const autoPrice = (pid: number) => it?.platform_auto?.[pid]
+function platformPrices(): Record<number, number> {
+  const out: Record<number, number> = {}
+  for (const [k, v] of Object.entries(it?.platform_prices ?? {})) out[Number(k)] = v
+  for (const p of props.platforms ?? []) {
+    const v = pp[p.id]
+    if (v === '' || v == null || !Number.isFinite(Number(v))) delete out[p.id]
+    else out[p.id] = toMinor(Number(v))
+  }
+  return out
+}
 
 // The store's flavour note templates (docs/NOTE_TEMPLATE_DESIGN.md §5.2): up to three per dish.
 const MAX_NOTES = 3
@@ -83,6 +104,7 @@ async function save() {
       options: g.options.map(o => ({ name: o.name, name_en: o.name_en, price_delta: toMinor(o.extra), sold_out: o.sold_out })) })),
     note_template_ids: f.note_template_ids,
     ...(toppings.value ? { topping_template_ids: f.topping_template_ids } : {}),
+    ...(props.platforms?.length ? { platform_prices: platformPrices() } : {}),
   }
   error.value = ''; busy.value = true
   try {
@@ -107,6 +129,16 @@ async function save() {
             <option v-for="c in cats" :key="c.id" :value="c.id">{{ c.name }}</option></select></label>
           <label class="field"><span>{{ t('price') }} ({{ cur }})</span><input type="number" min="0" step="0.01" v-model.number="f.price" required /></label>
           <label class="field"><span>{{ t('vo.code') }}</span><input v-model="f.code" maxlength="12" data-testid="item-code" :placeholder="t('vo.code_ph')" /></label>
+        </div>
+        <div v-if="platforms?.length" class="field" data-testid="item-platform-prices"><span>{{ t('pf.price') }} ({{ cur }})</span>
+          <div class="pfp">
+            <label v-for="p in platforms" :key="p.id" :data-platform="p.prefix">
+              <i :style="{ background: p.color }"></i><b>{{ platformName(p) }}</b>
+              <input v-model="pp[p.id]" type="number" min="0" step="0.01"
+                :placeholder="autoPrice(p.id) != null ? t('pf.auto') + ' ' + money(autoPrice(p.id)!, cur) : t('pf.auto')" />
+            </label>
+          </div>
+          <div class="muted small" style="margin-bottom:6px">{{ t('pf.price_hint') }}</div>
         </div>
         <label class="field"><span>{{ t('description') }}</span><input v-model="f.description" /></label>
         <ImageUpload v-model="f.image_url" :base="base" :ratio="1" :width="800" :label="t('im.dish')" :hint="t('im.dish_hint')" testid="item-image" />
@@ -198,6 +230,11 @@ async function save() {
 .chans { display: flex; flex-wrap: wrap; gap: 4px 20px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: center; }
 .notes { margin-top: 14px; }
+.pfp { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 12px; }
+.pfp label { display: flex; align-items: center; gap: 6px; }
+.pfp i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.pfp b { font-weight: 600; white-space: nowrap; }
+.pfp input { flex: 1; min-width: 0; }
 .notes h3 { margin: 0 0 4px; }
 .tplpick { display: grid; gap: 8px; }
 .tplpick label { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; cursor: pointer; }

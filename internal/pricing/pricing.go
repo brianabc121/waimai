@@ -357,3 +357,15 @@ func mulDiv(a, b, d int64) (int64, int64) {
 	q, r := bits.Div64(hi, lo, uint64(d))
 	return int64(q), int64(r)
 }
+
+// PlatformPrice is a dish's price on a delivery platform worked out from the
+// store's own price (docs/ORDER_TYPES_DESIGN.md §6): the price with the
+// markup, rounded half up to the step (cents; 0 rounds to the cent). It is
+// rounded once, from the exact amount, so 202.495 with a step of 1.00 is
+// 202.00, not 202.50 and then 203.00.
+func PlatformPrice(price int64, markupBP int, step int64) int64 {
+	if step <= 0 {
+		step = 1
+	}
+	return MulDivRound(price, int64(10000+markupBP), 10000*step) * step
+}
