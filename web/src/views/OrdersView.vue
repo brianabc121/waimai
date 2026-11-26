@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ORDER_TYPES, typeColor, typeLabel } from '../orderTypes'
+import { ORDER_TYPES, colorOf, typeLabel } from '../orderTypes'
 import KitchenNote from './KitchenNote.vue'
 import { computed, ref } from 'vue'
 import { ApiError, api, get, post } from '../api'
@@ -15,6 +15,7 @@ import './work/strings'
 import './translateStrings'
 import '../orders'
 import TotalsTable from './TotalsTable.vue'
+import PlatformBlock from './PlatformBlock.vue'
 import ApproveDialog from './ApproveDialog.vue'
 import '../approve'
 import { chatEnabled } from '../chat'
@@ -46,6 +47,8 @@ const payOpts = ref<PayOptions | null>(null)
 void get<PayOptions>(`/merchant/branches/${bid}/pay-options`).then(o => (payOpts.value = o)).catch(() => null)
 const adjFor = ref<Order | null>(null)
 const adjToken = ref('')
+// a platform order says who collects it: the platform's rider or the customer
+const svcText = (o: Order) => o.platform ? t('po.pk.' + o.platform.pickup) : t(o.service_type)
 const canAdjust = (o: Order) => o.service_type !== 'dine_in' && o.payment_status !== 'paid' && !!o.addon?.open && can('order.handle')
 function adjustOrder(o: Order) {
   if (can('checkout.discount')) { adjToken.value = ''; adjFor.value = o; return }
@@ -284,11 +287,11 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
         <button v-for="o in shown" :key="o.id" class="card ord" :class="{ sel: o.id === selectedId, pend: o.acceptance_status === 'pending' }" @click="selectedId = o.id">
           <div class="row between"><b>{{ o.public_no }}</b><span class="price bold">{{ money(o.totals.total, o.currency) }}</span></div>
           <div class="row between small" style="margin-top:4px">
-            <span>{{ t(o.service_type) }} · {{ o.customer_name }}</span>
+            <span>{{ svcText(o) }}<template v-if="o.customer_name"> · {{ o.customer_name }}</template></span>
             <span class="muted" v-if="scope === 'active'">{{ t('waiting') }} {{ waited(o) }} {{ t('min') }}</span>
           </div>
           <div class="row wrap" style="margin-top:8px;gap:6px">
-            <span class="tag ottag" :style="{ background: typeColor[o.order_type || 'web'] }" data-testid="ot-tag">{{ typeLabel(o) }}</span>
+            <span class="tag ottag" :style="{ background: colorOf(o) }" data-testid="ot-tag">{{ typeLabel(o) }}</span>
             <span v-if="o.order_source" class="tag info" data-testid="by-staff-tag">{{ t('vo.tag', { s: srcText(o.order_source) }) }}</span>
             <span class="tag brand" v-if="o.scheduled_for">{{ t('scheduled') }} {{ whenText(o.scheduled_for, o.timezone) }}</span>
             <span class="tag" :class="accTag(o.acceptance_status)">{{ t('a.' + o.acceptance_status) }}</span>
@@ -309,14 +312,14 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
         <div class="stack">
           <button class="btn link backlist" data-testid="order-back" @click="selectedId = null">‹ {{ t('back') }}</button>
           <div class="row between">
-            <h2>{{ selected.public_no }} · {{ typeLabel(selected) }} · {{ t(selected.service_type) }}</h2>
+            <h2>{{ selected.public_no }}<template v-if="!selected.platform"> · {{ typeLabel(selected) }}</template> · {{ svcText(selected) }}</h2>
             <a class="btn small" :href="`/ticket/${selected.id}`" target="_blank">{{ t('print') }}</a>
           </div>
           <div class="row wrap" style="gap:6px">
             <span class="tag" :class="accTag(selected.acceptance_status)">{{ t('a.' + selected.acceptance_status) }}</span>
             <span class="tag">{{ t('p.' + selected.packing_status) }}</span>
             <span class="tag">{{ t('f.' + selected.fulfillment_status) }}</span>
-            <span class="tag" :class="selected.payment_status === 'paid' ? 'ok' : 'warn'">{{ t(selected.payment_method) }} · {{ t(selected.payment_status) }}</span>
+            <span class="tag" :class="selected.payment_status === 'paid' ? 'ok' : 'warn'">{{ selected.pay_type === 'platform' ? t('ck.pt.platform') : t(selected.payment_method) + ' · ' + t(selected.payment_status) }}</span>
             <router-link v-if="readyTag(selected) && can('order.progress') && scope === 'active'" class="tag cp-tag" :class="{ ok: readyTag(selected)!.ready === readyTag(selected)!.total }" :to="`/merchant/progress?order=${selected.id}`" data-testid="cp-order-link">{{ t('kp.order_tag', { a: readyTag(selected)!.ready, b: readyTag(selected)!.total }) }} ›</router-link>
           </div>
           <div v-if="selected.close_reason" class="banner bad">{{ t('reason') }}: {{ reasonText(selected.close_reason) }}</div>
@@ -341,17 +344,18 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
           <div v-if="selected.scheduled_for" class="banner info">{{ t(selected.service_type === 'delivery' ? 'deliver_at' : 'pickup_at') }} <b>{{ whenText(selected.scheduled_for, selected.timezone) }}</b>
             <span v-if="selected.release_at"> · {{ t('kitchen_from') }} {{ whenText(selected.release_at, selected.timezone) }}</span></div>
 
-          <div>
+          <PlatformBlock v-if="selected.platform" :order="selected" @changed="refreshNow" />
+          <div v-if="!selected.platform || selected.customer_name || selected.note || selected.staff_note">
             <div class="muted small">{{ t('customer') }}</div>
-            <div data-testid="order-contact">{{ contactName(selected) }} · <a :href="'tel:' + contactPhone(selected)">{{ contactPhone(selected) }}</a>
-              <router-link v-if="chatOn && selected.service_type !== 'dine_in'" class="btn link small" style="margin-inline-start:6px" data-testid="order-chat" :to="{ path: '/merchant/messages', query: { order: selected.id } }">{{ t('ch.contact_customer') }}</router-link>
+            <div v-if="!selected.platform || selected.customer_name" data-testid="order-contact">{{ contactName(selected) }} · <a :href="'tel:' + contactPhone(selected)">{{ contactPhone(selected) }}</a>
+              <router-link v-if="chatOn && selected.service_type !== 'dine_in' && !selected.platform" class="btn link small" style="margin-inline-start:6px" data-testid="order-chat" :to="{ path: '/merchant/messages', query: { order: selected.id } }">{{ t('ch.contact_customer') }}</router-link>
               <span v-if="selected.contact_phone && selected.contact_phone !== selected.customer_phone" class="small muted"> · {{ t('oc.ordered_by') }} {{ selected.customer_phone }}</span></div>
             <div v-if="contactApps(selected).length" class="small" data-testid="order-im">
               <span v-for="(c, i) in contactApps(selected)" :key="c.field"><template v-if="i"> · </template>{{ c.label }} <b>{{ c.value }}</b></span></div>
             <div v-if="selected.service_type === 'delivery'">{{ selected.zone_name }} · {{ selected.address_line }} {{ selected.address_unit }}
               <span v-if="selected.zone_distance_m" class="tag warn" data-testid="outside-zone">{{ t('outside_zone', { n: selected.zone_distance_m }) }}</span>
               <a v-if="selected.dest_lat != null" class="small" target="_blank" rel="noopener" :href="`https://www.google.com/maps/search/?api=1&query=${selected.dest_lat},${selected.dest_lng}`">{{ t('view_on_map') }}</a></div>
-            <div v-else>{{ t('pickup_code') }} <b>{{ selected.pickup_code }}</b></div>
+            <div v-else-if="!selected.platform">{{ t('pickup_code') }} <b>{{ selected.pickup_code }}</b></div>
             <div v-if="selected.address_note" class="small">{{ t('address_note') }}: {{ selected.address_note }}</div>
             <div v-if="selected.address_photo" class="small" data-testid="door-photo">{{ t('oc.door_photo') }} <a :href="`/api/v1/merchant/orders/${selected.id}/address-photo`" target="_blank" rel="noopener">{{ t('oc.view') }}</a></div>
             <div v-if="selected.note" class="banner warn small" style="margin-top:6px">{{ t('order_note') }}: {{ selected.note }}</div>
@@ -380,7 +384,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
           <div v-if="selected.addon && can('order.manual') && (selected.addon.open || addons(selected).length)" class="addonbar" data-testid="addon-box">
             <template v-if="selected.addon.open">
               <router-link class="btn primary small" data-testid="addon-new" :to="{ path: '/merchant/order/delivery', query: { append: selected.id } }">{{ t('ao.btn') }}</router-link>
-              <span class="small muted">{{ selected.addon.repack ? t('ao.repack') : t(selected.service_type === 'pickup' ? 'ao.until_pickup' : 'ao.until_delivery') }}</span>
+              <span class="small muted">{{ selected.addon.repack ? t('ao.repack') : t(selected.platform?.pickup === 'rider' ? 'po.o.until_rider' : selected.service_type === 'pickup' ? 'ao.until_pickup' : 'ao.until_delivery') }}</span>
             </template>
             <span v-else class="small muted" data-testid="addon-closed">{{ t('ao.closed') }}</span>
           </div>
@@ -411,7 +415,8 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
           <div v-if="voidClosed(selected)" class="small muted" data-testid="void-closed">{{ t('vd.closed') }}</div>
           <TotalsTable :totals="selected.totals" :currency="selected.currency" :delivery="selected.service_type === 'delivery'" :discounts="selected.discounts" />
           <div v-if="selected.refunds?.length || selected.refund_open" class="stack refunds" data-testid="refunds">
-            <div v-for="r in selected.refunds" :key="r.id" class="small">{{ t('vd.r.row', { s: money(r.amount, selected.currency), m: r.method, r: r.reason, at: whenText(r.at, selected.timezone) }) }}
+            <div v-for="r in selected.refunds" :key="r.id" class="small">{{ r.method === 'platform' ? t('po.o.deduct_row', { s: money(r.amount, selected.currency), r: r.reason, at: whenText(r.at, selected.timezone) })
+              : t('vd.r.row', { s: money(r.amount, selected.currency), m: r.method, r: r.reason, at: whenText(r.at, selected.timezone) }) }}
               <span class="muted"> · {{ r.lines.map(l => `${l.name} ×${l.qty}`).join('、') }}</span></div>
             <div v-if="refundDone" class="banner ok small">{{ refundDone }}</div>
             <button v-if="selected.refund_open" class="btn small" style="align-self:flex-start" data-testid="refund-btn" @click="refundDone = ''; refunding = true">{{ t('vd.r.btn') }}</button>
@@ -422,9 +427,9 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
           <div v-if="selected.payment_status === 'paid' && selected.pay_type" class="row between" data-testid="pay-row">
             <span class="muted">{{ t('ck.pay_type') }}</span><span>{{ payText(selected) }}
               <span v-if="selected.pay_check" class="tag" :class="selected.pay_check === 'ok' ? 'ok' : 'bad'" data-testid="pay-check">{{ t('rc.check_tag', { s: t('rc.st.' + selected.pay_check) }) }}<template v-if="selected.pay_check_note"> · {{ selected.pay_check_note }}</template></span></span></div>
-          <div v-if="canAdjust(selected) || (selected.payment_status === 'paid' && selected.service_type !== 'dine_in' && can('order.handle'))" class="row wrap" style="gap:8px">
+          <div v-if="canAdjust(selected) || (selected.payment_status === 'paid' && selected.service_type !== 'dine_in' && !selected.platform && can('order.handle'))" class="row wrap" style="gap:8px">
             <button v-if="canAdjust(selected)" class="btn small" data-testid="adj-edit" @click="adjustOrder(selected)">{{ t('ck.edit_adj') }}</button>
-            <button v-if="selected.payment_status === 'paid' && selected.service_type !== 'dine_in' && can('order.handle')" class="btn small" data-testid="pay-record" @click="recordPay(selected)">{{ t('ck.record_pay') }}</button>
+            <button v-if="selected.payment_status === 'paid' && selected.service_type !== 'dine_in' && !selected.platform && can('order.handle')" class="btn small" data-testid="pay-record" @click="recordPay(selected)">{{ t('ck.record_pay') }}</button>
           </div>
 
           <div v-if="selected.delivery" class="row between">
@@ -454,9 +459,9 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
               </select>
             </label>
             <button v-if="selected.fulfillment_status === 'awaiting_handoff' && selected.delivery" class="btn primary" @click="act(selected, 'handoff')">{{ t('handoff_rider') }}</button>
-            <button v-if="selected.fulfillment_status === 'awaiting_pickup'" class="btn primary" @click="act(selected, 'handoff')">{{ t('handoff_customer') }}</button>
-            <button v-if="canCancel(selected) && can('order.cancel')" class="btn danger" data-testid="cancel-order" @click="withReason(selected, 'cancel')">{{ t('cancel_order') }}</button>
-            <button v-else-if="canCancel(selected)" class="btn need" :title="t('rp.need')" data-testid="cancel-locked" @click="askApproval('order.cancel', t('cancel_order'), h => withReason(selected!, 'cancel', h))">🔒 {{ t('cancel_order') }} · {{ t('ap.ask') }}</button>
+            <button v-if="selected.fulfillment_status === 'awaiting_pickup'" class="btn primary" data-testid="handoff-pickup" @click="act(selected, 'handoff')">{{ t(selected.platform?.pickup === 'rider' ? 'po.o.rider_took' : 'handoff_customer') }}</button>
+            <button v-if="canCancel(selected) && can('order.cancel')" class="btn danger" data-testid="cancel-order" @click="withReason(selected, 'cancel')">{{ t(selected.platform ? 'po.o.cancel' : 'cancel_order') }}</button>
+            <button v-else-if="canCancel(selected)" class="btn need" :title="t('rp.need')" data-testid="cancel-locked" @click="askApproval('order.cancel', t('cancel_order'), h => withReason(selected!, 'cancel', h))">🔒 {{ t(selected.platform ? 'po.o.cancel' : 'cancel_order') }} · {{ t('ap.ask') }}</button>
             <template v-if="failed(selected)">
               <div class="banner warn">{{ t('failed_hint') }}</div>
               <div class="row wrap">

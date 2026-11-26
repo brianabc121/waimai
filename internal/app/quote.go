@@ -351,6 +351,13 @@ func checkRequired(ctx context.Context, q Querier, branchID int64, service strin
 // priceLines validates cart lines against the live menu and prices them. It is
 // shared by delivery/pickup quotes and dine-in batches.
 func priceLines(ctx context.Context, q Querier, branchID int64, service string, in []QuoteLineInput) ([]QuoteLine, int64, error) {
+	return priceLinesOn(ctx, q, branchID, service, in, nil)
+}
+
+// priceLinesOn is priceLines at a delivery platform's prices when pp is set
+// (docs/ORDER_TYPES_DESIGN.md §9.3): the dish's platform price, and each
+// option's extra price with the markup.
+func priceLinesOn(ctx context.Context, q Querier, branchID int64, service string, in []QuoteLineInput, pp *platformPricer) ([]QuoteLine, int64, error) {
 	if len(in) == 0 {
 		return nil, 0, ErrValidation("cart is empty")
 	}
@@ -393,6 +400,9 @@ func priceLines(ctx context.Context, q Querier, branchID int64, service string, 
 		ql := QuoteLine{ItemID: it.ID, Name: it.Name, NameEn: it.NameEn, Qty: line.Qty, Note: line.Note,
 			NeedsPrep: it.NeedsPrep, Options: []LineOption{}, Basket: max(1, line.Basket), CategoryID: it.CategoryID}
 		unit := it.Price
+		if pp != nil {
+			unit = pp.dish(it.ID, it.Price)
+		}
 		chosen := map[int64]int{}
 		for _, id := range line.OptionIDs {
 			if chosen[id] > 0 && !line.repeat {
@@ -421,11 +431,15 @@ func priceLines(ctx context.Context, q Querier, branchID int64, service string, 
 				if o.SoldOut {
 					optionGone = true
 				}
-				unit += o.PriceDelta * int64(k)
-				lo := LineOption{OptionID: o.ID, Group: g.Name, GroupEn: g.NameEn, Name: o.Name, NameEn: o.NameEn, PriceDelta: o.PriceDelta,
+				delta := o.PriceDelta
+				if pp != nil {
+					delta = pp.option(delta)
+				}
+				unit += delta * int64(k)
+				lo := LineOption{OptionID: o.ID, Group: g.Name, GroupEn: g.NameEn, Name: o.Name, NameEn: o.NameEn, PriceDelta: delta,
 					Topping: isTopping(g, o)}
 				if k > 1 {
-					lo.Qty, lo.PriceDelta = k, o.PriceDelta*int64(k)
+					lo.Qty, lo.PriceDelta = k, delta*int64(k)
 					lo.Name, lo.NameEn = fmt.Sprintf("%s ×%d", o.Name, k), ""
 					if o.NameEn != "" {
 						lo.NameEn = fmt.Sprintf("%s ×%d", o.NameEn, k)

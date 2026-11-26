@@ -29,6 +29,10 @@ const (
 // couponOrder is the order coupons are applied in.
 var couponOrder = []string{CouponStoreThreshold, CouponStoreFree, CouponStoreDelivery, CouponPlatformFree}
 
+// discountOrder is couponOrder and then the platform's own discount on a
+// platform order, which is not a coupon anyone holds.
+var discountOrder = append(append([]string{}, couponOrder...), KindPlatformPromo)
+
 func validCouponKind(k string) bool {
 	for _, x := range couponOrder {
 		if x == k {

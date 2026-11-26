@@ -53,7 +53,11 @@ type moneyLine struct {
 type orderMoney struct {
 	ID, BranchID       int64
 	ServiceType, Phone string
-	Created            time.Time
+	// Platform orders (docs/ORDER_TYPES_DESIGN.md §7.3) never take the
+	// store's promotions: their only discounts are the two the platform
+	// order came with.
+	Platform bool
+	Created  time.Time
 	// Opened is when the table was opened (dine-in), else Created.
 	Opened time.Time
 	Fees   TaxConfig
@@ -84,10 +88,12 @@ func loadMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, erro
 	if err := q.QueryRow(ctx, `SELECT o.branch_id, o.service_type, o.customer_phone, o.created_at,
 		COALESCE((SELECT s.opened_at FROM dining_sessions s WHERE s.id = o.session_id), o.created_at),
 		o.tax_rate_bp, o.tax_inclusive, o.service_charge_bp, o.packaging_fee, o.subtotal, o.delivery_fee, o.total,
-		o.promotion_id, o.promotion_kind, o.discount, o.platform_subsidy, o.adj_percent_bp, o.adj_mode, o.round_off
+		o.promotion_id, o.promotion_kind, o.discount, o.platform_subsidy, o.adj_percent_bp, o.adj_mode, o.round_off,
+		o.order_type = 'platform'
 		FROM orders o WHERE o.id=$1`, orderID).Scan(&m.BranchID, &m.ServiceType, &m.Phone, &m.Created, &m.Opened,
 		&m.Fees.TaxRateBP, &m.Fees.TaxInclusive, &m.Fees.ServiceChargeBP, &m.Fees.PackagingFee, &m.Subtotal,
-		&m.DeliveryFee, &m.Total, &promoID, &promoKind, &discount, &platform, &m.StaffBP, &m.AdjMode, &m.RoundOff); err != nil {
+		&m.DeliveryFee, &m.Total, &promoID, &promoKind, &discount, &platform, &m.StaffBP, &m.AdjMode, &m.RoundOff,
+		&m.Platform); err != nil {
 		return nil, err
 	}
 	rows, err := q.Query(ctx, `SELECT id, line_total, item_id, CASE WHEN qty > 0 THEN line_total / qty ELSE 0 END
@@ -134,6 +140,11 @@ func loadMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, erro
 		if c.Kind == "promotion" {
 			havePromoRow = true
 			m.PromoAmount += c.Amount
+			continue
+		}
+		if c.Kind == KindPlatformMerchantPromo {
+			// the store's own offer on the platform: the order's promotion
+			m.Promo, m.PromoAmount = platformMerchantPromo(c.Name, c.NameEn, rule, c.Amount), c.Amount
 			continue
 		}
 		if c.FundedBy == "store" {
@@ -222,6 +233,9 @@ func (m *orderMoney) heldPromo(sub int64, pol promoPolicy) int64 {
 // choosePromo decides the promotion for sub of dishes, by pol. switched
 // says it is another promotion than the order had.
 func (m *orderMoney) choosePromo(ctx context.Context, q Querier, b *Branch, sub int64, pol promoPolicy) (*Promotion, Discount, bool, error) {
+	if m.Platform {
+		pol.pick = false
+	}
 	var cur *Promotion
 	var off Discount
 	if m.Promo != nil {
@@ -317,7 +331,7 @@ func couponStage(kind string) pricing.Stage {
 	switch kind {
 	case CouponStoreDelivery:
 		return pricing.StageDelivery
-	case CouponPlatformFree:
+	case CouponPlatformFree, KindPlatformPromo:
 		return pricing.StagePlatform
 	}
 	return pricing.StageOrder
@@ -331,12 +345,15 @@ func engineInput(in moneyIn) pricing.Input {
 	if in.Promo != nil {
 		a := pricing.Adjustment{Kind: "promotion", Ref: in.Promo.ID, Name: in.Promo.Name, NameEn: in.Promo.NameEn,
 			FundedBy: "store", Stage: pricing.StageOrder, Amount: in.PromoOff.Goods}
+		if in.Promo.Kind == KindPlatformMerchantPromo {
+			a.Kind = KindPlatformMerchantPromo
+		}
 		if in.Promo.Kind == "free_delivery" || in.PromoOff.Delivery > 0 {
 			a.Stage, a.Amount = pricing.StageDelivery, in.PromoOff.Delivery
 		}
 		adj = append(adj, a)
 	}
-	for _, kind := range couponOrder {
+	for _, kind := range discountOrder {
 		for _, c := range in.Coupons {
 			if c.Kind == kind {
 				adj = append(adj, pricing.Adjustment{Kind: c.Kind, FundedBy: c.FundedBy, Name: c.Name, NameEn: c.NameEn,
@@ -416,7 +433,7 @@ func priceMoney(in moneyIn) (*priced, error) {
 		}
 		i++
 	}
-	for _, kind := range couponOrder {
+	for _, kind := range discountOrder {
 		for _, c := range in.Coupons {
 			if c.Kind == kind {
 				c.Amount, c.share = r.Applied[i].Off, r.Applied[i]
@@ -463,7 +480,7 @@ func (m *orderMoney) reprice(ctx context.Context, q Querier, b *Branch, lines []
 	// the dish promotions first: the order's own as they were, and, when
 	// pol may move to a better offer, those running now on other dishes
 	dish := append([]*Promotion{}, m.Dish...)
-	if pol.pick {
+	if pol.pick && !m.Platform {
 		live, err := liveDishPromos(ctx, q, b, m.ServiceType, pol.at, sub)
 		if err != nil {
 			return nil, false, err
@@ -526,7 +543,7 @@ func (m *orderMoney) withExtra(extra []QuoteLine) []moneyLine {
 func saveMoney(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, p *priced, manifest bool) error {
 	t := p.Totals
 	var promoID *int64
-	if p.Promo != nil && t.PromotionDiscount > 0 {
+	if p.Promo != nil && t.PromotionDiscount > 0 && p.Promo.Kind != KindPlatformMerchantPromo {
 		promoID = &p.Promo.ID
 	}
 	bump := ""
@@ -549,7 +566,11 @@ func saveMoney(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, p *pric
 	if err := saveLineShares(ctx, tx, orderID, p.Result, p.ids); err != nil {
 		return err
 	}
-	return saveDiscountRows(ctx, tx, b.ID, orderID, p)
+	if err := saveDiscountRows(ctx, tx, b.ID, orderID, p); err != nil {
+		return err
+	}
+	// a platform order's commission follows its amounts
+	return refreshPlatformFees(ctx, tx, orderID)
 }
 
 // saveDiscountRows replaces the order's discount rows: one for the
@@ -560,7 +581,14 @@ func saveDiscountRows(ctx context.Context, tx pgx.Tx, branchID, orderID int64, p
 		return err
 	}
 	t := p.Totals
-	if p.Promo != nil && t.PromotionDiscount > 0 {
+	if p.Promo != nil && t.PromotionDiscount > 0 && p.Promo.Kind == KindPlatformMerchantPromo {
+		if _, err := tx.Exec(ctx, `INSERT INTO order_discounts (order_id, branch_id, kind, funded_by, name, name_en,
+			amount, per_line, rule, created_at) VALUES ($1,$2,$3,'store',$4,$5,$6,$7,$8,
+			(SELECT created_at FROM orders WHERE id=$1))`, orderID, branchID, KindPlatformMerchantPromo, t.PromotionName,
+			t.PromotionNameEn, t.PromotionDiscount, perLine(p.promoShare, p.ids), ruleOf(p.Promo)); err != nil {
+			return fmt.Errorf("platform offer row: %w", err)
+		}
+	} else if p.Promo != nil && t.PromotionDiscount > 0 {
 		if _, err := tx.Exec(ctx, `INSERT INTO order_discounts (order_id, branch_id, kind, funded_by, name, name_en,
 			amount, promotion_id, per_line, created_at) VALUES ($1,$2,'promotion','store',$3,$4,$5,$6,$7,
 			(SELECT created_at FROM orders WHERE id=$1))`, orderID, branchID, t.PromotionName,

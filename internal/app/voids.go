@@ -644,6 +644,13 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 			(o.Fulfillment != "delivered" && o.Fulfillment != "picked_up" && o.Fulfillment != "dined") {
 			return Err(http.StatusConflict, "REFUND_NOT_YET", "refunds by dish are for orders the customer has received; void dishes before that")
 		}
+		var isPlatform bool
+		if err := tx.QueryRow(ctx, `SELECT order_type = 'platform' FROM orders WHERE id=$1`, o.ID).Scan(&isPlatform); err != nil {
+			return err
+		}
+		if isPlatform {
+			return ErrInvalidState("the platform refunds its customers; record what it took back instead")
+		}
 		b, err := readBranch(ctx, tx, o.BranchID)
 		if err != nil {
 			return err

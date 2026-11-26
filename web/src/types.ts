@@ -146,7 +146,7 @@ export interface Order {
   session_id: number | null; table_name: string; amount_received: number | null; payment_note: string
   pay_method?: string; table_tags?: string[]
   // how it was paid and who gave the discount at checkout (staff only)
-  pay_type?: '' | 'cash' | 'card' | 'online'; pay_channel_id?: number; adj_reason?: string; adj_by?: string; adj_approved_by?: string; adj_at?: string | null
+  pay_type?: '' | 'cash' | 'card' | 'online' | 'platform'; pay_channel_id?: number; adj_reason?: string; adj_by?: string; adj_approved_by?: string; adj_at?: string | null
   pay_check?: '' | 'ok' | 'problem'; pay_check_note?: string
   aftersale: Aftersale | null; store?: OrderStore; completed_at?: string | null; accepted_at?: string | null; closed_at?: string | null
   // the promotion and each coupon taken off; the coupon this order earned (customer page only)
@@ -157,6 +157,22 @@ export interface Order {
   batches?: OrderBatch[]; addon?: AddonState
   // dishes taken off and money given back by dish (docs/VOID_ITEM_DESIGN.md)
   voids?: OrderVoid[]; refunds?: OrderRefund[]; void_open?: boolean; refund_open?: boolean; refunded?: number
+  // an order from a delivery platform (docs/ORDER_TYPES_DESIGN.md §7, §9): staff pages only
+  platform?: PlatformInfo
+}
+// What the store pays the platform for an order: the commission (worked out, or typed with a reason) and other charges.
+export interface PlatformFee { id: number; kind: 'commission' | 'other'; rate_bp: number; base_kind: string; base: number; amount: number; manual: boolean; reason: string }
+// receivable = what the platform owes the store (the total and the platform's own discount, less what it took back);
+// payout = receivable less commission and other charges
+export interface PlatformInfo {
+  platform_id: number; name: string; names: Record<string, string>; prefix: string; color: string; logo_url: string
+  order_no: string; pickup: 'rider' | 'customer'; markup_bp: number; fees: PlatformFee[]
+  receivable: number; commission: number; other_fees: number; deducted: number; payout: number
+}
+export interface PlatformQuote {
+  currency: string; lines: QuoteLine[]; totals: Totals; receivable: number
+  commission_rate_bp: number; commission_base: 'after_merchant' | 'original'; commission: number; commission_auto: number; payout: number
+  duplicate?: { order_id: number; public_no: string; created_at: string }
 }
 // One void; who did it and how far the dish had got are only on the store's pages.
 export interface OrderVoid {
@@ -221,7 +237,7 @@ export interface MenuImport {
 // A post is one job in a branch: a kitchen station, the packing counter, or rider.
 export interface Post { kind: 'station' | 'packing' | 'rider'; station_id: number | null; station_name?: string; station_name_en?: string; station_active?: boolean }
 // role is back-office access (owner, manager, cashier, staff); posts say what the person works on.
-export interface BranchRole { branch_id: number; branch_name: string; slug: string; currency: string; role: string; posts: Post[]; perms?: string[] }
+export interface BranchRole { branch_id: number; branch_name: string; slug: string; currency: string; role: string; posts: Post[]; perms?: string[]; platforms?: boolean }
 export interface StaffMember { id: number; username: string; display_name: string; phone: string; role: string; active: boolean; posts: Post[]; open_tasks: number; active_deliveries: number; on_duty: boolean }
 export interface RiderInfo extends StaffMember { lat: number | null; lng: number | null; accuracy: number | null; battery: number | null; located_at: string | null; contact: '' | 'ok' | 'none' | 'lost'; distance_m: number | null }
 export interface Tracking { active: boolean; rider_name?: string; rider_phone?: string; lat: number | null; lng: number | null; located_at: string | null; dest_lat: number | null; dest_lng: number | null; distance_m: number | null }
@@ -242,7 +258,7 @@ export interface CouponChoice extends CustomerCoupon {
   usable: boolean; reason: '' | 'below_threshold' | 'delivery_only' | 'no_saving'; short: number; saves: number; selected: boolean
 }
 export interface AppliedCoupon { id: number; kind: CouponKind; name: string; name_en: string; amount: number; funded_by: 'store' | 'platform' }
-export interface OrderDiscount { kind: 'promotion' | 'dish_promotion' | CouponKind; funded_by: 'store' | 'platform'; name: string; name_en: string; amount: number; coupon_id: number | null }
+export interface OrderDiscount { kind: 'promotion' | 'dish_promotion' | 'platform_merchant_promo' | 'platform_promo' | CouponKind; funded_by: 'store' | 'platform'; name: string; name_en: string; amount: number; coupon_id: number | null }
 export interface RepurchaseRule {
   enabled: boolean; kind: CouponKind; value: number; threshold: number; valid_days: number; min_order: number
   monthly_cap: number | null; currency: string

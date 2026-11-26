@@ -42,6 +42,9 @@ type BranchRole struct {
 	// for the owner, what the owner allowed for a manager or an order taker
 	// (docs/STAFF_ACCESS_DESIGN.md §6), nothing for staff.
 	Perms []string `json:"perms"`
+	// Platforms: the store is on at least one delivery platform, so staff can
+	// enter its orders (docs/ORDER_TYPES_DESIGN.md §7.1).
+	Platforms bool `json:"platforms"`
 }
 
 type User struct {
@@ -114,7 +117,9 @@ func (a *App) loadUser(ctx context.Context, id int64) (*User, error) {
 	} else if err != nil {
 		return nil, err
 	}
-	rows, err := a.DB.Query(ctx, `SELECT r.branch_id, b.name, b.slug, b.currency, r.role FROM user_branch_roles r
+	rows, err := a.DB.Query(ctx, `SELECT r.branch_id, b.name, b.slug, b.currency, r.role,
+		EXISTS (SELECT 1 FROM branch_platforms bp
+			WHERE bp.branch_id = b.id AND bp.enabled) FROM user_branch_roles r
 		JOIN branches b ON b.id = r.branch_id JOIN merchants m ON m.id = b.merchant_id
 		WHERE r.user_id=$1 AND b.deleted_at IS NULL AND m.deleted_at IS NULL ORDER BY r.branch_id`, id)
 	if err != nil {
@@ -123,7 +128,7 @@ func (a *App) loadUser(ctx context.Context, id int64) (*User, error) {
 	defer rows.Close()
 	for rows.Next() {
 		r := BranchRole{Posts: []Post{}}
-		if err := rows.Scan(&r.BranchID, &r.BranchName, &r.Slug, &r.Currency, &r.Role); err != nil {
+		if err := rows.Scan(&r.BranchID, &r.BranchName, &r.Slug, &r.Currency, &r.Role, &r.Platforms); err != nil {
 			return nil, err
 		}
 		u.Roles = append(u.Roles, r)

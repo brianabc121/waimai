@@ -1,6 +1,6 @@
 // Order types and order numbers (docs/ORDER_TYPES_DESIGN.md): the five types,
 // their colours and texts, shared by the order list, kitchen and settings.
-import { extend, t } from './i18n'
+import { extend, locale, t } from './i18n'
 
 extend({
   'ot.all': ['全部', 'All'],
@@ -28,8 +28,10 @@ export const ORDER_TYPES = ['dine_in', 'staff', 'platform', 'mall', 'web'] as co
 export type OrderType = typeof ORDER_TYPES[number]
 
 // typeLabel is the short tag of an order: 堂食 · 店员, 代客, 商城...
-export function typeLabel(o: { order_type?: string; dine_source?: string }): string {
+// A platform order shows its platform: Grab, foodpanda.
+export function typeLabel(o: { order_type?: string; dine_source?: string; platform?: { name: string; names?: Record<string, string> } }): string {
   const ty = o.order_type || 'web'
+  if (o.platform) return o.platform.names?.[locale.value] || o.platform.name
   const base = t('ot.t.' + ty)
   return ty === 'dine_in' && o.dine_source ? `${base} · ${t('ot.ds.' + o.dine_source)}` : base
 }
@@ -37,3 +39,6 @@ export function typeLabel(o: { order_type?: string; dine_source?: string }): str
 export const typeColor: Record<string, string> = {
   dine_in: '#2f7d4f', staff: '#8a5a2b', platform: '#00b14f', mall: '#c2410c', web: '#2463a6',
 }
+
+// colorOf is the tag colour of an order: its platform's colour, else its type's.
+export const colorOf = (o: { order_type?: string; platform?: { color: string } }) => o.platform?.color || typeColor[o.order_type || 'web']

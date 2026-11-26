@@ -13,10 +13,13 @@ import (
 // decides what its managers and order takers may do in the back office. The
 // owner can do everything; staff without a back-office role can do none of it.
 const (
-	PermOrderView      = "order.view"
-	PermOrderProgress  = "order.progress"
-	PermOrderHandle    = "order.handle"
-	PermOrderManual    = "order.manual"
+	PermOrderView     = "order.view"
+	PermOrderProgress = "order.progress"
+	PermOrderHandle   = "order.handle"
+	PermOrderManual   = "order.manual"
+	// PermOrderPlatform enters orders taken on a delivery platform
+	// (docs/ORDER_TYPES_DESIGN.md §7.1).
+	PermOrderPlatform  = "order.platform"
 	PermOrderCancel    = "order.cancel"
 	PermOrderAftersale = "order.aftersale"
 	// PermCheckoutDiscount gives a discount, a round-off or a set amount at
@@ -73,6 +76,7 @@ var PermCatalog = []PermDef{
 	{Code: PermOrderProgress, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderHandle, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderManual, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
+	{Code: PermOrderPlatform, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderCancel, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderAftersale, Group: "order", Cashier: true, Manager: true, Requires: []string{PermOrderView}},
 	{Code: PermOrderVoid, Group: "order", Cashier: false, Manager: true, Requires: []string{PermOrderView}},

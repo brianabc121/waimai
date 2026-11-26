@@ -198,6 +198,10 @@ type BranchPlatform struct {
 // BranchPlatforms lists the active platforms of the store's country, those it
 // sells on first. enabledOnly keeps those.
 func (a *App) BranchPlatforms(ctx context.Context, q Querier, branchID int64, enabledOnly bool) ([]BranchPlatform, error) {
+	return branchPlatforms(ctx, q, branchID, enabledOnly)
+}
+
+func branchPlatforms(ctx context.Context, q Querier, branchID int64, enabledOnly bool) ([]BranchPlatform, error) {
 	rows, err := q.Query(ctx, `SELECT `+platformCols+`, COALESCE(bp.enabled, false), COALESCE(bp.shop_ref, ''),
 		bp.commission_bp, bp.markup_bp, COALESCE(bp.round_step, 100)
 		FROM delivery_platforms p JOIN branches b ON b.id = $1

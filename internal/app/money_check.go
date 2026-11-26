@@ -128,6 +128,10 @@ func (a *App) CheckOrderMoney(ctx context.Context, orderID int64) ([]string, err
 		fail("D9 dishes' discount %d, discount rows' shares %d + checkout discount %d", ldisc, o.perLine, o.staff)
 	}
 
+	if o.otype == TypePlatform {
+		bad = append(bad, a.checkPlatformOrder(ctx, orderID, o.sub, o.svc, o.ship, o.staff, o.round, o.merch, o.platf, o.total)...)
+	}
+
 	// R1–R3 replay. An order without a single dish line (the demo sales
 	// figures cmd/seed writes) has nothing to replay.
 	if len(stored) == 0 && voided == 0 {
@@ -180,6 +184,61 @@ func (a *App) CheckOrderMoney(ctx context.Context, orderID int64) ([]string, err
 		}
 	}
 	return bad, nil
+}
+
+// checkPlatformOrder is D10 and D11 (docs/ORDER_TYPES_DESIGN.md §10.2): a
+// platform order has no service charge, delivery fee or discount at checkout,
+// and no discount but the platform's two; its commission is rate × base
+// unless typed, and what the store is paid is not below 0.
+func (a *App) checkPlatformOrder(ctx context.Context, orderID, sub, svc, ship, staff, round, merch, platf, total int64) []string {
+	var bad []string
+	fail := func(f string, v ...any) { bad = append(bad, fmt.Sprintf(f, v...)) }
+	if svc != 0 || ship != 0 || staff != 0 || round != 0 {
+		fail("D10 platform order has service %d, delivery %d, checkout discount %d, round-off %d", svc, ship, staff, round)
+	}
+	var others int64
+	if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM order_discounts WHERE order_id=$1 AND kind NOT IN ($2, $3)`,
+		orderID, KindPlatformMerchantPromo, KindPlatformPromo).Scan(&others); err != nil {
+		return append(bad, err.Error())
+	}
+	if others != 0 {
+		fail("D10 platform order has %d discount rows of the store's own offers or coupons", others)
+	}
+	rows, err := a.DB.Query(ctx, `SELECT kind, rate_bp, base_kind, base, amount, manual FROM order_platform_fees WHERE order_id=$1`, orderID)
+	if err != nil {
+		return append(bad, err.Error())
+	}
+	defer rows.Close()
+	var charges int64
+	commissions := 0
+	for rows.Next() {
+		var kind, baseKind string
+		var rate int
+		var base, amount int64
+		var manual bool
+		if err := rows.Scan(&kind, &rate, &baseKind, &base, &amount, &manual); err != nil {
+			return append(bad, err.Error())
+		}
+		charges += amount
+		if kind != "commission" {
+			continue
+		}
+		commissions++
+		want := commissionBase(baseKind, sub, merch)
+		if base != want {
+			fail("D11 commission base %d, the order gives %d", base, want)
+		}
+		if !manual && amount != pricing.Commission(want, rate) {
+			fail("D11 commission %d, %d bp of %d is %d", amount, rate, want, pricing.Commission(want, rate))
+		}
+	}
+	if commissions != 1 {
+		fail("D11 platform order has %d commission rows", commissions)
+	}
+	if payout := total + platf - charges; payout < 0 {
+		fail("D11 the store is paid %d (total %d + platform %d - charges %d)", payout, total, platf, charges)
+	}
+	return bad
 }
 
 // CheckAllOrderMoney runs CheckOrderMoney over the orders created since

@@ -465,6 +465,14 @@ func (a *App) SetOrderPayment(ctx context.Context, orderID int64, in PayInput, a
 		if o.Payment != "paid" {
 			return ErrInvalidState("the order is not paid yet")
 		}
+		// a platform order was paid on the platform: changing it would put it in the cash drawer
+		var isPlatform bool
+		if err := tx.QueryRow(ctx, `SELECT order_type = 'platform' FROM orders WHERE id=$1`, o.ID).Scan(&isPlatform); err != nil {
+			return err
+		}
+		if isPlatform {
+			return ErrInvalidState("a platform order is paid on the platform")
+		}
 		ch, name, err := resolvePay(ctx, tx, o.BranchID, in)
 		if err != nil {
 			return err

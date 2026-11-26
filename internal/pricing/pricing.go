@@ -369,3 +369,13 @@ func PlatformPrice(price int64, markupBP int, step int64) int64 {
 	}
 	return MulDivRound(price, int64(10000+markupBP), 10000*step) * step
 }
+
+// Commission is what a delivery platform charges on base at rateBP (3000 is
+// 30%), rounded half up to the cent (docs/ORDER_TYPES_DESIGN.md §9.1). It is
+// a cost of the store, not part of what the customer pays.
+func Commission(base int64, rateBP int) int64 {
+	if base <= 0 || rateBP <= 0 {
+		return 0
+	}
+	return MulDivRound(base, int64(rateBP), 10000)
+}
