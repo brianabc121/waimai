@@ -3906,5 +3906,6 @@
  "br.cash_store": "Két tiền là của cả cửa hàng: kiểm tiền mặt và tiền tài xế nộp lại xem ở \"Tất cả thương hiệu\".",
  "br.by_brand": "Doanh thu theo thương hiệu",
  "br.by_brand_hint": "Các thương hiệu cộng lại = tổng",
- "br.platform_owe": "Nền tảng phải trả"
+ "br.platform_owe": "Nền tảng phải trả",
+ "br.map_color": "Tô màu điểm theo thương hiệu (bản đồ nhiệt tính tất cả)"
 }

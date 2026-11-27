@@ -3906,5 +3906,6 @@
  "br.cash_store": "La caja es de toda la tienda: el arqueo y lo que entregan los repartidores se ven en \"Todas las marcas\".",
  "br.by_brand": "Ventas por marca",
  "br.by_brand_hint": "Las marcas suman el total",
- "br.platform_owe": "Deben las plataformas"
+ "br.platform_owe": "Deben las plataformas",
+ "br.map_color": "Colorear puntos por marca (el mapa de calor cuenta todas)"
 }

@@ -313,7 +313,7 @@ func filtered(s DeliveryScope, r DeliveryRange, args *sqlArgs) (string, error) {
 		return "", err
 	}
 	w = append(w, rw...)
-	return `f AS (SELECT o.id, o.branch_id, o.created_at, o.total, o.currency, o.dest_lat, o.address_unit, o.customer_name,
+	return `f AS (SELECT o.id, o.branch_id, o.brand_id, o.created_at, o.total, o.currency, o.dest_lat, o.address_unit, o.customer_name,
 			o.customer_phone, ` + custKey + ` AS cust, addr_key(o.address_line) AS akey
 		FROM orders o JOIN branches b ON b.id = o.branch_id WHERE ` + strings.Join(w, " AND ") + `)`, nil
 }
@@ -400,6 +400,17 @@ type MapPoint struct {
 	Customers int       `json:"c"`
 	Line      string    `json:"line"`
 	LastAt    time.Time `json:"last_at"`
+	// Brand is the brand with the most deliveries to the address, for the
+	// dot's colour when several brands are shown together.
+	Brand int64 `json:"b"`
+}
+
+// MapBrand is a brand whose deliveries are on the map, with its colour.
+type MapBrand struct {
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+	N     int    `json:"n"`
 }
 
 // MapStore is a store drawn on the map.
@@ -427,6 +438,9 @@ type DeliveryMap struct {
 	Unpinned int        `json:"unpinned"`
 	Stores   []MapStore `json:"stores"`
 	Zones    []MapZone  `json:"zones"`
+	// Brands is the brands of one store's deliveries (docs/MULTI_BRAND_DESIGN.md
+	// §12): the dots can be coloured by brand; the heat stays all of them.
+	Brands []MapBrand `json:"brands"`
 }
 
 // DeliveryPoints is the period's addresses with a position, for the map.
@@ -436,12 +450,13 @@ func (a *App) DeliveryPoints(ctx context.Context, s DeliveryScope, r DeliveryRan
 	if err != nil {
 		return nil, err
 	}
-	out := &DeliveryMap{Points: []MapPoint{}, Stores: []MapStore{}, Zones: []MapZone{}}
+	out := &DeliveryMap{Points: []MapPoint{}, Stores: []MapStore{}, Zones: []MapZone{}, Brands: []MapBrand{}}
 	rows, err := a.DB.Query(ctx, `WITH `+f+`, g AS (
 			SELECT akey, count(*) AS n, count(DISTINCT cust) AS c, max(created_at) AS last_at,
-				(array_agg(id ORDER BY created_at DESC, id DESC) FILTER (WHERE dest_lat IS NOT NULL))[1] AS pin_id
+				(array_agg(id ORDER BY created_at DESC, id DESC) FILTER (WHERE dest_lat IS NOT NULL))[1] AS pin_id,
+				mode() WITHIN GROUP (ORDER BY brand_id) AS brand
 			FROM f GROUP BY akey)
-		SELECT g.akey, po.dest_lat, po.dest_lng, g.n, g.c, btrim(po.address_line), g.last_at
+		SELECT g.akey, po.dest_lat, po.dest_lng, g.n, g.c, btrim(po.address_line), g.last_at, COALESCE(g.brand, 0)
 		FROM g LEFT JOIN orders po ON po.id = g.pin_id
 		ORDER BY g.n DESC, g.akey LIMIT `+args.add(MaxMapPoints*2), args...)
 	if err != nil {
@@ -451,7 +466,7 @@ func (a *App) DeliveryPoints(ctx context.Context, s DeliveryScope, r DeliveryRan
 		var p MapPoint
 		var lat, lng *float64
 		var line *string
-		if err := rows.Scan(&p.Key, &lat, &lng, &p.N, &p.Customers, &line, &p.LastAt); err != nil {
+		if err := rows.Scan(&p.Key, &lat, &lng, &p.N, &p.Customers, &line, &p.LastAt, &p.Brand); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -501,6 +516,24 @@ func (a *App) DeliveryPoints(ctx context.Context, s DeliveryScope, r DeliveryRan
 		}
 		if out.Zones, err = pgx.CollectRows(zrows, pgx.RowToStructByPos[MapZone]); err != nil {
 			return nil, err
+		}
+		// the store's brands, with the deliveries of the dots each colours
+		n := map[int64]int{}
+		for _, p := range out.Points {
+			n[p.Brand] += p.N
+		}
+		brows, err := a.DB.Query(ctx, `SELECT id, name, color, 0 FROM brands WHERE branch_id = $1 ORDER BY NOT is_main, sort, id`, s.BranchID)
+		if err != nil {
+			return nil, err
+		}
+		all, err := pgx.CollectRows(brows, pgx.RowToStructByPos[MapBrand])
+		if err != nil {
+			return nil, err
+		}
+		for _, b := range all {
+			if b.N = n[b.ID]; b.N > 0 {
+				out.Brands = append(out.Brands, b)
+			}
 		}
 	}
 	return out, nil

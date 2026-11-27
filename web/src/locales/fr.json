@@ -3906,5 +3906,6 @@
  "br.cash_store": "La caisse est celle de tout le magasin : le comptage et les remises des livreurs sont sous « Toutes les marques ».",
  "br.by_brand": "Recettes par marque",
  "br.by_brand_hint": "Les marques font le total",
- "br.platform_owe": "Dû par les plateformes"
+ "br.platform_owe": "Dû par les plateformes",
+ "br.map_color": "Colorer les points par marque (la chaleur compte toutes)"
 }

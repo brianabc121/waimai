@@ -38,7 +38,7 @@ func TestDeliveryStats(t *testing.T) {
 	}
 	p1, p2, p3 := "+639175550001", "+639175550002", "+639175550003"
 	order(s, p1, "Ayala Tower One, 6750 Ayala Ave", "23F", true, "2026-11-10 10:00", "accepted", "delivered")
-	order(s, p2, "ayala tower one，６７５０ ayala ave.", "18F", true, "2026-11-11 12:00", "accepted", "delivered")
+	p2order := order(s, p2, "ayala tower one，６７５０ ayala ave.", "18F", true, "2026-11-11 12:00", "accepted", "delivered")
 	order(s, p1, "Ayala Tower One, 6750 Ayala Ave", "23f ", true, "2026-11-12 12:00", "accepted", "delivered")
 	order(s, p3, "88 Unpinned Rd", "", false, "2026-11-12 13:00", "accepted", "delivered")
 	order(s, p3, "1 Declined St", "", true, "2026-11-12 13:00", "rejected", "none")
@@ -141,5 +141,39 @@ func TestDeliveryStats(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("regions: %+v", regs)
+	}
+
+	// Two brands (docs/MULTI_BRAND_DESIGN.md §12): the 18F order was a second
+	// brand's. Together nothing changes and the dot takes the brand with the
+	// most deliveries; each brand alone counts its own.
+	main, err := a.MainBrandID(ctx, s.branchID)
+	noErr(t, err)
+	hcd, err := a.CreateBrand(ctx, s.branchID, s.staff, app.BrandInput{Name: "好吃党", Code: brandCode("HS"), Delivery: true})
+	noErr(t, err)
+	_, err = a.DB.Exec(ctx, `UPDATE orders SET brand_id=$2 WHERE id=$1`, p2order, hcd.ID)
+	noErr(t, err)
+	m, err = a.DeliveryPoints(ctx, own, nov)
+	noErr(t, err)
+	if len(m.Points) != 1 || m.Points[0].N != 4 || m.Points[0].Brand != main || len(m.Brands) != 1 || m.Brands[0].ID != main || m.Brands[0].N != 4 {
+		t.Fatalf("map, brands together: %+v %+v", m.Points, m.Brands)
+	}
+	mine := app.DeliveryScope{BranchID: s.branchID, Brands: []int64{main}}
+	theirs := app.DeliveryScope{BranchID: s.branchID, Brands: []int64{hcd.ID}}
+	tm, err := a.TopAddresses(ctx, mine, nov)
+	noErr(t, err)
+	th, err := a.TopAddresses(ctx, theirs, nov)
+	noErr(t, err)
+	if tm.Orders != 4 || th.Orders != 1 || th.Items[0].Customers != 1 {
+		t.Fatalf("top by brand: %+v / %+v", tm, th)
+	}
+	m, err = a.DeliveryPoints(ctx, theirs, nov)
+	noErr(t, err)
+	if len(m.Points) != 1 || m.Points[0].N != 1 || m.Points[0].Brand != hcd.ID || len(m.Brands) != 1 || m.Brands[0].Name != "好吃党" {
+		t.Fatalf("map of one brand: %+v %+v", m.Points, m.Brands)
+	}
+	h, err = a.AddressOrders(ctx, s.branchID, []int64{hcd.ID}, row.Cust, row.Key, row.UnitKey, app.Page{})
+	noErr(t, err)
+	if h.Total != 0 {
+		t.Fatalf("the other brand's orders at p1's address: %+v", h)
 	}
 }
