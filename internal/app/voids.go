@@ -780,6 +780,19 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		after.Total = max(0, after.Total-m.RoundOff)
 		q.Left = o.Total - paidBack
 		q.Suggested = max(0, min(o.Total-after.Total, q.Left))
+		// The last dish refunded gives back everything left of what was paid:
+		// the packaging fee, its tax, the delivery fee and any cent the
+		// dishes' shares left over (brian, 2026-11-27; sample S11). A dish's
+		// share never holds the fees, so without this an order with no
+		// promotion kept them once every dish was refunded. The staff can
+		// still give back less.
+		last, err := refundEmptiesOrder(ctx, tx, o.ID, refunded, in.Lines)
+		if err != nil {
+			return err
+		}
+		if last {
+			q.Suggested = max(0, q.Left)
+		}
 		out = q
 		oc, err := readOrderCredit(ctx, tx, o.ID)
 		if err != nil {
@@ -1102,4 +1115,32 @@ func refundPayType(method string) string {
 		return "cash"
 	}
 	return "other"
+}
+
+// refundEmptiesOrder says whether a refund of these lines leaves no portion
+// of any dish on the order unrefunded.
+func refundEmptiesOrder(ctx context.Context, tx pgx.Tx, orderID int64, refunded map[int64]int, lines []struct {
+	ItemID int64 `json:"item_id"`
+	Qty    int   `json:"qty"`
+}) (bool, error) {
+	now := map[int64]int{}
+	for _, l := range lines {
+		now[l.ItemID] += l.Qty
+	}
+	rows, err := tx.Query(ctx, `SELECT id, qty FROM order_items WHERE order_id=$1 AND prep_status <> 'cancelled'`, orderID)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var qty int
+		if err := rows.Scan(&id, &qty); err != nil {
+			return false, err
+		}
+		if qty-refunded[id]-now[id] > 0 {
+			return false, nil
+		}
+	}
+	return true, rows.Err()
 }
