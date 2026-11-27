@@ -231,9 +231,19 @@ type BillSummary struct {
 	// Refunded is money given back by dish on the period's completed orders,
 	// RefundedToCredit the part of it that went into store balances; PaidByCredit
 	// is what store balances paid of Paid (docs/REFUND_BALANCE_DESIGN.md §10.2).
-	Refunded         int64      `json:"refunded"`
-	RefundedToCredit int64      `json:"refunded_to_credit"`
-	PaidByCredit     int64      `json:"paid_by_credit"`
+	Refunded         int64 `json:"refunded"`
+	RefundedToCredit int64 `json:"refunded_to_credit"`
+	PaidByCredit     int64 `json:"paid_by_credit"`
+	// Stored value (docs/STORED_VALUE_DESIGN.md §8.5, §10): StoredPrincipal
+	// and StoredBonus are the part of PaidByCredit it paid, the bonus being
+	// the store's marketing cost; RefundedToStored the part of
+	// RefundedToCredit that went back into it; StoredTopups the principal
+	// taken in the period (net of top-ups undone), StoredGiven the bonus given.
+	StoredPrincipal  int64      `json:"stored_principal"`
+	StoredBonus      int64      `json:"stored_bonus"`
+	RefundedToStored int64      `json:"refunded_to_stored"`
+	StoredTopups     int64      `json:"stored_topups"`
+	StoredGiven      int64      `json:"stored_given"`
 	Kinds            []BillKind `json:"kinds"` // every kind, in the order of the bill
 	Repurchase       struct {
 		Issued int   `json:"issued"`
@@ -267,18 +277,28 @@ func (a *App) BillSummary(ctx context.Context, branchID int64, brands []int64, f
 			COALESCE(sum(o.merchant_discount) FILTER (WHERE `+strings.TrimPrefix(done, " AND ")+`), 0),
 			COALESCE(sum(o.platform_subsidy) FILTER (WHERE `+strings.TrimPrefix(done, " AND ")+`), 0),
 			COALESCE(sum(o.total) FILTER (WHERE `+strings.TrimPrefix(done, " AND ")+`), 0),
-			COALESCE(sum(o.credit_paid) FILTER (WHERE `+strings.TrimPrefix(done, " AND ")+`), 0)
+			COALESCE(sum(o.credit_paid) FILTER (WHERE `+strings.TrimPrefix(done, " AND ")+`), 0),
+			COALESCE(sum(o.stored_principal_paid) FILTER (WHERE `+strings.TrimPrefix(done, " AND ")+`), 0),
+			COALESCE(sum(o.stored_bonus_paid) FILTER (WHERE `+strings.TrimPrefix(done, " AND ")+`), 0)
 		FROM orders o JOIN branches b ON b.id = o.branch_id WHERE `+in, branchID, from, to, brands).
-		Scan(&s.Orders, &s.Cancelled, &s.Food, &s.MerchantDiscount, &s.PlatformDiscount, &s.Paid, &s.PaidByCredit)
+		Scan(&s.Orders, &s.Cancelled, &s.Food, &s.MerchantDiscount, &s.PlatformDiscount, &s.Paid, &s.PaidByCredit,
+			&s.StoredPrincipal, &s.StoredBonus)
 	if err != nil {
 		return nil, err
 	}
 	s.Takings = s.Paid + s.PlatformDiscount
-	if err := a.DB.QueryRow(ctx, `SELECT COALESCE(sum(r.amount), 0), COALESCE(sum(r.to_credit), 0) FROM order_refunds r
+	if err := a.DB.QueryRow(ctx, `SELECT COALESCE(sum(r.amount), 0), COALESCE(sum(r.to_credit), 0),
+			COALESCE(sum(r.principal_part + r.bonus_part), 0) FROM order_refunds r
 		JOIN orders o ON o.id = r.order_id JOIN branches b ON b.id = o.branch_id WHERE `+in+done, branchID, from, to, brands).
-		Scan(&s.Refunded, &s.RefundedToCredit); err != nil {
+		Scan(&s.Refunded, &s.RefundedToCredit, &s.RefundedToStored); err != nil {
 		return nil, err
 	}
+	// top-ups by the brand they were taken at (rule R: brands add up)
+	var st ReconStored
+	if err := storedRecon(ctx, a.DB, branchID, brands, from, to, &st); err != nil {
+		return nil, err
+	}
+	s.StoredTopups, s.StoredGiven = st.Paid-st.Revoked, st.Bonus-st.RevokedBonus
 
 	got := map[string]BillKind{}
 	rows, err := a.DB.Query(ctx, `SELECT d.kind, count(DISTINCT d.order_id), sum(d.amount)

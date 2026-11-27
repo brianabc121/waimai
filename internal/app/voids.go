@@ -631,6 +631,9 @@ type RefundQuote struct {
 	// credit part goes back to the balance it came from.
 	CashPart   int64 `json:"cash_part"`
 	CreditPart int64 `json:"credit_part"`
+	// StoredPart is the part of CreditPart that goes back to stored value
+	// (docs/STORED_VALUE_DESIGN.md §8.2).
+	StoredPart int64 `json:"stored_part"`
 	// Refund is the refund recorded (not on a dry run).
 	RefundID int64 `json:"refund_id,omitempty"`
 }
@@ -713,19 +716,21 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		}
 		// What each line still has that was not refunded.
 		refunded := map[int64]int{}
-		var paidBack, cashBack int64
-		rows, err := tx.Query(ctx, `SELECT lines, amount, cash_part FROM order_refunds WHERE order_id=$1`, o.ID)
+		var paidBack, cashBack, prinBack, bonusBack int64
+		rows, err := tx.Query(ctx, `SELECT lines, amount, cash_part, principal_part, bonus_part FROM order_refunds WHERE order_id=$1`, o.ID)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			var raw []byte
-			var amt, cashPart int64
-			if err := rows.Scan(&raw, &amt, &cashPart); err != nil {
+			var amt, cashPart, prinPart, bonusPart int64
+			if err := rows.Scan(&raw, &amt, &cashPart, &prinPart, &bonusPart); err != nil {
 				rows.Close()
 				return err
 			}
 			cashBack += cashPart
+			prinBack += prinPart
+			bonusBack += bonusPart
 			var ls []RefundLine
 			_ = json.Unmarshal(raw, &ls)
 			for _, l := range ls {
@@ -808,6 +813,11 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		}
 		q.CashPart = refundSplit(o.Total, oc.CreditPaid, paidBack, cashBack, amount)
 		q.CreditPart = amount - q.CashPart
+		split := func(amount, cashPart int64) storedParts {
+			return storedRefundSplit(o.Total, oc, paidBack, cashBack, prinBack, bonusBack, amount, amount-cashPart)
+		}
+		dry := split(amount, q.CashPart)
+		q.StoredPart = dry.Principal + dry.Bonus
 		if in.Dry {
 			return nil
 		}
@@ -819,6 +829,7 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		}
 		cashPart := refundSplit(o.Total, oc.CreditPaid, paidBack, cashBack, amount)
 		creditPart := amount - cashPart
+		parts := split(amount, cashPart)
 		toCredit := creditPart
 		if in.ToCredit {
 			toCredit = amount
@@ -858,15 +869,23 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		lines, _ := json.Marshal(q.Lines)
 		var refundID int64
 		if err := tx.QueryRow(ctx, `INSERT INTO order_refunds (order_id, branch_id, lines, amount, method, reason, reason_kind,
-			refunded_by, approved_by, aftersale_id, pay_type, cash_part, to_credit, consent)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`, o.ID, o.BranchID, lines,
-			amount, in.Method, in.Reason, in.ReasonKind, by, approvedBy, asID, in.PayType, cashPart, toCredit, in.Consent).
+			refunded_by, approved_by, aftersale_id, pay_type, cash_part, to_credit, consent, principal_part, bonus_part)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`, o.ID, o.BranchID, lines,
+			amount, in.Method, in.Reason, in.ReasonKind, by, approvedBy, asID, in.PayType, cashPart, toCredit, in.Consent,
+			parts.Principal, parts.Bonus).
 			Scan(&refundID); err != nil {
 			return err
 		}
-		q.RefundID, q.CashPart, q.CreditPart = refundID, cashPart, creditPart
-		if toCredit > 0 {
-			if err := creditRefund(ctx, tx, o.ID, refundID, creditCustomer, toCredit, actor); err != nil {
+		q.RefundID, q.CashPart, q.CreditPart, q.StoredPart = refundID, cashPart, creditPart, parts.Principal+parts.Bonus
+		// what came from stored value goes back to it, principal and bonus
+		// apart; the rest of what goes to a balance, to the refund balance
+		if parts.Principal+parts.Bonus > 0 {
+			if err := storedRefund(ctx, tx, o.ID, refundID, creditCustomer, parts, actor); err != nil {
+				return err
+			}
+		}
+		if rest := toCredit - parts.Principal - parts.Bonus; rest > 0 {
+			if err := creditRefund(ctx, tx, o.ID, refundID, creditCustomer, rest, actor); err != nil {
 				return err
 			}
 		}

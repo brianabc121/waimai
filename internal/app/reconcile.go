@@ -49,6 +49,9 @@ type ReconRow struct {
 	OK        int `json:"ok"`
 	Problem   int `json:"problem"`
 	Unchecked int `json:"unchecked"`
+	// stored value only: its principal and bonus parts
+	Principal int64 `json:"principal,omitempty"`
+	Bonus     int64 `json:"bonus,omitempty"`
 }
 
 // ReconCash is where the cash of the period is.
@@ -59,9 +62,39 @@ type ReconCash struct {
 	RiderPending   int64 `json:"rider_pending"`   // still with the riders or not checked
 	// Refunded is cash given back for dishes in the period.
 	Refunded int64 `json:"refunded"`
+	// StoredIn is cash taken for stored value, less top-ups undone; StoredOut
+	// stored value paid back in cash (docs/STORED_VALUE_DESIGN.md §10).
+	StoredIn  int64 `json:"stored_in"`
+	StoredOut int64 `json:"stored_out"`
 	// Expected is what the drawer should hold: cash at the store plus what
-	// riders handed in, less cash refunds.
+	// riders handed in, less cash refunds, plus stored value in cash less
+	// stored value paid back in cash.
 	Expected int64 `json:"expected"`
+}
+
+// ReconStored is the period's stored value (docs/STORED_VALUE_DESIGN.md
+// §10): money taken in advance, not takings. Top-ups count on the day they
+// were paid, undoing on the day it was done.
+type ReconStored struct {
+	Count   int   `json:"count"`
+	Paid    int64 `json:"paid"`  // principal taken in
+	Bonus   int64 `json:"bonus"` // bonus given with it
+	Cash    int64 `json:"cash"`
+	Card    int64 `json:"card"`
+	Online  int64 `json:"online"`
+	Revoked int64 `json:"revoked"` // principal of top-ups undone
+	// RevokedCash is the part of Revoked given back from the drawer.
+	RevokedCash int64 `json:"revoked_cash"`
+	// RevokedBonus is the bonus of the top-ups undone.
+	RevokedBonus int64 `json:"revoked_bonus"`
+	// Spent is stored value spent on the period's orders: principal and bonus.
+	SpentPrincipal int64 `json:"spent_principal"`
+	SpentBonus     int64 `json:"spent_bonus"`
+	// Cashouts: stored value paid back; CashoutCash of it from the drawer.
+	Cashouts    int   `json:"cashouts"`
+	PaidOut     int64 `json:"paid_out"`
+	CashoutCash int64 `json:"cashout_cash"`
+	Clawback    int64 `json:"clawback"`
 }
 
 // ReconRefunds is money given back by dish in the period, whenever the
@@ -73,6 +106,9 @@ type ReconRefunds struct {
 	// ToCredit went into customers' store balances: no money left the store
 	// (docs/REFUND_BALANCE_DESIGN.md §10.2).
 	ToCredit int64 `json:"to_credit"`
+	// ToStored went back into stored value (part of to_credit in the
+	// database, apart here).
+	ToStored int64 `json:"to_stored"`
 }
 
 // CashCount is the cash counted in the drawer on one day.
@@ -110,6 +146,7 @@ type Reconcile struct {
 	Cash      ReconCash      `json:"cash"`
 	Discounts ReconDiscounts `json:"discounts"`
 	Refunds   ReconRefunds   `json:"refunds"`
+	Stored    ReconStored    `json:"stored"`
 	// Net is Total less the refunds.
 	Net int64 `json:"net"`
 	// Problems counts online payments marked wrong, in any period.
@@ -200,17 +237,32 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64
 	}
 	// what store balances paid (docs/REFUND_BALANCE_DESIGN.md §10.2): its own
 	// row, whatever paid the rest; its orders are already counted above
+	// and stored value its own (docs/STORED_VALUE_DESIGN.md §10)
 	credit := ReconRow{PayType: "store_credit", Names: map[string]string{}}
-	if err := a.DB.QueryRow(ctx, `SELECT count(*), COALESCE(sum(o.credit_paid), 0),
-			COALESCE(sum(o.credit_paid) FILTER (WHERE o.service_type = 'dine_in'), 0),
-			COALESCE(sum(o.credit_paid) FILTER (WHERE o.service_type <> 'dine_in'), 0)
+	stored := ReconRow{PayType: "stored_value", Names: map[string]string{}}
+	const refundCredit = `(o.credit_paid - o.stored_principal_paid - o.stored_bonus_paid)`
+	const storedPaid = `(o.stored_principal_paid + o.stored_bonus_paid)`
+	if err := a.DB.QueryRow(ctx, `SELECT count(*) FILTER (WHERE `+refundCredit+` > 0), COALESCE(sum(`+refundCredit+`), 0),
+			COALESCE(sum(`+refundCredit+`) FILTER (WHERE o.service_type = 'dine_in'), 0),
+			COALESCE(sum(`+refundCredit+`) FILTER (WHERE o.service_type <> 'dine_in'), 0),
+			count(*) FILTER (WHERE `+storedPaid+` > 0), COALESCE(sum(`+storedPaid+`), 0),
+			COALESCE(sum(`+storedPaid+`) FILTER (WHERE o.service_type = 'dine_in'), 0),
+			COALESCE(sum(`+storedPaid+`) FILTER (WHERE o.service_type <> 'dine_in'), 0),
+			COALESCE(sum(o.stored_principal_paid), 0), COALESCE(sum(o.stored_bonus_paid), 0)
 		FROM orders o JOIN branches b ON b.id = o.branch_id WHERE `+paidInPeriod+` AND o.credit_paid > 0`,
-		branchID, from, to, brands).Scan(&credit.Count, &credit.Amount, &credit.Dine, &credit.Takeaway); err != nil {
+		branchID, from, to, brands).Scan(&credit.Count, &credit.Amount, &credit.Dine, &credit.Takeaway,
+		&stored.Count, &stored.Amount, &stored.Dine, &stored.Takeaway, &stored.Principal, &stored.Bonus); err != nil {
 		return nil, err
 	}
-	if credit.Count > 0 {
-		out.Total += credit.Amount
-		out.Rows = append(out.Rows, credit)
+	for _, r := range []ReconRow{credit, stored} {
+		if r.Count > 0 {
+			out.Total += r.Amount
+			out.Rows = append(out.Rows, r)
+		}
+	}
+	out.Stored.SpentPrincipal, out.Stored.SpentBonus = stored.Principal, stored.Bonus
+	if err := storedRecon(ctx, a.DB, branchID, brands, from, to, &out.Stored); err != nil {
+		return nil, err
 	}
 	// cash: at the counter, and what riders took in and handed back
 	if err := a.DB.QueryRow(ctx, `SELECT
@@ -228,16 +280,20 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64
 		return nil, err
 	}
 	if err := a.DB.QueryRow(ctx, `SELECT count(*), COALESCE(sum(r.amount), 0),
-			COALESCE(sum(r.amount - r.to_credit) FILTER (WHERE r.pay_type = 'cash'), 0), COALESCE(sum(r.to_credit), 0)
+			COALESCE(sum(r.amount - r.to_credit) FILTER (WHERE r.pay_type = 'cash'), 0),
+			COALESCE(sum(r.to_credit - r.principal_part - r.bonus_part), 0), COALESCE(sum(r.principal_part + r.bonus_part), 0)
 		FROM order_refunds r JOIN branches b ON b.id = r.branch_id JOIN orders o ON o.id = r.order_id
 		WHERE r.branch_id = $1 AND (r.created_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date
 			AND ($4::bigint[] IS NULL OR o.brand_id = ANY($4))`,
-		branchID, from, to, brands).Scan(&out.Refunds.Count, &out.Refunds.Total, &out.Refunds.Cash, &out.Refunds.ToCredit); err != nil {
+		branchID, from, to, brands).Scan(&out.Refunds.Count, &out.Refunds.Total, &out.Refunds.Cash, &out.Refunds.ToCredit,
+		&out.Refunds.ToStored); err != nil {
 		return nil, err
 	}
 	out.Cash.Refunded = out.Refunds.Cash
 	out.Net = out.Total - out.Refunds.Total
-	out.Cash.Expected = out.Cash.Counter + out.Cash.RiderReturned - out.Cash.Refunded
+	out.Cash.StoredIn = out.Stored.Cash - out.Stored.RevokedCash
+	out.Cash.StoredOut = out.Stored.CashoutCash
+	out.Cash.Expected = out.Cash.Counter + out.Cash.RiderReturned - out.Cash.Refunded + out.Cash.StoredIn - out.Cash.StoredOut
 	// coupons the store paid for
 	if err := a.DB.QueryRow(ctx, `SELECT COALESCE(sum(d.amount), 0) FROM order_discounts d
 		JOIN orders o ON o.id = d.order_id JOIN branches b ON b.id = o.branch_id
@@ -280,6 +336,40 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64
 		}
 	}
 	return out, nil
+}
+
+// storedRecon fills the period's top-ups, undoing and paying back. A
+// brand's view has the top-ups taken at its brands; stored value paid back
+// is the store's, so only the whole store's view has it.
+func storedRecon(ctx context.Context, q Querier, branchID int64, brands []int64, from, to string, out *ReconStored) error {
+	if err := q.QueryRow(ctx, `SELECT count(*) FILTER (WHERE t.paid_at IS NOT NULL AND `+storedDay("t.paid_at")+`),
+			COALESCE(sum(t.pay) FILTER (WHERE `+storedDay("t.paid_at")+`), 0),
+			COALESCE(sum(t.bonus) FILTER (WHERE `+storedDay("t.paid_at")+`), 0),
+			COALESCE(sum(t.pay) FILTER (WHERE `+storedDay("t.paid_at")+` AND t.pay_type = 'cash'), 0),
+			COALESCE(sum(t.pay) FILTER (WHERE `+storedDay("t.paid_at")+` AND t.pay_type = 'card'), 0),
+			COALESCE(sum(t.pay) FILTER (WHERE `+storedDay("t.paid_at")+` AND t.pay_type = 'online'), 0),
+			COALESCE(sum(t.pay) FILTER (WHERE t.status = 'revoked' AND `+storedDay("t.revoked_at")+`), 0),
+			COALESCE(sum(t.pay) FILTER (WHERE t.status = 'revoked' AND `+storedDay("t.revoked_at")+` AND t.pay_type = 'cash'), 0),
+			COALESCE(sum(t.bonus) FILTER (WHERE t.status = 'revoked' AND `+storedDay("t.revoked_at")+`), 0)
+		FROM topups t JOIN branches b ON b.id = t.branch_id
+		WHERE t.branch_id = $1 AND t.status IN ('paid', 'revoked') AND ($4::bigint[] IS NULL OR t.brand_id = ANY($4))`,
+		branchID, from, to, brands).Scan(&out.Count, &out.Paid, &out.Bonus, &out.Cash, &out.Card, &out.Online, &out.Revoked,
+		&out.RevokedCash, &out.RevokedBonus); err != nil {
+		return err
+	}
+	if brands != nil {
+		return nil
+	}
+	return q.QueryRow(ctx, `SELECT count(*), COALESCE(sum(c.paid_out), 0),
+			COALESCE(sum(c.paid_out) FILTER (WHERE c.pay_type = 'cash'), 0), COALESCE(sum(c.clawback), 0)
+		FROM stored_cashouts c JOIN branches b ON b.id = c.branch_id
+		WHERE c.branch_id = $1 AND `+storedDay("c.created_at"), branchID, from, to).
+		Scan(&out.Cashouts, &out.PaidOut, &out.CashoutCash, &out.Clawback)
+}
+
+// storedDay says a time falls on one of the period's days at the store.
+func storedDay(col string) string {
+	return `(` + col + ` AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date`
 }
 
 func jsonNames(s string) map[string]string {

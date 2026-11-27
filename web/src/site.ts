@@ -29,6 +29,7 @@ export const ownSlug = () => site.store?.slug ?? ''
 // store inside the mall.
 export const storePath = (slug: string) => ownSite() ? '/' : `/mall/s/${slug}`
 export const checkoutPath = (slug: string) => ownSite() ? '/checkout' : `/mall/s/${slug}/checkout`
+export const offersPath = (slug: string) => ownSite() ? '/offers' : `/mall/s/${slug}/offers`
 
 // storeURL is the address a merchant shares: the store's own page. On a
 // development machine without the platform's domain, <no>.localhost works in

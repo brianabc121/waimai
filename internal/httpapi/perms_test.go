@@ -44,7 +44,8 @@ func TestRolePermissions(t *testing.T) {
 	if p := permsOf(t, mgr); !slices.Contains(p, "wallet.refund") || !slices.Contains(p, "wallet.view") {
 		t.Fatalf("manager lacks store credit: %v", p)
 	}
-	if p := permsOf(t, owner); len(p) != 39 {
+	// stored value adds stored.topup and stored.cashout (docs/STORED_VALUE_DESIGN.md)
+	if p := permsOf(t, owner); len(p) != 41 {
 		t.Fatalf("owner: %d perms", len(p))
 	}
 	mgr.want(403, "OWNER_ONLY", "GET", permsURL, nil)

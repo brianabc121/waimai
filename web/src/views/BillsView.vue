@@ -2,6 +2,7 @@
 // The store's bill (docs/COUPON_DESIGN.md §8): every delivery and pickup order
 // of a period with what each discount took off, and a summary with the sums
 // per kind of discount and the platform's coupon statements.
+import '../stored'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { get } from '../api'
@@ -155,7 +156,10 @@ async function showSettlement(id: number) {
           <small class="s">{{ t('bl.c.refunded_sub') }}</small>
           <small v-if="sum.refunded_to_credit" class="s">{{ t('rc.c.to_credit', { v: money(sum.refunded_to_credit, cur) }) }}</small></div>
         <div v-if="sum.paid_by_credit" class="ox-stat" data-testid="bl-paid-credit"><span class="l">{{ t('bl.c.paid_credit') }}</span><b class="v">{{ money(sum.paid_by_credit, cur) }}</b>
-          <small class="s">{{ t('bl.c.paid_credit_sub') }}</small></div>
+          <small class="s">{{ t('bl.c.paid_credit_sub') }}</small>
+          <small v-if="sum.stored_principal || sum.stored_bonus" class="s" data-testid="bl-stored">{{ t('sv.bl.stored') }}: {{ t('sv.bl.stored_s', { p: money(sum.stored_principal ?? 0, cur), b: money(sum.stored_bonus ?? 0, cur) }) }}</small></div>
+        <div v-if="sum.stored_topups || sum.stored_given" class="ox-stat" data-testid="bl-stored-topups"><span class="l">{{ t('sv.bl.stored') }}</span><b class="v">{{ money(sum.stored_topups ?? 0, cur) }}</b>
+          <small class="s">{{ t('sv.bl.topups', { p: money(sum.stored_topups ?? 0, cur), b: money(sum.stored_given ?? 0, cur) }) }}</small></div>
       </div>
       <div class="cols">
         <div class="ox-panel stack">

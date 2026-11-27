@@ -43,7 +43,8 @@ func scanCreditEntry(rows pgx.Rows, extra ...any) (CreditEntry, error) {
 	return e, rows.Scan(dest...)
 }
 
-// StoreCredit is a customer's balance at one store.
+// StoreCredit is a customer's balance at one store: the refund balance and
+// stored value (docs/STORED_VALUE_DESIGN.md §3); Balance is all of it.
 type StoreCredit struct {
 	AccountID int64  `json:"account_id"`
 	BranchID  int64  `json:"branch_id"`
@@ -51,23 +52,31 @@ type StoreCredit struct {
 	Slug      string `json:"slug"`
 	Currency  string `json:"currency"`
 	Balance   int64  `json:"balance"`
+	Credit    int64  `json:"credit"`
+	Principal int64  `json:"principal"`
+	Bonus     int64  `json:"bonus"`
 	Frozen    bool   `json:"frozen"`
 	// Closed: the store no longer takes orders (§7.3).
 	Closed bool `json:"closed"`
 }
 
 func storeCredits(ctx context.Context, q Querier, customerID int64, all bool) ([]StoreCredit, error) {
-	rows, err := q.Query(ctx, `SELECT w.id, w.branch_id, b.name, b.slug, w.currency, w.balance, w.frozen,
+	rows, err := q.Query(ctx, `SELECT min(w.id), w.branch_id, b.name, b.slug, w.currency, sum(w.balance),
+			COALESCE(sum(w.balance) FILTER (WHERE w.kind = 'store_credit'), 0),
+			COALESCE(sum(w.balance) FILTER (WHERE w.kind = 'stored_principal'), 0),
+			COALESCE(sum(w.balance) FILTER (WHERE w.kind = 'stored_bonus'), 0), bool_or(w.frozen),
 			b.deleted_at IS NOT NULL OR EXISTS (SELECT 1 FROM merchants m WHERE m.id = b.merchant_id AND (m.deleted_at IS NOT NULL OR m.status = 'suspended'))
 		FROM wallet_accounts w JOIN branches b ON b.id = w.branch_id
-		WHERE w.kind='store_credit' AND w.customer_id=$1 AND ($2 OR w.balance <> 0)
-		ORDER BY w.balance DESC, w.id`, customerID, all)
+		WHERE w.kind IN ('store_credit', 'stored_principal', 'stored_bonus') AND w.customer_id=$1
+		GROUP BY w.branch_id, b.id, w.currency HAVING $2 OR sum(w.balance) <> 0
+		ORDER BY sum(w.balance) DESC, min(w.id)`, customerID, all)
 	if err != nil {
 		return nil, err
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (StoreCredit, error) {
 		var s StoreCredit
-		return s, r.Scan(&s.AccountID, &s.BranchID, &s.StoreName, &s.Slug, &s.Currency, &s.Balance, &s.Frozen, &s.Closed)
+		return s, r.Scan(&s.AccountID, &s.BranchID, &s.StoreName, &s.Slug, &s.Currency, &s.Balance, &s.Credit, &s.Principal,
+			&s.Bonus, &s.Frozen, &s.Closed)
 	})
 	if out == nil {
 		out = []StoreCredit{}
@@ -433,8 +442,11 @@ func (a *App) AdminFreezeCredit(ctx context.Context, actor AdminActor, accountID
 		return ErrValidation("note too long")
 	}
 	return a.inTx(ctx, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `UPDATE wallet_accounts SET frozen=$2, frozen_note=$3, updated_at=now()
-			WHERE id=$1 AND kind='store_credit'`, accountID, frozen, note)
+		// the refund balance and stored value of the customer at the store go together
+		tag, err := tx.Exec(ctx, `UPDATE wallet_accounts w SET frozen=$2, frozen_note=$3, updated_at=now()
+			FROM wallet_accounts a WHERE a.id=$1 AND a.kind IN ('store_credit', 'stored_principal', 'stored_bonus')
+			AND w.customer_id = a.customer_id AND w.branch_id = a.branch_id
+			AND w.kind IN ('store_credit', 'stored_principal', 'stored_bonus')`, accountID, frozen, note)
 		if err != nil {
 			return err
 		}
@@ -452,7 +464,7 @@ func (a *App) AdminFreezeBranchCredits(ctx context.Context, actor AdminActor, br
 	var n int64
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `UPDATE wallet_accounts SET frozen=$2, frozen_note=$3, updated_at=now()
-			WHERE branch_id=$1 AND kind='store_credit' AND balance > 0`, branchID, frozen, note)
+			WHERE branch_id=$1 AND kind IN ('store_credit', 'stored_principal', 'stored_bonus') AND (balance > 0 OR frozen)`, branchID, frozen, note)
 		if err != nil {
 			return err
 		}
@@ -466,7 +478,8 @@ func (a *App) AdminFreezeBranchCredits(ctx context.Context, actor AdminActor, br
 // branchCreditOwed is what a store owes customers in balances.
 func branchCreditOwed(ctx context.Context, q Querier, branchID int64) (int64, error) {
 	var owed int64
-	err := q.QueryRow(ctx, `SELECT COALESCE(sum(balance), 0) FROM wallet_accounts WHERE kind='store_credit' AND branch_id=$1`,
+	err := q.QueryRow(ctx, `SELECT COALESCE(sum(balance), 0) FROM wallet_accounts
+		WHERE kind IN ('store_credit', 'stored_principal', 'stored_bonus') AND branch_id=$1`,
 		branchID).Scan(&owed)
 	return owed, err
 }

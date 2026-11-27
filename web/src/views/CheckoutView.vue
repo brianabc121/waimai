@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { storePath, checkoutPath } from '../site'
+import { storePath, checkoutPath, offersPath } from '../site'
+import { storeStored, type StoredOffers } from '../stored'
 import { cartTags, tagNames } from '../notes'
 import { fromCart, fromLineOptions, type Extras } from '../extras'
 import LineExtras from './LineExtras.vue'
@@ -205,6 +206,15 @@ const promoName = computed(() => quote.value?.totals.promotion_discount ? pick(q
 // The store balance (docs/REFUND_BALANCE_DESIGN.md §5.2): used unless the
 // customer says no; what the page showed is sent, so a balance that changed
 // meanwhile is shown again before anything is spent.
+// a top-up offer, when what the customer holds does not cover the order
+// (docs/STORED_VALUE_DESIGN.md §5, Q11)
+const stored = ref<StoredOffers | null>(null)
+void storeStored(props.slug).then(r => { stored.value = r }).catch(() => null)
+const upsell = computed(() => {
+  if (!quote.value || (quote.value.store_credit ?? 0) >= quote.value.totals.total) return null
+  const tiers = (stored.value?.campaign?.tiers ?? []).filter(x => !x.closed && x.pay + x.bonus + (quote.value?.store_credit ?? 0) >= (quote.value?.totals.total ?? 0))
+  return tiers.sort((a, b) => a.pay - b.pay)[0] ?? null
+})
 const useCredit = ref(true)
 const credit = computed(() => useCredit.value ? quote.value?.credit ?? 0 : 0)
 const due = computed(() => quote.value ? quote.value.totals.total - credit.value : subtotal.value)
@@ -320,6 +330,8 @@ async function submit() {
           <span class="grow"><b>{{ t('co.use_credit') }}</b><small>{{ t('co.credit_have', { amt: money(quote.store_credit, cur) }) }}</small></span>
           <b v-if="useCredit && quote.credit" class="off">−{{ money(quote.credit, cur) }}</b>
         </label>
+        <router-link v-if="upsell" class="co-upsell" :to="offersPath(slug)" data-testid="co-upsell">
+          <span class="grow">{{ t('sv.co.upsell', { pay: money(upsell.pay, cur), bonus: money(upsell.bonus, cur) }) }}</span><b>{{ t('sv.c.go') }} ›</b></router-link>
         <div class="co-row co-acct" v-if="customer.verified" data-testid="account-phone"><span>{{ t('co.account') }}</span><span>{{ prettyPhone(customer.phone) }}</span></div>
       </div>
       </div>
@@ -486,6 +498,9 @@ async function submit() {
 .co-note .field > span { font-size: 15px; font-weight: 600; color: var(--ink); }
 .co-note input { background: #fff; }
 .co-paywith { display: flex; align-items: center; gap: 12px; }
+.co-upsell { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 9px 12px; border-radius: 10px; background: #fff1d6; border: 1px dashed #e3b766;
+  color: #7a3e00; font-size: 13px; text-decoration: none; }
+.co-upsell b { color: var(--red); white-space: nowrap; }
 .co-credit { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--gold, #d9b26b); border-radius: 10px; background: #fff8ea; cursor: pointer; }
 .co-credit input { width: 18px; height: 18px; accent-color: var(--red); flex: none; }
 .co-credit .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }

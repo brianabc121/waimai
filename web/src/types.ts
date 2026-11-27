@@ -198,7 +198,7 @@ export interface VoidQuote {
 export interface RefundQuote { lines: RefundLine[]; dishes: number; suggested: number; left: number
   // the order's split (docs/REFUND_BALANCE_DESIGN.md §6): paid from the store balance, whether the customer is known,
   // and how the suggested (or given) amount splits between the money paid and the balance
-  credit_paid?: number; can_credit?: boolean; cash_part?: number; credit_part?: number; refund_id?: number }
+  credit_paid?: number; can_credit?: boolean; cash_part?: number; credit_part?: number; stored_part?: number; refund_id?: number }
 export interface QuoteLine { item_id: number; name: string; name_en: string; name_tr?: string; unit_price: number; qty: number; line_total: number
   options: LineOption[]; note: string; note_tags?: LineNoteTag[]; needs_prep?: boolean; basket?: number }
 export interface OrderBatch {
@@ -305,6 +305,7 @@ export interface Settlement {
 export interface BillSummary {
   from: string; to: string; currency: string; orders: number; cancelled: number; food: number; merchant_discount: number
   platform_discount: number; paid: number; takings: number; refunded: number; refunded_to_credit?: number; paid_by_credit?: number
+  stored_principal?: number; stored_bonus?: number; refunded_to_stored?: number; stored_topups?: number; stored_given?: number
   kinds: { kind: 'promotion' | CouponKind; funded_by: 'store' | 'platform'; orders: number; amount: number }[]
   repurchase: { issued: number; used: number; sales: number }
   days: { day: string; orders: number; food: number; discount: number; paid: number; takings: number }[]

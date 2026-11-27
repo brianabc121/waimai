@@ -28,7 +28,20 @@ const (
 	acctCredit = "store_credit" // a customer's balance at a store
 	acctRefund = "store_refund" // what the store put into balances
 	acctSales  = "store_sales"  // what was paid from balances at the store
+
+	// Stored value (docs/STORED_VALUE_DESIGN.md §7): what a customer topped
+	// up and the store's bonus on it, and the store's side of both.
+	acctPrincipal   = "stored_principal"   // a customer's own money topped up at a store
+	acctBonus       = "stored_bonus"       // the store's bonus on it
+	acctTopup       = "store_topup"        // what the store took in top-ups (negative: owed)
+	acctBonusFund   = "store_bonus"        // what the store gave in bonuses
+	acctStoredSales = "store_stored_sales" // what was paid from stored value at the store
 )
+
+// customerAcct says whether an account kind belongs to a customer.
+func customerAcct(kind string) bool {
+	return kind == acctCredit || kind == acctPrincipal || kind == acctBonus
+}
 
 type walletAcct struct {
 	ID      int64
@@ -40,7 +53,7 @@ type walletAcct struct {
 // are locked before the store's, in that order everywhere.
 func walletAccount(ctx context.Context, tx pgx.Tx, kind string, branchID, customerID int64, currency string) (*walletAcct, error) {
 	var cust *int64
-	if kind == acctCredit {
+	if customerAcct(kind) {
 		if customerID == 0 {
 			return nil, ErrValidation("a store balance belongs to a customer")
 		}
@@ -64,6 +77,8 @@ type journal struct {
 	Currency string
 	OrderID  int64
 	RefundID int64
+	TopupID  int64
+	Cashout  int64
 	Actor    Actor
 	Note     string
 	Reverses int64
@@ -95,9 +110,10 @@ func postJournal(ctx context.Context, tx pgx.Tx, j journal, ps ...posting) (id i
 		return &v
 	}
 	err = tx.QueryRow(ctx, `INSERT INTO wallet_journals (kind, idem_key, branch_id, currency, order_id, refund_id,
-		actor_type, actor_id, approved_by, note, reverses) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,left($10, 200),$11)
+		actor_type, actor_id, approved_by, note, reverses, topup_id, cashout_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,left($10, 200),$11,$12,$13)
 		ON CONFLICT (idem_key) DO NOTHING RETURNING id`, j.Kind, j.Idem, j.BranchID, j.Currency, nz(j.OrderID),
-		nz(j.RefundID), j.Actor.Type, nz(j.Actor.ID), nz(j.Actor.ApprovedBy), j.Note, nz(j.Reverses)).Scan(&id)
+		nz(j.RefundID), j.Actor.Type, nz(j.Actor.ID), nz(j.Actor.ApprovedBy), j.Note, nz(j.Reverses), nz(j.TopupID),
+		nz(j.Cashout)).Scan(&id)
 	if isNoRows(err) {
 		err = tx.QueryRow(ctx, `SELECT id FROM wallet_journals WHERE idem_key=$1`, j.Idem).Scan(&id)
 		return id, false, err
@@ -122,14 +138,20 @@ type orderCredit struct {
 	BranchID, CustomerID, CreditCustomer int64
 	Currency, Type, Acceptance, Payment  string
 	Total, CreditPaid                    int64
+	// the part of CreditPaid that came from stored value
+	StoredPrincipal, StoredBonus int64
 }
+
+// refundCredit is what the order paid from the customer's refund balance.
+func (o *orderCredit) refundCredit() int64 { return o.CreditPaid - o.StoredPrincipal - o.StoredBonus }
 
 func readOrderCredit(ctx context.Context, tx pgx.Tx, orderID int64) (*orderCredit, error) {
 	var c orderCredit
 	var cust, credit *int64
 	err := tx.QueryRow(ctx, `SELECT branch_id, customer_id, credit_customer_id, currency, order_type, acceptance_status,
-		payment_status, total, credit_paid FROM orders WHERE id=$1`, orderID).Scan(&c.BranchID, &cust, &credit, &c.Currency,
-		&c.Type, &c.Acceptance, &c.Payment, &c.Total, &c.CreditPaid)
+		payment_status, total, credit_paid, stored_principal_paid, stored_bonus_paid FROM orders WHERE id=$1`, orderID).
+		Scan(&c.BranchID, &cust, &credit, &c.Currency, &c.Type, &c.Acceptance, &c.Payment, &c.Total, &c.CreditPaid,
+			&c.StoredPrincipal, &c.StoredBonus)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	} else if err != nil {
@@ -173,39 +195,99 @@ func useCredit(ctx context.Context, tx pgx.Tx, orderID, customerID, want int64, 
 	if want <= 0 {
 		return 0, nil
 	}
+	// customer accounts first, then the store's (the lock order)
 	acct, err := walletAccount(ctx, tx, acctCredit, o.BranchID, customerID, o.Currency)
 	if err != nil {
 		return 0, err
 	}
-	if acct.Frozen {
+	prin, err := walletAccount(ctx, tx, acctPrincipal, o.BranchID, customerID, o.Currency)
+	if err != nil {
+		return 0, err
+	}
+	bonus, err := walletAccount(ctx, tx, acctBonus, o.BranchID, customerID, o.Currency)
+	if err != nil {
+		return 0, err
+	}
+	if acct.Frozen || (prin.Frozen && prin.Balance > 0) || (bonus.Frozen && bonus.Balance > 0) {
 		return 0, Err(http.StatusConflict, "CREDIT_FROZEN", "this store balance is frozen")
 	}
-	amount := min(want, acct.Balance)
-	if amount <= 0 {
+	// the refund balance first: it is money the customer already paid
+	// (docs/STORED_VALUE_DESIGN.md §8.1), then stored value
+	fromCredit := min(want, acct.Balance)
+	p, b := storedTake(min(want-fromCredit, prin.Balance+bonus.Balance), prin.Balance, bonus.Balance)
+	if fromCredit+p+b <= 0 {
 		return 0, nil
 	}
-	sales, err := walletAccount(ctx, tx, acctSales, o.BranchID, 0, o.Currency)
-	if err != nil {
-		return 0, err
+	if fromCredit > 0 {
+		sales, err := walletAccount(ctx, tx, acctSales, o.BranchID, 0, o.Currency)
+		if err != nil {
+			return 0, err
+		}
+		n, err := journalSeq(ctx, tx, orderID, "spend")
+		if err != nil {
+			return 0, err
+		}
+		if _, _, err := postJournal(ctx, tx, journal{Kind: "spend", Idem: fmt.Sprintf("spend:%d:%d", orderID, n),
+			BranchID: o.BranchID, Currency: o.Currency, OrderID: orderID, Actor: actor},
+			posting{acct.ID, -fromCredit}, posting{sales.ID, fromCredit}); err != nil {
+			return 0, err
+		}
 	}
-	n, err := journalSeq(ctx, tx, orderID, "spend")
-	if err != nil {
-		return 0, err
+	if p+b > 0 {
+		sales, err := walletAccount(ctx, tx, acctStoredSales, o.BranchID, 0, o.Currency)
+		if err != nil {
+			return 0, err
+		}
+		n, err := journalSeq(ctx, tx, orderID, "stored_spend")
+		if err != nil {
+			return 0, err
+		}
+		if _, _, err := postJournal(ctx, tx, journal{Kind: "stored_spend", Idem: fmt.Sprintf("sspend:%d:%d", orderID, n),
+			BranchID: o.BranchID, Currency: o.Currency, OrderID: orderID, Actor: actor},
+			posting{prin.ID, -p}, posting{bonus.ID, -b}, posting{sales.ID, p + b}); err != nil {
+			return 0, err
+		}
 	}
-	if _, _, err := postJournal(ctx, tx, journal{Kind: "spend", Idem: fmt.Sprintf("spend:%d:%d", orderID, n),
-		BranchID: o.BranchID, Currency: o.Currency, OrderID: orderID, Actor: actor},
-		posting{acct.ID, -amount}, posting{sales.ID, amount}); err != nil {
-		return 0, err
-	}
+	amount := fromCredit + p + b
 	if _, err := tx.Exec(ctx, `UPDATE orders SET credit_paid = credit_paid + $2, credit_customer_id = $3,
-		version=version+1, updated_at=now() WHERE id=$1`, orderID, amount, customerID); err != nil {
+		stored_principal_paid = stored_principal_paid + $4, stored_bonus_paid = stored_bonus_paid + $5,
+		version=version+1, updated_at=now() WHERE id=$1`, orderID, amount, customerID, p, b); err != nil {
 		return 0, err
 	}
 	return amount, nil
 }
 
-// giveCreditBack puts back into the balance up to amount of what the order
-// paid from it (the order row locked).
+// storedTake splits x taken from stored value holding principal and bonus in
+// proportion (rule W9): the bonus share rounded down, so the cent left over
+// is principal and what may be paid back in money is never a cent more.
+func storedTake(x, principal, bonus int64) (p, b int64) {
+	if x <= 0 || principal+bonus <= 0 {
+		return 0, 0
+	}
+	x = min(x, principal+bonus)
+	b = pricing.MulDivFloor(x, bonus, principal+bonus)
+	return x - b, b
+}
+
+// storedGiveBack splits x given back to stored value of what an order paid
+// from it (principal p, bonus b) the same way, with the principal share
+// rounded down.
+func storedGiveBack(x, p, b int64) (int64, int64) {
+	if x <= 0 || p+b <= 0 {
+		return 0, 0
+	}
+	x = min(x, p+b)
+	pp := min(pricing.MulDivFloor(x, p, p+b), p)
+	bb := x - pp
+	if bb > b {
+		pp, bb = pp+bb-b, b
+	}
+	return pp, bb
+}
+
+// giveCreditBack puts back into the balances up to amount of what the order
+// paid from them (the order row locked): stored value first, in proportion,
+// then the refund balance (docs/STORED_VALUE_DESIGN.md §8.2).
 func giveCreditBack(ctx context.Context, tx pgx.Tx, orderID, amount int64, actor Actor, note string) error {
 	o, err := readOrderCredit(ctx, tx, orderID)
 	if err != nil {
@@ -215,27 +297,56 @@ func giveCreditBack(ctx context.Context, tx pgx.Tx, orderID, amount int64, actor
 	if amount <= 0 {
 		return nil
 	}
-	acct, err := walletAccount(ctx, tx, acctCredit, o.BranchID, o.CreditCustomer, o.Currency)
-	if err != nil {
-		return err
+	p, b := storedGiveBack(amount, o.StoredPrincipal, o.StoredBonus)
+	c := min(amount-p-b, o.refundCredit())
+	if c > 0 {
+		acct, err := walletAccount(ctx, tx, acctCredit, o.BranchID, o.CreditCustomer, o.Currency)
+		if err != nil {
+			return err
+		}
+		sales, err := walletAccount(ctx, tx, acctSales, o.BranchID, 0, o.Currency)
+		if err != nil {
+			return err
+		}
+		n, err := journalSeq(ctx, tx, orderID, "return")
+		if err != nil {
+			return err
+		}
+		if _, _, err := postJournal(ctx, tx, journal{Kind: "return", Idem: fmt.Sprintf("return:%d:%d", orderID, n),
+			BranchID: o.BranchID, Currency: o.Currency, OrderID: orderID, Actor: actor, Note: note},
+			posting{acct.ID, c}, posting{sales.ID, -c}); err != nil {
+			return err
+		}
 	}
-	sales, err := walletAccount(ctx, tx, acctSales, o.BranchID, 0, o.Currency)
-	if err != nil {
-		return err
+	if p+b > 0 {
+		prin, err := walletAccount(ctx, tx, acctPrincipal, o.BranchID, o.CreditCustomer, o.Currency)
+		if err != nil {
+			return err
+		}
+		bonus, err := walletAccount(ctx, tx, acctBonus, o.BranchID, o.CreditCustomer, o.Currency)
+		if err != nil {
+			return err
+		}
+		sales, err := walletAccount(ctx, tx, acctStoredSales, o.BranchID, 0, o.Currency)
+		if err != nil {
+			return err
+		}
+		n, err := journalSeq(ctx, tx, orderID, "stored_return")
+		if err != nil {
+			return err
+		}
+		if _, _, err := postJournal(ctx, tx, journal{Kind: "stored_return", Idem: fmt.Sprintf("sreturn:%d:%d", orderID, n),
+			BranchID: o.BranchID, Currency: o.Currency, OrderID: orderID, Actor: actor, Note: note},
+			posting{prin.ID, p}, posting{bonus.ID, b}, posting{sales.ID, -(p + b)}); err != nil {
+			return err
+		}
 	}
-	n, err := journalSeq(ctx, tx, orderID, "return")
-	if err != nil {
-		return err
-	}
-	if _, _, err := postJournal(ctx, tx, journal{Kind: "return", Idem: fmt.Sprintf("return:%d:%d", orderID, n),
-		BranchID: o.BranchID, Currency: o.Currency, OrderID: orderID, Actor: actor, Note: note},
-		posting{acct.ID, amount}, posting{sales.ID, -amount}); err != nil {
-		return err
-	}
+	back := c + p + b
 	_, err = tx.Exec(ctx, `UPDATE orders SET credit_paid = credit_paid - $2,
+		stored_principal_paid = stored_principal_paid - $3, stored_bonus_paid = stored_bonus_paid - $4,
 		credit_customer_id = CASE WHEN credit_paid - $2 = 0 THEN NULL ELSE credit_customer_id END,
 		pay_type = CASE WHEN pay_type = 'credit' AND credit_paid - $2 < total THEN '' ELSE pay_type END,
-		version=version+1, updated_at=now() WHERE id=$1`, orderID, amount)
+		version=version+1, updated_at=now() WHERE id=$1`, orderID, back, p, b)
 	return err
 }
 
@@ -363,8 +474,82 @@ func storeCreditOf(ctx context.Context, q Querier, branchID int64, phone, curren
 		return 0, nil
 	}
 	var bal int64
-	err := q.QueryRow(ctx, `SELECT COALESCE((SELECT w.balance FROM wallet_accounts w JOIN customers c ON c.id = w.customer_id
-		WHERE w.kind='store_credit' AND w.branch_id=$1 AND c.phone=$2 AND w.currency=$3 AND NOT w.frozen), 0)`,
+	err := q.QueryRow(ctx, `SELECT COALESCE((SELECT sum(w.balance) FROM wallet_accounts w JOIN customers c ON c.id = w.customer_id
+		WHERE w.kind IN ('store_credit', 'stored_principal', 'stored_bonus') AND w.branch_id=$1 AND c.phone=$2
+			AND w.currency=$3 AND NOT w.frozen), 0)`,
 		branchID, phone, currency).Scan(&bal)
 	return bal, err
+}
+
+// storedParts is a refund's share of stored value.
+type storedParts struct{ Principal, Bonus int64 }
+
+// storedRefundSplit works out how much of a refund's balance part
+// (creditPart, the refund less its cash part) goes back to stored principal
+// and bonus (docs/STORED_VALUE_DESIGN.md §8.2, rule W12): each part's
+// running share of the order is rounded down — principal, then the refund
+// balance — and the bonus takes the cents left over, so neither of the
+// parts that can become money again is ever a cent too much. A refund of
+// everything gives each part back exactly.
+func storedRefundSplit(total int64, oc *orderCredit, paidBack, cashBack, prinBack, bonusBack, amount, creditPart int64) storedParts {
+	if total <= 0 || creditPart <= 0 || oc.StoredPrincipal+oc.StoredBonus == 0 {
+		return storedParts{}
+	}
+	cum := paidBack + amount
+	credit := oc.refundCredit()
+	creditBack := max(0, paidBack-cashBack-prinBack-bonusBack)
+	capP := max(0, oc.StoredPrincipal-prinBack)
+	capB := max(0, oc.StoredBonus-bonusBack)
+	capC := max(0, credit-creditBack)
+	p := max(0, min(pricing.MulDivFloor(cum, oc.StoredPrincipal, total)-prinBack, capP, creditPart))
+	c := max(0, min(pricing.MulDivFloor(cum, credit, total)-creditBack, capC, creditPart-p))
+	b := creditPart - p - c
+	if b > capB {
+		over := b - capB
+		b = capB
+		more := min(over, capC-c)
+		c, over = c+more, over-more
+		more = min(over, capP-p)
+		p += more
+	}
+	return storedParts{Principal: p, Bonus: b}
+}
+
+// storedRefund puts a refund's share of stored value back where it came
+// from.
+func storedRefund(ctx context.Context, tx pgx.Tx, orderID, refundID, customerID int64, parts storedParts, actor Actor) error {
+	o, err := readOrderCredit(ctx, tx, orderID)
+	if err != nil {
+		return err
+	}
+	prin, err := walletAccount(ctx, tx, acctPrincipal, o.BranchID, customerID, o.Currency)
+	if err != nil {
+		return err
+	}
+	bonus, err := walletAccount(ctx, tx, acctBonus, o.BranchID, customerID, o.Currency)
+	if err != nil {
+		return err
+	}
+	sales, err := walletAccount(ctx, tx, acctStoredSales, o.BranchID, 0, o.Currency)
+	if err != nil {
+		return err
+	}
+	if _, _, err := postJournal(ctx, tx, journal{Kind: "stored_refund", Idem: fmt.Sprintf("srefund:%d", refundID),
+		BranchID: o.BranchID, Currency: o.Currency, OrderID: orderID, RefundID: refundID, Actor: actor},
+		posting{prin.ID, parts.Principal}, posting{bonus.ID, parts.Bonus},
+		posting{sales.ID, -(parts.Principal + parts.Bonus)}); err != nil {
+		return err
+	}
+	var storeName, publicNo string
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(NULLIF(o.brand_name, ''), b.name), o.public_no FROM orders o
+		JOIN branches b ON b.id = o.branch_id WHERE o.id=$1`, orderID).Scan(&storeName, &publicNo); err != nil {
+		return err
+	}
+	amt := fmtMoney(parts.Principal+parts.Bonus, o.Currency)
+	return tell(ctx, tx, customerID, Message{Kind: "wallet",
+		Title:   fmt.Sprintf("%s 退款 %s 已退回你的储值余额", storeName, amt),
+		TitleEn: fmt.Sprintf("%s refunded %s to your stored value", storeName, amt),
+		Body:    "订单 " + publicNo, BodyEn: "Order " + publicNo,
+		Link: fmt.Sprintf("/me/store-credit/%d", o.BranchID), Key: "stored_refund",
+		Args: map[string]string{"store": storeName, "amount": amt, "no": publicNo}})
 }

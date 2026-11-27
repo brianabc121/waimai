@@ -10,6 +10,7 @@ import { can } from '../session'
 import type { Order, RefundQuote } from '../types'
 import { customerReasons, kindOf, splitList, voidErr } from '../voids'
 import ApproveDialog from './ApproveDialog.vue'
+import '../stored'
 
 const props = defineProps<{ order: Order; branchId: number }>()
 const emit = defineEmits<{ (e: 'done', o: Order, amount: number): void; (e: 'close'): void }>()
@@ -155,6 +156,7 @@ async function go(headers?: Record<string, string>) {
           <div v-if="s.toCredit" class="banner info small" data-testid="refund-split">{{ t('sc.r.split_credit', { s: m(amount) }) }}</div>
           <div v-else-if="quote.credit_paid && quote.credit_part" class="banner info small" data-testid="refund-split">
             {{ t('sc.r.split', { cash: m(quote.cash_part ?? 0), credit: m(quote.credit_part) }) }}</div>
+          <div v-if="quote.stored_part" class="banner info small" data-testid="refund-stored">{{ t('sv.r.split', { s: m(quote.stored_part) }) }}</div>
         </template>
         <div v-if="error" class="banner bad small">{{ error }}</div>
       </div>

@@ -28,6 +28,13 @@ extend({
   'msg.order.delivered.body': ['{store} · {no}', '{store} · {no}'],
   'msg.store_credit_refund': ['{store} 退款 {amount} 已存入你在本店的余额', '{store} refunded {amount} into your balance at the store'],
   'msg.store_credit_refund.body': ['只能在本店使用。订单 {no}', 'It can only be spent at this store. Order {no}'],
+  // stored value (docs/STORED_VALUE_DESIGN.md)
+  'msg.stored_topup': ['{store} 充值 {amount} 成功，赠送 {bonus}', 'Topped up {amount} at {store}, with {bonus} free'],
+  'msg.stored_topup.body': ['只能在本店使用。', 'It can only be spent at this store.'],
+  'msg.stored_refund': ['{store} 退款 {amount} 已退回你的储值余额', '{store} refunded {amount} to your stored value'],
+  'msg.stored_refund.body': ['订单 {no}', 'Order {no}'],
+  'msg.stored_cashout': ['{store} 已退还你的储值 {amount}', '{store} paid back {amount} of your stored value'],
+  'msg.stored_cashout.body': ['你在本店的储值已清零。', 'Your stored value at the store is now 0.'],
   'msg.store_credit_revoked': ['店铺余额 {amount} 已改为现金退款', '{amount} of your store balance was refunded in cash instead'],
   'msg.store_credit_revoked.body': ['商家已用现金退给你，这部分从店铺余额里扣回', 'The store paid it back in cash, so it came out of your store balance'],
   'msg.welcome_gift': ['新人礼：{amount}无门槛券已放入你的账户', 'Welcome gift: {amount} off your first orders'],

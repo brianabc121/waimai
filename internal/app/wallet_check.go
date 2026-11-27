@@ -16,9 +16,25 @@ func checkOrderCredit(ctx context.Context, q Querier, orderID int64) []string {
 	var bad []string
 	fail := func(f string, v ...any) { bad = append(bad, fmt.Sprintf(f, v...)) }
 	var total, paid, spent, refunded, cashPart, cashOut, toCredit, posted, branch, acctBranch int64
+	var sp, sb, spentP, spentB, partP, partB, postedP, postedB int64
 	var status, currency, acctCurrency string
 	var others int
-	err := q.QueryRow(ctx, `SELECT o.total, o.credit_paid, o.acceptance_status, o.branch_id, o.currency,
+	err := q.QueryRow(ctx, `SELECT o.total, o.credit_paid, o.stored_principal_paid, o.stored_bonus_paid,
+		-COALESCE((SELECT sum(p.amount) FROM wallet_journals j JOIN wallet_postings p ON p.journal_id = j.id
+			JOIN wallet_accounts w ON w.id = p.account_id
+			WHERE j.order_id = o.id AND j.kind IN ('stored_spend', 'stored_return') AND w.kind = 'stored_principal'), 0),
+		-COALESCE((SELECT sum(p.amount) FROM wallet_journals j JOIN wallet_postings p ON p.journal_id = j.id
+			JOIN wallet_accounts w ON w.id = p.account_id
+			WHERE j.order_id = o.id AND j.kind IN ('stored_spend', 'stored_return') AND w.kind = 'stored_bonus'), 0),
+		COALESCE((SELECT sum(r.principal_part) FROM order_refunds r WHERE r.order_id = o.id), 0),
+		COALESCE((SELECT sum(r.bonus_part) FROM order_refunds r WHERE r.order_id = o.id), 0),
+		COALESCE((SELECT sum(p.amount) FROM wallet_journals j JOIN wallet_postings p ON p.journal_id = j.id
+			JOIN wallet_accounts w ON w.id = p.account_id
+			WHERE j.order_id = o.id AND j.kind = 'stored_refund' AND w.kind = 'stored_principal'), 0),
+		COALESCE((SELECT sum(p.amount) FROM wallet_journals j JOIN wallet_postings p ON p.journal_id = j.id
+			JOIN wallet_accounts w ON w.id = p.account_id
+			WHERE j.order_id = o.id AND j.kind = 'stored_refund' AND w.kind = 'stored_bonus'), 0),
+		o.acceptance_status, o.branch_id, o.currency,
 		-COALESCE((SELECT sum(p.amount) FROM wallet_journals j JOIN wallet_postings p ON p.journal_id = j.id
 			JOIN wallet_accounts w ON w.id = p.account_id
 			WHERE j.order_id = o.id AND j.kind IN ('spend', 'return') AND w.kind = 'store_credit'), 0),
@@ -35,8 +51,9 @@ func checkOrderCredit(ctx context.Context, q Querier, orderID int64) []string {
 			JOIN wallet_accounts w ON w.id = p.account_id WHERE j.order_id = o.id AND w.kind = 'store_credit'), o.currency),
 		(SELECT count(*) FROM wallet_journals j JOIN wallet_postings p ON p.journal_id = j.id
 			JOIN wallet_accounts w ON w.id = p.account_id
-			WHERE j.order_id = o.id AND w.kind = 'store_credit' AND (w.branch_id <> o.branch_id OR w.currency <> o.currency))
-		FROM orders o WHERE o.id = $1`, orderID).Scan(&total, &paid, &status, &branch, &currency, &spent, &refunded,
+			WHERE j.order_id = o.id AND (w.branch_id <> o.branch_id OR w.currency <> o.currency))
+		FROM orders o WHERE o.id = $1`, orderID).Scan(&total, &paid, &sp, &sb, &spentP, &spentB, &partP, &partB, &postedP, &postedB,
+		&status, &branch, &currency, &spent, &refunded,
 		&cashPart, &cashOut, &toCredit, &posted, &acctBranch, &acctCurrency, &others)
 	if err != nil {
 		return []string{"W read: " + err.Error()}
@@ -52,8 +69,25 @@ func checkOrderCredit(ctx context.Context, q Querier, orderID int64) []string {
 	if (status == "rejected" || status == "cancelled") && paid != 0 {
 		fail("W4 closed order still paid %d from the balance", paid)
 	}
-	if spent != paid {
-		fail("W4 the books took %d from the balance, the order says %d", spent, paid)
+	if spent != paid-sp-sb {
+		fail("W4 the books took %d from the refund balance, the order says %d", spent, paid-sp-sb)
+	}
+	// W10/W11 stored value is part of what balances paid, and the books agree
+	if sp < 0 || sb < 0 || sp+sb > paid {
+		fail("W10 stored value paid %d + %d, balances %d", sp, sb, paid)
+	}
+	if spentP != sp || spentB != sb {
+		fail("W11 the books took %d + %d from stored value, the order says %d + %d", spentP, spentB, sp, sb)
+	}
+	// W12/W13 refunds give stored value back to where it came from, never more
+	if partP > sp || partB > sb {
+		fail("W12 refunds gave back %d + %d of stored value, it paid %d + %d", partP, partB, sp, sb)
+	}
+	if refunded == total && total > 0 && (partP != sp || partB != sb) {
+		fail("W12 refunded in full but stored value got back %d + %d of %d + %d", partP, partB, sp, sb)
+	}
+	if postedP != partP || postedB != partB {
+		fail("W13 refunds say %d + %d went back to stored value, the books %d + %d", partP, partB, postedP, postedB)
 	}
 	// W5 refunds of every kind never exceed what was paid (D7 counts them too)
 	if refunded > total {
@@ -70,8 +104,8 @@ func checkOrderCredit(ctx context.Context, q Querier, orderID int64) []string {
 		fail("W6 %d of refunds came from the balance but only %d went back to it", refunded-cashPart, toCredit)
 	}
 	// W7 every refund into the balance is in the books, to the cent
-	if posted != toCredit {
-		fail("W7 refunds say %d went into the balance, the books %d", toCredit, posted)
+	if posted+postedP+postedB != toCredit {
+		fail("W7 refunds say %d went into balances, the books %d", toCredit, posted+postedP+postedB)
 	}
 	return bad
 }
@@ -102,7 +136,7 @@ func (a *App) CheckWallet(ctx context.Context) ([]string, error) {
 	rows, err = a.DB.Query(ctx, `SELECT w.id, w.kind, w.balance, COALESCE(sum(p.amount), 0),
 			COALESCE((SELECT p2.balance_after FROM wallet_postings p2 WHERE p2.account_id = w.id ORDER BY p2.id DESC LIMIT 1), 0)
 		FROM wallet_accounts w LEFT JOIN wallet_postings p ON p.account_id = w.id
-		GROUP BY w.id HAVING w.balance <> COALESCE(sum(p.amount), 0) OR (w.kind = 'store_credit' AND w.balance < 0)
+		GROUP BY w.id HAVING w.balance <> COALESCE(sum(p.amount), 0) OR (w.customer_id IS NOT NULL AND w.balance < 0)
 			OR w.balance <> COALESCE((SELECT p2.balance_after FROM wallet_postings p2 WHERE p2.account_id = w.id ORDER BY p2.id DESC LIMIT 1), 0)`)
 	if err != nil {
 		return nil, err
@@ -118,8 +152,8 @@ func (a *App) CheckWallet(ctx context.Context) ([]string, error) {
 	}
 	rows.Close()
 	rows, err = a.DB.Query(ctx, `SELECT branch_id, currency,
-			COALESCE(sum(balance) FILTER (WHERE kind = 'store_credit'), 0),
-			COALESCE(sum(balance) FILTER (WHERE kind <> 'store_credit'), 0)
+			COALESCE(sum(balance) FILTER (WHERE customer_id IS NOT NULL), 0),
+			COALESCE(sum(balance) FILTER (WHERE customer_id IS NULL), 0)
 		FROM wallet_accounts GROUP BY branch_id, currency
 		HAVING COALESCE(sum(balance), 0) <> 0`)
 	if err != nil {
@@ -132,10 +166,14 @@ func (a *App) CheckWallet(ctx context.Context) ([]string, error) {
 			rows.Close()
 			return nil, err
 		}
-		fail("W1 store %d (%s): customers hold %d, the store's side is %d", branch, cur, cust, store)
+		fail("W15 store %d (%s): customers hold %d, the store's side is %d", branch, cur, cust, store)
 	}
 	rows.Close()
-	return bad, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	more, err := checkStored(ctx, a.DB)
+	return append(bad, more...), err
 }
 
 const walletCheckInterval = 24 * time.Hour
@@ -177,4 +215,68 @@ func (a *App) LastWalletCheck(ctx context.Context) (*WalletCheckRun, error) {
 		return nil, nil
 	}
 	return &r, err
+}
+
+// checkStored checks the top-ups and paybacks against the books (rules W8
+// and W14, docs/STORED_VALUE_DESIGN.md §11).
+func checkStored(ctx context.Context, q Querier) ([]string, error) {
+	var bad []string
+	rows, err := q.Query(ctx, `SELECT t.id, t.status, t.pay, t.bonus,
+			COALESCE((SELECT sum(p.amount) FROM wallet_journals j JOIN wallet_postings p ON p.journal_id = j.id
+				JOIN wallet_accounts w ON w.id = p.account_id WHERE j.topup_id = t.id AND w.kind = 'stored_principal' AND j.kind = 'topup'), 0),
+			COALESCE((SELECT sum(p.amount) FROM wallet_journals j JOIN wallet_postings p ON p.journal_id = j.id
+				JOIN wallet_accounts w ON w.id = p.account_id WHERE j.topup_id = t.id AND w.kind = 'stored_bonus' AND j.kind = 'topup'), 0),
+			COALESCE((SELECT sum(p.amount) FROM wallet_journals j JOIN wallet_postings p ON p.journal_id = j.id
+				JOIN wallet_accounts w ON w.id = p.account_id WHERE j.topup_id = t.id AND w.customer_id IS NOT NULL), 0)
+		FROM topups t`)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var id, pay, bonus, inP, inB, net int64
+		var status string
+		if err := rows.Scan(&id, &status, &pay, &bonus, &inP, &inB, &net); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		booked := status == "paid" || status == "revoked"
+		switch {
+		case booked && (inP != pay || inB != bonus):
+			bad = append(bad, fmt.Sprintf("W8 top-up %d (%s): booked %d + %d, it was %d + %d", id, status, inP, inB, pay, bonus))
+		case !booked && (inP != 0 || inB != 0):
+			bad = append(bad, fmt.Sprintf("W8 top-up %d (%s) is in the books", id, status))
+		case status == "revoked" && net != 0:
+			bad = append(bad, fmt.Sprintf("W8 revoked top-up %d still holds %d", id, net))
+		case status == "paid" && net != pay+bonus:
+			bad = append(bad, fmt.Sprintf("W8 top-up %d: the books hold %d, it was %d", id, net, pay+bonus))
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows, err = q.Query(ctx, `SELECT s.id, s.reason, s.principal, s.bonus, s.clawback, s.paid_out,
+			COALESCE((SELECT -sum(p.amount) FROM wallet_journals j JOIN wallet_postings p ON p.journal_id = j.id
+				JOIN wallet_accounts w ON w.id = p.account_id WHERE j.cashout_id = s.id AND w.kind = 'stored_principal'), 0),
+			COALESCE((SELECT -sum(p.amount) FROM wallet_journals j JOIN wallet_postings p ON p.journal_id = j.id
+				JOIN wallet_accounts w ON w.id = p.account_id WHERE j.cashout_id = s.id AND w.kind = 'stored_bonus'), 0)
+		FROM stored_cashouts s`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, p, b, claw, out, outP, outB int64
+		var reason string
+		if err := rows.Scan(&id, &reason, &p, &b, &claw, &out, &outP, &outB); err != nil {
+			return nil, err
+		}
+		if outP != p || outB != b {
+			bad = append(bad, fmt.Sprintf("W14 payback %d: took %d + %d from the books, it says %d + %d", id, outP, outB, p, b))
+		}
+		if out+claw != p || (reason == "store" && claw != 0) {
+			bad = append(bad, fmt.Sprintf("W14 payback %d (%s): paid %d, kept %d, of %d", id, reason, out, claw, p))
+		}
+	}
+	return bad, rows.Err()
 }

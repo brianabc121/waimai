@@ -20,6 +20,7 @@ import { pagePerms } from '../perms'
 import { useShell } from '../shell'
 import { storeChats } from '../chat'
 import '../brands'
+import '../stored'
 
 const router = useRouter(), route = useRoute()
 const shell = useShell('store')
@@ -35,7 +36,7 @@ const groupPages: Record<string, string[]> = {
   pos: ['/merchant/order/', '/merchant/queue'], orders: ['/merchant/progress', '/merchant/voids'],
   cm: ['/merchant/members', '/merchant/addresses'], msg: ['/merchant/messages', '/merchant/support'],
   deco: ['/merchant/media', '/merchant/templates', '/merchant/site-link'], fin: ['/merchant/cash', '/merchant/bills', '/merchant/reconcile', '/merchant/credit'],
-  dlv: ['/merchant/riders', '/merchant/delivery-map'],
+  dlv: ['/merchant/riders', '/merchant/delivery-map'], mk: ['/merchant/marketing', '/merchant/promos'],
 }
 const openGrps = ref<Record<string, boolean>>({})
 const isOpen = (g: string) => !!openGrps.value[g]
@@ -114,13 +115,14 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
       </div>
       <div v-if="role && !viewing" class="shell-role" data-testid="nav-role"><span class="rtag" :class="role">{{ t('role.' + role) }}</span><span class="who">{{ session.user?.display_name }}</span></div>
       <div class="shell-links">
-        <template v-if="show('/merchant/order/dine') || show('/merchant/order/delivery') || showPlatform || show('/merchant/queue')">
+        <template v-if="show('/merchant/order/dine') || show('/merchant/order/delivery') || showPlatform || show('/merchant/queue') || show('/merchant/order/topup')">
           <button class="navgrp" :class="{ open: isOpen('pos') }" :aria-expanded="isOpen('pos')" data-testid="nav-pos" @click="toggleGrp('pos')"><span class="grow">{{ t('pos.nav') }}</span><i class="caret"></i></button>
           <template v-if="isOpen('pos')">
             <router-link v-if="show('/merchant/order/dine')" to="/merchant/order/dine" class="navsub" data-testid="nav-pos-dine">{{ t('pos.dine') }}</router-link>
             <router-link v-if="show('/merchant/order/delivery')" to="/merchant/order/delivery" class="navsub" data-testid="nav-pos-delivery" :title="t('pos.delivery_hint')">{{ t('pos.delivery') }}</router-link>
             <router-link v-if="showPlatform" to="/merchant/order/platform" class="navsub" data-testid="nav-pos-platform" :title="t('pos.platform_hint')">{{ t('pos.platform') }}</router-link>
             <router-link v-if="show('/merchant/queue')" to="/merchant/queue" class="navsub" data-testid="nav-queue">{{ t('qu.nav') }}</router-link>
+            <router-link v-if="show('/merchant/order/topup')" to="/merchant/order/topup" class="navsub" data-testid="nav-topup">{{ t('sv.desk') }}</router-link>
           </template>
         </template>
         <div v-if="show('/merchant/orders')" class="navrow">
@@ -157,7 +159,13 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
             <router-link v-if="show('/merchant/site-link')" to="/merchant/site-link" class="navsub" data-testid="nav-site-link">{{ t('sl.title') }}</router-link>
           </template>
         </template>
-        <router-link v-if="show('/merchant/promos')" to="/merchant/promos">{{ t('promos') }}</router-link>
+        <template v-if="show('/merchant/marketing') || show('/merchant/promos')">
+          <button class="navgrp" :class="{ open: isOpen('mk') }" :aria-expanded="isOpen('mk')" data-testid="nav-mk" @click="toggleGrp('mk')"><span class="grow">{{ t('mk.nav') }}</span><i class="caret"></i></button>
+          <template v-if="isOpen('mk')">
+            <router-link v-if="show('/merchant/marketing')" to="/merchant/marketing" class="navsub" data-testid="nav-marketing">{{ t('mk.campaigns') }}</router-link>
+            <router-link v-if="show('/merchant/promos')" to="/merchant/promos" class="navsub" data-testid="nav-promos">{{ t('promos') }}</router-link>
+          </template>
+        </template>
         <template v-if="show('/merchant/cash') || show('/merchant/bills') || show('/merchant/reconcile') || show('/merchant/credit')">
           <button class="navgrp" :class="{ open: isOpen('fin') }" :aria-expanded="isOpen('fin')" data-testid="nav-fin" @click="toggleGrp('fin')"><span class="grow">{{ t('fin.nav') }}</span><i class="caret"></i></button>
           <template v-if="isOpen('fin')">
