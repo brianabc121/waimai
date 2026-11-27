@@ -26,6 +26,7 @@ type BillDiscount struct {
 // and the others show 0 for what was paid.
 type BillOrder struct {
 	ID             int64          `json:"id"`
+	BrandID        int64          `json:"brand_id"`
 	PublicNo       string         `json:"public_no"`
 	CreatedAt      time.Time      `json:"created_at"`
 	ServiceType    string         `json:"service_type"`
@@ -89,7 +90,8 @@ func billDays(from, to string) error {
 
 // Bills lists the orders of a period. filter: "" all, "coupon" any coupon,
 // "none" no discount at all, or one kind (promotion, store_free, ...).
-func (a *App) Bills(ctx context.Context, branchID int64, from, to, filter string) (*BillList, error) {
+// brands narrows it to some of the store's brands (nil: the whole store).
+func (a *App) Bills(ctx context.Context, branchID int64, brands []int64, from, to, filter string) (*BillList, error) {
 	if err := billDays(from, to); err != nil {
 		return nil, err
 	}
@@ -109,12 +111,13 @@ func (a *App) Bills(ctx context.Context, branchID int64, from, to, filter string
 	default:
 		return nil, ErrValidation("unknown filter")
 	}
-	rows, err := a.DB.Query(ctx, `SELECT o.id, o.public_no, o.created_at, o.service_type, `+billState+`,
+	rows, err := a.DB.Query(ctx, `SELECT o.id, o.brand_id, o.public_no, o.created_at, o.service_type, `+billState+`,
 			o.subtotal, o.delivery_fee, o.total, o.platform_subsidy
 		FROM orders o JOIN branches b ON b.id = o.branch_id
 		WHERE o.branch_id = $1 AND o.service_type IN ('delivery','pickup')
-			AND (o.created_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date`+cond+`
-		ORDER BY o.created_at DESC, o.id DESC`, branchID, from, to)
+			AND (o.created_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date
+			AND ($4::bigint[] IS NULL OR o.brand_id = ANY($4))`+cond+`
+		ORDER BY o.created_at DESC, o.id DESC`, branchID, from, to, brands)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +127,7 @@ func (a *App) Bills(ctx context.Context, branchID int64, from, to, filter string
 	for rows.Next() {
 		var o BillOrder
 		var total, subsidy int64
-		if err := rows.Scan(&o.ID, &o.PublicNo, &o.CreatedAt, &o.ServiceType, &o.State, &o.Food, &o.DeliveryFee,
+		if err := rows.Scan(&o.ID, &o.BrandID, &o.PublicNo, &o.CreatedAt, &o.ServiceType, &o.State, &o.Food, &o.DeliveryFee,
 			&total, &subsidy); err != nil {
 			rows.Close()
 			return nil, err
@@ -239,7 +242,9 @@ type BillSummary struct {
 
 var billKinds = []string{"promotion", "dish_promotion", CouponStoreFree, CouponStoreThreshold, CouponStoreDelivery, CouponPlatformFree}
 
-func (a *App) BillSummary(ctx context.Context, branchID int64, from, to string) (*BillSummary, error) {
+// BillSummary sums up the bill of the whole store (brands nil) or of some
+// of its brands.
+func (a *App) BillSummary(ctx context.Context, branchID int64, brands []int64, from, to string) (*BillSummary, error) {
 	if err := billDays(from, to); err != nil {
 		return nil, err
 	}
@@ -249,7 +254,8 @@ func (a *App) BillSummary(ctx context.Context, branchID int64, from, to string) 
 	}
 	s := &BillSummary{From: from, To: to, Currency: b.Currency, Kinds: []BillKind{}, Days: []BillDay{}}
 	in := `o.branch_id = $1 AND o.service_type IN ('delivery','pickup')
-		AND (o.created_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date`
+		AND (o.created_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date
+		AND ($4::bigint[] IS NULL OR o.brand_id = ANY($4))`
 	done := ` AND o.fulfillment_status IN ('delivered','picked_up')`
 	err = a.DB.QueryRow(ctx, `SELECT count(*) FILTER (WHERE `+strings.TrimPrefix(done, " AND ")+`),
 			count(*) FILTER (WHERE o.acceptance_status IN ('rejected','cancelled')),
@@ -257,14 +263,14 @@ func (a *App) BillSummary(ctx context.Context, branchID int64, from, to string) 
 			COALESCE(sum(o.merchant_discount) FILTER (WHERE `+strings.TrimPrefix(done, " AND ")+`), 0),
 			COALESCE(sum(o.platform_subsidy) FILTER (WHERE `+strings.TrimPrefix(done, " AND ")+`), 0),
 			COALESCE(sum(o.total) FILTER (WHERE `+strings.TrimPrefix(done, " AND ")+`), 0)
-		FROM orders o JOIN branches b ON b.id = o.branch_id WHERE `+in, branchID, from, to).
+		FROM orders o JOIN branches b ON b.id = o.branch_id WHERE `+in, branchID, from, to, brands).
 		Scan(&s.Orders, &s.Cancelled, &s.Food, &s.MerchantDiscount, &s.PlatformDiscount, &s.Paid)
 	if err != nil {
 		return nil, err
 	}
 	s.Takings = s.Paid + s.PlatformDiscount
 	if err := a.DB.QueryRow(ctx, `SELECT COALESCE(sum(r.amount), 0) FROM order_refunds r
-		JOIN orders o ON o.id = r.order_id JOIN branches b ON b.id = o.branch_id WHERE `+in+done, branchID, from, to).
+		JOIN orders o ON o.id = r.order_id JOIN branches b ON b.id = o.branch_id WHERE `+in+done, branchID, from, to, brands).
 		Scan(&s.Refunded); err != nil {
 		return nil, err
 	}
@@ -272,7 +278,7 @@ func (a *App) BillSummary(ctx context.Context, branchID int64, from, to string) 
 	got := map[string]BillKind{}
 	rows, err := a.DB.Query(ctx, `SELECT d.kind, count(DISTINCT d.order_id), sum(d.amount)
 		FROM order_discounts d JOIN orders o ON o.id = d.order_id JOIN branches b ON b.id = o.branch_id
-		WHERE `+in+done+` GROUP BY d.kind`, branchID, from, to)
+		WHERE `+in+done+` GROUP BY d.kind`, branchID, from, to, brands)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +308,8 @@ func (a *App) BillSummary(ctx context.Context, branchID int64, from, to string) 
 			COALESCE(sum(o.subtotal) FILTER (WHERE c.status='used' AND o.fulfillment_status IN ('delivered','picked_up')), 0)
 		FROM customer_coupons c JOIN branches b ON b.id = c.branch_id LEFT JOIN orders o ON o.id = c.order_id
 		WHERE c.branch_id=$1 AND c.source='repurchase'
-			AND (c.issued_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date`, branchID, from, to).
+			AND (c.issued_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date
+			AND ($4::bigint[] IS NULL OR c.brand_id = ANY($4))`, branchID, from, to, brands).
 		Scan(&s.Repurchase.Issued, &s.Repurchase.Used, &s.Repurchase.Sales)
 	if err != nil {
 		return nil, err
@@ -310,7 +317,7 @@ func (a *App) BillSummary(ctx context.Context, branchID int64, from, to string) 
 
 	rows, err = a.DB.Query(ctx, `SELECT to_char((o.created_at AT TIME ZONE b.timezone)::date, 'YYYY-MM-DD'), count(*),
 			sum(o.subtotal), sum(o.discount), sum(o.total), sum(o.total + o.platform_subsidy)
-		FROM orders o JOIN branches b ON b.id = o.branch_id WHERE `+in+done+` GROUP BY 1 ORDER BY 1`, branchID, from, to)
+		FROM orders o JOIN branches b ON b.id = o.branch_id WHERE `+in+done+` GROUP BY 1 ORDER BY 1`, branchID, from, to, brands)
 	if err != nil {
 		return nil, err
 	}

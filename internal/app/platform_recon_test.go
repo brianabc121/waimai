@@ -62,7 +62,7 @@ func TestPlatformReconciliation(t *testing.T) {
 	noErr(t, err)
 	checked(t, "平台已取消", o2.ID)
 
-	r, err := a.Reconciliation(ctx, s.branchID, today, today)
+	r, err := a.Reconciliation(ctx, s.branchID, nil, today, today)
 	noErr(t, err)
 	if r.Count != 2 || r.Total != cash.Totals.Total+39200 || len(r.Rows) != 2 {
 		t.Fatalf("summary: count %d total %d rows %+v", r.Count, r.Total, r.Rows)
@@ -98,7 +98,7 @@ func TestPlatformReconciliation(t *testing.T) {
 		r.Types[1].Type != "platform" || r.Types[1].PlatformID != grab || r.Types[1].Amount != 39200 || sum != r.Total {
 		t.Fatalf("types: %+v", r.Types)
 	}
-	l, err := a.PlatformReconOrders(ctx, s.branchID, today, today, grab)
+	l, err := a.PlatformReconOrders(ctx, s.branchID, nil, today, today, grab)
 	noErr(t, err)
 	if len(l) != 1 || l[0].OrderID != o.ID || l[0].Receivable != 39200 || l[0].Deducted != 3600 || l[0].Payout != 23340 {
 		t.Fatalf("orders under Grab: %+v", l)
@@ -108,7 +108,7 @@ func TestPlatformReconciliation(t *testing.T) {
 	amt := int64(30000)
 	wantCode(t, a.SavePlatformPayout(ctx, s.branchID, app.PlatformPayoutInput{PlatformID: grab, From: today, To: today}, s.staff), "VALIDATION")
 	noErr(t, a.SavePlatformPayout(ctx, s.branchID, app.PlatformPayoutInput{PlatformID: grab, From: today, To: today, Amount: &amt, Note: "周结"}, s.staff))
-	r, err = a.Reconciliation(ctx, s.branchID, today, today)
+	r, err = a.Reconciliation(ctx, s.branchID, nil, today, today)
 	noErr(t, err)
 	p = r.Platforms[0]
 	if p.Actual == nil || *p.Actual != 30000 || *p.Diff != 6660 || len(p.Payouts) != 1 || p.Payouts[0].Note != "周结" {
@@ -117,7 +117,7 @@ func TestPlatformReconciliation(t *testing.T) {
 	// typed again for the same period: replaced, not added
 	amt = 23340
 	noErr(t, a.SavePlatformPayout(ctx, s.branchID, app.PlatformPayoutInput{PlatformID: grab, From: today, To: today, Amount: &amt}, s.staff))
-	r, err = a.Reconciliation(ctx, s.branchID, today, today)
+	r, err = a.Reconciliation(ctx, s.branchID, nil, today, today)
 	noErr(t, err)
 	p = r.Platforms[0]
 	if *p.Actual != 23340 || *p.Diff != 0 || len(p.Payouts) != 1 {
@@ -125,7 +125,7 @@ func TestPlatformReconciliation(t *testing.T) {
 	}
 	noErr(t, a.DeletePlatformPayout(ctx, s.branchID, p.Payouts[0].ID, s.staff))
 	wantCode(t, a.DeletePlatformPayout(ctx, s.branchID, p.Payouts[0].ID, s.staff), "NOT_FOUND")
-	r, err = a.Reconciliation(ctx, s.branchID, today, today)
+	r, err = a.Reconciliation(ctx, s.branchID, nil, today, today)
 	noErr(t, err)
 	if r.Platforms[0].Actual != nil {
 		t.Fatalf("deleted statement still counted: %+v", r.Platforms[0])

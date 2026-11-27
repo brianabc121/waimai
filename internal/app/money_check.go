@@ -328,3 +328,150 @@ func (a *App) CheckAllOrderMoney(ctx context.Context, since time.Time) (int, map
 	}
 	return len(ids), out, nil
 }
+
+// CheckBrandViews checks rule R of docs/PRICING_CHECK.md §2 for one store
+// and period: read brand by brand, the reconciliation and the bill add up to
+// the whole store's; every brand together, named one by one, is the whole
+// store; and the by-brand block of the whole store adds up to its totals.
+// It returns one line per broken sum (nil when all hold) and only reads.
+func (a *App) CheckBrandViews(ctx context.Context, branchID int64, from, to string) ([]string, error) {
+	var bad []string
+	fail := func(f string, v ...any) { bad = append(bad, fmt.Sprintf(f, v...)) }
+	whole, err := a.Reconciliation(ctx, branchID, nil, from, to)
+	if err != nil {
+		return nil, err
+	}
+	wholeBill, err := a.BillSummary(ctx, branchID, nil, from, to)
+	if err != nil {
+		return nil, err
+	}
+	var ids []int64
+	if err := pgxCollectInt64(ctx, a.DB, &ids, `SELECT id FROM brands WHERE branch_id=$1 ORDER BY id`, branchID); err != nil {
+		return nil, err
+	}
+	type sums struct{ count, total, refunds, platform, commission, payout int64 }
+	recon := func(r *Reconcile) sums {
+		s := sums{count: int64(r.Count), total: r.Total, refunds: r.Refunds.Total}
+		for _, p := range r.Platforms {
+			s.platform += p.Receivable
+			s.commission += p.Commission
+			s.payout += p.Payout
+		}
+		return s
+	}
+	type bill struct{ orders, food, paid, takings, refunded, merchant, platform int64 }
+	bills := func(b *BillSummary) bill {
+		return bill{int64(b.Orders), b.Food, b.Paid, b.Takings, b.Refunded, b.MerchantDiscount, b.PlatformDiscount}
+	}
+	var each sums
+	var eachBill bill
+	for _, id := range ids {
+		r, err := a.Reconciliation(ctx, branchID, []int64{id}, from, to)
+		if err != nil {
+			return nil, err
+		}
+		if r.Cash != (ReconCash{}) || r.CashCount != nil {
+			fail("R brand %d's reconciliation shows the cash drawer", id)
+		}
+		x := recon(r)
+		each.count += x.count
+		each.total += x.total
+		each.refunds += x.refunds
+		each.platform += x.platform
+		each.commission += x.commission
+		each.payout += x.payout
+		b, err := a.BillSummary(ctx, branchID, []int64{id}, from, to)
+		if err != nil {
+			return nil, err
+		}
+		y := bills(b)
+		eachBill.orders += y.orders
+		eachBill.food += y.food
+		eachBill.paid += y.paid
+		eachBill.takings += y.takings
+		eachBill.refunded += y.refunded
+		eachBill.merchant += y.merchant
+		eachBill.platform += y.platform
+	}
+	if w := recon(whole); each != w {
+		fail("R reconciliation by brand %+v, whole store %+v", each, w)
+	}
+	if w := bills(wholeBill); eachBill != w {
+		fail("R bill by brand %+v, whole store %+v", eachBill, w)
+	}
+	all, err := a.Reconciliation(ctx, branchID, ids, from, to)
+	if err != nil {
+		return nil, err
+	}
+	if recon(all) != recon(whole) {
+		fail("R every brand together %+v, whole store %+v", recon(all), recon(whole))
+	}
+	var blk sums
+	for _, b := range whole.Brands {
+		blk.count += int64(b.Count)
+		blk.total += b.Amount
+		blk.refunds += b.Refunds
+		blk.platform += b.Platform
+		blk.commission += b.Commission
+	}
+	w := recon(whole)
+	if blk.count != w.count || blk.total != w.total || blk.refunds != w.refunds || blk.platform != w.platform || blk.commission != w.commission {
+		fail("R by-brand block %+v, whole store %+v", blk, w)
+	}
+	return bad, nil
+}
+
+func pgxCollectInt64(ctx context.Context, q Querier, out *[]int64, sql string, args ...any) error {
+	rows, err := q.Query(ctx, sql, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var v int64
+		if err := rows.Scan(&v); err != nil {
+			return err
+		}
+		*out = append(*out, v)
+	}
+	return rows.Err()
+}
+
+// CheckAllBrandViews checks rule R for every store with more than one brand
+// over its last days (by its own clock, today included).
+func (a *App) CheckAllBrandViews(ctx context.Context, days int) (int, map[int64][]string, error) {
+	rows, err := a.DB.Query(ctx, `SELECT b.id, to_char((now() AT TIME ZONE b.timezone)::date - $1::int, 'YYYY-MM-DD'),
+			to_char((now() AT TIME ZONE b.timezone)::date, 'YYYY-MM-DD')
+		FROM branches b WHERE b.deleted_at IS NULL AND (SELECT count(*) FROM brands br WHERE br.branch_id = b.id) > 1 ORDER BY b.id`, days-1)
+	if err != nil {
+		return 0, nil, err
+	}
+	type span struct {
+		id       int64
+		from, to string
+	}
+	var list []span
+	for rows.Next() {
+		var s span
+		if err := rows.Scan(&s.id, &s.from, &s.to); err != nil {
+			rows.Close()
+			return 0, nil, err
+		}
+		list = append(list, s)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, nil, err
+	}
+	bad := map[int64][]string{}
+	for _, s := range list {
+		lines, err := a.CheckBrandViews(ctx, s.id, s.from, s.to)
+		if err != nil {
+			return 0, nil, err
+		}
+		if len(lines) > 0 {
+			bad[s.id] = lines
+		}
+	}
+	return len(list), bad, nil
+}

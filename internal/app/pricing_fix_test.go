@@ -65,7 +65,7 @@ func TestPricingFixDineRefundPromo(t *testing.T) {
 	loc, err := time.LoadLocation(br.Timezone)
 	noErr(t, err)
 	day := time.Now().In(loc).Format("2006-01-02")
-	rc, err := a.Reconciliation(ctx, s.branchID, day, day)
+	rc, err := a.Reconciliation(ctx, s.branchID, nil, day, day)
 	noErr(t, err)
 	if rc.Refunds.Count != 1 || rc.Refunds.Cash != 2520 || rc.Cash.Refunded != 2520 ||
 		rc.Cash.Expected != rc.Cash.Counter+rc.Cash.RiderReturned-2520 || rc.Net != rc.Total-2520 {

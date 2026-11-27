@@ -116,7 +116,7 @@ func TestDeliveryStats(t *testing.T) {
 	if l.Items[0].Orders != 4 {
 		t.Fatalf("by orders: %+v", l.Items)
 	}
-	h, err := a.AddressOrders(ctx, s.branchID, row.Cust, row.Key, row.UnitKey, app.Page{})
+	h, err := a.AddressOrders(ctx, s.branchID, nil, row.Cust, row.Key, row.UnitKey, app.Page{})
 	noErr(t, err)
 	if h.Total != 4 {
 		t.Fatalf("orders at the address: %+v", h)

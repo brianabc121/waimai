@@ -12,6 +12,9 @@ import { session } from '../session'
 import '../officeStrings'
 import type { BillList, BillOrder, BillSummary } from '../types'
 import { addDays, addMonths, clock, dayOf, monthEnd, monthStart } from './staff/time'
+import { brandById, brandsHere, multiBrand, useBrandPick } from '../brands'
+import BrandSeg from './brands/BrandSeg.vue'
+import BrandTag from './brands/BrandTag.vue'
 
 const route = useRoute(), router = useRouter()
 const bid = session.branchId!
@@ -36,10 +39,13 @@ function choose(p: Preset) {
   else if (p === 'month') { from.value = monthStart(d); to.value = d }
   else if (p === 'last_month') { from.value = addMonths(d, -1); to.value = monthEnd(addMonths(d, -1)) }
 }
+// one brand, or every brand together (docs/MULTI_BRAND_DESIGN.md §12)
+const { pick: brandPick } = useBrandPick('bills', brandsHere, true)
+const bq = () => brandPick.value ? `&brand=${brandPick.value}` : ''
 async function load() {
   if (!from.value || !to.value || from.value > to.value) return
   error.value = ''
-  const q = `from=${from.value}&to=${to.value}`
+  const q = `from=${from.value}&to=${to.value}` + bq()
   try {
     if (tab.value === 'orders') {
       const l = await get<BillList>(`/merchant/branches/${bid}/bills?${q}&filter=${filter.value}`)
@@ -49,12 +55,12 @@ async function load() {
   } catch (e) { error.value = (e as Error).message }
 }
 onMounted(() => { choose('month'); void load() })
-watch([from, to, filter, tab], () => { void load() })
+watch([from, to, filter, tab, brandPick], () => { void load() })
 
 const cur = computed(() => list.value?.currency ?? sum.value?.currency ?? session.user?.roles.find(r => r.branch_id === bid)?.currency ?? 'PHP')
 const m = (v: number) => v ? money(v, cur.value) : '—'
 const off = (v: number) => v ? '−' + money(v, cur.value) : '—'
-const exportHref = computed(() => `/api/v1/merchant/branches/${bid}/bills?from=${from.value}&to=${to.value}&filter=${filter.value}&format=xlsx&lang=${locale.value}`)
+const exportHref = computed(() => `/api/v1/merchant/branches/${bid}/bills?from=${from.value}&to=${to.value}&filter=${filter.value}${bq()}&format=xlsx&lang=${locale.value}`)
 const storeCoupons = (o: BillOrder) => o.store_free + o.store_threshold
 const totalOff = computed(() => sum.value ? sum.value.kinds.reduce((s, k) => s + k.amount, 0) : 0)
 const rate = computed(() => sum.value?.repurchase.issued ? Math.round(sum.value.repurchase.used * 100 / sum.value.repurchase.issued) : 0)
@@ -85,6 +91,7 @@ async function showSettlement(id: number) {
       <select v-if="tab === 'orders'" v-model="filter" data-testid="bill-filter" class="filter">
         <option v-for="f in FILTERS" :key="f" :value="f">{{ filterName(f) }}</option></select>
     </div>
+    <div v-if="multiBrand()" class="ox-tools" style="margin:0"><BrandSeg v-model="brandPick" :brands="brandsHere()" all data-testid="bill-brand" /></div>
     <div v-if="error" class="banner bad">{{ error }}</div>
 
     <template v-if="tab === 'orders' && list">
@@ -100,7 +107,7 @@ async function showSettlement(id: number) {
             <template v-for="o in list.orders" :key="o.id">
               <tr :class="{ off: o.state !== 'completed', has: o.discounts.length, opened: open === o.id }" data-testid="bill-row"
                 @click="o.discounts.length && (open = open === o.id ? null : o.id)">
-                <td><b class="ox-code">{{ o.public_no }}</b><div class="small muted">{{ dayOf(o.created_at, tz).slice(5) }} {{ clock(o.created_at, tz) }}</div></td>
+                <td><BrandTag v-if="!brandPick" :name="brandById(o.brand_id)?.name" :color="brandById(o.brand_id)?.color" /> <b class="ox-code">{{ o.public_no }}</b><div class="small muted">{{ dayOf(o.created_at, tz).slice(5) }} {{ clock(o.created_at, tz) }}</div></td>
                 <td>{{ t('bl.' + o.service_type) }}</td>
                 <td class="r">{{ m(o.food) }}</td><td class="r">{{ m(o.delivery_fee) }}</td>
                 <td class="r neg">{{ off(o.promotion + (o.dish_promotion ?? 0)) }}</td><td class="r neg">{{ off(storeCoupons(o)) }}</td><td class="r neg">{{ off(o.store_delivery) }}</td>

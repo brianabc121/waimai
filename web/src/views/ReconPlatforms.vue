@@ -29,9 +29,9 @@ extend({
   'rc.pf.detail_hint': ['逐单的平台扣款是这张单的全部扣款，不分日期', "Taken back per order is all of that order's deductions, whatever the date"],
 })
 
-interface Payout { id: number; platform_id: number; from: string; to: string; amount: number; note: string; by: string; at: string }
+interface Payout { id: number; brand_id: number; platform_id: number; from: string; to: string; amount: number; note: string; by: string; at: string }
 export interface ReconPlatform {
-  platform_id: number; name: string; names: Record<string, string>; prefix: string; color: string; count: number
+  brand_id: number; brand_name: string; platform_id: number; name: string; names: Record<string, string>; prefix: string; color: string; count: number
   subtotal: number; merchant: number; subsidy: number; paid: number; receivable: number; commission: number; other_fees: number
   deducted: number; payout: number; actual: number | null; diff: number | null; payouts: Payout[]
 }
@@ -39,7 +39,11 @@ export interface ReconType { type: string; source: string; platform_id: number; 
 interface POrder { order_id: number; public_no: string; paid_at: string; status: string; subtotal: number; merchant: number; subsidy: number
   paid: number; receivable: number; commission: number; other_fees: number; deducted: number; payout: number }
 
-const props = defineProps<{ bid: number; from: string; to: string; currency: string; tz: string; total: number; platforms: ReconPlatform[]; types: ReconType[] }>()
+// several: the store has more than one brand, so a row is a brand's shop on a platform ("一品湘 Grab")
+const props = defineProps<{ bid: number; from: string; to: string; currency: string; tz: string; total: number; platforms: ReconPlatform[]; types: ReconType[]
+  several?: boolean }>()
+const shopKey = (p: ReconPlatform) => `${p.brand_id}-${p.platform_id}`
+const shopName = (p: ReconPlatform) => props.several ? `${p.brand_name} ${platformName(p)}` : platformName(p)
 const emit = defineEmits<{ changed: [] }>()
 const m = (v: number) => money(v, props.currency)
 const signed = (v: number) => (v > 0 ? '+' : v < 0 ? '−' : '') + m(Math.abs(v))
@@ -49,28 +53,30 @@ const typeName = (x: ReconType) => x.platform_id ? platformName(x)
 const share = (v: number) => props.total ? `${Math.round(v * 1000 / props.total) / 10}%` : '—'
 const typeTotal = computed(() => props.types.reduce((s, x) => s + x.count, 0))
 
-// the orders under a platform
-const open = ref(0)
+// the orders under a brand's shop on a platform
+const open = ref('')
 const orders = ref<POrder[]>([])
-async function toggle(id: number) {
-  if (open.value === id) { open.value = 0; return }
-  open.value = id; orders.value = []
-  orders.value = (await get<{ orders: POrder[] }>(`/merchant/branches/${props.bid}/reconcile/platform-orders?from=${props.from}&to=${props.to}&platform=${id}`)).orders
+async function toggle(p: ReconPlatform) {
+  const k = shopKey(p)
+  if (open.value === k) { open.value = ''; return }
+  open.value = k; orders.value = []
+  orders.value = (await get<{ orders: POrder[] }>(`/merchant/branches/${props.bid}/reconcile/platform-orders?from=${props.from}&to=${props.to}` +
+    `&platform=${p.platform_id}&brand=${p.brand_id}`)).orders
 }
 
 // the actual payout, typed in from the platform's statement for the chosen dates
-const form = reactive({ id: 0, amount: '', note: '', busy: false, error: '' })
+const form = reactive({ key: '', brand: 0, id: 0, amount: '', note: '', busy: false, error: '' })
 function enter(p: ReconPlatform) {
   const same = p.payouts.find(x => x.from === props.from && x.to === props.to)
-  Object.assign(form, { id: p.platform_id, amount: same ? String(same.amount / 100) : '', note: same?.note ?? '', error: '' })
+  Object.assign(form, { key: shopKey(p), brand: p.brand_id, id: p.platform_id, amount: same ? String(same.amount / 100) : '', note: same?.note ?? '', error: '' })
 }
 async function save() {
   if (form.amount.trim() === '' || isNaN(Number(form.amount))) return
   form.busy = true; form.error = ''
   try {
     await api('PUT', `/merchant/branches/${props.bid}/reconcile/platform-payouts`,
-      { platform_id: form.id, from: props.from, to: props.to, amount: toMinor(form.amount), note: form.note })
-    form.id = 0
+      { brand_id: form.brand, platform_id: form.id, from: props.from, to: props.to, amount: toMinor(form.amount), note: form.note })
+    form.key = ''
     emit('changed')
   } catch (e) { form.error = (e as Error).message }
   form.busy = false
@@ -106,9 +112,9 @@ async function drop(x: Payout) {
         <th class="r">{{ t('po.commission') }}</th><th class="r">{{ t('po.o.fees') }}</th><th class="r">{{ t('po.o.deducted') }}</th>
         <th class="r">{{ t('po.payout') }}</th><th class="r">{{ t('rc.pf.actual') }}</th><th class="r">{{ t('rc.pf.diff') }}</th></tr></thead>
       <tbody>
-        <template v-for="p in platforms" :key="p.platform_id">
-          <tr :data-platform="p.prefix" class="prow" @click="toggle(p.platform_id)">
-            <td><span class="pname" :style="{ background: p.color }">{{ platformName(p) }}</span> <span class="caret" :class="{ on: open === p.platform_id }">›</span></td>
+        <template v-for="p in platforms" :key="shopKey(p)">
+          <tr :data-platform="p.prefix" :data-brand="p.brand_id" class="prow" @click="toggle(p)">
+            <td><span class="pname" :style="{ background: p.color }">{{ shopName(p) }}</span> <span class="caret" :class="{ on: open === shopKey(p) }">›</span></td>
             <td class="r">{{ p.count }}</td><td class="r">{{ m(p.subtotal) }}</td><td class="r neg">{{ p.merchant ? '−' + m(p.merchant) : '—' }}</td>
             <td class="r">{{ p.subsidy ? m(p.subsidy) : '—' }}</td><td class="r"><b data-testid="rc-pf-receivable">{{ m(p.receivable) }}</b></td>
             <td class="r neg">−{{ m(p.commission) }}</td><td class="r neg">{{ p.other_fees ? '−' + m(p.other_fees) : '—' }}</td>
@@ -118,19 +124,19 @@ async function drop(x: Payout) {
               <button class="btn small" data-testid="rc-pf-enter" @click="enter(p)">{{ p.actual != null ? t('edit') : t('rc.pf.enter') }}</button></td>
             <td class="r"><b v-if="p.diff != null" :class="{ neg: p.diff !== 0 }" data-testid="rc-pf-diff">{{ signed(p.diff) }}</b><span v-else class="muted">—</span></td>
           </tr>
-          <tr v-if="form.id === p.platform_id"><td colspan="12">
+          <tr v-if="form.key === shopKey(p)"><td colspan="12">
             <form class="row wrap" style="gap:8px" @submit.prevent="save">
               <span class="small muted">{{ t('rc.pf.period', { f: from, t: to }) }}</span>
               <input v-model="form.amount" inputmode="decimal" style="width:130px" :placeholder="t('rc.pf.actual')" data-testid="rc-pf-amount" />
               <input v-model="form.note" class="grow" maxlength="200" :placeholder="t('rc.pf.note_ph')" />
               <button class="btn primary" :disabled="form.busy" data-testid="rc-pf-save">{{ t('po.o.save') }}</button>
-              <button type="button" class="btn" @click="form.id = 0">{{ t('ck.cancel') }}</button>
+              <button type="button" class="btn" @click="form.key = ''">{{ t('ck.cancel') }}</button>
             </form>
             <div v-if="form.error" class="banner bad small">{{ form.error }}</div></td></tr>
           <tr v-for="x in p.payouts" :key="'x' + x.id" class="sub"><td colspan="10" class="small muted">{{ t('rc.pf.period', { f: x.from, t: x.to }) }}
             · {{ m(x.amount) }}<template v-if="x.note"> · {{ x.note }}</template><template v-if="x.by"> · {{ x.by }}</template></td>
             <td colspan="2" class="r"><button class="btn link small" data-testid="rc-pf-del" @click="drop(x)">{{ t('po.o.delete') }}</button></td></tr>
-          <tr v-if="open === p.platform_id"><td colspan="12" class="detail">
+          <tr v-if="open === shopKey(p)"><td colspan="12" class="detail">
             <div class="small muted">{{ t('rc.pf.detail') }} · {{ t('rc.pf.detail_hint') }}</div>
             <table class="data inner" data-testid="rc-pf-orders">
               <thead><tr><th>{{ t('rc.col.time') }}</th><th>{{ t('rc.col.order') }}</th><th class="r">{{ t('rc.pf.subtotal') }}</th><th class="r">{{ t('po.merchant') }}</th>

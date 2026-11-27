@@ -66,6 +66,31 @@ func (s *Server) brandScope(c *gin.Context, perms []string, brand int64) (bid, b
 	return bid, brand, true
 }
 
+// brandView is the brands a page that is read together or brand by brand
+// is read for (docs/MULTI_BRAND_DESIGN.md §12): ?brand=N is one brand, and
+// none is every brand the person works on, which is nil (the whole store,
+// cash drawer and all) when they work on every brand.
+func (s *Server) brandView(c *gin.Context, bid int64) ([]int64, bool) {
+	if brand := queryInt(c, "brand"); brand != 0 {
+		if !s.mayUseBrand(c, bid, brand) {
+			return nil, false
+		}
+		if _, err := s.App.BrandOf(c, bid, brand); err != nil {
+			fail(c, err)
+			return nil, false
+		}
+		return []int64{brand}, true
+	}
+	u := currentUser(c)
+	if u.AllBrands(bid) {
+		return nil, true
+	}
+	if ids := u.BrandsOf(bid); len(ids) > 0 {
+		return ids, true
+	}
+	return []int64{}, true
+}
+
 // mayUseBrand answers 403 when the person does not work on the brand.
 func (s *Server) mayUseBrand(c *gin.Context, bid, brand int64) bool {
 	u := currentUser(c)

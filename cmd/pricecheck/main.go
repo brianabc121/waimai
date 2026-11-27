@@ -53,7 +53,19 @@ func main() {
 		}
 	}
 	fmt.Printf("%d orders checked, %d broken\n", n, len(broken))
-	if len(broken) > 0 {
+	// rule R: each store with several brands, the last 31 days read brand by brand
+	stores, bad, err := app.New(pool, "").CheckAllBrandViews(ctx, 31)
+	if err != nil {
+		log.Fatalf("check brands: %v", err)
+	}
+	for id, lines := range bad {
+		fmt.Printf("store %d\n", id)
+		for _, l := range lines {
+			fmt.Printf("  %s\n", l)
+		}
+	}
+	fmt.Printf("%d stores with several brands checked, %d broken\n", stores, len(bad))
+	if len(broken) > 0 || len(bad) > 0 {
 		os.Exit(1)
 	}
 }

@@ -24,7 +24,13 @@ const payTypeSQL = `COALESCE(NULLIF(o.pay_type, ''), CASE WHEN o.payment_method 
 // not pay for it (docs/ORDER_TYPES_DESIGN.md §7.4).
 const paidInPeriod = `o.branch_id = $1 AND o.payment_status = 'paid' AND o.paid_at IS NOT NULL
 	AND (o.paid_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date
-	AND NOT (o.order_type = 'platform' AND o.acceptance_status IN ('cancelled', 'rejected'))`
+	AND NOT (o.order_type = 'platform' AND o.acceptance_status IN ('cancelled', 'rejected'))
+	AND ($4::bigint[] IS NULL OR o.brand_id = ANY($4))`
+
+// Brands narrows a page that can be read for the whole store or by brand
+// (docs/MULTI_BRAND_DESIGN.md §12) to some of the store's brands; nil is the
+// whole store, which is the only view that shows the cash drawer, since the
+// cash of every brand is in one drawer.
 
 // ReconRow is one payment method's takings.
 type ReconRow struct {
@@ -110,10 +116,30 @@ type Reconcile struct {
 	// Platforms is the delivery platforms' block; Types the takings by order type.
 	Platforms []ReconPlatform `json:"platforms"`
 	Types     []ReconType     `json:"types"`
+	// Whole is the whole store's view: only it shows the cash drawer (Cash
+	// and CashCount are empty otherwise). Brands is the takings by brand.
+	Whole  bool         `json:"whole"`
+	Brands []ReconBrand `json:"brands"`
 }
 
-// Reconciliation sums up a period's takings by payment method.
-func (a *App) Reconciliation(ctx context.Context, branchID int64, from, to string) (*Reconcile, error) {
+// ReconBrand is one brand's share of the period (rule R: the brands add up
+// to the view they are part of).
+type ReconBrand struct {
+	BrandID int64  `json:"brand_id"`
+	Name    string `json:"name"`
+	Code    string `json:"code"`
+	Count   int    `json:"count"`
+	Amount  int64  `json:"amount"`
+	Refunds int64  `json:"refunds"`
+	// Platform is what the platforms owe for the brand's shops, Commission
+	// what they charge for them.
+	Platform   int64 `json:"platform"`
+	Commission int64 `json:"commission"`
+}
+
+// Reconciliation sums up a period's takings by payment method, of the whole
+// store (brands nil) or of some of its brands.
+func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64, from, to string) (*Reconcile, error) {
 	if err := billDays(from, to); err != nil {
 		return nil, err
 	}
@@ -121,7 +147,8 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, from, to strin
 	if err != nil {
 		return nil, err
 	}
-	out := &Reconcile{Timezone: b.Timezone, From: from, To: to, Currency: b.Currency, Rows: []ReconRow{}}
+	out := &Reconcile{Timezone: b.Timezone, From: from, To: to, Currency: b.Currency, Rows: []ReconRow{}, Whole: brands == nil,
+		Brands: []ReconBrand{}}
 	rows, err := a.DB.Query(ctx, `SELECT `+payTypeSQL+` AS pt, COALESCE(o.pay_channel_id, 0),
 			CASE WHEN `+payTypeSQL+` = 'platform' THEN COALESCE(o.platform_id, 0) ELSE 0 END,
 			COALESCE(max(c.name), max(dp.name), max(o.pay_method), ''), COALESCE(max(c.names::text), max(dp.names::text), '{}'),
@@ -136,7 +163,7 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, from, to strin
 			LEFT JOIN delivery_platforms dp ON dp.id = o.platform_id
 		WHERE `+paidInPeriod+`
 		GROUP BY 1, 2, 3 ORDER BY CASE `+payTypeSQL+` WHEN 'cash' THEN 0 WHEN 'card' THEN 1 WHEN 'online' THEN 2 ELSE 3 END,
-			min(COALESCE(c.sort, dp.sort, 999)), 2, 3`, branchID, from, to)
+			min(COALESCE(c.sort, dp.sort, 999)), 2, 3`, branchID, from, to, brands)
 	if err != nil {
 		return nil, err
 	}
@@ -174,15 +201,16 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, from, to strin
 			COALESCE(sum(o.staff_discount), 0), COALESCE(sum(o.round_off), 0)
 		FROM orders o JOIN branches b ON b.id = o.branch_id
 			LEFT JOIN cash_collections cc ON cc.order_id = o.id
-		WHERE `+paidInPeriod, branchID, from, to).Scan(&out.Cash.Counter, &out.Cash.RiderCollected, &out.Cash.RiderReturned,
+		WHERE `+paidInPeriod, branchID, from, to, brands).Scan(&out.Cash.Counter, &out.Cash.RiderCollected, &out.Cash.RiderReturned,
 		&out.Cash.RiderPending, &out.Discounts.Promotion, &out.Discounts.Staff, &out.Discounts.RoundOff); err != nil {
 		return nil, err
 	}
 	if err := a.DB.QueryRow(ctx, `SELECT count(*), COALESCE(sum(r.amount), 0),
 			COALESCE(sum(r.amount) FILTER (WHERE r.pay_type = 'cash'), 0)
-		FROM order_refunds r JOIN branches b ON b.id = r.branch_id
-		WHERE r.branch_id = $1 AND (r.created_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date`,
-		branchID, from, to).Scan(&out.Refunds.Count, &out.Refunds.Total, &out.Refunds.Cash); err != nil {
+		FROM order_refunds r JOIN branches b ON b.id = r.branch_id JOIN orders o ON o.id = r.order_id
+		WHERE r.branch_id = $1 AND (r.created_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date
+			AND ($4::bigint[] IS NULL OR o.brand_id = ANY($4))`,
+		branchID, from, to, brands).Scan(&out.Refunds.Count, &out.Refunds.Total, &out.Refunds.Cash); err != nil {
 		return nil, err
 	}
 	out.Cash.Refunded = out.Refunds.Cash
@@ -192,30 +220,38 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, from, to strin
 	if err := a.DB.QueryRow(ctx, `SELECT COALESCE(sum(d.amount), 0) FROM order_discounts d
 		JOIN orders o ON o.id = d.order_id JOIN branches b ON b.id = o.branch_id
 		WHERE `+paidInPeriod+` AND d.kind NOT IN ('promotion','dish_promotion','platform_merchant_promo') AND d.funded_by = 'store'`,
-		branchID, from, to).Scan(&out.Discounts.Coupon); err != nil {
+		branchID, from, to, brands).Scan(&out.Discounts.Coupon); err != nil {
 		return nil, err
 	}
 	// the two discounts of platform orders
 	if err := a.DB.QueryRow(ctx, `SELECT COALESCE(sum(d.amount) FILTER (WHERE d.kind = 'platform_merchant_promo'), 0),
 			COALESCE(sum(d.amount) FILTER (WHERE d.kind = 'platform_promo'), 0)
 		FROM order_discounts d JOIN orders o ON o.id = d.order_id JOIN branches b ON b.id = o.branch_id
-		WHERE `+paidInPeriod+` AND o.order_type = 'platform'`, branchID, from, to).
+		WHERE `+paidInPeriod+` AND o.order_type = 'platform'`, branchID, from, to, brands).
 		Scan(&out.Discounts.PlatformMerchant, &out.Discounts.PlatformSubsidy); err != nil {
 		return nil, err
 	}
 	out.Discounts.Total = out.Discounts.Promotion + out.Discounts.Coupon + out.Discounts.Staff + out.Discounts.RoundOff +
 		out.Discounts.PlatformMerchant
-	if out.Platforms, err = platformRecon(ctx, a.DB, branchID, from, to); err != nil {
+	if out.Platforms, err = platformRecon(ctx, a.DB, branchID, brands, from, to); err != nil {
 		return nil, err
 	}
-	if out.Types, err = typeRecon(ctx, a.DB, branchID, from, to); err != nil {
+	if out.Types, err = typeRecon(ctx, a.DB, branchID, brands, from, to); err != nil {
 		return nil, err
 	}
-	if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM payment_checks WHERE branch_id=$1 AND status='problem'`, branchID).
+	if out.Brands, err = brandRecon(ctx, a.DB, branchID, brands, from, to); err != nil {
+		return nil, err
+	}
+	if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM payment_checks pc JOIN orders o ON o.id = pc.order_id
+		WHERE pc.branch_id=$1 AND pc.status='problem' AND ($2::bigint[] IS NULL OR o.brand_id = ANY($2))`, branchID, brands).
 		Scan(&out.Problems); err != nil {
 		return nil, err
 	}
-	if from == to {
+	if !out.Whole {
+		// the drawer is the store's: a brand's view does not show it
+		out.Cash = ReconCash{}
+	}
+	if from == to && out.Whole {
 		out.CashCount, err = a.cashCount(ctx, a.DB, branchID, from)
 		if err != nil {
 			return nil, err
@@ -254,7 +290,7 @@ func (a *App) SaveCashCount(ctx context.Context, branchID int64, day string, cou
 	if counted < 0 || len([]rune(note)) > 200 {
 		return nil, ErrValidation("invalid count")
 	}
-	r, err := a.Reconciliation(ctx, branchID, day, day)
+	r, err := a.Reconciliation(ctx, branchID, nil, day, day)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +334,7 @@ type OnlinePayment struct {
 
 // OnlinePayments lists a period's online payments; channelID and status
 // ("", ok, problem, unchecked) narrow it down.
-func (a *App) OnlinePayments(ctx context.Context, branchID int64, from, to string, channelID int64, status string) ([]OnlinePayment, error) {
+func (a *App) OnlinePayments(ctx context.Context, branchID int64, brands []int64, from, to string, channelID int64, status string) ([]OnlinePayment, error) {
 	if err := billDays(from, to); err != nil {
 		return nil, err
 	}
@@ -321,8 +357,8 @@ func (a *App) OnlinePayments(ctx context.Context, branchID int64, from, to strin
 			LEFT JOIN pay_channels c ON c.id = o.pay_channel_id
 			LEFT JOIN payment_checks pc ON pc.order_id = o.id
 			LEFT JOIN users cu ON cu.id = pc.checked_by
-		WHERE `+paidInPeriod+` AND `+payTypeSQL+` = 'online' AND ($4 = 0 OR o.pay_channel_id = $4)`+cond+`
-		ORDER BY o.paid_at DESC, o.id DESC LIMIT 2000`, branchID, from, to, channelID)
+		WHERE `+paidInPeriod+` AND `+payTypeSQL+` = 'online' AND ($5 = 0 OR o.pay_channel_id = $5)`+cond+`
+		ORDER BY o.paid_at DESC, o.id DESC LIMIT 2000`, branchID, from, to, brands, channelID)
 	if err != nil {
 		return nil, err
 	}
@@ -449,7 +485,7 @@ type DiscountLog struct {
 
 // Discounts lists a period's discounts at checkout, totals them by who gave
 // them, and totals the promotions (dine-in and delivery apart).
-func (a *App) Discounts(ctx context.Context, branchID int64, from, to string) (*DiscountLog, error) {
+func (a *App) Discounts(ctx context.Context, branchID int64, brands []int64, from, to string) (*DiscountLog, error) {
 	if err := billDays(from, to); err != nil {
 		return nil, err
 	}
@@ -460,7 +496,7 @@ func (a *App) Discounts(ctx context.Context, branchID int64, from, to string) (*
 			COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.adj_approved_by), '')
 		FROM orders o JOIN branches b ON b.id = o.branch_id
 		WHERE `+paidInPeriod+` AND (o.adj_percent_bp > 0 OR o.adj_mode <> '')
-		ORDER BY o.paid_at DESC, o.id DESC LIMIT 2000`, branchID, from, to)
+		ORDER BY o.paid_at DESC, o.id DESC LIMIT 2000`, branchID, from, to, brands)
 	if err != nil {
 		return nil, err
 	}
@@ -496,7 +532,7 @@ func (a *App) Discounts(ctx context.Context, branchID int64, from, to string) (*
 				WHERE d.order_id = o.id AND d.kind <> 'promotion' AND d.funded_by = 'store'), 0))), 0)
 		FROM orders o JOIN branches b ON b.id = o.branch_id JOIN promotions p ON p.id = o.promotion_id
 		WHERE `+paidInPeriod+`
-		GROUP BY p.id ORDER BY p.scope, 6 DESC`, branchID, from, to)
+		GROUP BY p.id ORDER BY p.scope, 6 DESC`, branchID, from, to, brands)
 	if err != nil {
 		return nil, err
 	}

@@ -89,6 +89,7 @@ DATABASE_URL='postgres://...' make pricing-check-db DAYS=0   # 全部订单
 | D12 | 网店单（`order_type='web'`，顾客在店铺专属页面下的单）没有平台出资的优惠行，平台出资 = 0：平台券只限商城单（docs/ORDER_TYPES_DESIGN.md 9.4） |
 | D13 | 订单的每条活动明细（活动、菜品活动）对应的活动在下单时适用于订单的品牌（`order_discounts.brand_ids` 快照含订单品牌；没有快照的老行不验）；每张店铺券的发券品牌 = 订单的品牌；平台券、平台单的两种平台优惠不受这条限制（docs/MULTI_BRAND_DESIGN.md 11.2） |
 | D14 | 平台单的“品牌 + 平台”在 `branch_platforms`（按品牌）里有这家店；佣金行是这个平台的，比例是下单时这个品牌在这个平台的比例（或手改的，快照在 `order_platform_fees.rate_bp`）（docs/MULTI_BRAND_DESIGN.md 11.2） |
+| R | 对账、账单按品牌（docs/MULTI_BRAND_DESIGN.md 11.2、第 12 节）：每个品牌单看的单数、收款合计、退款、平台应收、佣金、预计到账相加 = “全部品牌”合并视图；把所有品牌一个个点名合起来 = 门店（不分品牌）的结果；合并视图里“营业额按品牌”一块相加 = 合计；账单汇总（完成单数、菜品原价、商家/平台优惠、实付、收入、退款）同理。钱箱（现金清点、骑手交回）只在门店视图里出现。检查：`App.CheckBrandViews`，`pricecheck` 对每个多品牌门店最近 31 天跑一遍 |
 | D15 | 代客单（`order_type='staff'`）的会员和订单是同一个品牌；单号 = 品牌代码 + 本品牌 6 位会员号（同日再下加 `-2`）（docs/MULTI_BRAND_DESIGN.md 11.2） |
 | R1 | **重放**：只用订单自己存的东西（下单时的税率/服务费率/包装费/配送费快照、还在的菜、菜品活动的规则快照、活动和每张券当时减的钱、结账打折比例、抹零）重新交给引擎算一遍，结果满足 2.1 节全部规则 |
 | R2 | 重放出来的小计、服务费、税、总优惠、店铺/平台出资、结账打折、抹零、应付和库里存的**一分不差** |
@@ -123,7 +124,7 @@ R 这一组是最重要的：任何一条改金额的路径如果绕开了 `load
 | 15 | 币种：按店铺国家定币种，老订单保留原币种 | `TestCurrencyTableMatchesMigration` |
 | 16 | 平台订单：平台价下单（手设价优先，没设按加价取整）、商家出资 + 平台出资优惠、一律含税、佣金；店铺原因退菜商家优惠按比例保留、平台优惠不变；改了加价之后加单仍按下单时的加价；顾客原因退菜；手改佣金、其他扣费、记录平台扣款（进退款）、平台取消；不套本店活动 | 样例 S9；`TestPlatformOrder`、`TestPlatformOrderChain`、`TestPlatformOrderOverHTTP`、`TestPlatformReconciliation` |
 | 17 | 商城单和网店单：同一购物车在商城和店铺专属页面下单金额一分不差（没有平台券时）；网店单不用平台券（不列、点名要也不用），顾客多付的正好是平台券的钱；商城报价不能拿到专属页面下单 | `TestMallVsWebOrder`、`TestStoreSiteOverHTTP` |
-| 18 | 一店多品牌：同一购物车在两个品牌下单按各自的品牌价；活动、券不跨品牌（列表里不出现、点名也不用）；加单按订单品牌的菜单价；代客单号和会员按品牌；顾客在品牌专属页面/商城品牌卡片下单按该品牌的价和活动（S10 的 150.00 / 157.00），一个品牌页面的报价不能拿到另一个品牌下单，商城单号按品牌各自编；平台单按“品牌 + 平台”的店：平台价从品牌价加价、佣金按这家店（S10a） | 样例 S10、S10a；`TestBrandPricing`、`TestBrandPromoCouponScope`、`TestBrandAddonPrice`、`TestBrands`、`TestBrandSites`、`TestBrandPlatformOrder` |
+| 18 | 一店多品牌：同一购物车在两个品牌下单按各自的品牌价；活动、券不跨品牌（列表里不出现、点名也不用）；加单按订单品牌的菜单价；代客单号和会员按品牌；顾客在品牌专属页面/商城品牌卡片下单按该品牌的价和活动（S10 的 150.00 / 157.00），一个品牌页面的报价不能拿到另一个品牌下单，商城单号按品牌各自编；平台单按“品牌 + 平台”的店：平台价从品牌价加价、佣金按这家店（S10a）；对账、账单按品牌相加 = 合并，平台到账按“品牌 + 平台”录（规则 R） | 样例 S10、S10a；`TestBrandPricing`、`TestBrandPromoCouponScope`、`TestBrandAddonPrice`、`TestBrands`、`TestBrandSites`、`TestBrandPlatformOrder`、`TestBrandReconciliation`（规则 R） |
 
 ---
 

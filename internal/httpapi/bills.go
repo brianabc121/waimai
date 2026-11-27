@@ -29,12 +29,16 @@ func (s *Server) bills(c *gin.Context) {
 		return
 	}
 	from, to := c.Query("from"), c.Query("to")
-	l, err := s.App.Bills(c, bid, from, to, c.Query("filter"))
+	brands, ok := s.brandView(c, bid)
+	if !ok {
+		return
+	}
+	l, err := s.App.Bills(c, bid, brands, from, to, c.Query("filter"))
 	if err != nil || !wantsXLSX(c) {
 		reply(c, l, err)
 		return
 	}
-	sum, err := s.App.BillSummary(c, bid, from, to)
+	sum, err := s.App.BillSummary(c, bid, brands, from, to)
 	if err != nil {
 		fail(c, err)
 		return
@@ -109,7 +113,11 @@ func (s *Server) billSummary(c *gin.Context) {
 	if !ok {
 		return
 	}
-	r, err := s.App.BillSummary(c, bid, c.Query("from"), c.Query("to"))
+	brands, ok := s.brandView(c, bid)
+	if !ok {
+		return
+	}
+	r, err := s.App.BillSummary(c, bid, brands, c.Query("from"), c.Query("to"))
 	reply(c, r, err)
 }
 
