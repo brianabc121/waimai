@@ -10,10 +10,11 @@ import { cluster, dotColor, dotRadius, HEAT_GRADIENT, paintHeat } from './heat'
 import '../mapStrings'
 import './deliveryStrings'
 
-export interface MapPoint { key: string; lat: number; lng: number; n: number; c: number; line: string; last_at: string }
+export interface MapPoint { key: string; lat: number; lng: number; n: number; c: number; line: string; last_at: string; b?: number }
+export interface MapBrand { id: number; name: string; color: string; n: number }
 export interface MapStore { id: number; name: string; lat: number; lng: number }
 export interface MapZone { id: number; name: string; name_en: string; color: string; polygon: LatLng[] }
-export interface MapData { points: MapPoint[]; too_many: boolean; orders: number; unpinned: number; stores: MapStore[]; zones: MapZone[] }
+export interface MapData { points: MapPoint[]; too_many: boolean; orders: number; unpinned: number; stores: MapStore[]; zones: MapZone[]; brands?: MapBrand[] }
 
 const props = defineProps<{ mapsKey: string; data: MapData; focus?: string; admin?: boolean }>()
 const emit = defineEmits<{ rank: [key: string] }>()
@@ -29,6 +30,18 @@ const showZones = ref(true)
 const radius = ref(30)
 const mapType = ref<'roadmap' | 'satellite'>('roadmap')
 const sel = ref<MapPoint | null>(null)
+// Several brands shown together: a dot takes the colour of the brand that
+// delivered most there (docs/MULTI_BRAND_DESIGN.md §12); the heat stays all of them.
+const brandList = computed(() => props.data.brands ?? [])
+const byBrand = ref(true)
+const colorBy = computed(() => byBrand.value && brandList.value.length > 1)
+const brandColor = (id?: number) => brandList.value.find(b => b.id === id)?.color || '#a02c20'
+function fill(c: { n: number; items: { n: number; p: MapPoint }[] }) {
+  if (!colorBy.value) return dotColor(c.n)
+  const by = new Map<number, number>()
+  for (const d of c.items) by.set(d.p.b ?? 0, (by.get(d.p.b ?? 0) ?? 0) + d.n)
+  return brandColor([...by.entries()].sort((a, b) => b[1] - a[1])[0][0])
+}
 
 const pts = computed(() => props.data.points)
 const all = computed<LatLng[]>(() => [...pts.value.map(p => [p.lat, p.lng] as LatLng), ...props.data.stores.map(s => [s.lat, s.lng] as LatLng)])
@@ -119,7 +132,7 @@ function setType(m: 'roadmap' | 'satellite') { mapType.value = m; map.value?.set
           </g>
           <g v-if="mode !== 'heat'">
             <g v-for="(c, i) in dots(px)" :key="i" class="hit" :data-n="c.n" :data-count="c.items.length" data-testid="map-dot" @click.stop="openCluster(c)">
-              <circle :cx="c.x" :cy="c.y" :r="c.items.length > 1 ? Math.max(14, dotRadius(c.n)) : dotRadius(c.n)" :fill="dotColor(c.n)"
+              <circle :cx="c.x" :cy="c.y" :r="c.items.length > 1 ? Math.max(14, dotRadius(c.n)) : dotRadius(c.n)" :fill="fill(c)"
                 :fill-opacity="c.items.length > 1 ? 0.78 : 0.9" stroke="#fff" :stroke-width="c.items.length > 1 ? 3 : 1.5" />
               <text v-if="c.n >= 10 || c.items.length > 1" :x="c.x" :y="c.y + 4" text-anchor="middle" font-size="11.5" font-weight="700" fill="#fff">{{ c.n }}</text>
             </g>
@@ -165,6 +178,10 @@ function setType(m: 'roadmap' | 'satellite') { mapType.value = m; map.value?.set
         <h3>{{ t('da.show') }}</h3>
         <label class="row small"><input v-model="showStores" type="checkbox" data-testid="show-stores" />{{ t('da.show_stores') }}</label>
         <label v-if="!admin" class="row small"><input v-model="showZones" type="checkbox" data-testid="show-zones" />{{ t('da.show_zones') }}</label>
+        <label v-if="brandList.length > 1" class="row small"><input v-model="byBrand" type="checkbox" data-testid="color-brands" />{{ t('br.map_color') }}</label>
+        <div v-if="colorBy" class="dm-brands" data-testid="map-brands">
+          <span v-for="b in brandList" :key="b.id" class="row small"><i class="dm-dot" :style="{ background: b.color || '#a02c20' }"></i><span class="grow ell">{{ b.name }}</span><b>{{ b.n }}</b></span>
+        </div>
         <template v-if="mode !== 'pins'">
           <div class="small muted dm-gap">{{ t('da.radius') }}</div>
           <input v-model.number="radius" type="range" min="12" max="70" step="2" data-testid="heat-radius" />
@@ -202,6 +219,9 @@ function setType(m: 'roadmap' | 'satellite') { mapType.value = m; map.value?.set
 .dm-side h3 { font-size: 14px; margin: 0 0 2px; }
 .dm-side input[type=range] { width: 100%; accent-color: var(--brand); padding: 0; border: 0; }
 .dm-gap { margin-top: 6px; }
+.dm-brands { display: grid; gap: 4px; padding-inline-start: 4px; }
+.dm-brands .row { gap: 6px; align-items: center; }
+.dm-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .dm-top { gap: 8px; font-size: 13px; padding: 4px 0; border-bottom: 1px solid #f3f3f3; cursor: pointer; }
 .dm-top:last-child { border: 0; }
 .ell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

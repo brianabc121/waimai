@@ -3906,5 +3906,6 @@
  "br.cash_store": "錢箱是整個門店共用的，現金清點和騎手交回只在「全部品牌」裡看。",
  "br.by_brand": "營業額按品牌",
  "br.by_brand_hint": "各品牌相加 = 合計",
- "br.platform_owe": "平台應收"
+ "br.platform_owe": "平台應收",
+ "br.map_color": "地址點按品牌上色（熱力圖按總單量）"
 }

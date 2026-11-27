@@ -60,6 +60,7 @@ extend({
   'br.cash_store': ['钱箱是整个门店共用的，现金清点和骑手交回只在“全部品牌”里看。', 'The cash drawer is the whole store\'s: counting cash and riders\' hand-ins are under "All brands".'],
   'br.by_brand': ['营业额按品牌', 'Takings by brand'],
   'br.by_brand_hint': ['各品牌相加 = 合计', 'The brands add up to the total'],
+  'br.map_color': ['地址点按品牌上色（热力图按总单量）', 'Colour dots by brand (the heat is every brand)'],
   'br.platform_owe': ['平台应收', 'Platforms owe'],
   'br.pf_hint': ['每个品牌在外卖平台上是一家单独的店：平台店铺号、佣金、加价各填各的。手填的平台菜价只用于主品牌，其他品牌按品牌价加价。', 'Each brand is a shop of its own on the platforms, with its own shop ID, commission and markup. Platform prices typed by hand are the main brand\'s; other brands mark up their own prices.'],
   'bm.link': ['品牌菜单', 'Brand menu'],
