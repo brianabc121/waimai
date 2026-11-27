@@ -33,8 +33,13 @@ async function load() {
     error.value = ''
   } catch (e) { error.value = (e as Error).message }
 }
+// the daily check of the store balance books (docs/REFUND_BALANCE_DESIGN.md §10.1)
+const walletCheck = ref<{ ran_at: string; problems: string[] } | null>(null)
 let stop = () => {}
-onMounted(() => { stop = poll(load, 10) })
+onMounted(() => {
+  stop = poll(load, 10)
+  void get<{ last: { ran_at: string; problems: string[] } | null }>('/admin/wallet-check').then(r => { walletCheck.value = r.last }).catch(() => {})
+})
 onUnmounted(() => stop())
 
 function pick(s: '' | JobStatus) { tab.value = s; page.value = 1; void load() }
@@ -90,6 +95,9 @@ const anyOnline = computed(() => status.value?.instances.some(i => i.online) ?? 
     <div v-if="error" class="banner bad">{{ error }}</div>
     <div v-if="notice" class="banner" data-testid="notice">{{ notice }}</div>
     <div v-if="status && !anyOnline" class="banner bad" data-testid="no-worker">{{ t('ad.no_worker') }}</div>
+    <div v-if="walletCheck?.problems?.length" class="banner bad" data-testid="wallet-check">{{ t('ad.wallet_bad', { n: walletCheck.problems.length, at: fmtDateTime(walletCheck.ran_at) }) }}
+      <div v-for="(p, i) in walletCheck.problems.slice(0, 20)" :key="i" class="small mono">{{ p }}</div></div>
+    <div v-else-if="walletCheck" class="small muted" data-testid="wallet-check">{{ t('ad.wallet_ok', { at: fmtDateTime(walletCheck.ran_at) }) }}</div>
     <template v-if="status">
       <div class="adm-grid2">
         <div class="card flush">

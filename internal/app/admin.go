@@ -663,6 +663,14 @@ func (a *App) DeleteMerchant(ctx context.Context, actor AdminActor, id int64, co
 		if open > 0 {
 			return errOrdersInProgress
 		}
+		var owed int64
+		if err := tx.QueryRow(ctx, `SELECT COALESCE(sum(w.balance), 0) FROM wallet_accounts w JOIN branches b ON b.id = w.branch_id
+			WHERE b.merchant_id=$1 AND w.kind='store_credit'`, id).Scan(&owed); err != nil {
+			return err
+		}
+		if owed > 0 {
+			return errCreditOwed(owed)
+		}
 		if _, err := tx.Exec(ctx, `UPDATE merchants SET deleted_at=now(), updated_at=now() WHERE id=$1`, id); err != nil {
 			return err
 		}
@@ -783,6 +791,14 @@ func (a *App) DeleteBranch(ctx context.Context, actor AdminActor, id int64) erro
 		}
 		if open > 0 {
 			return errOrdersInProgress
+		}
+		// customers still hold balances at the store (docs/REFUND_BALANCE_DESIGN.md §7.3)
+		owed, err := branchCreditOwed(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if owed > 0 {
+			return errCreditOwed(owed)
 		}
 		if _, err := tx.Exec(ctx, `UPDATE branches SET deleted_at=now() WHERE id=$1`, id); err != nil {
 			return err

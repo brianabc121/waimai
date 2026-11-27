@@ -141,6 +141,12 @@ func MulDivRound(a, b, d int64) int64 {
 	return (a*b + d/2) / d
 }
 
+// MulDivFloor returns a*b/d rounded down (a, b ≥ 0, d > 0): the cash part of
+// a refund is never rounded up (docs/REFUND_BALANCE_DESIGN.md §6.2).
+func MulDivFloor(a, b, d int64) int64 {
+	return a * b / d
+}
+
 // Price works an order out. Adjustments of one stage are taken in the order
 // given; stages always go in their fixed order.
 func Price(in Input) (Result, error) {

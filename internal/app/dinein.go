@@ -713,18 +713,27 @@ func (a *App) CloseTable(ctx context.Context, sessionID int64, in CloseInput, ac
 		if in.ExpectedTotal != nil && *in.ExpectedTotal != total {
 			return ErrVersion
 		}
+		// what a store balance paid is not collected (docs/REFUND_BALANCE_DESIGN.md §5.1)
+		var fromCredit int64
+		if err := tx.QueryRow(ctx, `SELECT credit_paid FROM orders WHERE id=$1`, o.ID).Scan(&fromCredit); err != nil {
+			return err
+		}
+		fromCredit = min(fromCredit, total)
+		due := total - fromCredit
 		var channel *int64
-		if in.PayType != "" {
+		if due == 0 && fromCredit > 0 {
+			in.PayType, in.PayMethod, in.AmountReceived = "credit", "", 0
+		} else if in.PayType != "" {
 			ch, name, err := resolvePay(ctx, tx, s.BranchID, PayInput{Type: in.PayType, ChannelID: in.PayChannelID})
 			if err != nil {
 				return err
 			}
 			channel, in.PayMethod = ch, name
 			if in.PayType != "cash" {
-				in.AmountReceived = total // a card or an online payment is for the exact amount
+				in.AmountReceived = due // a card or an online payment is for the exact amount
 			}
 		}
-		if in.AmountReceived < total {
+		if in.AmountReceived < due {
 			return ErrValidation("the amount received is less than the bill")
 		}
 		// The dine-in promotion takes its quota only now: an open table holds none.

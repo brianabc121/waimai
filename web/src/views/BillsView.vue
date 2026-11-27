@@ -152,7 +152,10 @@ async function showSettlement(id: number) {
         <div class="ox-stat"><span class="l">{{ t('bl.c.due') }}</span><b class="v plat">{{ money(sum.platform_discount, cur) }}</b></div>
         <div class="ox-stat"><span class="l">{{ t('bl.c.takings') }}</span><b class="v ok">{{ money(sum.takings, cur) }}</b></div>
         <div v-if="sum.refunded" class="ox-stat" data-testid="bl-refunded"><span class="l">{{ t('bl.c.refunded') }}</span><b class="v neg">-{{ money(sum.refunded, cur) }}</b>
-          <small class="s">{{ t('bl.c.refunded_sub') }}</small></div>
+          <small class="s">{{ t('bl.c.refunded_sub') }}</small>
+          <small v-if="sum.refunded_to_credit" class="s">{{ t('rc.c.to_credit', { v: money(sum.refunded_to_credit, cur) }) }}</small></div>
+        <div v-if="sum.paid_by_credit" class="ox-stat" data-testid="bl-paid-credit"><span class="l">{{ t('bl.c.paid_credit') }}</span><b class="v">{{ money(sum.paid_by_credit, cur) }}</b>
+          <small class="s">{{ t('bl.c.paid_credit_sub') }}</small></div>
       </div>
       <div class="cols">
         <div class="ox-panel stack">

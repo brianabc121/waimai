@@ -164,6 +164,11 @@ type Order struct {
 	// says which method, PayMethod its name then); "" when not recorded.
 	PayType      string `json:"pay_type"`
 	PayChannelID int64  `json:"pay_channel_id"`
+	// CreditPaid is what the order paid from the customer's store balance;
+	// Due is the rest, collected in cash or otherwise
+	// (docs/REFUND_BALANCE_DESIGN.md §5.1).
+	CreditPaid int64 `json:"credit_paid"`
+	Due        int64 `json:"due"`
 	// PayCheck is the owner's check of an online payment on the
 	// reconciliation page: "", ok or problem (with PayCheckNote).
 	PayCheck     string `json:"pay_check"`
@@ -270,7 +275,7 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.adj_approved_by), ''), o.adj_at, o.pay_type,
 	COALESCE(o.pay_channel_id, 0), COALESCE((SELECT pc.status FROM payment_checks pc WHERE pc.order_id = o.id), ''),
 	COALESCE((SELECT pc.note FROM payment_checks pc WHERE pc.order_id = o.id), ''), o.order_type, o.dine_source,
-	o.brand_id, o.brand_name, COALESCE((SELECT br.color FROM brands br WHERE br.id = o.brand_id), '')`
+	o.brand_id, o.brand_name, COALESCE((SELECT br.color FROM brands br WHERE br.id = o.brand_id), ''), o.credit_paid`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}, Discounts: []OrderDiscount{}, Voids: []OrderVoid{}, Refunds: []OrderRefund{}}
@@ -288,10 +293,11 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.PlacedBy, &o.StaffNote, &o.PayMethod, &o.TableTags,
 		&t.AdjPercentBP, &t.StaffDiscount, &t.AdjMode, &t.RoundOff, &o.AdjReason, &o.AdjBy, &o.AdjApprovedBy, &o.AdjAt,
 		&o.PayType, &o.PayChannelID, &o.PayCheck, &o.PayCheckNote, &o.OrderType, &o.DineSource,
-		&o.BrandID, &o.BrandName, &o.BrandColor)
+		&o.BrandID, &o.BrandName, &o.BrandColor, &o.CreditPaid)
 	if err != nil {
 		return nil, err
 	}
+	o.Due = max(0, t.Total-o.CreditPaid)
 	o.DisplayStatus = DisplayStatus(o.AcceptanceStatus, o.FulfillmentStatus)
 	// An accepted scheduled order that the kitchen has not started on yet.
 	if o.DisplayStatus == "preparing" && o.ReleaseAt != nil && o.ReleaseAt.After(time.Now()) {
@@ -485,6 +491,11 @@ type PlaceOrderInput struct {
 	AddressUnit  string `json:"address_unit"`
 	AddressNote  string `json:"address_note"`
 	Note         string `json:"note"`
+	// UseCredit pays what it can from the customer's balance at the store
+	// (docs/REFUND_BALANCE_DESIGN.md §5.2); CreditExpected is the amount the
+	// checkout page showed: another amount means the balance changed.
+	UseCredit      bool   `json:"use_credit"`
+	CreditExpected *int64 `json:"credit_expected"`
 	// OwnSite: ordered on the store's own page, set by the server.
 	OwnSite bool `json:"-"`
 }
@@ -659,6 +670,23 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		if err := touchCustomerSessions(ctx, tx, phone); err != nil {
 			return wrap("extend session", err)
 		}
+		if in.UseCredit {
+			var used int64
+			var cust int64
+			err := tx.QueryRow(ctx, `SELECT id FROM customers WHERE phone=$1`, phone).Scan(&cust)
+			if err == nil {
+				used, err = useCredit(ctx, tx, orderID, cust, t.Total, Actor{Type: "customer", ID: cust})
+			} else if isNoRows(err) {
+				err = nil
+			}
+			if err != nil {
+				return err
+			}
+			if in.CreditExpected != nil && *in.CreditExpected != used {
+				return ErrD(http.StatusConflict, "CREDIT_CHANGED", "your store balance changed, please confirm again",
+					map[string]any{"credit": used})
+			}
+		}
 		if addressID != nil {
 			if _, err := tx.Exec(ctx, `UPDATE customer_addresses SET last_used_at=now() WHERE id=$1`, *addressID); err != nil {
 				return wrap("address used", err)
@@ -735,6 +763,10 @@ func (a *App) closeOrder(ctx context.Context, tx pgx.Tx, o *lockedOrder, status,
 		return err
 	}
 	if err := releaseCoupons(ctx, tx, o.ID); err != nil {
+		return err
+	}
+	// a store balance it was paid from gets everything back
+	if err := giveCreditBack(ctx, tx, o.ID, o.Total, actor, "order "+status); err != nil {
 		return err
 	}
 	if err := a.endPendingAddons(ctx, tx, o.ID, "cancelled"); err != nil {

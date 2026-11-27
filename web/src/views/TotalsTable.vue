@@ -2,9 +2,12 @@
 import { discountLabel, kindBadge } from '../coupons'
 import { money, pick, t } from '../i18n'
 import '../checkout'
+import '../addresses'
 import type { OrderDiscount, Totals } from '../types'
 // discounts, when given, are shown one per line: the promotion and each coupon.
-defineProps<{ totals: Totals; currency: string; delivery: boolean; discounts?: OrderDiscount[] }>()
+// creditPaid is what the order paid from the customer's store balance: the
+// rest is what is still collected (docs/REFUND_BALANCE_DESIGN.md §5).
+defineProps<{ totals: Totals; currency: string; delivery: boolean; discounts?: OrderDiscount[]; creditPaid?: number }>()
 </script>
 
 <template>
@@ -23,6 +26,10 @@ defineProps<{ totals: Totals; currency: string; delivery: boolean; discounts?: O
       <tr v-if="totals.staff_discount" class="disc" data-testid="staff-discount-line"><td>{{ t('ck.staff_disc') }}</td><td>−{{ money(totals.staff_discount, currency) }}</td></tr>
       <tr v-if="totals.round_off" class="disc" data-testid="round-off-line"><td>{{ t(totals.adj_mode === 'round' ? 'ck.round_off' : 'ck.staff_disc') }}</td><td>−{{ money(totals.round_off, currency) }}</td></tr>
       <tr class="sum"><td>{{ t('total') }}</td><td>{{ money(totals.total, currency) }}</td></tr>
+      <template v-if="creditPaid">
+        <tr class="disc" data-testid="credit-paid-line"><td>{{ t('co.credit_line') }}</td><td>−{{ money(creditPaid, currency) }}</td></tr>
+        <tr class="sum" data-testid="due-line"><td>{{ t('od.due') }}</td><td>{{ money(Math.max(0, totals.total - creditPaid), currency) }}</td></tr>
+      </template>
       <tr v-if="totals.tax_amount && totals.tax_inclusive"><td class="muted small">{{ t('tax_included') }} {{ totals.tax_rate_bp / 100 }}%</td>
         <td class="muted small">{{ money(totals.tax_amount, currency) }}</td></tr>
     </tbody>

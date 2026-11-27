@@ -248,8 +248,8 @@ func (a *App) handoff(ctx context.Context, tx pgx.Tx, o *lockedOrder, actor Acto
 		// Paid at the counter in cash unless recorded otherwise (prepaid, or
 		// corrected on the order page afterwards).
 		if _, err := tx.Exec(ctx, `UPDATE orders SET fulfillment_status='picked_up', payment_status='paid',
-			pay_type = CASE WHEN pay_type = '' THEN 'cash' ELSE pay_type END,
-			amount_received = COALESCE(amount_received, total),
+			pay_type = CASE WHEN pay_type <> '' THEN pay_type WHEN credit_paid = total AND total > 0 THEN 'credit' ELSE 'cash' END,
+			amount_received = COALESCE(amount_received, total - credit_paid),
 			handed_off_at=now(), completed_at=now(), version=version+1, updated_at=now() WHERE id=$1`, o.ID); err != nil {
 			return err
 		}
@@ -593,13 +593,24 @@ func (a *App) RiderDeliverPaid(ctx context.Context, taskID, riderID, collected i
 			return err
 		}
 		paid := o.Payment
-		if o.Payment == "unpaid" && pay != nil && pay.Type == "online" {
+		// what a store balance paid is not collected at the door
+		var due, fromCredit int64
+		if err := tx.QueryRow(ctx, `SELECT total - credit_paid, credit_paid FROM orders WHERE id=$1`, o.ID).
+			Scan(&due, &fromCredit); err != nil {
+			return err
+		}
+		if o.Payment == "unpaid" && due == 0 && fromCredit > 0 {
+			if _, err := tx.Exec(ctx, `UPDATE orders SET pay_type='credit', amount_received=0 WHERE id=$1`, o.ID); err != nil {
+				return err
+			}
+			paid, collected = "paid", 0
+		} else if o.Payment == "unpaid" && pay != nil && pay.Type == "online" {
 			ch, name, err := resolvePay(ctx, tx, o.BranchID, *pay)
 			if err != nil {
 				return err
 			}
 			if _, err := tx.Exec(ctx, `UPDATE orders SET pay_type='online', pay_channel_id=$2, pay_method=$3,
-				amount_received=total WHERE id=$1`, o.ID, ch, name); err != nil {
+				amount_received=total - credit_paid WHERE id=$1`, o.ID, ch, name); err != nil {
 				return err
 			}
 			paid, collected = "paid", 0
@@ -609,10 +620,10 @@ func (a *App) RiderDeliverPaid(ctx context.Context, taskID, riderID, collected i
 			}
 			if _, err := tx.Exec(ctx, `INSERT INTO cash_collections (order_id, branch_id, rider_id, amount_due,
 				amount_collected) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (order_id) DO NOTHING`,
-				o.ID, o.BranchID, riderID, o.Total, collected); err != nil {
+				o.ID, o.BranchID, riderID, due, collected); err != nil {
 				return err
 			}
-			if collected == o.Total {
+			if collected == due {
 				paid = "paid"
 			}
 		}
@@ -630,7 +641,7 @@ func (a *App) RiderDeliverPaid(ctx context.Context, taskID, riderID, collected i
 			return err
 		}
 		if err := audit(ctx, tx, o.BranchID, o.ID, Actor{Type: "rider", ID: riderID}, "delivery.delivered",
-			map[string]any{"amount_due": o.Total, "amount_collected": collected}); err != nil {
+			map[string]any{"amount_due": due, "amount_collected": collected}); err != nil {
 			return err
 		}
 		return notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID, RiderIDs: []int64{riderID}})

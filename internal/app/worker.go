@@ -30,6 +30,7 @@ var workerTasks = []struct {
 	{"jobs", workerTick},
 	{"rider_trips", tripInterval},
 	{"cleanup", cleanupInterval},
+	{"wallet_check", walletCheckInterval},
 }
 
 // Worker is one running worker loop.
@@ -114,6 +115,7 @@ func (w *Worker) Tick(ctx context.Context) {
 	}
 	if time.Since(w.lastCleanup) > cleanupInterval {
 		w.runTask(ctx, "cleanup", func(ctx context.Context) (int, error) { return 0, a.Cleanup(ctx) })
+		w.runTask(ctx, "wallet_check", a.WalletCheckDue)
 		w.lastCleanup = time.Now()
 	}
 	if ctx.Err() != nil {

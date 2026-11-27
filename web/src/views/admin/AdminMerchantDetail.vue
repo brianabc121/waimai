@@ -50,6 +50,11 @@ async function saveBranch() {
     br.open = false; await load()
   } catch (e) { br.error = (e as Error).message }
 }
+// a store that closed: every customer's balance there is frozen (docs/REFUND_BALANCE_DESIGN.md §7.3)
+function freezeCredits(b: AdminBranch, frozen: boolean) {
+  if (!confirm(t(frozen ? 'ad.freeze_credits_confirm' : 'ad.unfreeze_credits_confirm', { name: b.name }))) return
+  void run(() => post(`/admin/branches/${b.id}/freeze-credits`, { frozen, note: frozen ? t('ad.freeze_credits_note') : '' }))
+}
 function removeBranch(b: AdminBranch) { if (confirm(t('ad.delete_branch_confirm', { name: b.name }))) void run(() => del(`/admin/branches/${b.id}`)) }
 function viewStore(b: AdminBranch) { setAdminView(b); location.href = '/merchant/orders' }
 const branchState = (b: AdminBranch) => b.paused ? ['warn', 'ad.b.paused'] : b.open_now ? ['ok', 'ad.b.open'] : ['', 'ad.b.closed']
@@ -141,6 +146,8 @@ const rolesOf = (u: MerchantUser) => [...new Set(u.roles.map(r => r.role))]
                 <router-link class="btn small" :to="{ path: '/admin/items', query: { merchant_id: b.merchant_id, branch_id: b.id } }">{{ t('ad.items') }}</router-link>
                 <router-link class="btn small" data-testid="branch-import" :to="{ path: '/admin/items', query: { merchant_id: b.merchant_id, branch_id: b.id, import: '1' } }">{{ t('ad.import_menu') }}</router-link>
                 <button class="btn small" data-testid="view-store" @click="viewStore(b)">{{ t('ad.view_store') }} ↗</button>
+                <button class="btn small" data-testid="freeze-credits" @click="freezeCredits(b, true)">{{ t('ad.freeze_credits') }}</button>
+                <button class="btn small" @click="freezeCredits(b, false)">{{ t('ad.unfreeze_credits') }}</button>
                 <button class="btn small danger" @click="removeBranch(b)">{{ t('delete') }}</button>
               </div></td>
             </tr>

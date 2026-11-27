@@ -28,6 +28,9 @@ import { useRoute } from 'vue-router'
 import { addons, batchSource, batchTitle, itemsByBatch, pendingAddon, addonErr, presetSplit } from '../addon'
 import VoidSheet from './VoidSheet.vue'
 import RefundSheet from './RefundSheet.vue'
+import CreditSpend from './CreditSpend.vue'
+import '../credit'
+import '../addresses'
 import MoneyLog from './MoneyLog.vue'
 import { copyText, voidMessage, voidNote, voidsOf } from '../voids'
 import type { OrderItem, OrderVoid } from '../types'
@@ -239,6 +242,16 @@ const rejecting = ref(false)
 const voiding = ref<OrderItem | null>(null)
 const voidDone = ref<{ order: Order; v: OrderVoid; text: string; copied: boolean } | null>(null)
 const refunding = ref(false)
+// an order the staff entered may be paid from the customer's store balance, with the code texted to them
+const spending = ref(false)
+const spentNote = ref('')
+const canSpendCredit = (o: Order) => (o.order_type === 'staff' || o.order_type === 'dine_in') && o.payment_status !== 'paid' && !o.credit_paid &&
+  o.acceptance_status !== 'rejected' && o.acceptance_status !== 'cancelled' && can('order.handle', 'table.use', 'order.manual')
+async function spent(o: Order) {
+  spending.value = false
+  spentNote.value = t('sc.s.done', { s: money(o.credit_paid ?? 0, o.currency) })
+  await refreshNow()
+}
 const refundDone = ref('')
 const canVoid = (o: Order, it: OrderItem) => !!o.void_open && it.prep_status !== 'cancelled' && can('order.handle')
 const voidClosed = (o: Order) => o.acceptance_status === 'accepted' && o.service_type !== 'dine_in' && !o.void_open && o.fulfillment_status === 'out_for_delivery'
@@ -421,14 +434,17 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
               {{ batchTitle(b.seq) }} · {{ t('ao.src.customer') }} · {{ t('ao.st.' + b.status) }}<template v-if="b.reject_reason">（{{ b.reject_reason }}）</template></div>
           </div>
           <div v-if="voidClosed(selected)" class="small muted" data-testid="void-closed">{{ t('vd.closed') }}</div>
-          <TotalsTable :totals="selected.totals" :currency="selected.currency" :delivery="selected.service_type === 'delivery'" :discounts="selected.discounts" />
+          <TotalsTable :totals="selected.totals" :currency="selected.currency" :delivery="selected.service_type === 'delivery'" :discounts="selected.discounts" :credit-paid="selected.credit_paid" />
           <div v-if="selected.refunds?.length || selected.refund_open" class="stack refunds" data-testid="refunds">
             <div v-for="r in selected.refunds" :key="r.id" class="small">{{ r.method === 'platform' ? t('po.o.deduct_row', { s: money(r.amount, selected.currency), r: r.reason, at: whenText(r.at, selected.timezone) })
               : t('vd.r.row', { s: money(r.amount, selected.currency), m: r.method, r: r.reason, at: whenText(r.at, selected.timezone) }) }}
-              <span class="muted"> · {{ r.lines.map(l => `${l.name} ×${l.qty}`).join('、') }}</span></div>
+              <span class="muted"> · {{ r.lines.map(l => `${l.name} ×${l.qty}`).join('、') }}</span>
+              <span v-if="r.to_credit" class="tag" data-testid="refund-to-credit-tag">{{ t('co.credit_line') }} {{ money(r.to_credit, selected.currency) }}</span></div>
             <div v-if="refundDone" class="banner ok small">{{ refundDone }}</div>
             <button v-if="selected.refund_open" class="btn small" style="align-self:flex-start" data-testid="refund-btn" @click="refundDone = ''; refunding = true">{{ t('vd.r.btn') }}</button>
           </div>
+          <button v-if="canSpendCredit(selected)" class="btn small" style="align-self:flex-start" data-testid="credit-spend-btn" @click="spending = true">{{ t('sc.s.btn') }}</button>
+          <div v-if="spentNote" class="banner ok small">{{ spentNote }}</div>
           <MoneyLog v-if="can('order.view')" :key="'ml' + selected.id" :order-id="selected.id" :version="selected.version" :currency="selected.currency" :timezone="selected.timezone" />
           <div v-if="selected.totals.adj_percent_bp || selected.totals.adj_mode" class="row between adjrow" data-testid="adj-row">
             <span class="muted">{{ t('ck.adj') }}</span><span>{{ adjText(selected) }}</span></div>
@@ -497,6 +513,7 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
       </div>
     </div>
     <VoidSheet v-if="voiding && selected" :item="voiding" :branch-id="bid" :currency="selected.currency" @done="voided" @close="voiding = null" />
+    <CreditSpend v-if="spending && selected" :order="selected" @done="spent" @close="spending = false" />
     <RefundSheet v-if="refunding && selected" :order="selected" :branch-id="bid" @done="refunded" @close="refunding = false" />
     <div v-if="voidDone" class="vdone-mask" @click.self="voidDone = null">
       <div class="card stack vdone" data-testid="void-done">

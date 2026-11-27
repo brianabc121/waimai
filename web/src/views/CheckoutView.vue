@@ -202,6 +202,13 @@ const buttonText = computed(() => busy.value ? t('placing') : short.value > 0 ? 
 const count = computed(() => lines.value.reduce((n, l) => n + l.qty, 0))
 const promoName = computed(() => quote.value?.totals.promotion_discount ? pick(quote.value.totals.promotion_name, quote.value.totals.promotion_name_en) : '')
 
+// The store balance (docs/REFUND_BALANCE_DESIGN.md §5.2): used unless the
+// customer says no; what the page showed is sent, so a balance that changed
+// meanwhile is shown again before anything is spent.
+const useCredit = ref(true)
+const credit = computed(() => useCredit.value ? quote.value?.credit ?? 0 : 0)
+const due = computed(() => quote.value ? quote.value.totals.total - credit.value : subtotal.value)
+
 const ready = computed(() => !!quote.value && customer.verified && (delivery.value ? !!address.value : cart.name.trim() !== ''))
 
 async function submit() {
@@ -212,16 +219,17 @@ async function submit() {
     const r = await post(`/stores/${props.slug}/orders`, {
       // a delivery takes the name and the address from the saved address
       quote_id: quote.value.id, customer_name: delivery.value ? '' : cart.name, note: cart.note,
+      use_credit: credit.value > 0, credit_expected: credit.value > 0 ? credit.value : undefined,
     }, { 'Idempotency-Key': idemKey })
     clearLines()
     sessionStorage.removeItem('order-key')
     localStorage.setItem('last-order:' + props.slug, r.access_token)
     router.replace(`/o/${r.access_token}`)
   } catch (e) {
-    if (e instanceof ApiError && (e.code === 'QUOTE_CHANGED' || e.code === 'QUOTE_EXPIRED' || e.code === 'QUOTE_USED')) {
+    if (e instanceof ApiError && (e.code === 'QUOTE_CHANGED' || e.code === 'QUOTE_EXPIRED' || e.code === 'QUOTE_USED' || e.code === 'CREDIT_CHANGED')) {
       // Show the new amount first; the customer confirms again.
       await requote()
-      notice.value = t('amount_changed')
+      notice.value = t(e.code === 'CREDIT_CHANGED' ? 'co.credit_changed' : 'amount_changed')
     } else if (e instanceof ApiError && e.code === 'PHONE_NOT_VERIFIED') {
       customer.verified = false
       toLogin()
@@ -307,6 +315,11 @@ async function submit() {
           <span class="grow"><b>{{ t(delivery ? 'co.cod' : 'pay_at_pickup') }}</b><small>{{ t('co.pay_cash') }}</small></span>
           <svg class="ok" viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="11" fill="currentColor" /><path d="m7 12.5 3.2 3L17 9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </div>
+        <label v-if="quote?.store_credit" class="co-credit" data-testid="use-credit">
+          <input v-model="useCredit" type="checkbox" />
+          <span class="grow"><b>{{ t('co.use_credit') }}</b><small>{{ t('co.credit_have', { amt: money(quote.store_credit, cur) }) }}</small></span>
+          <b v-if="useCredit && quote.credit" class="off">−{{ money(quote.credit, cur) }}</b>
+        </label>
         <div class="co-row co-acct" v-if="customer.verified" data-testid="account-phone"><span>{{ t('co.account') }}</span><span>{{ prettyPhone(customer.phone) }}</span></div>
       </div>
       </div>
@@ -350,6 +363,10 @@ async function submit() {
               <span><i class="ic" :class="c.kind">{{ kindBadge(c.kind) }}</i>{{ discountLabel({ ...c, coupon_id: c.id }) }}</span><span>−{{ money(c.amount, cur) }}</span></div>
             <div class="co-row" v-if="quote.totals.discount && (coupons.length || quote.dish_discounts?.length || !quote.totals.promotion_discount)"><span>{{ t('cp.total_off') }}</span><span class="off">−{{ money(quote.totals.discount, cur) }}</span></div>
             <div class="co-row sum"><b>{{ t('total') }}</b><b class="due">{{ money(quote.totals.total, cur) }}</b></div>
+            <template v-if="credit">
+              <div class="co-row disc hl" data-testid="credit-line"><span>{{ t('co.credit_line') }}</span><span>−{{ money(credit, cur) }}</span></div>
+              <div class="co-row sum"><b>{{ t(delivery ? 'co.due_cod' : 'co.due_pickup') }}</b><b class="due" data-testid="checkout-due">{{ money(due, cur) }}</b></div>
+            </template>
             <div class="small muted" v-if="quote.totals.platform_subsidy">{{ t('cp.platform_note') }}</div>
             <div class="co-row small muted" v-if="quote.totals.tax_amount && quote.totals.tax_inclusive"><span>{{ t('tax_included') }} {{ quote.totals.tax_rate_bp / 100 }}%</span><span>{{ money(quote.totals.tax_amount, cur) }}</span></div>
           </template>
@@ -364,7 +381,7 @@ async function submit() {
             <span v-if="count" class="n">{{ count }}</span>
           </span>
           <div class="amt" data-testid="checkout-total">
-            <div class="line1"><b>{{ money(quote ? quote.totals.total : subtotal, cur) }}</b>
+            <div class="line1"><b>{{ money(due, cur) }}</b>
               <span v-if="quote?.totals.discount" class="got">{{ t('co.saved', { amt: money(quote.totals.discount, cur) }) }}</span></div>
             <div class="hint" v-if="promoName">{{ t('sf.got_promo', { name: promoName }) }}</div>
             <div class="hint" v-else-if="!quote && delivery">{{ t('co.no_fee_yet') }}</div>
@@ -469,6 +486,11 @@ async function submit() {
 .co-note .field > span { font-size: 15px; font-weight: 600; color: var(--ink); }
 .co-note input { background: #fff; }
 .co-paywith { display: flex; align-items: center; gap: 12px; }
+.co-credit { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--gold, #d9b26b); border-radius: 10px; background: #fff8ea; cursor: pointer; }
+.co-credit input { width: 18px; height: 18px; accent-color: var(--red); flex: none; }
+.co-credit .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.co-credit small { color: var(--muted); }
+.co-credit .off { color: var(--red); white-space: nowrap; }
 .co-paywith .ic { flex: none; color: var(--red); }
 .co-paywith .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .co-paywith b { font-size: 15px; font-weight: 600; } .co-paywith small { color: var(--muted); font-size: 12px; }

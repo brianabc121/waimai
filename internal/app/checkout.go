@@ -473,6 +473,13 @@ func (a *App) SetOrderPayment(ctx context.Context, orderID int64, in PayInput, a
 		if isPlatform {
 			return ErrInvalidState("a platform order is paid on the platform")
 		}
+		var due int64
+		if err := tx.QueryRow(ctx, `SELECT total - credit_paid FROM orders WHERE id=$1`, o.ID).Scan(&due); err != nil {
+			return err
+		}
+		if due == 0 {
+			return ErrInvalidState("the order was paid from the store balance")
+		}
 		ch, name, err := resolvePay(ctx, tx, o.BranchID, in)
 		if err != nil {
 			return err

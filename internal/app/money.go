@@ -582,7 +582,12 @@ func saveMoney(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, p *pric
 		return err
 	}
 	// a platform order's commission follows its amounts
-	return refreshPlatformFees(ctx, tx, orderID)
+	if err := refreshPlatformFees(ctx, tx, orderID); err != nil {
+		return err
+	}
+	// what was paid from a store balance stays within the new amount
+	// (docs/REFUND_BALANCE_DESIGN.md §5.4)
+	return settleTenders(ctx, tx, orderID)
 }
 
 // saveDiscountRows replaces the order's discount rows: one for the

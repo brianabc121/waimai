@@ -50,6 +50,9 @@ export interface Application extends ApplicationPlace {
   id: number; store_name: string; contact_name: string; phone: string; city: string; cuisine: string; note: string
   status: 'pending' | 'approved' | 'rejected'; reply: string; decided_at: string | null; created_at: string
 }
+// A balance a store refunded into, spent only at that store (docs/REFUND_BALANCE_DESIGN.md).
+export interface StoreCredit { account_id: number; branch_id: number; store_name: string; slug: string; currency: string; balance: number; frozen: boolean; closed: boolean }
+export interface CreditEntry { id: number; at: string; kind: 'refund' | 'spend' | 'return' | 'revoke'; amount: number; balance: number; order_id: number; public_no: string; brand_name: string; refund_id: number }
 export interface WalletEntry { id: number; account: string; currency: string; amount: number; note: string; created_at: string }
 export type PlatformInfo = Record<'name' | 'about' | 'about_en' | 'support_phone' | 'support_email' | 'support_hours' | 'support_chat', string>
 
@@ -88,6 +91,8 @@ export const placeLine = (p: Partial<ApplicationPlace> & { city?: string }) =>
 export const myApplications = () => get<{ applications: Application[] }>('/customer/applications').then(r => r.applications)
 export const sendApplication = (a: Record<string, string | number | null>) => post<Application>('/customer/applications', a)
 export const walletEntries = (account: string) => get<{ entries: WalletEntry[] }>(`/customer/wallet/${account}`).then(r => r.entries)
+export const myStoreCredits = () => get<{ items: StoreCredit[] }>('/customer/store-credits').then(r => r.items)
+export const myStoreCreditEntries = (branchID: number) => get<{ items: CreditEntry[] }>(`/customer/store-credits/${branchID}`).then(r => r.items)
 export const platformInfo = () => get<PlatformInfo>('/platform/info')
 
 // ---- "home" is the marketplace; the last store is still remembered ----
@@ -132,7 +137,7 @@ extend({
   'me.no_offers': ['暂无可用优惠，去店铺看看吧', 'No offers right now. Have a look at a store.'],
   'me.favorites': ['我的收藏', 'Favourites'], 'me.support': ['我的客服', 'Support'], 'me.reviews': ['我的评价', 'My reviews'],
   'me.messages': ['我的消息', 'Messages'], 'me.apply': ['商家入驻', 'Open a store'], 'me.addresses': ['收货地址', 'Addresses'],
-  'me.about': ['关于我们', 'About us'], 'me.feedback': ['意见反馈', 'Feedback'], 'me.help': ['账号疑问', 'Account help'],
+  'me.store_credit': ['店铺余额', 'Store balances'], 'me.about': ['关于我们', 'About us'], 'me.feedback': ['意见反馈', 'Feedback'], 'me.help': ['账号疑问', 'Account help'],
   'me.common': ['常用服务', 'Everyday'], 'me.more_services': ['更多服务', 'More'],
   'me.need_login': ['请先登录', 'Please log in first'],
   // profile and settings
@@ -147,6 +152,13 @@ extend({
     'For now only the platform adds to your balance (refunds, compensation). Topping up and paying from the balance come with online payment, which is not available yet.'],
   'mw.bonus_note': ['奖励金由平台在活动中发放，目前只做记录，还不能在下单时抵扣。',
     'Rewards are given by the platform during campaigns. For now they are only recorded and cannot be spent on an order yet.'],
+  // store balances
+  'sc.title': ['店铺余额', 'Store balances'], 'sc.none': ['还没有店铺余额', 'No store balances yet'],
+  'sc.note': ['店铺余额是商家把退款存给你的钱，只能在那家店下单时使用，不能提现，也不能转给别人。下单结算时可以勾选“用店铺余额”。',
+    'A store balance is a refund the store kept for you. It can only be spent on orders at that store, and cannot be cashed out or passed on. Tick "Use store balance" at checkout.'],
+  'sc.frozen': ['已冻结', 'Frozen'], 'sc.closed': ['店铺已停业', 'Store closed'], 'sc.use': ['去下单', 'Order'],
+  'sc.k_refund': ['退款存入', 'Refund in'], 'sc.k_spend': ['下单使用', 'Spent'], 'sc.k_return': ['订单退回', 'Returned'], 'sc.k_revoke': ['改为现金退款', 'Paid in cash instead'],
+  'sc.after': ['余额 {amt}', 'Balance {amt}'], 'sc.order': ['订单 {no}', 'Order {no}'],
   // offers
   'mo.title': ['我的优惠', 'My offers'], 'mo.hint': ['下面是你常去的店铺正在进行的优惠。满足条件时下单会自动使用最划算的一个，不用领取。',
     'These are the offers running at your stores. The best one that applies is used by itself at checkout.'],

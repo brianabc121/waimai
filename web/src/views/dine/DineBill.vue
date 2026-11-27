@@ -7,7 +7,10 @@ import { ApiError, get, post } from '../../api'
 import { money, pick, t, toMinor } from '../../i18n'
 import { can } from '../../session'
 import { pctText, payText } from '../../checkout'
-import type { Adjust, Bill, DinePresets, Item, OrderItem, PayChoice, PayOptions, Totals } from '../../types'
+import type { Adjust, Bill, DinePresets, Item, Order, OrderItem, PayChoice, PayOptions, Totals } from '../../types'
+import CreditSpend from '../CreditSpend.vue'
+import '../../credit'
+import '../../addresses'
 import AdjustSheet from '../checkout/AdjustSheet.vue'
 import PayPicker from '../checkout/PayPicker.vue'
 import ApproveDialog from '../ApproveDialog.vue'
@@ -116,13 +119,17 @@ function resetPay() { pay.digits = ''; pay.manifest = o.value.manifest_version; 
 resetPay()
 watch(() => o.value.manifest_version, v => { if (pay.manifest && v !== pay.manifest) { resetPay(); error.value = t('bill_changed') } })
 // amounts are typed in major units; the bill is in minor units
-const due = computed(() => tot.value.total)
+// what is still collected: the bill less what the customer's store balance paid (docs/REFUND_BALANCE_DESIGN.md §5)
+const total = computed(() => tot.value.total)
+const due = computed(() => Math.max(0, tot.value.total - (o.value.credit_paid ?? 0)))
+const spending = ref(false)
+function spent(order: Order) { spending.value = false; emit('update', { ...props.bill, order }); resetPay() }
 const received = computed(() => pay.digits ? toMinor(pay.digits) : due.value)
 const change = computed(() => received.value - due.value)
 const canClose = computed(() => !cooking.value && change.value >= 0 && !pay.busy && (choice.value.type !== 'online' || !!choice.value.channel_id))
 // the quick amounts: round numbers just above the bill
 const quick = computed(() => {
-  const due = tot.value.total / 100
+  const due = Math.max(0, tot.value.total - (o.value.credit_paid ?? 0)) / 100
   const steps = due < 100 ? [10, 50, 100] : due < 1000 ? [50, 100, 500] : [100, 500, 1000]
   const out: number[] = []
   for (const s of steps) { const v = Math.ceil(due / s) * s; if (v > due && !out.includes(v)) out.push(v) }
@@ -141,7 +148,7 @@ async function close() {
   try {
     const b = await post<Bill>(`/merchant/table-sessions/${props.bill.session_id}/close`,
       { expected_manifest_version: pay.manifest, amount_received: cashLike.value ? received.value : due.value, pay_type: choice.value.type,
-        pay_channel_id: choice.value.channel_id, adjust: adjust.value, expected_total: due.value, note: '' },
+        pay_channel_id: choice.value.channel_id, adjust: adjust.value, expected_total: total.value, note: '' },
       adjust.value && approval.value ? { 'X-Approval': approval.value } : undefined)
     emit('update', b)
     done.value = true
@@ -194,7 +201,7 @@ const done = ref(false)
           </template>
         </template>
         <div v-if="!rounds.length" class="dd-empty">{{ t('dd.not_ordered') }}</div>
-        <div v-if="phone && bill.status === 'open'" class="dd-pfoot"><span>{{ t('dd.due') }} <b>{{ m(o.totals.total) }}</b></span>
+        <div v-if="phone && bill.status === 'open'" class="dd-pfoot"><span>{{ t('dd.due') }} <b>{{ m(due) }}</b></span>
           <button class="dd-big gold" data-testid="dd-pay" @click="paying = true">{{ t('dd.pay') }}</button></div>
       </section>
 
@@ -207,6 +214,9 @@ const done = ref(false)
         <button class="kv adj" :class="{ set: !!adjust }" data-testid="dd-adj" @click="openAdjust">
           <span>{{ t('ck.adj') }}</span><span>{{ adjLabel }} <span class="rtl-flip">›</span></span></button>
         <div v-if="notice" class="muted small" data-testid="dd-approved">{{ notice }}</div>
+        <div v-if="o.credit_paid" class="kv promo" data-testid="dd-credit"><span>{{ t('co.credit_line') }}</span><span>−{{ m(o.credit_paid) }}</span></div>
+        <button v-else-if="can('order.handle', 'table.use', 'order.manual')" class="kv adj" data-testid="dd-use-credit" @click="spending = true">
+          <span>{{ t('sc.s.btn') }}</span><span class="rtl-flip">›</span></button>
         <div class="due"><span>{{ t('dd.due') }}</span><b data-testid="dd-due"><s v-if="adjTotals && adjTotals.total !== o.totals.total" class="was">{{ m(o.totals.total) }}</s>{{ m(due) }}</b></div>
         <PayPicker v-model="choice" :options="payOpts" class="methods" />
         <template v-if="cashLike">
@@ -223,6 +233,7 @@ const done = ref(false)
       </section>
     </div>
 
+    <CreditSpend v-if="spending" :order="o" @done="spent" @close="spending = false" />
     <AdjustSheet v-if="adjOpen" :currency="currency" :reasons="payOpts?.reasons" :initial="adjust" :bottom="phone" :preview="previewAdj"
       @close="adjOpen = false" @apply="setAdjust" />
     <ApproveDialog v-if="approving" :branch-id="o.branch_id" perm="checkout.discount" :what="t('ck.approve_what')" @approved="approved" @close="approving = false" />
@@ -239,7 +250,8 @@ const done = ref(false)
           <div v-if="o.totals.staff_discount" class="kv"><span>{{ t('ck.staff_disc') }}</span><b>−{{ m(o.totals.staff_discount) }}</b></div>
           <div v-if="o.totals.round_off" class="kv"><span>{{ t('ck.round_off') }}</span><b>−{{ m(o.totals.round_off) }}</b></div>
           <div class="kv"><span>{{ t('dd.received') }} · {{ payText(o) }}</span><b data-testid="dd-closed-received">{{ m(o.amount_received ?? 0) }}</b></div>
-          <div v-if="(o.amount_received ?? 0) > o.totals.total" class="kv"><span>{{ t('dd.change') }}</span><b>{{ m((o.amount_received ?? 0) - o.totals.total) }}</b></div>
+          <div v-if="o.credit_paid" class="kv"><span>{{ t('co.credit_line') }}</span><b>−{{ m(o.credit_paid) }}</b></div>
+          <div v-if="(o.amount_received ?? 0) > o.totals.total - (o.credit_paid ?? 0)" class="kv"><span>{{ t('dd.change') }}</span><b>{{ m((o.amount_received ?? 0) - o.totals.total + (o.credit_paid ?? 0)) }}</b></div>
         </div>
         <div class="mf"><a class="dd-big ghost" :href="`/ticket/${o.id}`" target="_blank" rel="noopener">{{ t('dd.print') }}</a>
           <button class="dd-big" style="flex:2" data-testid="dd-done" @click="emit('closed')">{{ t('dd.done') }}</button></div>

@@ -37,7 +37,14 @@ func TestRolePermissions(t *testing.T) {
 	if p := permsOf(t, mgr); !slices.Contains(p, "bills") || !slices.Contains(p, "staff.manage") {
 		t.Fatalf("manager defaults: %v", p)
 	}
-	if p := permsOf(t, owner); len(p) != 37 {
+	// store credit (docs/REFUND_BALANCE_DESIGN.md §6.4): managers by default, not order takers
+	if p := permsOf(t, desk); slices.Contains(p, "wallet.refund") || slices.Contains(p, "wallet.view") {
+		t.Fatalf("cashier has store credit: %v", p)
+	}
+	if p := permsOf(t, mgr); !slices.Contains(p, "wallet.refund") || !slices.Contains(p, "wallet.view") {
+		t.Fatalf("manager lacks store credit: %v", p)
+	}
+	if p := permsOf(t, owner); len(p) != 39 {
 		t.Fatalf("owner: %d perms", len(p))
 	}
 	mgr.want(403, "OWNER_ONLY", "GET", permsURL, nil)

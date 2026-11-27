@@ -48,6 +48,7 @@ e2e:
 	$(E2E_NODE) e2e/admin.cjs
 	$(E2E_NODE) e2e/dinedesk.cjs
 	$(E2E_NODE) e2e/void.cjs
+	$(E2E_NODE) e2e/storecredit.cjs
 	$(E2E_NODE) e2e/toppings.cjs
 	$(E2E_NODE) e2e/pospages.cjs
 	$(E2E_NODE) e2e/menupage.cjs

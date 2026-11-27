@@ -24,3 +24,13 @@ func TestPricingCheckOverAllOrders(t *testing.T) {
 	}
 	t.Logf("%d orders checked, %d broken", n, len(broken))
 }
+
+// The store-credit books as a whole (docs/PRICING_CHECK.md §2, W1 and W2).
+func TestWalletCheckOverAll(t *testing.T) {
+	need(t)
+	bad, err := testApp.CheckWallet(context.Background())
+	noErr(t, err)
+	if len(bad) > 0 {
+		t.Errorf("wallet:\n  %s", strings.Join(bad, "\n  "))
+	}
+}

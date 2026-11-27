@@ -3,7 +3,8 @@
 // §7): pick dishes, the amount follows the void rules, the money is given
 // back outside the system and recorded here.
 import { computed, reactive, ref, watch } from 'vue'
-import { post } from '../api'
+import { ApiError, newKey, post } from '../api'
+import { creditErr, requestCreditCode } from '../credit'
 import { money, t, toMinor } from '../i18n'
 import { can } from '../session'
 import type { Order, RefundQuote } from '../types'
@@ -25,7 +26,12 @@ const lines = computed(() => props.order.items.filter(i => i.prep_status !== 'ca
 const qty = reactive<Record<number, number>>({})
 const picked = computed(() => lines.value.filter(l => (qty[l.it.id] ?? 0) > 0).map(l => ({ item_id: l.it.id, qty: qty[l.it.id] })))
 
-const s = reactive({ reason: '', writing: false, text: '', kind: 'store' as 'store' | 'customer', method: '', amount: '', busy: false })
+const s = reactive({ reason: '', writing: false, text: '', kind: 'store' as 'store' | 'customer', method: '', amount: '', busy: false,
+  // into the customer's store balance (docs/REFUND_BALANCE_DESIGN.md §6.3): how they agreed, or the code texted to them
+  toCredit: false, consent: '' as '' | 'in_person' | 'phone' | 'chat', phone: '', code: '', codeID: 0, sentTo: '', needPhone: false })
+// one refund, however many times it is pressed or retried
+const idem = newKey()
+const consents = ['in_person', 'phone', 'chat'] as const
 const methods = splitList('vd.r.methods')
 // the list is cash, transfer, e-wallet, other in every language
 const payType = () => ['cash', 'transfer', 'online', 'other'][methods.indexOf(s.method)] ?? 'other'
@@ -34,31 +40,64 @@ const reasons = [...customerReasons(), ...splitList('vd.reasons.store')]
 const reason = computed(() => s.writing ? s.text.trim() : s.reason)
 const quote = ref<RefundQuote | null>(null)
 const error = ref('')
-const approving = ref(false)
+const approving = ref('')
+const canCreditDest = computed(() => !!quote.value && props.order.order_type !== 'platform')
+const needCode = computed(() => s.toCredit && !!quote.value && !quote.value.can_credit)
 
 let seq = 0
-watch([picked, () => s.kind], async () => {
+async function dry(keepAmount: boolean) {
   const n = ++seq
   if (!picked.value.length) { quote.value = null; return }
   try {
-    const r = await post<{ quote: RefundQuote }>(`/merchant/orders/${props.order.id}/refunds`, { lines: picked.value, reason_kind: s.kind, dry: true })
-    if (n === seq) { quote.value = r.quote; s.amount = ''; error.value = '' }
+    const typed = keepAmount && s.amount ? toMinor(s.amount) : 0
+    const r = await post<{ quote: RefundQuote }>(`/merchant/orders/${props.order.id}/refunds`,
+      { lines: picked.value, reason_kind: s.kind, dry: true, amount: typed > 0 ? typed : undefined })
+    if (n === seq) { quote.value = r.quote; if (!keepAmount) s.amount = ''; error.value = '' }
   } catch (e) { if (n === seq) { quote.value = null; error.value = voidErr(e) } }
-}, { deep: true })
+}
+watch([picked, () => s.kind], () => dry(false), { deep: true })
+// the split between the money paid and the balance follows the amount typed
+let timer = 0
+watch(() => s.amount, () => { clearTimeout(timer); timer = window.setTimeout(() => dry(true), 300) })
 
 const amount = computed(() => s.amount ? toMinor(s.amount) : quote.value?.suggested ?? 0)
 const tooMuch = computed(() => !!quote.value && amount.value > quote.value.suggested)
 function tap(r: string) { s.reason = r; s.writing = false; s.kind = kindOf(r) }
 
+const perm = computed(() => s.toCredit ? 'wallet.refund' : 'order.aftersale')
+const ready = computed(() => !!quote.value && !!reason.value && !tooMuch.value && amount.value > 0 &&
+  (!s.toCredit || (needCode.value ? s.codeID > 0 && /^\d{6}$/.test(s.code) : !!s.consent)))
+
+async function sendCode() {
+  error.value = ''
+  try {
+    const r = await requestCreditCode(props.order.id, 'refund', s.phone.trim())
+    s.codeID = r.id; s.sentTo = r.phone; s.code = r.dev_code ?? ''
+  } catch (e) {
+    if (e instanceof ApiError && e.code === 'CREDIT_PHONE') s.needPhone = true
+    error.value = creditErr(e)
+  }
+}
+
 async function go(headers?: Record<string, string>) {
-  if (!quote.value || !reason.value || tooMuch.value || amount.value <= 0) return
-  if (!headers && !can('order.aftersale')) { approving.value = true; return }
+  if (!ready.value) return
+  if (!headers && !can(perm.value)) { approving.value = perm.value; return }
   s.busy = true; error.value = ''
   try {
-    const r = await post<{ order: Order }>(`/merchant/orders/${props.order.id}/refunds`,
-      { lines: picked.value, amount: amount.value, method: s.method, pay_type: payType(), reason: reason.value, reason_kind: s.kind }, headers)
+    const body: Record<string, unknown> = { lines: picked.value, amount: amount.value, reason: reason.value, reason_kind: s.kind }
+    if (s.toCredit) {
+      body.to_credit = true
+      if (needCode.value) body.verify = { id: s.codeID, code: s.code }
+      else body.consent = s.consent
+    } else { body.method = s.method; body.pay_type = payType() }
+    const r = await post<{ order: Order }>(`/merchant/orders/${props.order.id}/refunds`, body, { ...headers, 'Idempotency-Key': idem })
     emit('done', r.order, amount.value)
-  } catch (e) { error.value = voidErr(e) }
+  } catch (e) {
+    // above the store's limits: a manager (or the owner) approves this one
+    if (e instanceof ApiError && (e.code === 'CREDIT_NEEDS_APPROVAL' || e.code === 'CREDIT_DAILY_LIMIT') && !headers) {
+      error.value = creditErr(e); approving.value = 'wallet.refund'
+    } else error.value = e instanceof ApiError && e.code.startsWith('CREDIT') || e instanceof ApiError && e.code.startsWith('OTP') ? creditErr(e) : voidErr(e)
+  }
   s.busy = false
 }
 </script>
@@ -83,21 +122,50 @@ async function go(headers?: Record<string, string>) {
         </div>
         <div class="kinds"><button v-for="k in (['store', 'customer'] as const)" :key="k" class="kd" :class="{ on: s.kind === k }" @click="s.kind = k">{{ t('vd.kind.' + k) }}</button>
           <span class="small muted">{{ t('vd.kind_hint.' + s.kind) }}</span></div>
-        <div class="lbl">{{ t('vd.r.method') }}</div>
-        <div class="chs"><button v-for="x in methods" :key="x" class="ch" :class="{ on: s.method === x }" @click="s.method = x">{{ x }}</button></div>
+        <template v-if="canCreditDest">
+          <div class="lbl">{{ t('sc.r.dest') }}</div>
+          <div class="chs">
+            <button class="ch" :class="{ on: !s.toCredit }" data-testid="refund-to-money" @click="s.toCredit = false">{{ t('sc.r.to_money') }}</button>
+            <button class="ch" :class="{ on: s.toCredit }" data-testid="refund-to-credit" @click="s.toCredit = true">{{ !can('wallet.refund') ? '🔒 ' : '' }}{{ t('sc.r.to_credit') }}</button>
+          </div>
+        </template>
+        <template v-if="!s.toCredit">
+          <div class="lbl">{{ t('vd.r.method') }}</div>
+          <div class="chs"><button v-for="x in methods" :key="x" class="ch" :class="{ on: s.method === x }" @click="s.method = x">{{ x }}</button></div>
+        </template>
+        <template v-else>
+          <div class="small muted">{{ t('sc.r.credit_hint') }}</div>
+          <template v-if="!needCode">
+            <div class="lbl">{{ t('sc.r.consent') }} <span class="req">{{ t('vd.required') }}</span></div>
+            <div class="chs"><button v-for="c in consents" :key="c" class="ch" :class="{ on: s.consent === c }" data-testid="refund-consent" @click="s.consent = c">{{ t('sc.r.c.' + c) }}</button></div>
+          </template>
+          <div v-else class="stack code" data-testid="refund-code">
+            <div class="small">{{ t('sc.r.code_need') }}</div>
+            <label v-if="s.needPhone || !order.customer_phone" class="field" style="margin:0"><span>{{ t('sc.r.phone') }}</span>
+              <input v-model="s.phone" inputmode="tel" data-testid="refund-code-phone" /></label>
+            <div class="row"><button class="btn small" data-testid="refund-code-send" @click="sendCode">{{ t(s.codeID ? 'sc.r.resend' : 'sc.r.send') }}</button>
+              <span v-if="s.sentTo" class="small muted">{{ t('sc.r.sent', { p: s.sentTo }) }}</span></div>
+            <label v-if="s.codeID" class="field" style="margin:0"><span>{{ t('sc.r.code') }}</span>
+              <input v-model="s.code" inputmode="numeric" maxlength="6" data-testid="refund-code-input" /></label>
+          </div>
+        </template>
         <template v-if="quote">
           <label class="field" style="margin:0"><span>{{ t('vd.r.amount') }} · {{ t('vd.r.suggested', { s: m(quote.suggested) }) }}</span>
             <input v-model="s.amount" inputmode="decimal" :placeholder="(quote.suggested / 100).toFixed(2)" data-testid="refund-amount" /></label>
+          <div v-if="s.toCredit" class="banner info small" data-testid="refund-split">{{ t('sc.r.split_credit', { s: m(amount) }) }}</div>
+          <div v-else-if="quote.credit_paid && quote.credit_part" class="banner info small" data-testid="refund-split">
+            {{ t('sc.r.split', { cash: m(quote.cash_part ?? 0), credit: m(quote.credit_part) }) }}</div>
         </template>
         <div v-if="error" class="banner bad small">{{ error }}</div>
       </div>
       <div class="vf">
         <button class="btn" @click="emit('close')">{{ t('vd.cancel') }}</button>
-        <button class="btn primary grow" :disabled="s.busy || !quote || !reason || tooMuch || amount <= 0" data-testid="refund-ok" @click="go()">
-          {{ !can('order.aftersale') ? '🔒 ' : '' }}{{ t('vd.r.ok', { s: m(amount) }) }}</button>
+        <button class="btn primary grow" :disabled="s.busy || !ready" data-testid="refund-ok" @click="go()">
+          {{ !can(perm) ? '🔒 ' : '' }}{{ t(s.toCredit ? 'sc.r.ok' : 'vd.r.ok', { s: m(amount) }) }}</button>
       </div>
     </div>
-    <ApproveDialog v-if="approving" :branch-id="branchId" perm="order.aftersale" :what="t('vd.r.btn')" @approved="tok => { approving = false; go({ 'X-Approval': tok }) }" @close="approving = false" />
+    <ApproveDialog v-if="approving" :branch-id="branchId" :perm="approving" :what="t(approving === 'wallet.refund' ? 'sc.r.approve' : 'vd.r.btn')"
+      @approved="tok => { approving = ''; go({ 'X-Approval': tok }) }" @close="approving = ''" />
   </div>
 </template>
 
@@ -123,6 +191,7 @@ async function go(headers?: Record<string, string>) {
 .kinds { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .kd { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; }
 .kd.on { border-color: var(--brand); color: var(--brand); font-weight: 600; }
+.code { gap: 8px; } .code .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .vf { display: flex; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .vf .btn { min-height: 44px; }
 </style>

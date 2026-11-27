@@ -7,6 +7,7 @@ import { t, whenText } from '../../i18n'
 import { isOwner, session } from '../../session'
 import StaffTabs from './StaffTabs.vue'
 import '../../perms'
+import '../../credit'
 
 interface Def { code: string; group: string; cashier: boolean; manager: boolean; locked_cashier?: boolean; requires?: string[] }
 interface Table { catalog: Def[]; cashier: string[]; manager: string[]; cashier_count: number; manager_count: number; updated_by?: string; updated_at?: string }
