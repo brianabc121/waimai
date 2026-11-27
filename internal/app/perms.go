@@ -109,6 +109,8 @@ var PermCatalog = []PermDef{
 	{Code: PermReconcile, Group: "money", Cashier: false, Manager: true},
 	{Code: PermWalletRefund, Group: "money", Cashier: false, Manager: true, Requires: []string{PermOrderAftersale}},
 	{Code: PermWalletView, Group: "money", Cashier: false, Manager: true},
+	{Code: PermStoredTopup, Group: "money", Cashier: true, Manager: true},
+	{Code: PermStoredCashout, Group: "money", Cashier: false, Manager: true},
 	{Code: PermRiderView, Group: "delivery", Cashier: true, Manager: true},
 	{Code: PermDeliveryMap, Group: "delivery", Cashier: false, Manager: true},
 	{Code: PermStaffView, Group: "staff", Cashier: false, Manager: true},

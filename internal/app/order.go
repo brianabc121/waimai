@@ -168,7 +168,11 @@ type Order struct {
 	// Due is the rest, collected in cash or otherwise
 	// (docs/REFUND_BALANCE_DESIGN.md §5.1).
 	CreditPaid int64 `json:"credit_paid"`
-	Due        int64 `json:"due"`
+	// StoredPrincipalPaid and StoredBonusPaid are the part of CreditPaid
+	// that came from stored value (docs/STORED_VALUE_DESIGN.md §5).
+	StoredPrincipalPaid int64 `json:"stored_principal_paid"`
+	StoredBonusPaid     int64 `json:"stored_bonus_paid"`
+	Due                 int64 `json:"due"`
 	// PayCheck is the owner's check of an online payment on the
 	// reconciliation page: "", ok or problem (with PayCheckNote).
 	PayCheck     string `json:"pay_check"`
@@ -275,7 +279,8 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	COALESCE((SELECT u.display_name FROM users u WHERE u.id = o.adj_approved_by), ''), o.adj_at, o.pay_type,
 	COALESCE(o.pay_channel_id, 0), COALESCE((SELECT pc.status FROM payment_checks pc WHERE pc.order_id = o.id), ''),
 	COALESCE((SELECT pc.note FROM payment_checks pc WHERE pc.order_id = o.id), ''), o.order_type, o.dine_source,
-	o.brand_id, o.brand_name, COALESCE((SELECT br.color FROM brands br WHERE br.id = o.brand_id), ''), o.credit_paid`
+	o.brand_id, o.brand_name, COALESCE((SELECT br.color FROM brands br WHERE br.id = o.brand_id), ''), o.credit_paid,
+	o.stored_principal_paid, o.stored_bonus_paid`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}, Discounts: []OrderDiscount{}, Voids: []OrderVoid{}, Refunds: []OrderRefund{}}
@@ -293,7 +298,8 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&o.PlacedBy, &o.StaffNote, &o.PayMethod, &o.TableTags,
 		&t.AdjPercentBP, &t.StaffDiscount, &t.AdjMode, &t.RoundOff, &o.AdjReason, &o.AdjBy, &o.AdjApprovedBy, &o.AdjAt,
 		&o.PayType, &o.PayChannelID, &o.PayCheck, &o.PayCheckNote, &o.OrderType, &o.DineSource,
-		&o.BrandID, &o.BrandName, &o.BrandColor, &o.CreditPaid)
+		&o.BrandID, &o.BrandName, &o.BrandColor, &o.CreditPaid,
+		&o.StoredPrincipalPaid, &o.StoredBonusPaid)
 	if err != nil {
 		return nil, err
 	}
