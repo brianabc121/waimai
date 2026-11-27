@@ -33,7 +33,10 @@ const MaxMapPoints = 20000
 // DeliveryScope is whose deliveries: one store (BranchID), one merchant's
 // stores, or every store, optionally in one country or city.
 type DeliveryScope struct {
-	BranchID    int64
+	BranchID int64
+	// Brands narrows a store's deliveries to some of its brands; nil is every
+	// brand together (docs/MULTI_BRAND_DESIGN.md §12).
+	Brands      []int64
 	MerchantID  int64
 	CountryCode string
 	City        string
@@ -74,6 +77,9 @@ func (s DeliveryScope) where(args *sqlArgs) []string {
 	w := []string{countedDelivery, "b.deleted_at IS NULL"}
 	if s.BranchID != 0 {
 		w = append(w, "o.branch_id = "+args.add(s.BranchID))
+	}
+	if s.Brands != nil {
+		w = append(w, "o.brand_id = ANY("+args.add(s.Brands)+"::bigint[])")
 	}
 	if s.MerchantID != 0 {
 		w = append(w, "b.merchant_id = "+args.add(s.MerchantID))
@@ -232,12 +238,14 @@ func (a *App) CustomerAddresses(ctx context.Context, f CustomerAddressFilter) (*
 }
 
 // AddressOrders lists one store's delivery orders for one customer at one
-// address (and unit), newest first, whatever became of them.
-func (a *App) AddressOrders(ctx context.Context, branchID int64, cust, key, unitKey string, p Page) (*MemberOrders, error) {
+// address (and unit), newest first, whatever became of them; brands narrows
+// them to some of the store's brands (nil: all).
+func (a *App) AddressOrders(ctx context.Context, branchID int64, brands []int64, cust, key, unitKey string, p Page) (*MemberOrders, error) {
 	const mine = `o.branch_id = $1 AND o.service_type = 'delivery' AND ` + custKey + ` = $2
-		AND addr_key(o.address_line) = $3 AND lower(btrim(o.address_unit)) = $4`
+		AND addr_key(o.address_line) = $3 AND lower(btrim(o.address_unit)) = $4
+		AND ($5::bigint[] IS NULL OR o.brand_id = ANY($5))`
 	out := &MemberOrders{Items: []MemberOrder{}}
-	if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM orders o WHERE `+mine, branchID, cust, key, unitKey).
+	if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM orders o WHERE `+mine, branchID, cust, key, unitKey, brands).
 		Scan(&out.Total); err != nil {
 		return nil, err
 	}
@@ -246,8 +254,8 @@ func (a *App) AddressOrders(ctx context.Context, branchID int64, cust, key, unit
 			o.acceptance_status, o.fulfillment_status, o.total, o.currency, o.address_line, o.member_id IS NOT NULL,
 			COALESCE((SELECT string_agg(i.name || ' ×' || i.qty, '、' ORDER BY i.id) FROM order_items i
 				WHERE i.order_id = o.id AND i.void_reason = ''), '')
-		FROM orders o WHERE `+mine+` ORDER BY o.created_at DESC, o.id DESC LIMIT $5 OFFSET $6`,
-		branchID, cust, key, unitKey, limit, offset)
+		FROM orders o WHERE `+mine+` ORDER BY o.created_at DESC, o.id DESC LIMIT $6 OFFSET $7`,
+		branchID, cust, key, unitKey, brands, limit, offset)
 	if err != nil {
 		return nil, err
 	}

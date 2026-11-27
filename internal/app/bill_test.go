@@ -38,7 +38,7 @@ func TestBills(t *testing.T) {
 	done(o3, "now()")
 
 	today := time.Now().In(time.FixedZone("PHT", 8*3600)).Format("2006-01-02")
-	l, err := a.Bills(ctx, s.branchID, today, today, "")
+	l, err := a.Bills(ctx, s.branchID, nil, today, today, "")
 	noErr(t, err)
 	if len(l.Orders) != 3 || l.Count != 3 {
 		t.Fatalf("rows: %d", len(l.Orders))
@@ -63,16 +63,16 @@ func TestBills(t *testing.T) {
 		t.Fatalf("sum: %+v", l.Sum)
 	}
 	for f, want := range map[string]int{"coupon": 1, "none": 2, app.CouponPlatformFree: 1, app.CouponStoreThreshold: 0} {
-		l, err := a.Bills(ctx, s.branchID, today, today, f)
+		l, err := a.Bills(ctx, s.branchID, nil, today, today, f)
 		noErr(t, err)
 		if len(l.Orders) != want {
 			t.Fatalf("filter %s: %d rows, want %d", f, len(l.Orders), want)
 		}
 	}
-	_, err = a.Bills(ctx, s.branchID, today, today, "x")
+	_, err = a.Bills(ctx, s.branchID, nil, today, today, "x")
 	wantCode(t, err, "VALIDATION")
 
-	sum, err := a.BillSummary(ctx, s.branchID, today, today)
+	sum, err := a.BillSummary(ctx, s.branchID, nil, today, today)
 	noErr(t, err)
 	if sum.Orders != 2 || sum.Cancelled != 1 || sum.PlatformDiscount != 1000 || sum.Takings != sum.Paid+1000 || len(sum.Kinds) != 6 {
 		t.Fatalf("summary: %+v", sum)
@@ -120,7 +120,7 @@ func TestBills(t *testing.T) {
 	wantCode(t, a.MarkSettlementPaid(ctx, admin, st.ID, "2026-12-05", ""), "VALIDATION")
 	noErr(t, a.MarkSettlementPaid(ctx, admin, st.ID, "2026-12-05", "BDO-123"))
 	wantCode(t, a.MarkSettlementPaid(ctx, admin, st.ID, "2026-12-05", "BDO-123"), "INVALID_STATE")
-	sum, err = a.BillSummary(ctx, s.branchID, today, today)
+	sum, err = a.BillSummary(ctx, s.branchID, nil, today, today)
 	noErr(t, err)
 	if len(sum.Settlements) != 1 || sum.Settlements[0].Status != "paid" || *sum.Settlements[0].PaidOn != "2026-12-05" {
 		t.Fatalf("store sees: %+v", sum.Settlements)

@@ -16,6 +16,9 @@ import '../members/memberStrings'
 import './deliveryStrings'
 import OxPager from '../OxPager.vue'
 import '../../officeStrings'
+import { brandsHere, multiBrand, useBrandPick } from '../../brands'
+import BrandSeg from '../brands/BrandSeg.vue'
+import type { BrandRef } from '../../types'
 
 const props = defineProps<{ admin?: boolean }>()
 const route = useRoute(), router = useRouter()
@@ -84,10 +87,20 @@ function errText(e: unknown): string {
   if (e instanceof ApiError && e.code === 'RANGE_TOO_LONG') return t('da.too_long', { n: MAX_DAYS, d: days.value })
   return (e as Error).message
 }
+// one brand, or every brand together (docs/MULTI_BRAND_DESIGN.md §12); the
+// platform picks a brand once it has picked a store
+const { pick: brandPick } = useBrandPick('addresses', brandsHere, true)
+const adminBrand = ref(0)
+const adminBrands = ref<BrandRef[]>([])
+watch(() => sc.branch, async id => {
+  adminBrand.value = 0; adminBrands.value = []
+  if (props.admin && id) adminBrands.value = (await get<{ brands: BrandRef[] }>(`/admin/delivery-addresses/brands?branch_id=${id}`).catch(() => ({ brands: [] }))).brands
+})
+const brandQ = () => props.admin ? (sc.branch ? adminBrand.value : 0) : brandPick.value
 function qs(extra: Record<string, string | number>) {
   const u = new URLSearchParams()
   const all: Record<string, string | number> = props.admin
-    ? { merchant_id: sc.merchant, branch_id: sc.branch, country: sc.country, city: sc.city, ...extra } : extra
+    ? { merchant_id: sc.merchant, branch_id: sc.branch, country: sc.country, city: sc.city, brand: brandQ(), ...extra } : { brand: brandQ(), ...extra }
   for (const [k, v] of Object.entries(all)) if (v !== '' && v !== 0) u.set(k, String(v))
   return '?' + u.toString()
 }
@@ -118,6 +131,7 @@ async function showOrders(r: Row) {
     const path = props.admin ? '/admin/delivery-addresses/orders' : base() + '/customer-addresses/orders'
     const q = new URLSearchParams({ cust: r.cust, key: r.key, unit: r.unit_key, page_size: '50' })
     if (props.admin) q.set('branch_id', String(r.branch_id))
+    if (brandQ()) q.set('brand', String(brandQ()))
     const l = await get<{ items: Order[]; total: number }>(path + '?' + q.toString())
     ord.items = l.items; ord.total = l.total
   } catch (e) { ord.error = errText(e) }
@@ -175,7 +189,7 @@ function refresh() {
 }
 watch(tab, refresh)
 watch(() => [range.from, range.to], () => { stale.top = stale.map = true; refresh() })
-watch(() => [sc.merchant, sc.branch, sc.country, sc.city], () => { stale.list = stale.top = stale.map = true; f.page = 1; refresh() })
+watch(() => [sc.merchant, sc.branch, sc.country, sc.city, brandPick.value, adminBrand.value], () => { stale.list = stale.top = stale.map = true; f.page = 1; refresh() })
 watch(() => sc.merchant, () => { if (sc.branch && !storesOf.value.some(b => b.id === sc.branch)) sc.branch = 0 })
 watch(() => sc.country, () => { if (sc.city && !cities.value.some(c => c.city === sc.city)) sc.city = '' })
 
@@ -239,7 +253,12 @@ const filtered = computed(() => !!(f.q || f.source))
         <option value="">{{ t('da.city_all') }}</option>
         <option v-for="c in cities" :key="c.country_code + c.city" :value="c.city">{{ c.city }}</option>
       </select>
+      <select v-if="adminBrands.length > 1" v-model.number="adminBrand" data-testid="dab-brand">
+        <option :value="0">{{ t('br.all') }}</option>
+        <option v-for="b in adminBrands" :key="b.id" :value="b.id">{{ b.name }}</option>
+      </select>
     </div>
+    <div v-else-if="multiBrand()" class="ox-tools" data-testid="dab-brands"><BrandSeg v-model="brandPick" :brands="brandsHere()" all /></div>
 
     <div v-if="tab !== 'list'" class="ox-tools ox-chips dab-range" data-testid="dab-range">
       <input v-model="range.from" type="date" :max="range.to" data-testid="dab-from" />

@@ -3902,5 +3902,9 @@
  "br.logo": "Logo thương hiệu",
  "br.cover": "Ảnh bìa thương hiệu",
  "br.intro": "Giới thiệu một dòng (hiện trên thẻ ở chợ)",
- "br.pf_hint": "Mỗi thương hiệu là một cửa hàng riêng trên các nền tảng, với mã cửa hàng, hoa hồng và mức tăng giá riêng. Giá nhập tay trên nền tảng chỉ dùng cho thương hiệu chính; thương hiệu khác tăng từ giá của chính mình."
+ "br.pf_hint": "Mỗi thương hiệu là một cửa hàng riêng trên các nền tảng, với mã cửa hàng, hoa hồng và mức tăng giá riêng. Giá nhập tay trên nền tảng chỉ dùng cho thương hiệu chính; thương hiệu khác tăng từ giá của chính mình.",
+ "br.cash_store": "Két tiền là của cả cửa hàng: kiểm tiền mặt và tiền tài xế nộp lại xem ở \"Tất cả thương hiệu\".",
+ "br.by_brand": "Doanh thu theo thương hiệu",
+ "br.by_brand_hint": "Các thương hiệu cộng lại = tổng",
+ "br.platform_owe": "Nền tảng phải trả"
 }

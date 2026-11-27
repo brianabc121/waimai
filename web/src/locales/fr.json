@@ -3902,5 +3902,9 @@
  "br.logo": "Logo de la marque",
  "br.cover": "Couverture de la marque",
  "br.intro": "Présentation en une ligne (sur la carte du marché)",
- "br.pf_hint": "Chaque marque est une boutique à part sur les plateformes, avec son identifiant, sa commission et sa majoration. Les prix saisis à la main sont ceux de la marque principale ; les autres majorent leurs propres prix."
+ "br.pf_hint": "Chaque marque est une boutique à part sur les plateformes, avec son identifiant, sa commission et sa majoration. Les prix saisis à la main sont ceux de la marque principale ; les autres majorent leurs propres prix.",
+ "br.cash_store": "La caisse est celle de tout le magasin : le comptage et les remises des livreurs sont sous « Toutes les marques ».",
+ "br.by_brand": "Recettes par marque",
+ "br.by_brand_hint": "Les marques font le total",
+ "br.platform_owe": "Dû par les plateformes"
 }

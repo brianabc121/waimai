@@ -449,6 +449,16 @@ func (u *User) MayUseBrand(branchID, brandID int64) bool {
 	return u.Entry == EntryAdmin
 }
 
+// BrandsOf is the brands of the store the person works on; nil is all of them.
+func (u *User) BrandsOf(branchID int64) []int64 {
+	for _, r := range u.Roles {
+		if r.BranchID == branchID {
+			return r.BrandIDs
+		}
+	}
+	return nil
+}
+
 // AllBrands says whether the person works on every brand of the store.
 func (u *User) AllBrands(branchID int64) bool {
 	for _, r := range u.Roles {

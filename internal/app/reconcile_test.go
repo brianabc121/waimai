@@ -41,7 +41,7 @@ func TestReconciliation(t *testing.T) {
 	online := pay("R2", app.CloseInput{PayType: "online", PayChannelID: gcash}, nil)
 	card := pay("R3", app.CloseInput{PayType: "card"}, &app.Adjust{Mode: "set_total", Amount: 100, Reason: "员工餐"})
 
-	r, err := a.Reconciliation(ctx, s.branchID, today, today)
+	r, err := a.Reconciliation(ctx, s.branchID, nil, today, today)
 	noErr(t, err)
 	if r.Count != 3 || r.Total != cash.Totals.Total+online.Totals.Total+card.Totals.Total || len(r.Rows) != 3 {
 		t.Fatalf("summary: %+v", r)
@@ -56,7 +56,7 @@ func TestReconciliation(t *testing.T) {
 	}
 
 	// online payments: checked one by one
-	l, err := a.OnlinePayments(ctx, s.branchID, today, today, 0, "unchecked")
+	l, err := a.OnlinePayments(ctx, s.branchID, nil, today, today, 0, "unchecked")
 	noErr(t, err)
 	if len(l) != 1 || l[0].OrderID != online.ID || l[0].Method != "GCash" || l[0].Amount != online.Totals.Total {
 		t.Fatalf("online: %+v", l)
@@ -69,13 +69,13 @@ func TestReconciliation(t *testing.T) {
 	if o.PayCheck != "problem" || o.PayCheckNote != "没收到" {
 		t.Fatalf("order check: %q %q", o.PayCheck, o.PayCheckNote)
 	}
-	r, err = a.Reconciliation(ctx, s.branchID, today, today)
+	r, err = a.Reconciliation(ctx, s.branchID, nil, today, today)
 	noErr(t, err)
 	if r.Problems != 1 || r.Rows[2].Problem != 1 {
 		t.Fatalf("problem: %+v", r)
 	}
 	noErr(t, a.SetPaymentChecks(ctx, s.branchID, []int64{online.ID}, "ok", "ignored", s.staff))
-	l, err = a.OnlinePayments(ctx, s.branchID, today, today, gcash, "ok")
+	l, err = a.OnlinePayments(ctx, s.branchID, nil, today, today, gcash, "ok")
 	noErr(t, err)
 	if len(l) != 1 || l[0].Note != "" || l[0].CheckedBy == "" {
 		t.Fatalf("ok: %+v", l)
@@ -87,14 +87,14 @@ func TestReconciliation(t *testing.T) {
 	if k.Expected != cash.Totals.Total || k.Counted != cash.Totals.Total-5000 || k.CountedBy == "" {
 		t.Fatalf("count: %+v", k)
 	}
-	r, err = a.Reconciliation(ctx, s.branchID, today, today)
+	r, err = a.Reconciliation(ctx, s.branchID, nil, today, today)
 	noErr(t, err)
 	if r.CashCount == nil || r.CashCount.Note != "少 50" {
 		t.Fatalf("count on the page: %+v", r.CashCount)
 	}
 
 	// the discount log, by who gave them
-	d, err := a.Discounts(ctx, s.branchID, today, today)
+	d, err := a.Discounts(ctx, s.branchID, nil, today, today)
 	noErr(t, err)
 	if len(d.Entries) != 2 || len(d.ByStaff) != 1 || d.ByStaff[0].Count != 2 ||
 		d.ByStaff[0].Amount != cash.Totals.StaffDiscount+card.Totals.RoundOff {

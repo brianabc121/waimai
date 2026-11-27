@@ -28,13 +28,17 @@ func (s *Server) reconcileRoutes(auth *gin.RouterGroup) {
 
 func (s *Server) reconcilePlatformOrders(c *gin.Context, bid int64) {
 	pid, _ := strconv.ParseInt(c.Query("platform"), 10, 64)
-	l, err := s.App.PlatformReconOrders(c, bid, c.Query("from"), c.Query("to"), pid)
+	brands, ok := s.brandView(c, bid)
+	if !ok {
+		return
+	}
+	l, err := s.App.PlatformReconOrders(c, bid, brands, c.Query("from"), c.Query("to"), pid)
 	reply(c, gin.H{"orders": l}, err)
 }
 
 func (s *Server) savePlatformPayout(c *gin.Context, bid int64) {
 	var in app.PlatformPayoutInput
-	if !bind(c, &in) {
+	if !bind(c, &in) || !s.mayUseBrand(c, bid, in.BrandID) {
 		return
 	}
 	reply(c, gin.H{"ok": true}, s.App.SavePlatformPayout(c, bid, in, staffActor(c)))
@@ -48,17 +52,21 @@ func (s *Server) deletePlatformPayout(c *gin.Context, bid int64) {
 
 func (s *Server) reconcileSummary(c *gin.Context, bid int64) {
 	from, to := c.Query("from"), c.Query("to")
-	r, err := s.App.Reconciliation(c, bid, from, to)
+	brands, ok := s.brandView(c, bid)
+	if !ok {
+		return
+	}
+	r, err := s.App.Reconciliation(c, bid, brands, from, to)
 	if err != nil || !wantsXLSX(c) {
 		reply(c, r, err)
 		return
 	}
-	online, err := s.App.OnlinePayments(c, bid, from, to, 0, "")
+	online, err := s.App.OnlinePayments(c, bid, brands, from, to, 0, "")
 	if err != nil {
 		fail(c, err)
 		return
 	}
-	disc, err := s.App.Discounts(c, bid, from, to)
+	disc, err := s.App.Discounts(c, bid, brands, from, to)
 	if err != nil {
 		fail(c, err)
 		return
@@ -110,6 +118,13 @@ func (s *Server) reconcileSummary(c *gin.Context, bid int64) {
 		}
 		sum = append(sum, []any{name, x.Count, m(x.Amount)})
 	}
+	if len(r.Brands) > 1 {
+		sum = append(sum, []any{}, []any{w("营业额按品牌", "Takings by brand"), w("笔数", "Orders"), w("金额", "Amount"), w("退款", "Refunds"),
+			w("平台应收", "Platforms owe"), w("佣金", "Commission")})
+		for _, x := range r.Brands {
+			sum = append(sum, []any{x.Name, x.Count, m(x.Amount), m(x.Refunds), m(x.Platform), m(x.Commission)})
+		}
+	}
 	if k := r.CashCount; k != nil {
 		sum = append(sum, []any{w("现金盘点", "Cash count"), m(k.Counted), w("应有", "Expected"), m(k.Expected), w("差额", "Difference"), m(k.Counted - k.Expected), k.Note, k.CountedBy})
 	}
@@ -144,7 +159,7 @@ func (s *Server) reconcileSummary(c *gin.Context, bid int64) {
 		}
 		dl = append(dl, []any{name, sc, x.Count, m(x.Amount)})
 	}
-	porders, err := s.App.PlatformReconOrders(c, bid, from, to, 0)
+	porders, err := s.App.PlatformReconOrders(c, bid, brands, from, to, 0)
 	if err != nil {
 		fail(c, err)
 		return
@@ -153,21 +168,28 @@ func (s *Server) reconcileSummary(c *gin.Context, bid int64) {
 		w("平台出资", "Platform-funded"), w("顾客实付", "Customers paid"), w("商家应收", "Store receives"), w("佣金", "Commission"),
 		w("其他扣费", "Other charges"), w("平台扣款", "Taken back"), w("预计到账", "Expected payout"), w("实际到账", "Actual payout"), w("差额", "Difference")}
 	pl := [][]any{head}
-	pname := map[int64]string{}
+	// a brand's shop on a platform: "一品湘 Grab" once the store has several brands
+	type shop struct{ brand, platform int64 }
+	pname := map[shop]string{}
+	several := len(r.Brands) > 1
 	for _, p := range r.Platforms {
-		pname[p.PlatformID] = p.Name
+		name := p.Name
+		if several {
+			name = p.BrandName + " " + p.Name
+		}
+		pname[shop{p.BrandID, p.PlatformID}] = name
 		var actual, diff any
 		if p.Actual != nil {
 			actual, diff = m(*p.Actual), m(*p.Diff)
 		}
-		pl = append(pl, []any{p.Name, p.Count, m(p.Subtotal), m(p.Merchant), m(p.Subsidy), m(p.Paid), m(p.Receivable), m(p.Commission),
+		pl = append(pl, []any{name, p.Count, m(p.Subtotal), m(p.Merchant), m(p.Subsidy), m(p.Paid), m(p.Receivable), m(p.Commission),
 			m(p.OtherFees), m(p.Deducted), m(p.Payout), actual, diff})
 	}
 	pl = append(pl, []any{}, []any{w("付款时间", "Paid at"), w("订单号", "Order"), w("平台", "Platform"), w("平台价营业额", "Dishes at platform prices"),
 		w("商家出资", "Store-funded"), w("平台出资", "Platform-funded"), w("顾客实付", "Customers paid"), w("商家应收", "Store receives"),
 		w("佣金", "Commission"), w("其他扣费", "Other charges"), w("平台扣款", "Taken back"), w("预计到账", "Expected payout")})
 	for _, o := range porders {
-		pl = append(pl, []any{stamp(&o.PaidAt, loc), o.PublicNo, pname[o.PlatformID], m(o.Subtotal), m(o.Merchant), m(o.Subsidy), m(o.Paid),
+		pl = append(pl, []any{stamp(&o.PaidAt, loc), o.PublicNo, pname[shop{o.BrandID, o.PlatformID}], m(o.Subtotal), m(o.Merchant), m(o.Subsidy), m(o.Paid),
 			m(o.Receivable), m(o.Commission), m(o.OtherFees), m(o.Deducted), m(o.Payout)})
 	}
 	sendXLSX(c, fmt.Sprintf("reconcile_%s_%s", from, to), xlsx.Sheet{Name: w("收款汇总", "Takings"), Rows: sum},
@@ -177,12 +199,20 @@ func (s *Server) reconcileSummary(c *gin.Context, bid int64) {
 
 func (s *Server) reconcileOnline(c *gin.Context, bid int64) {
 	ch, _ := strconv.ParseInt(c.Query("channel"), 10, 64)
-	l, err := s.App.OnlinePayments(c, bid, c.Query("from"), c.Query("to"), ch, c.Query("status"))
+	brands, ok := s.brandView(c, bid)
+	if !ok {
+		return
+	}
+	l, err := s.App.OnlinePayments(c, bid, brands, c.Query("from"), c.Query("to"), ch, c.Query("status"))
 	reply(c, gin.H{"payments": l}, err)
 }
 
 func (s *Server) reconcileDiscounts(c *gin.Context, bid int64) {
-	l, err := s.App.Discounts(c, bid, c.Query("from"), c.Query("to"))
+	brands, ok := s.brandView(c, bid)
+	if !ok {
+		return
+	}
+	l, err := s.App.Discounts(c, bid, brands, c.Query("from"), c.Query("to"))
 	reply(c, l, err)
 }
 
@@ -205,6 +235,10 @@ func (s *Server) cashCount(c *gin.Context, bid int64) {
 		Note    string `json:"note"`
 	}
 	if !bind(c, &in) {
+		return
+	}
+	if !currentUser(c).AllBrands(bid) {
+		fail(c, errNotBrands) // the drawer is every brand's
 		return
 	}
 	k, err := s.App.SaveCashCount(c, bid, in.Day, in.Counted, in.Note, staffActor(c))

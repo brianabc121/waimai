@@ -284,7 +284,7 @@ export interface CouponCountry { country_code: string; country: string; currency
 export interface PlatformCouponSummary { currency: string; month_spent: number; month_orders: number; open_count: number; open_value: number }
 export interface BillDiscount extends OrderDiscount { source: string }
 export interface BillOrder {
-  id: number; public_no: string; created_at: string; service_type: string; state: 'completed' | 'cancelled' | 'failed' | 'open'
+  id: number; brand_id?: number; public_no: string; created_at: string; service_type: string; state: 'completed' | 'cancelled' | 'failed' | 'open'
   food: number; delivery_fee: number; promotion: number; dish_promotion?: number; store_free: number; store_threshold: number; store_delivery: number
   platform_free: number; paid: number; takings: number; discounts: BillDiscount[]
 }

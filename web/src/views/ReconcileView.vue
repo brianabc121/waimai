@@ -14,6 +14,8 @@ import type { PayChannel } from '../types'
 import { addDays, addMonths, clock, dayOf, monthEnd, monthStart } from './staff/time'
 import ReconPlatforms, { type ReconPlatform, type ReconType } from './ReconPlatforms.vue'
 import { platformName } from '../platforms'
+import { brandsHere, multiBrand, useBrandPick } from '../brands'
+import BrandSeg from './brands/BrandSeg.vue'
 
 interface Row { pay_type: string; channel_id: number; platform_id: number; name: string; names: Record<string, string>; count: number; amount: number
   dine: number; takeaway: number; ok: number; problem: number; unchecked: number }
@@ -22,7 +24,8 @@ interface Summary { timezone: string; currency: string; count: number; total: nu
   cash: { counter: number; rider_collected: number; rider_returned: number; rider_pending: number; refunded: number; expected: number }
   refunds: { count: number; total: number; cash: number }; net: number
   discounts: { promotion: number; coupon: number; staff: number; round_off: number; platform_merchant: number; platform_subsidy: number; total: number }
-  cash_count: CashCount | null; platforms: ReconPlatform[]; types: ReconType[] }
+  cash_count: CashCount | null; platforms: ReconPlatform[]; types: ReconType[]
+  whole: boolean; brands: { brand_id: number; name: string; code: string; count: number; amount: number; refunds: number; platform: number; commission: number }[] }
 interface Payment { order_id: number; public_no: string; paid_at: string; service_type: string; table_name: string; channel_id: number
   method: string; names: Record<string, string>; amount: number; staff: string; status: '' | 'ok' | 'problem'; note: string; checked_by: string; checked_at: string | null }
 interface Entry { order_id: number; public_no: string; at: string; service_type: string; table_name: string; percent_bp: number; mode: string
@@ -55,7 +58,9 @@ function choose(p: Preset) {
   else if (p === 'month') { from.value = monthStart(d); to.value = d }
   else if (p === 'last_month') { from.value = addMonths(d, -1); to.value = monthEnd(addMonths(d, -1)) }
 }
-const q = () => `from=${from.value}&to=${to.value}`
+// one brand, or every brand together (docs/MULTI_BRAND_DESIGN.md §12)
+const { pick: brandPick } = useBrandPick('reconcile', brandsHere, true)
+const q = () => `from=${from.value}&to=${to.value}` + (brandPick.value ? `&brand=${brandPick.value}` : '')
 async function load() {
   if (!from.value || !to.value || from.value > to.value) return
   error.value = ''
@@ -73,7 +78,7 @@ async function loadOnline() {
   pays.value = (await get<{ payments: Payment[] }>(`/merchant/branches/${bid}/reconcile/online?${q()}&channel=${filt.channel}&status=${filt.status}`)).payments
 }
 onMounted(() => { choose('today'); void load() })
-watch([from, to, tab], () => { void load() })
+watch([from, to, tab, brandPick], () => { void load() })
 watch(filt, () => { void loadOnline().catch(e => (error.value = (e as Error).message)) })
 
 const cur = computed(() => sum.value?.currency ?? 'PHP')
@@ -135,6 +140,7 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
         :data-preset="p" @click="p === 'custom' ? preset = 'custom' : choose(p)">{{ t('bl.p.' + p) }}</button>
       <span v-if="preset === 'custom'" class="custom"><input v-model="from" type="date" :max="to"> ~ <input v-model="to" type="date" :min="from" :max="today"></span>
     </div>
+    <div v-if="multiBrand()" class="ox-tools" style="margin:0"><BrandSeg v-model="brandPick" :brands="brandsHere()" all data-testid="rc-brand" /></div>
     <div v-if="error" class="banner bad">{{ error }}</div>
     <div v-if="sum?.problems" class="banner bad" data-testid="rc-problems">{{ t('rc.c.problems', { n: sum.problems }) }}
       <a href="#" @click.prevent="setTab('online'); filt.status = 'problem'">›</a></div>
@@ -168,7 +174,12 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
             </tbody>
           </table>
         </div>
-        <div class="ox-panel stack">
+        <div v-if="!sum.whole" class="ox-panel stack" data-testid="rc-cash-store">
+          <h2>{{ t('rc.cash') }}</h2>
+          <p class="muted small" style="margin:0">{{ t('br.cash_store') }}</p>
+          <button v-if="multiBrand() && brandPick" class="btn" @click="brandPick = 0">{{ t('br.all') }}</button>
+        </div>
+        <div v-else class="ox-panel stack">
           <h2>{{ t('rc.cash') }}</h2>
           <div class="kv"><span>{{ t('rc.cash_counter') }}</span><b>{{ m(sum.cash.counter) }}</b></div>
           <div class="kv"><span>{{ t('rc.cash_rider') }}</span><b>{{ m(sum.cash.rider_collected) }}</b></div>
@@ -192,7 +203,23 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
           <p v-else class="muted small" style="margin:0">{{ t('rc.count_day_only') }}</p>
         </div>
       </div>
-      <ReconPlatforms :bid="bid" :from="from" :to="to" :tz="tz" :currency="cur" :total="sum.total" :platforms="sum.platforms ?? []" :types="sum.types ?? []" @changed="load" />
+      <div v-if="sum.brands.length > 1" class="ox-panel ox-scroll" data-testid="rc-brands">
+        <div class="ox-panel-h"><h2>{{ t('br.by_brand') }}</h2><span class="muted small">{{ t('br.by_brand_hint') }}</span></div>
+        <table class="data">
+          <thead><tr><th>{{ t('br.title') }}</th><th class="r">{{ t('rc.col.count') }}</th><th class="r">{{ t('rc.col.amount') }}</th>
+            <th class="r">{{ t('rc.c.refunds') }}</th><th class="r">{{ t('br.platform_owe') }}</th><th class="r">{{ t('po.commission') }}</th></tr></thead>
+          <tbody>
+            <tr v-for="x in sum.brands" :key="x.brand_id" :data-brand="x.code">
+              <td><b>{{ x.name }}</b> <span class="muted small">{{ x.code }}</span></td><td class="r">{{ x.count }}</td><td class="r"><b>{{ m(x.amount) }}</b></td>
+              <td class="r">{{ x.refunds ? '−' + m(x.refunds) : '—' }}</td><td class="r">{{ x.platform ? m(x.platform) : '—' }}</td>
+              <td class="r">{{ x.commission ? '−' + m(x.commission) : '—' }}</td>
+            </tr>
+            <tr class="sum"><td>{{ t('rc.c.total') }}</td><td class="r">{{ sum.count }}</td><td class="r"><b>{{ m(sum.total) }}</b></td>
+              <td class="r">{{ sum.refunds.total ? '−' + m(sum.refunds.total) : '—' }}</td><td></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ReconPlatforms :several="multiBrand()" :bid="bid" :from="from" :to="to" :tz="tz" :currency="cur" :total="sum.total" :platforms="sum.platforms ?? []" :types="sum.types ?? []" @changed="load" />
     </template>
 
     <!-- online payments -->
@@ -296,5 +323,6 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
 .kv.sub { padding-inline-start: 14px; color: var(--muted); font-size: 13px; }
 .badge.bad { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: #b8392a; color: #fff; font-size: 11px; line-height: 18px; margin-inline-start: 4px; }
 tr.st-problem td { background: #fff3f1; }
+tr.sum td { font-weight: 700; border-top: 2px solid var(--line); }
 @media (max-width: 600px) { .cards { grid-template-columns: 1fr 1fr; } }
 </style>
