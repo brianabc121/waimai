@@ -11,9 +11,18 @@ type Config struct {
 	Addr              string
 	DatabaseURL       string
 	ListenDatabaseURL string // direct (non-pooled) connection: LISTEN and migrations
-	AppSecret         string
-	CookieSecure      bool
-	OTPDevEcho        bool
+	// MigrateDatabaseURL is the books' owner, for migrations only, when the
+	// app itself connects as the restricted role waimai_app
+	// (docs/DEPLOY.md §8, docs/BALANCE_CHECK.md §5.1). Defaults to ListenDatabaseURL.
+	MigrateDatabaseURL string
+	// AppDBPassword, when set, lets waimai_app log in with it (set by migrate).
+	AppDBPassword string
+	// WalletAlertWebhook gets a JSON POST when a check of the balance books
+	// finds a problem (Slack, Telegram bot, 企业微信 or any webhook).
+	WalletAlertWebhook string
+	AppSecret          string
+	CookieSecure       bool
+	OTPDevEcho         bool
 	// GoogleMapsKey is the browser key for the delivery map. Empty turns the
 	// map features off; "stub" serves a tile-less map for tests and demos.
 	GoogleMapsKey string
@@ -126,6 +135,9 @@ func Load() Config {
 	if c.ListenDatabaseURL != c.DatabaseURL {
 		c.DatabaseURL = PoolerSafe(c.DatabaseURL)
 	}
+	c.MigrateDatabaseURL = env("MIGRATE_DATABASE_URL", c.ListenDatabaseURL)
+	c.AppDBPassword = env("APP_DB_PASSWORD", "")
+	c.WalletAlertWebhook = env("WALLET_ALERT_WEBHOOK", "")
 	return c
 }
 

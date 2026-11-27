@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -246,6 +248,8 @@ type WalletAdjust struct {
 	// Amount is in minor units; negative takes away.
 	Amount int64  `json:"amount"`
 	Note   string `json:"note"`
+	// IdemKey is the request's Idempotency-Key (docs/BALANCE_CHECK.md W20).
+	IdemKey string `json:"-"`
 }
 
 var accountNames = map[string][2]string{"balance": {"余额", "balance"}, "bonus": {"奖励金", "rewards"}}
@@ -266,23 +270,33 @@ func (a *App) AdminAdjustWallet(ctx context.Context, actor AdminActor, customerI
 	}
 	var out []Wallet
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
-		// one adjustment at a time per customer
-		var exists bool
-		if err := tx.QueryRow(ctx, `SELECT true FROM customers WHERE id=$1 FOR UPDATE`, customerID).Scan(&exists); isNoRows(err) {
+		scope := fmt.Sprintf("wallet_adjust:%d", customerID)
+		if replayed, err := idemBegin(ctx, tx, scope, in.IdemKey, hashJSON(in), &out); err != nil || replayed {
+			return err
+		}
+		// Double-entry since 00085 (docs/BALANCE_REVIEW.md H3): the
+		// customer's account against the platform's side; the customer's
+		// row is locked first and a balance cannot go below zero.
+		acct, err := walletAccount(ctx, tx, "platform_"+in.Account, 0, customerID, in.Currency)
+		if isNoRows(err) || errors.Is(err, ErrNotFound) {
 			return ErrNotFound
 		} else if err != nil {
 			return err
 		}
-		var have int64
-		if err := tx.QueryRow(ctx, `SELECT coalesce(sum(amount), 0)::bigint FROM customer_wallet_entries
-			WHERE customer_id=$1 AND account=$2 AND currency=$3`, customerID, in.Account, in.Currency).Scan(&have); err != nil {
-			return err
-		}
-		if have+in.Amount < 0 {
+		if acct.Balance+in.Amount < 0 {
 			return Err(http.StatusConflict, "WALLET_SHORT", "the account does not hold that much")
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO customer_wallet_entries (customer_id, account, currency, amount, note, admin_id)
-			VALUES ($1,$2,$3,$4,$5,$6)`, customerID, in.Account, in.Currency, in.Amount, in.Note, actor.ID); err != nil {
+		issued, err := walletAccount(ctx, tx, acctPlatformIssued, 0, 0, in.Currency)
+		if err != nil {
+			return err
+		}
+		n, err := platformAdjustSeq(ctx, tx, customerID)
+		if err != nil {
+			return err
+		}
+		if err := postNew(ctx, tx, journal{Kind: "platform_adjust", Idem: fmt.Sprintf("padjust:%d:%d", customerID, n),
+			Currency: in.Currency, Actor: Actor{Type: "admin", ID: actor.ID}, Note: in.Note},
+			posting{acct.ID, in.Amount}, posting{issued.ID, -in.Amount}); err != nil {
 			return err
 		}
 		verb := [2]string{"增加", "added to"}
@@ -298,11 +312,22 @@ func (a *App) AdminAdjustWallet(ctx context.Context, actor AdminActor, customerI
 			map[string]any{"account": in.Account, "currency": in.Currency, "amount": in.Amount, "note": in.Note}); err != nil {
 			return err
 		}
-		var err error
-		out, err = wallets(ctx, tx, customerID)
-		return err
+		if out, err = wallets(ctx, tx, customerID); err != nil {
+			return err
+		}
+		return idemSave(ctx, tx, scope, in.IdemKey, out)
 	})
 	return out, err
+}
+
+// platformAdjustSeq numbers a customer's platform adjustments, for their
+// idem keys; the customer's row is locked, so the count cannot race.
+func platformAdjustSeq(ctx context.Context, tx pgx.Tx, customerID int64) (int, error) {
+	var n int
+	err := tx.QueryRow(ctx, `SELECT count(DISTINCT p.journal_id) FROM wallet_postings p
+		JOIN wallet_accounts w ON w.id = p.account_id
+		WHERE w.customer_id=$1 AND w.kind IN ('platform_balance', 'platform_bonus')`, customerID).Scan(&n)
+	return n + 1, err
 }
 
 // AdminSavePlatformInfo replaces the texts about the platform.

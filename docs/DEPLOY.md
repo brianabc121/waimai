@@ -189,7 +189,23 @@ docker compose ps
 
 **回滚**：数据库迁移只向前，不自动回退。如果新版本有问题，先 `git checkout` 回上一个版本并重新 `docker compose up -d --build`。如果新版本的迁移和旧代码不兼容，用升级前的备份恢复。
 
-**店铺余额账本**（docs/REFUND_BALANCE_DESIGN.md）：顾客在店里的余额是钱，账本只能追加。数据库触发器已经拦住改、删凭证和明细，也不让直接改账户余额；后台任务每天核对一次（借贷平衡、余额等于明细之和），结果在平台后台“后台任务”页，有问题会显示红条。不要用 SQL 直接改 `wallet_accounts`、`wallet_journals`、`wallet_postings`；要调整请走商家后台的退款或撤回。`APP_SECRET` 也用来给短信验证码做签名，换了以后没用完的店铺余额验证码会失效（5 分钟内重发即可）。
+**余额账本**（docs/BALANCE_CHECK.md）：顾客的退款余额、储值、平台余额都是钱，账本只能追加，只能通过数据库函数 `wallet_post_journal` 记账。不要用 SQL 直接改 `wallet_accounts`、`wallet_journals`、`wallet_postings`；要调整走商家后台的退款、撤回、退储值，或平台后台的调整。`APP_SECRET` 也用来给短信验证码做签名，换了以后没用完的余额验证码会失效（5 分钟内重发即可）。
+
+*1）应用用受限的数据库角色连接*。迁移会建一个角色 `waimai_app`：能读写业务表，但账本只能读、只能调记账函数，连改都改不了。正式服务器在 `.env` 里这样设（`APP_DB_PASSWORD` 用 `openssl rand -hex 24` 生成）：
+
+```bash
+MIGRATE_DATABASE_URL=postgres://waimai:数据库密码@postgres:5432/waimai?sslmode=disable
+APP_DB_PASSWORD=应用角色密码
+DATABASE_URL=postgres://waimai_app:应用角色密码@postgres:5432/waimai?sslmode=disable
+```
+
+`migrate` 用 `MIGRATE_DATABASE_URL`（表的所有者）跑迁移，并给 `waimai_app` 设上密码、允许登录；`api`、`worker` 用 `DATABASE_URL`。用了托管数据库并且有 `DIRECT_DATABASE_URL` 时，它也换成 `waimai_app`，`MIGRATE_DATABASE_URL` 填所有者的直连地址。托管数据库不允许建角色时迁移会跳过这一步：请在数据库控制台手动建一个叫 `waimai_app` 的用户，再重跑 `docker compose up -d migrate`。没改的话系统照样能用（触发器也会拦），但平台后台“余额账本”页会一直显示安全警告。
+
+*2）自动检查和告警*。后台任务每小时检查新记的账、每天检查全部账本，每家店过了当地午夜关一次账（日终试算）。结果在平台后台左侧“余额账本”，有问题显示红色数字。想在手机上收到提醒，在 `.env` 设 `WALLET_ALERT_WEBHOOK` 为企业微信/钉钉/Slack/Telegram 机器人的地址，出问题会推一条（6 小时内不重复）。收到后照 docs/BALANCE_CHECK.md 第 7 节处理。
+
+*3）指纹*。“余额账本”页显示账本的指纹（一串字母数字）。建议每天把它抄到账本之外（例如截图发到群里）；以后有人改过历史数据，指纹就对不上。
+
+*4）升级到 00085 迁移*（余额账本加固）：迁移会把老的平台钱包流水搬进复式账本、给历史数据补哈希链和重分类凭证，**不能回退**。升级前务必备份；升级后跑一次 `docker compose exec api pricecheck -days 0` 或在平台后台“余额账本”页确认 0 个问题。
 
 **磁盘**：旧镜像会占空间，可以定期执行 `docker image prune -f`。
 
@@ -203,7 +219,8 @@ docker compose ps
 - [ ] 堂食走一遍：开台、扫码点菜、平板加菜、上桌、收款关台。
 - [ ] 重启一次 `docker compose restart api worker`，页面能自动恢复，订单都在。
 - [ ] 做过一次备份和恢复演练，并设置了每天自动备份。
-- [ ] 平台后台“后台任务”页显示“店铺余额账本最近一次核对没有问题”。
+- [ ] 平台后台“余额账本”页显示账本检查没有问题，并且没有安全警告（应用用的是 `waimai_app`）。
+- [ ] 设置了 `WALLET_ALERT_WEBHOOK`，或者每天有人看“余额账本”页。
 - [ ] 防火墙只开放 80 和 443，8000 端口从外网访问不到。
 
 ## 10. 使用托管数据库

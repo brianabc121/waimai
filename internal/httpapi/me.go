@@ -324,6 +324,7 @@ func (s *Server) adminAdjustWallet(c *gin.Context) {
 	if !ok || !bind(c, &in) {
 		return
 	}
+	in.IdemKey = c.GetHeader("Idempotency-Key")
 	w, err := s.App.AdminAdjustWallet(c, adminActor(c), id, in)
 	reply(c, gin.H{"wallets": w}, err)
 }

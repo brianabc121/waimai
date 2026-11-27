@@ -531,9 +531,12 @@ func TestStoredValueCheckCatchesTampering(t *testing.T) {
 	exec(`UPDATE orders SET stored_principal_paid = stored_principal_paid - 1, stored_bonus_paid = stored_bonus_paid + 1 WHERE id=$1`, o.ID)
 	want("W11")
 	exec(`UPDATE orders SET stored_principal_paid = stored_principal_paid + 1, stored_bonus_paid = stored_bonus_paid - 1 WHERE id=$1`, o.ID)
-	exec(`UPDATE order_refunds SET principal_part = principal_part - 1, bonus_part = bonus_part + 1 WHERE id=$1`, rq.RefundID)
+	if _, err := a.DB.Exec(ctx, `UPDATE order_refunds SET principal_part = principal_part - 1 WHERE id=$1`, rq.RefundID); err == nil {
+		t.Fatal("a refund's parts were changed")
+	}
+	tamper(t, `UPDATE order_refunds SET principal_part = principal_part - 1, bonus_part = bonus_part + 1 WHERE id=$1`, rq.RefundID)
 	want("W13")
-	exec(`UPDATE order_refunds SET principal_part = principal_part + 1, bonus_part = bonus_part - 1 WHERE id=$1`, rq.RefundID)
+	tamper(t, `UPDATE order_refunds SET principal_part = principal_part + 1, bonus_part = bonus_part - 1 WHERE id=$1`, rq.RefundID)
 	checked(t, "put back", o.ID)
 
 	exec(`UPDATE topups SET bonus = bonus + 1 WHERE id=$1`, tp.ID)

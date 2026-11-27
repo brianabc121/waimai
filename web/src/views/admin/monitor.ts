@@ -4,7 +4,7 @@ import { reactive } from 'vue'
 import { get } from '../../api'
 import type { WorkerStatus } from './types'
 
-export const monitor = reactive({ failedJobs: 0, supportUnread: 0, newApplications: 0 })
+export const monitor = reactive({ failedJobs: 0, supportUnread: 0, newApplications: 0, walletProblems: 0 })
 
 // loadNewApplications counts the applications to join nobody has contacted
 // yet (most come from the company website), for the "Customers" link.
@@ -15,6 +15,13 @@ export async function loadNewApplications() {
 // loadSupportUnread keeps the number on "platform support" current.
 export async function loadSupportUnread() {
   monitor.supportUnread = (await get<{ unread: number }>('/admin/support/unread')).unread
+}
+
+// loadWalletCheck keeps the number of balance-book problems on "Ledger":
+// anything but 0 means the books need looking at now.
+export async function loadWalletCheck() {
+  const r = await get<{ last: { problems: string[] | null } | null }>('/admin/wallet-check')
+  monitor.walletProblems = r.last?.problems?.length ?? 0
 }
 
 export async function loadWorkerStatus(): Promise<WorkerStatus> {

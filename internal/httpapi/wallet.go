@@ -31,6 +31,57 @@ func (s *Server) walletRoutes(api, auth, admin *gin.RouterGroup) {
 	admin.POST("/store-credits/:id/freeze", s.adminFreezeCredit)
 	admin.POST("/branches/:bid/freeze-credits", s.adminFreezeBranchCredits)
 	admin.GET("/wallet-check", s.adminWalletCheck)
+
+	// the balance ledger and the closed days (docs/BALANCE_CHECK.md §5)
+	auth.GET("/merchant/branches/:bid/wallet-ledger", s.branchWalletLedger)
+	auth.GET("/merchant/branches/:bid/wallet-days", s.branchWalletDays)
+	admin.GET("/wallet-ledger", s.adminWalletLedger)
+	admin.GET("/wallet-days", s.adminWalletDays)
+}
+
+func ledgerFilter(c *gin.Context) app.LedgerFilter {
+	f := app.LedgerFilter{Phone: c.Query("phone"), Order: c.Query("order"), Kind: c.Query("kind"),
+		Account: c.Query("account"), From: c.Query("from"), To: c.Query("to")}
+	f.Staff, _ = strconv.ParseInt(c.Query("staff"), 10, 64)
+	f.Before, _ = strconv.ParseInt(c.Query("before"), 10, 64)
+	return f
+}
+
+func (s *Server) branchWalletLedger(c *gin.Context) {
+	bid, ok := branchScope(c, pWalletView)
+	if !ok {
+		return
+	}
+	f := ledgerFilter(c)
+	f.BranchID, f.Mask = bid, true
+	l, err := s.App.WalletLedger(c, f)
+	reply(c, l, err)
+}
+
+func (s *Server) branchWalletDays(c *gin.Context) {
+	bid, ok := branchScope(c, pWalletView)
+	if !ok {
+		return
+	}
+	t, err := s.App.WalletTrialBalance(c, bid, false, c.Query("day"))
+	reply(c, t, err)
+}
+
+func (s *Server) adminWalletLedger(c *gin.Context) {
+	f := ledgerFilter(c)
+	f.BranchID, _ = strconv.ParseInt(c.Query("branch"), 10, 64)
+	f.Platform = c.Query("platform") == "1"
+	l, err := s.App.WalletLedger(c, f)
+	if err == nil {
+		l.Check, err = s.App.LastWalletCheck(c)
+	}
+	reply(c, l, err)
+}
+
+func (s *Server) adminWalletDays(c *gin.Context) {
+	bid, _ := strconv.ParseInt(c.Query("branch"), 10, 64)
+	t, err := s.App.WalletTrialBalance(c, bid, c.Query("all") == "1", c.Query("day"))
+	reply(c, t, err)
 }
 
 func (s *Server) myStoreCredits(c *gin.Context) {

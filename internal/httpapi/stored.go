@@ -213,6 +213,7 @@ func (s *Server) confirmTopup(c *gin.Context) {
 	if !ok {
 		return
 	}
+	in.IdemKey = c.GetHeader("Idempotency-Key")
 	t, err := s.App.ConfirmTopup(c, bid, id, in, staffActor(c))
 	reply(c, t, err)
 }
@@ -265,6 +266,7 @@ func (s *Server) storedCashout(c *gin.Context) {
 	if !ok {
 		return
 	}
+	in.IdemKey = c.GetHeader("Idempotency-Key")
 	q, err := s.App.StoredCashout(c, bid, cid, in, staffActor(c))
 	reply(c, q, err)
 }

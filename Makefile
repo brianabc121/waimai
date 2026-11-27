@@ -1,4 +1,4 @@
-.PHONY: test build web site run migrate seed e2e pricing-check pricing-check-db
+.PHONY: test build web site run migrate seed e2e pricing-check pricing-check-db balance-check
 
 # Tests need a real PostgreSQL: TEST_DATABASE_URL=postgres://.../waimai_test
 test:
@@ -11,6 +11,11 @@ pricing-check:
 	go test -count=1 -v -run 'TestPricingCheck|TestPriceMatchesLegacy|TestItemDiscount|TestShare|TestPlatformPrice|TestPlatformCommission' ./internal/pricing/
 	go test -count=1 -p 1 ./internal/app/
 	cd web && node --test tests/dishpromo.test.mjs
+
+# 余额验算（docs/BALANCE_CHECK.md）：凡是改动店铺余额、储值、平台余额、账本都必须跑通。
+# 包含整套金额验算（app 包整包跑，含余额手算样例 B-S1–B-S4 和全账本检查 W1–W20），再加余额的接口测试。
+balance-check: pricing-check
+	go test -count=1 -p 1 -run 'TestStoreCreditRoutes|TestCustomerCenterOverHTTP' ./internal/httpapi/
 
 # 对一个真实数据库（DATABASE_URL）做只读的逐单重放验算，默认最近 30 天，DAYS=0 为全部。
 pricing-check-db:

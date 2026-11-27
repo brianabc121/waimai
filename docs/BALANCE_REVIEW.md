@@ -1,8 +1,8 @@
-# 余额架构评审和业内做法调研 v0.1（2026-11-27，等 brian 确认）
+# 余额架构评审和业内做法调研 v1.0（2026-11-27，brian 已确认，第一到三批已实施）
 
 > 范围：店铺余额（退款存入，PR #152/#153/#154）、充值送储值（PR #155/#156）、余额页改版和按比例退回（PR #157），以及“我的”页里早期的平台“余额/奖励金”（`customer_wallet_entries`，PR #48）。平台余额（按国家）还没做，放在第 6 节一起规划。
 >
-> 这份文档只评审、不改代码。第 7 节的问题等 brian 回复后再动余额相关代码，动的时候每一批都按 docs/PRICING_CHECK.md 验算。
+> brian 2026-11-27 回复“按照设计方案进行优化”，Q1–Q5 全按推荐（Q4 的邮件换成 webhook 推送，因为系统没有发邮件的服务）。实施记录见第 8 节；怎么验算见 [BALANCE_CHECK.md](BALANCE_CHECK.md)，以后所有余额改动都要按它重新验算。
 
 ---
 
@@ -264,3 +264,30 @@
 - 国内账务系统设计：[人人都是产品经理 · 账务系统](https://www.woshipm.com/pd/4440125.html)、[掘金 · 账务系统设计](https://juejin.cn/post/7409850315204542483)
 - 预付卡监管：[北京单用途预付卡备案及预收资金管理（新华网报道）](https://www.news.cn/20260528/929d95d62bec4ee785d54b9fb7fb6ba1/c.html)、[上海“以案释法”单用途预付卡](https://sww.sh.gov.cn/assets/RECP/y_06.html)
 - 项目内：docs/REFUND_BALANCE_DESIGN.md、docs/STORED_VALUE_DESIGN.md、docs/PRICING_CHECK.md 第 2.3 节
+
+---
+
+## 8. 实施记录（2026-11-27）
+
+第一到三批一起做在迁移 `00085_ledger_hardening.sql` 和同一个 PR 里，**没有改任何金额算法**：订单该付多少、退多少、储值怎么拆，全部和以前一样；改的是“怎么记账、怎么保护、怎么查”。验算方法和全部规则写进了新文档 [BALANCE_CHECK.md](BALANCE_CHECK.md)（W1–W20、手算样例 B-S1 到 B-S6），AGENTS.md / CLAUDE.md 加了铁规则：余额改动必须重新验算。
+
+| 问题 | 怎么改的 | 规则 / 测试 |
+|---|---|---|
+| H1 钱的去向 | 新科目 `store_cashout`（退出去的钱）、`store_clawback`（扣回）、`store_bonus_void`（作废赠送）；退储值按三个去向记账；历史退储值用重分类凭证 `reclass_cashout:<id>` 对齐 | W14；B-S1、B-S2；`TestCashoutBooksWhereItWent` |
+| H2 绕过保护 | 唯一入口数据库函数 `wallet_post_journal`（SECURITY DEFINER）；余额保护改看 `pg_trigger_depth()`，会话变量开不了门；新角色 `waimai_app` 只能读账本、调记账函数；每个账户的明细编号 + 哈希链 + 指纹 | W2、W18；`TestBooksGuards`、`TestAppRoleCannotWriteBooks` |
+| H3 平台余额单式账 | `customer_wallet_entries` 按原值、原时间迁进复式账本（`platform_adjust` 凭证、`platform_balance / platform_bonus / platform_issued` 科目），旧表停写、不能删；后台调整改走记账函数并带幂等键；顾客端“余额/奖励金”入口隐藏，只有还有老余额的顾客能看到 | W17；B-S5；`TestPlatformWalletBooks` |
+| M1 记到对的地方 | 规则表 `wallet_journal_rules`：每种凭证能动哪些科目；记账函数检查门店、币种、科目 | W1；`TestBooksGuards` |
+| M2 退款余额那份 | 退款时原本用退款余额付的那份冲回 `store_sales`，只有现金那份存进余额才记 `store_refund`；历史退款用 `reclass_refund:<id>` 重分类 | W16；B-S3；`TestRefundBalanceShareReverses` |
+| M3 幂等键 | 订单派生凭证用 `postNew`（同一个键已存在就报错，不会悄悄当成重放）；充值确认、退储值、平台调整接受 `Idempotency-Key`，前端每次操作带一个 | W20；B-S6 |
+| M4 锁顺序 | 先锁顾客，再按固定顺序锁门店科目；记账函数内部按账户 id 加锁；`inTx` 遇死锁、序列化冲突重试一次 | 全部测试 |
+| M5 核对和日终 | 每小时增量 + 每天全量检查，结果记在 `wallet_check_runs`（含指纹、安全警告）；有问题平台后台“余额账本”红色数字 + `WALLET_ALERT_WEBHOOK` 推送；每天关账写 `wallet_daily_balances`，商家和平台都能看日终试算 | W19；B-S4；`TestWalletDaysAndAlarm` |
+| M6 撤销充值作废券 | 券记下来自哪张充值单（`customer_coupons.topup_id`），撤销时按它作废；历史数据按 ±1 秒补一次 | `TestTopupRevokeVoidsItsCoupons` |
+| L1 撤回改退款记录 | `order_refunds` 加 `revoked_credit / revoked_at / revoked_by`，金额列不能改，存进 + 撤回 恒定，记录不能删 | W7；`TestStoreCreditLimitsAndRevoke` |
+| L4 总流水 | 商家后台“店铺余额 → 全部流水 / 日终试算”（本店），平台后台“余额账本”（全部门店 + 平台余额），可按手机、单号、业务、科目、员工、日期筛，导出 CSV | `TestStoreCreditRoutes` |
+
+**没做的**：
+
+- L2（门店改币种后旧币种余额）、L3（门店科目热点行）：目前单店量级不需要，等真的出现再做。
+- **第四批平台余额（按国家）**：需要单独出方案（钱从哪来、能不能跨店用、谁出钱、怎么结算给门店），brian 确认后再做。现在平台余额只是迁进了复式账本、对顾客隐藏。
+
+**上线注意**：00085 不能回退（会搬数据、补哈希），升级前一定备份；正式服务器要按 DEPLOY.md 第 8 节把应用改成用 `waimai_app` 连接，并设 `WALLET_ALERT_WEBHOOK`。

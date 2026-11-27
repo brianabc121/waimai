@@ -45,6 +45,10 @@ services:
       OPENIM_HOOK_KEY: ${OPENIM_HOOK_KEY:-}
       DIRECT_DATABASE_URL: ${DIRECT_DATABASE_URL:-}
       LISTEN_DATABASE_URL: ${LISTEN_DATABASE_URL:-}
+      # The balance books (docs/BALANCE_CHECK.md §5, docs/DEPLOY.md §8)
+      MIGRATE_DATABASE_URL: ${MIGRATE_DATABASE_URL:-}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-}
+      WALLET_ALERT_WEBHOOK: ${WALLET_ALERT_WEBHOOK:-}
     depends_on:
       postgres:
         condition: service_healthy

@@ -3,7 +3,7 @@
 // applications to open a store, keep the wallet ledger, and say who the
 // platform is and how to reach it.
 import { onMounted, reactive, ref, watch } from 'vue'
-import { get, post, put } from '../../api'
+import { get, newKey, post, put } from '../../api'
 import { extend, money, t } from '../../i18n'
 import Pager from './Pager.vue'
 import { fmtDateTime, qs } from './util'
@@ -122,11 +122,13 @@ const adj = reactive({ who: null as Cust | null, account: 'balance', currency: '
 async function loadCu() {
   try { Object.assign(cu, await get('/admin/customers' + qs({ q: cu.q, page: cu.page, page_size: SIZE }))); error.value = '' } catch (e) { fail(e) }
 }
-function adjust(c: Cust) { Object.assign(adj, { who: c, account: 'balance', currency: c.wallets[0]?.currency ?? 'PHP', amount: '', note: '' }) }
+// One key per adjustment sheet, so a retry is not a second adjustment (W20).
+let idem = ''
+function adjust(c: Cust) { idem = newKey(); Object.assign(adj, { who: c, account: 'balance', currency: c.wallets[0]?.currency ?? 'PHP', amount: '', note: '' }) }
 async function saveAdjust() {
   if (!adj.who) return
   try {
-    await post(`/admin/customers/${adj.who.id}/wallet`, { account: adj.account, currency: adj.currency, amount: Math.round(Number(adj.amount) * 100), note: adj.note })
+    await post(`/admin/customers/${adj.who.id}/wallet`, { account: adj.account, currency: adj.currency, amount: Math.round(Number(adj.amount) * 100), note: adj.note }, { 'Idempotency-Key': idem })
     adj.who = null
     await loadCu()
   } catch (e) { fail(e) }

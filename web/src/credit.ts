@@ -13,7 +13,7 @@ export interface CreditEntry {
 export interface CreditHolder { customer_id: number; phone: string; balance: number; frozen: boolean; since: string }
 export interface CreditAlert { kind: 'customer_often' | 'quick_refund' | 'staff_often'; phone?: string; by?: string; public_no?: string; order_id?: number; count?: number; amount?: number }
 export interface BranchCredit {
-  currency: string; owed: number; customers: number; in: number; used: number; revoked: number
+  currency: string; from: string; to: string; owed: number; customers: number; in: number; used: number; revoked: number
   holders: CreditHolder[]; entries: CreditEntry[]; alerts: CreditAlert[]; approve_over: number; daily_limit: number
 }
 

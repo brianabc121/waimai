@@ -97,11 +97,13 @@ DATABASE_URL='postgres://...' make pricing-check-db DAYS=0   # 全部订单
 
 ### 2.3 店铺余额和储值（`checkOrderCredit` 逐单 + `App.CheckWallet` 全账本，编号 W；docs/REFUND_BALANCE_DESIGN.md 第 11 节、docs/STORED_VALUE_DESIGN.md 第 11 节）
 
+> **余额的完整验算方法（怎么记账、W1–W20 全部规则、记账手算样例 B-S1 到 B-S6、改动流程）在 [BALANCE_CHECK.md](BALANCE_CHECK.md)。** 涉及余额的改动除了本文，还要按 BALANCE_CHECK.md 第 6 节走一遍、跑 `make balance-check`。下表是和订单金额直接相关的部分；W16–W20（退款余额那份冲回消费、平台余额、哈希链、日终关账、幂等）见 BALANCE_CHECK.md 第 3 节。
+
 店铺余额是一种**付款方式**，不是优惠：计价引擎不变，订单的应付照旧，`orders.credit_paid` 记用余额付了多少，还要收的 = 应付 − credit_paid。记账是复式的（`wallet_accounts`、`wallet_journals`、`wallet_postings`）。
 
 | 编号 | 规则 |
 |---|---|
-| W1 | 每张凭证至少两行、借贷相加 = 0，全部是同一门店、同一币种；每家门店每种币种所有账户余额相加 = 0（顾客余额合计 = 店铺那边的负数） |
+| W1 | 每张凭证至少两行、借贷相加 = 0，全部是同一门店（平台凭证全部是平台账户）、同一币种，每行的账户种类是规则表允许的；每家门店每种币种所有账户余额相加 = 0（顾客余额合计 = 店铺那边的负数） |
 | W2 | 每个账户的余额 = 它所有明细相加 = 最后一行明细记下的余额；顾客余额不会小于 0（数据库 CHECK 也拦） |
 | W3 | 一张单动到的余额只能是本店、本币种的 |
 | W4 | 0 ≤ 用余额付的 ≤ 应付；取消、拒单后用余额付的 = 0（已退回）；账本上这张单扣掉的余额（扣减 − 退回）= 订单记的 credit_paid |
@@ -115,12 +117,12 @@ DATABASE_URL='postgres://...' make pricing-check-db DAYS=0   # 全部订单
 | W11 | 订单的 `stored_principal_paid`、`stored_bonus_paid` = 账本上这张单从本金、赠送扣掉的（扣减 − 退回），分开相等 |
 | W12 | 退款按累计目标拆成现金、退款余额、本金、赠送四份，前三份向下取整、零头落在赠送；每份累计 ≤ 原来付的，全部退完各自正好退回 |
 | W13 | 储值付的那份只回储值（本金回本金、赠送回赠送），退款记录写的两份 = 账本上的退款凭证 |
-| W14 | 退储值：顾客原因退现金 = max(0, 剩余本金 − 已用赠送)，门店原因 = 剩余本金；扣回的 = 剩余本金 − 退的现金；剩余赠送作废；之后本金、赠送都 = 0；账本和退储值记录一致 |
+| W14 | 退储值：顾客原因退现金 = max(0, 剩余本金 − 已用赠送)，门店原因 = 剩余本金；扣回的 = 剩余本金 − 退的现金；剩余赠送作废；之后本金、赠送都 = 0；账本上退的钱、扣回、作废赠送分别记在 `store_cashout`、`store_clawback`、`store_bonus_void`，和退储值记录一致 |
 | W15 | 每家门店每种币种：顾客的退款余额、本金、赠送合计 = 店铺那边（退款、储值充值、赠送、储值销售）的负数；对账钱箱里的储值现金 = 现金充值 − 撤销 − 退储值现金 |
 
 储值（“充值送”，docs/STORED_VALUE_DESIGN.md）和店铺余额一样是**付款方式**：计价引擎不变，订单的应付照旧，储值付的是 credit_paid 的一部分。W10–W13 进 `CheckOrderMoney`；W8、W14、W15 由 `CheckWallet` 验。
 
-W4–W7 进 `CheckOrderMoney`（每个 `checked` 都验）；W1、W2 由 `CheckWallet` 验，`make pricing-check`（`cmd/pricecheck`）和后台任务每天各跑一次，结果在平台后台“后台任务”页。凭证和明细只能追加，改或删会被数据库拒绝；账户余额只能由记账触发器改。
+W4–W7 进 `CheckOrderMoney`（每个 `checked` 都验）；W1、W2 等全账本规则由 `CheckWallet` 验，`make pricing-check`（`cmd/pricecheck`）跑一次，线上后台任务每小时查新记的账、每天查全部，结果在平台后台“余额账本”页，有问题推送告警（BALANCE_CHECK.md 第 5 节）。凭证和明细只能追加，改或删会被数据库拒绝；账户余额只能由记账函数 `wallet_post_journal` 改。
 
 R 这一组是最重要的：任何一条改金额的路径如果绕开了 `loadMoney → choosePromo → priceMoney → saveMoney`，或者读了门店/活动“现在”的值，或者手写了一个金额，存进去的数就会和重放对不上。
 

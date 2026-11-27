@@ -66,8 +66,8 @@ await page.goto(BASE + '/me')
 await page.waitForSelector(tid('me-name'))
 expect(/^0\d{3} \*\*\* \d{4}$/.test(await page.textContent(tid('me-name'))), 'without a nickname the masked number stands in')
 const memberNo = (await page.textContent(tid('me-member'))).match(/M-\d{8}/)[0]
-expect((await page.textContent(tid('me-balance'))).trim().replace(/^\D+/, '').startsWith('0'), 'a new account holds nothing')
-step(`the page shows who is logged in (${memberNo}) and an empty wallet`)
+expect(!(await page.locator(tid('me-balance')).count()), 'the platform balance is closed: a new account does not see it (BALANCE_REVIEW Q2)')
+step(`the page shows who is logged in (${memberNo}) and no platform balance`)
 
 // ---- profile and settings ----
 await page.click(tid('me-settings'))

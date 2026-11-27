@@ -39,10 +39,13 @@ type Profile struct {
 	ChatUnread int `json:"chat_unread"`
 }
 
+// wallets is what the customer holds on the platform's own balance and
+// rewards, from the books (00085 moved them there; docs/BALANCE_REVIEW.md H3).
 func wallets(ctx context.Context, q Querier, customerID int64) ([]Wallet, error) {
-	rows, err := q.Query(ctx, `SELECT currency, coalesce(sum(amount) FILTER (WHERE account='balance'), 0)::bigint,
-		coalesce(sum(amount) FILTER (WHERE account='bonus'), 0)::bigint
-		FROM customer_wallet_entries WHERE customer_id=$1 GROUP BY currency ORDER BY currency`, customerID)
+	rows, err := q.Query(ctx, `SELECT currency, coalesce(sum(balance) FILTER (WHERE kind='platform_balance'), 0)::bigint,
+		coalesce(sum(balance) FILTER (WHERE kind='platform_bonus'), 0)::bigint
+		FROM wallet_accounts WHERE customer_id=$1 AND kind IN ('platform_balance', 'platform_bonus')
+		GROUP BY currency HAVING bool_or(posting_seq > 0) ORDER BY currency`, customerID)
 	if err != nil {
 		return nil, err
 	}
@@ -606,8 +609,9 @@ func (a *App) WalletEntries(ctx context.Context, customerID int64, account strin
 	if account != "balance" && account != "bonus" {
 		return nil, ErrValidation("account must be balance or bonus")
 	}
-	rows, err := a.DB.Query(ctx, `SELECT id, account, currency, amount, note, created_at FROM customer_wallet_entries
-		WHERE customer_id=$1 AND account=$2 ORDER BY id DESC LIMIT 100`, customerID, account)
+	rows, err := a.DB.Query(ctx, `SELECT j.id, $2::text, w.currency, p.amount, j.note, j.created_at
+		FROM wallet_postings p JOIN wallet_accounts w ON w.id = p.account_id JOIN wallet_journals j ON j.id = p.journal_id
+		WHERE w.customer_id=$1 AND w.kind = 'platform_' || $2 ORDER BY p.id DESC LIMIT 100`, customerID, account)
 	if err != nil {
 		return nil, err
 	}

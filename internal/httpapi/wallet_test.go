@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/brianabc121/waimai/internal/app"
@@ -79,6 +80,32 @@ func TestStoreCreditRoutes(t *testing.T) {
 	}
 	admin.want(200, "", "GET", "/admin/wallet-check", nil)
 	owner.want(200, "", "POST", fmt.Sprintf("/merchant/refunds/%v/revoke-credit", r["quote"].(map[string]any)["refund_id"]), map[string]any{})
+
+	// the ledger: the store sees its own movements with phones masked, the
+	// platform everything (docs/BALANCE_CHECK.md §5)
+	ledger := fmt.Sprintf("/merchant/branches/%d/wallet-ledger", f.branchID)
+	desk.want(403, "FORBIDDEN", "GET", ledger, nil)
+	lg := owner.want(200, "", "GET", ledger, nil)
+	rows := lg["rows"].([]any)
+	if len(rows) != 4 { // refund into the balance (2 postings) and its revoke (2)
+		t.Fatalf("store ledger: %v", rows)
+	}
+	for _, x := range rows {
+		row := x.(map[string]any)
+		if p := row["phone"].(string); p != "" && !strings.Contains(p, "•") {
+			t.Fatalf("store ledger shows a phone: %v", row)
+		}
+		if len(row["counter"].([]any)) == 0 {
+			t.Fatalf("no other side: %v", row)
+		}
+	}
+	al := admin.want(200, "", "GET", fmt.Sprintf("/admin/wallet-ledger?branch=%d&kind=revoke", f.branchID), nil)
+	if len(al["rows"].([]any)) != 2 || al["check"] == nil {
+		t.Fatalf("platform ledger: %v", al)
+	}
+	owner.want(200, "", "GET", fmt.Sprintf("/merchant/branches/%d/wallet-days", f.branchID), nil)
+	admin.want(200, "", "GET", "/admin/wallet-days?all=1", nil)
+	admin.want(422, "VALIDATION", "GET", "/admin/wallet-ledger?from=2026-13-01&to=2026-01-01", nil)
 }
 
 func customerID(t *testing.T, c *client) int64 {
