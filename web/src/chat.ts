@@ -14,13 +14,19 @@ export interface ChatThread {
   id: number; branch_id: number; slug?: string; store_name?: string; customer_id?: number; customer?: string; phone_tail?: string
   peer: string; last_kind: string; last_text: string; last_sender: 'customer' | 'store' | 'system'; last_at: string
   unread: number; count: number; peer_read_at: string | null; order: OrderTag | null
+  brand_id?: number; brand_name?: string; brand_color?: string
 }
 export interface ChatOrder { id: number; public_no: string; status: string; service_type: string; total: number; currency: string; created_at: string; open: boolean; token?: string; store_name?: string }
 export interface CustomerChat {
   branch_id: number; slug: string; store_name: string; store_name_en: string; phone: string; open_now: boolean; open_time: string
   peer: string; enabled: boolean; muted: boolean; thread_id: number; peer_read_at: string | null; orders: ChatOrder[]; quiet: boolean
+  brand_id?: number
 }
 export interface StoreChat extends ChatThread { phone_masked: string; orders: ChatOrder[]; order_count: number; blocked: boolean }
+
+// ChatEx travels with a message: the store's side says which member of staff
+// is writing; the customer's side which brand's page they wrote from.
+export interface ChatEx { uid?: number; name?: string; brand?: number }
 
 // One message as the pages show it.
 export interface ChatMsg {
@@ -29,6 +35,7 @@ export interface ChatMsg {
   image?: string   // the picture's address
   orderId?: number
   auto?: boolean   // the answer a closed store gives by itself
+  brand?: number   // the brand a customer wrote to (docs/MULTI_BRAND_DESIGN.md §9)
   retry?: () => Promise<ChatMsg>   // how a picture or a card that failed is sent again
 }
 export interface QuickReply { id: number; body: string }
@@ -40,8 +47,8 @@ export const customerChats = () => get<{ chats: ChatThread[]; support: ChatThrea
 export const customerChat = (slug: string) => get<CustomerChat>(`/customer/chats/${slug}`)
 export const customerChatRead = (slug: string) => post(`/customer/chats/${slug}/read`)
 export const customerUnread = () => get<{ chats: number; support: number; notices: number; total: number }>('/customer/unread')
-export const storeChats = (bid: number, q: { q?: string; unread?: boolean; active?: boolean } = {}) =>
-  get<{ chats: ChatThread[]; unread: number; support_unread: number; enabled: boolean }>(`/merchant/branches/${bid}/chats?q=${encodeURIComponent(q.q ?? '')}&unread=${q.unread ? 1 : ''}&active=${q.active ? 1 : ''}`)
+export const storeChats = (bid: number, q: { q?: string; unread?: boolean; active?: boolean; brand?: number } = {}) =>
+  get<{ chats: ChatThread[]; unread: number; support_unread: number; enabled: boolean }>(`/merchant/branches/${bid}/chats?q=${encodeURIComponent(q.q ?? '')}&unread=${q.unread ? 1 : ''}&active=${q.active ? 1 : ''}${q.brand ? '&brand=' + q.brand : ''}`)
 export const storeChat = (bid: number, customerId: number) => get<StoreChat>(`/merchant/branches/${bid}/chats/${customerId}`)
 export const chatSetup = (bid: number) => get<ChatSetup>(`/merchant/branches/${bid}/chat-setup`)
 export const addQuickReply = (bid: number, body: string) => post<QuickReply>(`/merchant/branches/${bid}/chat-quick-replies`, { body })
@@ -97,11 +104,11 @@ function absolute(u: string, ws: boolean): string {
 
 // toMsg turns the SDK's message into ours. What is not a text shows as a placeholder.
 function toMsg(m: any, self: string): ChatMsg {
-  let staff = '', auto = false
-  try { const ex = JSON.parse(m.ex || '{}'); staff = ex.name ?? ''; auto = !!ex.auto } catch { /* no extra */ }
+  let staff = '', auto = false, brand = 0
+  try { const ex = JSON.parse(m.ex || '{}'); staff = ex.name ?? ''; auto = !!ex.auto; brand = Number(ex.brand) || 0 } catch { /* no extra */ }
   const out: ChatMsg = {
     id: m.clientMsgID, mine: m.sendID === self, kind: 'other', text: '',
-    at: m.sendTime || m.createTime || Date.now(), state: m.status === 3 ? 'failed' : 'sent', staff, auto,
+    at: m.sendTime || m.createTime || Date.now(), state: m.status === 3 ? 'failed' : 'sent', staff, auto, brand: brand || undefined,
   }
   if (m.contentType === 101) { out.kind = 'text'; out.text = m.textElem?.content ?? '' }
   else if (m.contentType === 110) {
@@ -204,7 +211,7 @@ export async function history(branchId: Side, peer: string, before = ''): Promis
 
 // sendText sends one text. extra travels with the message: the store's side
 // says which member of staff is writing.
-export async function sendText(branchId: Side, peer: string, text: string, extra?: { uid: number; name: string }): Promise<ChatMsg> {
+export async function sendText(branchId: Side, peer: string, text: string, extra?: ChatEx): Promise<ChatMsg> {
   const s = await connect(branchId)
   text = (await toUnicode(text).catch(() => ({ body: text }))).body // Zawgyi Burmese goes out as Unicode
   try {
@@ -215,7 +222,7 @@ export async function sendText(branchId: Side, peer: string, text: string, extra
   } catch (e) { throw chatError(e) }
 }
 
-async function sendCard(branchId: Side, peer: string, card: object, extra?: { uid: number; name: string }): Promise<ChatMsg> {
+async function sendCard(branchId: Side, peer: string, card: object, extra?: ChatEx): Promise<ChatMsg> {
   const s = await connect(branchId)
   try {
     const m = (await s.createCustomMessage({ data: JSON.stringify(card), extension: '', description: '' })).data
@@ -227,7 +234,7 @@ async function sendCard(branchId: Side, peer: string, card: object, extra?: { ui
 
 // sendImage shrinks a picture, uploads it to this system (uploadPath is the
 // conversation's own address for that) and sends its token as a card.
-export async function sendImage(branchId: Side, peer: string, uploadPath: string, file: File, extra?: { uid: number; name: string }): Promise<ChatMsg> {
+export async function sendImage(branchId: Side, peer: string, uploadPath: string, file: File, extra?: ChatEx): Promise<ChatMsg> {
   let token: string
   try { token = (await upload<{ token: string }>(uploadPath, await shrink(file))).token } catch (e) {
     if (e instanceof ApiError) throw new ApiError(e.status, e.code, describeChat(e.code === 'FILE_TOO_LARGE' || e.code === 'VALIDATION' ? 'BAD_IMAGE' : e.code))
@@ -236,7 +243,7 @@ export async function sendImage(branchId: Side, peer: string, uploadPath: string
   return sendCard(branchId, peer, { t: 'image', token }, extra)
 }
 
-export const sendOrder = (branchId: Side, peer: string, orderId: number, extra?: { uid: number; name: string }) =>
+export const sendOrder = (branchId: Side, peer: string, orderId: number, extra?: ChatEx) =>
   sendCard(branchId, peer, { t: 'order', order: orderId }, extra)
 
 // ---- words ----

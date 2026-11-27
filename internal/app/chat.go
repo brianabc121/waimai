@@ -169,7 +169,15 @@ type ChatThread struct {
 	Count      int        `json:"count"`
 	PeerReadAt *time.Time `json:"peer_read_at"`
 	Order      *OrderTag  `json:"order"`
+	// BrandID is the brand the customer last wrote to (docs/MULTI_BRAND_DESIGN.md §9);
+	// the store's desk shows it when the store has several brands.
+	BrandID    int64  `json:"brand_id"`
+	BrandName  string `json:"brand_name,omitempty"`
+	BrandColor string `json:"brand_color,omitempty"`
 }
+
+// threadBrand joins a conversation's brand (the main brand when it has none).
+const threadBrand = `LEFT JOIN brands tb ON tb.id = COALESCE(t.brand_id, (SELECT x.id FROM brands x WHERE x.branch_id=t.branch_id AND x.is_main))`
 
 // activeOrder is the lateral join that finds a conversation's open order.
 const activeOrder = `LEFT JOIN LATERAL (SELECT o.id, o.public_no, o.acceptance_status, o.fulfillment_status FROM orders o
@@ -191,9 +199,10 @@ func orderTag(id *int64, no, acceptance, fulfillment *string) *OrderTag {
 
 // CustomerChats lists the stores a customer has talked with.
 func (a *App) CustomerChats(ctx context.Context, customerID int64) ([]ChatThread, error) {
-	rows, err := a.DB.Query(ctx, `SELECT t.id, t.branch_id, b.slug, b.name, t.last_kind, t.last_text, t.last_sender, t.last_at,
-			t.customer_unread, t.msg_count, t.store_read_at, ao.id, ao.public_no, ao.acceptance_status, ao.fulfillment_status
-		FROM chat_threads t JOIN branches b ON b.id=t.branch_id `+activeOrder+`
+	rows, err := a.DB.Query(ctx, `SELECT t.id, t.branch_id, CASE WHEN tb.is_main IS NOT FALSE THEN b.slug ELSE tb.slug END,
+			CASE WHEN tb.is_main IS NOT FALSE THEN b.name ELSE tb.name END, t.last_kind, t.last_text, t.last_sender, t.last_at,
+			t.customer_unread, t.msg_count, t.store_read_at, ao.id, ao.public_no, ao.acceptance_status, ao.fulfillment_status, COALESCE(tb.id, 0)
+		FROM chat_threads t JOIN branches b ON b.id=t.branch_id `+threadBrand+` `+activeOrder+`
 		WHERE t.customer_id=$1 AND b.deleted_at IS NULL AND (t.customer_hidden_at IS NULL OR t.last_at > t.customer_hidden_at)
 		ORDER BY t.last_at DESC LIMIT 200`, customerID)
 	if err != nil {
@@ -206,7 +215,7 @@ func (a *App) CustomerChats(ctx context.Context, customerID int64) ([]ChatThread
 		var oid *int64
 		var no, acc, ful *string
 		if err := rows.Scan(&t.ID, &t.BranchID, &t.Slug, &t.StoreName, &t.LastKind, &t.LastText, &t.LastSender, &t.LastAt,
-			&t.Unread, &t.Count, &t.PeerReadAt, &oid, &no, &acc, &ful); err != nil {
+			&t.Unread, &t.Count, &t.PeerReadAt, &oid, &no, &acc, &ful, &t.BrandID); err != nil {
 			return nil, err
 		}
 		t.Peer, t.Order = branchIM(t.BranchID), orderTag(oid, no, acc, ful)
@@ -242,6 +251,9 @@ type ChatFilter struct {
 	Reported bool
 	Today    bool
 	BranchID int64
+	// Brands narrows a store's list to conversations last written to these
+	// brands; nil is all of them.
+	Brands []int64
 	Page
 }
 
@@ -250,13 +262,14 @@ func scanStoreThread(rows pgx.Rows) (ChatThread, error) {
 	var oid *int64
 	var no, acc, ful *string
 	err := rows.Scan(&t.ID, &t.BranchID, &t.CustomerID, &t.Customer, &t.PhoneTail, &t.LastKind, &t.LastText, &t.LastSender, &t.LastAt,
-		&t.Unread, &t.Count, &t.PeerReadAt, &oid, &no, &acc, &ful)
+		&t.Unread, &t.Count, &t.PeerReadAt, &oid, &no, &acc, &ful, &t.BrandID, &t.BrandName, &t.BrandColor)
 	t.Peer, t.Order = customerIM(t.CustomerID), orderTag(oid, no, acc, ful)
 	return t, err
 }
 
 const storeThreadCols = `t.id, t.branch_id, t.customer_id, ` + customerName + `, right(c.phone, 4), t.last_kind, t.last_text,
-	t.last_sender, t.last_at, t.store_unread, t.msg_count, t.customer_read_at, ao.id, ao.public_no, ao.acceptance_status, ao.fulfillment_status`
+	t.last_sender, t.last_at, t.store_unread, t.msg_count, t.customer_read_at, ao.id, ao.public_no, ao.acceptance_status, ao.fulfillment_status,
+	COALESCE(tb.id, 0), COALESCE(tb.name, ''), COALESCE(tb.color, '')`
 
 // StoreChats lists a store's conversations: the ones with an open order
 // first, then the latest.
@@ -268,12 +281,16 @@ func (a *App) StoreChats(ctx context.Context, branchID int64, f ChatFilter) ([]C
 	if f.Active {
 		where += ` AND ao.id IS NOT NULL`
 	}
+	if f.Brands != nil {
+		args = append(args, f.Brands)
+		where += fmt.Sprintf(` AND tb.id = ANY($%d::bigint[])`, len(args))
+	}
 	if q := strings.TrimSpace(f.Q); q != "" {
 		args = append(args, like(q))
 		where += fmt.Sprintf(` AND (%s ILIKE $%d OR c.phone ILIKE $%d OR EXISTS (SELECT 1 FROM orders o
 			WHERE o.branch_id=t.branch_id AND o.customer_id=t.customer_id AND o.public_no ILIKE $%d))`, customerName, len(args), len(args), len(args))
 	}
-	rows, err := a.DB.Query(ctx, `SELECT `+storeThreadCols+` FROM chat_threads t JOIN customers c ON c.id=t.customer_id `+activeOrder+`
+	rows, err := a.DB.Query(ctx, `SELECT `+storeThreadCols+` FROM chat_threads t JOIN customers c ON c.id=t.customer_id `+threadBrand+` `+activeOrder+`
 		WHERE `+where+` ORDER BY (ao.id IS NOT NULL) DESC, t.last_at DESC LIMIT 300`, args...)
 	if err != nil {
 		return nil, 0, err
@@ -356,6 +373,9 @@ type CustomerChat struct {
 	ThreadID    int64      `json:"thread_id"`
 	PeerReadAt  *time.Time `json:"peer_read_at"`
 	Quiet       bool       `json:"quiet"` // no reminders about this store's messages
+	// BrandID is the brand whose page the chat was opened on; the customer's
+	// messages carry it so the store's desk sees which brand they wrote to.
+	BrandID int64 `json:"brand_id"`
 	// the customer's orders here: what an order card shows, and what can be sent as one
 	Orders []ChatOrder `json:"orders"`
 }
@@ -371,7 +391,7 @@ func (a *App) CustomerChat(ctx context.Context, customerID int64, slug string) (
 		return nil, err
 	}
 	b.forBrand(br)
-	out := &CustomerChat{BranchID: b.ID, Slug: b.Slug, StoreName: b.Name, StoreNameEn: b.NameEn, Phone: b.Phone,
+	out := &CustomerChat{BranchID: b.ID, BrandID: br.ID, Slug: b.Slug, StoreName: b.Name, StoreNameEn: b.NameEn, Phone: b.Phone,
 		OpenNow: b.takesOrders() && b.isOpen(time.Now()), OpenTime: b.OpenTime, Peer: branchIM(b.ID)}
 	if err := a.DB.QueryRow(ctx, `SELECT chat_enabled FROM branches WHERE id=$1`, b.ID).Scan(&out.Enabled); err != nil {
 		return nil, err
@@ -424,9 +444,11 @@ func (a *App) StoreChatWith(ctx context.Context, branchID, customerID int64) (*S
 	}
 	out.BranchID, out.CustomerID, out.Peer = branchID, customerID, customerIM(customerID)
 	out.Phone, out.PhoneTail = "•••• "+last4(phone), last4(phone)
-	err = a.DB.QueryRow(ctx, `SELECT id, last_kind, last_text, last_sender, last_at, store_unread, msg_count, customer_read_at
-		FROM chat_threads WHERE branch_id=$1 AND customer_id=$2`, branchID, customerID).
-		Scan(&out.ID, &out.LastKind, &out.LastText, &out.LastSender, &out.LastAt, &out.Unread, &out.Count, &out.PeerReadAt)
+	err = a.DB.QueryRow(ctx, `SELECT t.id, t.last_kind, t.last_text, t.last_sender, t.last_at, t.store_unread, t.msg_count, t.customer_read_at,
+			COALESCE(tb.id, 0), COALESCE(tb.name, ''), COALESCE(tb.color, '')
+		FROM chat_threads t `+threadBrand+` WHERE t.branch_id=$1 AND t.customer_id=$2`, branchID, customerID).
+		Scan(&out.ID, &out.LastKind, &out.LastText, &out.LastSender, &out.LastAt, &out.Unread, &out.Count, &out.PeerReadAt,
+			&out.BrandID, &out.BrandName, &out.BrandColor)
 	if err != nil && !isNoRows(err) {
 		return nil, err
 	}
@@ -497,7 +519,8 @@ type chatMsg struct {
 	kind       string
 	body       string // the text; a picture's token
 	orderID    int64
-	auto       bool // the store's own answer while closed, sent by this system
+	auto       bool  // the store's own answer while closed, sent by this system
+	brandID    int64 // the brand a customer wrote to, from the brand's page; 0: not said
 }
 
 // read works out who is writing to whom and what. Only a customer and a store
@@ -520,13 +543,16 @@ func (h *ChatHook) read() (*chatMsg, error) {
 	if m.kind, m.body, m.orderID, err = h.content(); err != nil {
 		return nil, err
 	}
+	var ex struct {
+		UID   int64 `json:"uid"`
+		Auto  bool  `json:"auto"`
+		Brand int64 `json:"brand"`
+	}
+	_ = json.Unmarshal([]byte(h.Ex), &ex)
 	if m.sender == "store" {
-		var ex struct {
-			UID  int64 `json:"uid"`
-			Auto bool  `json:"auto"`
-		}
-		_ = json.Unmarshal([]byte(h.Ex), &ex)
 		m.staffID, m.auto = ex.UID, ex.Auto && ex.UID == 0 && m.kind == "text"
+	} else if ex.Brand > 0 {
+		m.brandID = ex.Brand
 	}
 	return m, nil
 }
@@ -595,6 +621,15 @@ func (a *App) ChatBeforeSend(ctx context.Context, h ChatHook) error {
 	if m.sender == "customer" {
 		if muted {
 			return errChatMuted
+		}
+		if m.brandID != 0 {
+			var ok bool
+			if err := a.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM brands WHERE id=$1 AND branch_id=$2)`, m.brandID, m.branchID).Scan(&ok); err != nil {
+				return err
+			}
+			if !ok {
+				return ErrValidation("no such brand in this store")
+			}
 		}
 		if blocked {
 			return errChatBlocked
@@ -691,10 +726,19 @@ func (a *App) ChatAfterSend(ctx context.Context, h ChatHook) error {
 	}
 	var fresh bool // false: a callback that was repeated
 	err = a.inTx(ctx, func(tx pgx.Tx) error {
+		// the brand: what the customer's page said, or the brand of the order
+		// sent as a card; else the conversation's own
+		brand := m.brandID
+		if brand == 0 && m.orderID != 0 && m.sender == "customer" {
+			if err := tx.QueryRow(ctx, `SELECT COALESCE(brand_id, 0) FROM orders WHERE id=$1`, m.orderID).Scan(&brand); err != nil {
+				return err
+			}
+		}
 		var threadID int64
-		err := tx.QueryRow(ctx, `INSERT INTO chat_threads (customer_id, branch_id, last_at) VALUES ($1,$2,$3)
+		err := tx.QueryRow(ctx, `INSERT INTO chat_threads (customer_id, branch_id, last_at, brand_id)
+			VALUES ($1,$2,$3, COALESCE(NULLIF($4::bigint, 0), (SELECT id FROM brands WHERE branch_id=$2 AND is_main)))
 			ON CONFLICT (customer_id, branch_id) DO UPDATE SET customer_id=EXCLUDED.customer_id RETURNING id`,
-			m.customerID, m.branchID, at).Scan(&threadID)
+			m.customerID, m.branchID, at, brand).Scan(&threadID)
 		if err != nil {
 			return err
 		}
@@ -706,10 +750,17 @@ func (a *App) ChatAfterSend(ctx context.Context, h ChatHook) error {
 		if m.orderID != 0 {
 			order = &m.orderID
 		}
-		tag, err := tx.Exec(ctx, `INSERT INTO chat_messages (thread_id, sender, staff_user_id, kind, body, order_id, im_msg_id, sent_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (im_msg_id) DO NOTHING`, threadID, m.sender, staff, m.kind, m.body, order, h.ServerMsgID, at)
+		tag, err := tx.Exec(ctx, `INSERT INTO chat_messages (thread_id, sender, staff_user_id, kind, body, order_id, im_msg_id, sent_at, brand_id)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8, COALESCE(NULLIF($9::bigint, 0), (SELECT brand_id FROM chat_threads WHERE id=$1)))
+			ON CONFLICT (im_msg_id) DO NOTHING`, threadID, m.sender, staff, m.kind, m.body, order, h.ServerMsgID, at, brand)
 		if err != nil || tag.RowsAffected() == 0 {
 			return err
+		}
+		if brand != 0 {
+			// the conversation is now with the brand the customer last wrote to
+			if _, err := tx.Exec(ctx, `UPDATE chat_threads SET brand_id=$2 WHERE id=$1`, threadID, brand); err != nil {
+				return err
+			}
 		}
 		fresh = true
 		// The sender has, by writing, read what came before. The other side
@@ -766,17 +817,19 @@ const adminChatCols = `t.id, t.branch_id, b.slug, b.name, m.name, t.customer_id,
 	t.last_sender, t.last_at, t.msg_count, ao.id, ao.public_no, ao.acceptance_status, ao.fulfillment_status,
 	c.chat_muted_at IS NOT NULL, b.chat_enabled,
 	(SELECT count(*) FROM chat_reports r WHERE r.thread_id=t.id AND r.resolved_at IS NULL),
-	EXISTS (SELECT 1 FROM chat_blocks k WHERE k.branch_id=t.branch_id AND k.customer_id=t.customer_id)`
+	EXISTS (SELECT 1 FROM chat_blocks k WHERE k.branch_id=t.branch_id AND k.customer_id=t.customer_id),
+	COALESCE(tb.id, 0), COALESCE(tb.name, ''), COALESCE(tb.color, '')`
 
 const adminChatFrom = ` FROM chat_threads t JOIN customers c ON c.id=t.customer_id JOIN branches b ON b.id=t.branch_id
-	JOIN merchants m ON m.id=b.merchant_id ` + activeOrder
+	JOIN merchants m ON m.id=b.merchant_id ` + threadBrand + ` ` + activeOrder
 
 func scanAdminChat(row interface{ Scan(...any) error }) (AdminChatRow, error) {
 	var r AdminChatRow
 	var oid *int64
 	var no, acc, ful *string
 	err := row.Scan(&r.ID, &r.BranchID, &r.Slug, &r.StoreName, &r.Merchant, &r.CustomerID, &r.Customer, &r.Phone, &r.LastKind, &r.LastText,
-		&r.LastSender, &r.LastAt, &r.Count, &oid, &no, &acc, &ful, &r.Muted, &r.ChatEnabled, &r.Reports, &r.Blocked)
+		&r.LastSender, &r.LastAt, &r.Count, &oid, &no, &acc, &ful, &r.Muted, &r.ChatEnabled, &r.Reports, &r.Blocked,
+		&r.BrandID, &r.BrandName, &r.BrandColor)
 	r.PhoneTail, r.Order = last4(r.Phone), orderTag(oid, no, acc, ful)
 	return r, err
 }
@@ -798,9 +851,9 @@ func (a *App) AdminChats(ctx context.Context, f ChatFilter) (*AdminChatList, err
 	if q := strings.TrimSpace(f.Q); q != "" {
 		args = append(args, like(q))
 		n := len(args)
-		where += fmt.Sprintf(` AND (b.name ILIKE $%d OR c.phone ILIKE $%d OR %s ILIKE $%d
+		where += fmt.Sprintf(` AND (b.name ILIKE $%d OR tb.name ILIKE $%d OR c.phone ILIKE $%d OR %s ILIKE $%d
 			OR EXISTS (SELECT 1 FROM orders o WHERE o.branch_id=t.branch_id AND o.customer_id=t.customer_id AND o.public_no ILIKE $%d)
-			OR EXISTS (SELECT 1 FROM chat_messages cm WHERE cm.thread_id=t.id AND cm.body ILIKE $%d))`, n, n, customerName, n, n, n)
+			OR EXISTS (SELECT 1 FROM chat_messages cm WHERE cm.thread_id=t.id AND cm.body ILIKE $%d))`, n, n, n, customerName, n, n, n)
 	}
 	out := &AdminChatList{Chats: []AdminChatRow{}}
 	if err := a.DB.QueryRow(ctx, `SELECT count(*)`+adminChatFrom+` WHERE `+where, args...).Scan(&out.Total); err != nil {
@@ -837,6 +890,8 @@ type ChatLine struct {
 	Body    string    `json:"body"`     // the text; the address of a picture
 	OrderNo string    `json:"order_no"` // of an order card
 	SentAt  time.Time `json:"sent_at"`
+	// Brand is the brand a customer's message was written to.
+	Brand string `json:"brand,omitempty"`
 }
 
 type AdminChat struct {
@@ -868,8 +923,9 @@ func (a *App) AdminChat(ctx context.Context, actor AdminActor, id, before int64)
 		before = 1 << 62
 	}
 	rows, err := a.DB.Query(ctx, `SELECT m.id, m.sender, COALESCE(NULLIF(u.display_name,''), u.username, ''), m.kind, m.body,
-			COALESCE(o.public_no, ''), m.sent_at
+			COALESCE(o.public_no, ''), m.sent_at, CASE WHEN m.sender = 'customer' THEN COALESCE(mb.name, '') ELSE '' END
 		FROM chat_messages m LEFT JOIN users u ON u.id=m.staff_user_id LEFT JOIN orders o ON o.id=m.order_id
+			LEFT JOIN brands mb ON mb.id=m.brand_id
 		WHERE m.thread_id=$1 AND m.id < $2 ORDER BY m.id DESC LIMIT $3`, id, before, adminChatPage)
 	if err != nil {
 		return nil, err
@@ -877,7 +933,7 @@ func (a *App) AdminChat(ctx context.Context, actor AdminActor, id, before int64)
 	defer rows.Close()
 	for rows.Next() {
 		var l ChatLine
-		if err := rows.Scan(&l.ID, &l.Sender, &l.Staff, &l.Kind, &l.Body, &l.OrderNo, &l.SentAt); err != nil {
+		if err := rows.Scan(&l.ID, &l.Sender, &l.Staff, &l.Kind, &l.Body, &l.OrderNo, &l.SentAt, &l.Brand); err != nil {
 			return nil, err
 		}
 		if l.Kind == "image" {

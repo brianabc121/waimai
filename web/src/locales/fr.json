@@ -3907,5 +3907,6 @@
  "br.by_brand": "Recettes par marque",
  "br.by_brand_hint": "Les marques font le total",
  "br.platform_owe": "Dû par les plateformes",
- "br.map_color": "Colorer les points par marque (la chaleur compte toutes)"
+ "br.map_color": "Colorer les points par marque (la chaleur compte toutes)",
+ "ch.from_brand": "Le client a écrit à cette marque"
 }

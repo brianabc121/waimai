@@ -72,7 +72,7 @@ function goBack() { if (window.history.state?.back) router.back(); else void rou
     <div v-if="error" class="banner bad" style="margin:12px">{{ error }}</div>
     <div v-if="note" class="banner ok" style="margin:12px" data-testid="chat-note">{{ note }}</div>
     <ChatPane v-if="info" :peer="info.peer" self="customer" :peer-read-at="info.peer_read_at" :blocked="blocked"
-      :upload-path="`/customer/chats/${slug}/images`" :orders="info.orders" @seen="seen" @order="o => o.token && router.push(`/o/${o.token}`)">
+      :upload-path="`/customer/chats/${slug}/images`" :orders="info.orders" :brand="info.brand_id" @seen="seen" @order="o => o.token && router.push(`/o/${o.token}`)">
       <template #top>
         <div class="ch-tip" data-testid="chat-privacy">{{ t('ch.privacy') }}</div>
         <div v-if="!info.open_now" class="ch-tip warn" data-testid="chat-closed-note">{{ t('ch.closed_note') }}</div>

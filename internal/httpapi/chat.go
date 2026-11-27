@@ -130,7 +130,12 @@ func (s *Server) storeChats(c *gin.Context) {
 	if !ok {
 		return
 	}
-	chats, unread, err := s.App.StoreChats(c, bid, app.ChatFilter{Q: c.Query("q"), Unread: c.Query("unread") == "1", Active: c.Query("active") == "1"})
+	brands, ok := s.brandView(c, bid)
+	if !ok {
+		return
+	}
+	chats, unread, err := s.App.StoreChats(c, bid, app.ChatFilter{Q: c.Query("q"), Unread: c.Query("unread") == "1", Active: c.Query("active") == "1",
+		Brands: brands})
 	var support int
 	if err == nil {
 		support, err = s.App.SupportUnread(c, app.StoreParty(bid))
