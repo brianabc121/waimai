@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>充值送和优惠活动页 原型</title>
+<style>
+:root{--brand:#a02c20;--red-deep:#8f251b;--gold:#f4cf73;--gold-soft:#fbe7b3;--ink:#3b1f14;--muted:#7b6657;--line:#e6d8c4;--bg:#f8efe1;--card:#fffaf2;--head:#f4ebde;--ok:#18794e;--warn:#b45309;--bad:#b42318}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);font-size:14px}
+.motif{background:var(--brand) repeating-radial-gradient(circle at 0 0,transparent 0 12px,rgba(255,255,255,.07) 12px 13px)}
+/* back office */
+.shell{display:grid;grid-template-columns:208px minmax(0,1fr);min-height:100vh}
+.side{background:#20252b;color:#d7dbe0;padding:14px 10px;font-size:13px}
+.side .shop{font-weight:700;font-size:16px;color:#fff;padding:4px 10px}
+.side .who{font-size:12px;color:#9aa3ad;padding:4px 10px 12px}
+.side .g{padding:8px 10px;font-weight:600;color:#fff;display:flex;justify-content:space-between}
+.side .s{padding:7px 10px 7px 24px;color:#c9ced5;border-radius:8px}
+.side .s.on{background:#353b44;color:#fff;border-left:3px solid var(--brand)}
+.side .new{background:var(--gold);color:#5a3200;border-radius:4px;font-size:10px;padding:0 5px;margin-left:6px;font-weight:700}
+.main{display:flex;flex-direction:column;min-width:0}
+.ph{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:18px 22px 6px}
+.ph h1{margin:0;font-size:20px}.ph p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.tabs{display:flex;gap:2px;padding:6px 22px 0;border-bottom:1px solid var(--line)}
+.tabs span{padding:8px 14px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent}
+.tabs span.on{color:var(--brand);border-color:var(--brand)}
+.body{padding:16px 22px;display:grid;gap:14px;align-content:start}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card h3{margin:0 0 10px;font-size:15px;display:flex;align-items:center;gap:8px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.sp{flex:1}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi .l{font-size:12px;color:var(--muted)}.kpi .v{font-size:22px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}.kpi .s{font-size:12px;color:var(--muted);margin-top:2px}
+.mini{font-size:12px;color:var(--muted)}
+.btn{border:1px solid var(--brand);color:var(--brand);background:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+.btn.p{background:var(--brand);color:#fff}
+.btn.g{border-color:var(--line);color:var(--ink)}
+.tag{display:inline-flex;align-items:center;border-radius:5px;padding:1px 7px;font-size:12px;font-weight:600;white-space:nowrap}
+.t-ok{background:#e3f4ea;color:var(--ok)}.t-off{background:#eee;color:#666}.t-gold{background:var(--gold-soft);color:#7a3e00}.t-red{background:#fde8e6;color:var(--bad)}.t-line{border:1px solid var(--line);color:var(--muted)}
+table{border-collapse:collapse;width:100%}
+th{background:var(--head);text-align:left;padding:8px 10px;font-size:12px;color:var(--muted);font-weight:600}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.tiers{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.tier{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--card);position:relative}
+.tier .pay{font-size:13px;color:var(--muted)}.tier .pay b{font-size:20px;color:var(--ink)}
+.tier .give{color:var(--brand);font-weight:700;margin-top:2px}
+.tier .cp{font-size:12px;color:#7a3e00;margin-top:4px}
+.tier .hot{position:absolute;top:-8px;right:8px}
+.f{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px;align-items:center;margin-bottom:12px}
+.f>label{font-weight:600;font-size:13px}
+.inp{border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:#fff;min-height:34px;display:flex;align-items:center;gap:8px}
+.note{background:#fff7e0;border:1px solid #f0d99a;border-radius:10px;padding:10px 12px;font-size:13px;color:#6b4a00;display:grid;gap:4px}
+.chk{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:4px;border:1.5px solid var(--brand);font-size:11px;color:#fff;background:var(--brand);flex:none}
+.chk.off{background:#fff}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:640px;background:#fff;box-shadow:-8px 0 30px rgba(0,0,0,.18);display:flex;flex-direction:column}
+.drawer .hd{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center}
+.drawer .hd h2{margin:0;font-size:17px}
+.drawer .bd{padding:16px 20px;overflow:auto;flex:1}
+.drawer .ft{padding:12px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+.mask{position:fixed;inset:0;background:rgba(30,20,10,.35)}
+.trow{display:grid;grid-template-columns:28px 1fr 1fr 1.4fr 1fr 28px;gap:8px;align-items:center;margin-bottom:8px}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:520px;background:#fff;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal .hd{padding:14px 18px;border-bottom:1px solid var(--line);font-weight:700;font-size:16px}
+.modal .bd{padding:14px 18px;display:grid;gap:10px}
+.modal .ft{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+.calc td{padding:6px 4px;border:0}.calc tr.sum td{border-top:1px solid var(--line);font-weight:700}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+.seg span{padding:6px 12px;border-inline-end:1px solid var(--line);font-weight:600;font-size:13px}
+.seg span:last-child{border:0}.seg span.on{background:var(--brand);color:#fff}
+/* customer */
+.c{background:var(--bg);min-height:100vh;font-size:14px}
+.ctop{color:#fff;padding:12px 14px 54px;position:relative}
+.ctop .bar{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:600}
+.ctop .sub{font-size:12px;color:var(--gold-soft);margin-top:4px}
+.cwrap{padding:0 12px 16px;margin-top:-42px;display:grid;gap:12px;position:relative}
+.ccard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.ccard h4{margin:0 0 10px;font-size:15px;display:flex;align-items:center;gap:6px}
+.ccard h4 .more{margin-left:auto;font-size:12px;color:var(--muted);font-weight:400}
+.wallet{background:linear-gradient(135deg,#fff6e2,#f8deae);border:1px solid #ecc977}
+.wallet .bal{font-size:28px;font-weight:700;color:var(--red-deep);font-variant-numeric:tabular-nums}
+.wallet .parts{display:flex;gap:14px;font-size:12px;color:#7a4a10;margin-top:4px;flex-wrap:wrap}
+.ctiers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ctier{border:1.5px solid var(--line);border-radius:12px;padding:10px;background:#fff;position:relative}
+.ctier.on{border-color:var(--brand);background:#fff4ef}
+.ctier .pay{font-size:12px;color:var(--muted)}.ctier .pay b{font-size:19px;color:var(--ink)}
+.ctier .give{font-size:13px;font-weight:700;color:var(--brand);margin-top:2px}
+.ctier .cp{font-size:11px;color:#7a3e00;margin-top:3px}
+.ctier .hot{position:absolute;top:-9px;left:8px;background:var(--gold);color:#5a3200;font-size:11px;font-weight:700;border-radius:6px;padding:0 6px}
+.ctier .tick{position:absolute;right:0;bottom:0;background:var(--brand);color:#fff;font-size:11px;border-radius:10px 0 10px 0;padding:0 6px}
+.cbtn{display:block;text-align:center;background:var(--brand);color:#fff;border-radius:22px;padding:11px;font-weight:600;font-size:15px}
+.cbtn.o{background:#fff;color:var(--brand);border:1px solid var(--brand)}
+.coupon{display:flex;border-radius:10px;overflow:hidden;border:1px solid #f0cf96;background:#fff;margin-bottom:8px}
+.coupon .l{width:92px;background:linear-gradient(135deg,#c2412f,#a02c20);color:#fff;display:grid;place-items:center;text-align:center;padding:8px 4px}
+.coupon .l b{font-size:20px}.coupon .l span{font-size:11px;opacity:.9}
+.coupon .m{flex:1;padding:8px 10px;min-width:0}.coupon .m .n{font-weight:600}.coupon .m .d{font-size:12px;color:var(--muted);margin-top:2px}
+.coupon .r{display:grid;place-items:center;padding:0 10px}
+.coupon .r span{border:1px solid var(--brand);color:var(--brand);border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600}
+.coupon .r span.got{border-color:var(--line);color:var(--muted)}
+.act{display:flex;gap:10px;padding:10px 0;border-top:1px dashed var(--line)}
+.act:first-of-type{border-top:0}
+.act .ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:700;color:#fff;flex:none;font-size:13px}
+.act .t{font-weight:600}.act .d{font-size:12px;color:var(--muted);margin-top:2px}
+.chip{display:inline-block;font-size:11px;border-radius:4px;padding:0 5px;margin-right:4px;border:1px solid #e9b8b0;color:var(--brand)}
+.rules{font-size:12px;color:var(--muted);line-height:1.7;margin:8px 0 0;padding-left:16px}
+.cfoot{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 14px;display:flex;align-items:center;gap:10px}
+.qr{width:180px;height:180px;margin:6px auto;background:
+ repeating-linear-gradient(90deg,#000 0 6px,transparent 6px 12px),repeating-linear-gradient(0deg,#000 0 6px,transparent 6px 14px);background-blend-mode:difference;border:10px solid #fff;outline:1px solid var(--line);position:relative;border-radius:6px}
+.qr:before,.qr:after{content:"";position:absolute;width:44px;height:44px;border:8px solid #000;background:#fff;box-shadow:inset 0 0 0 6px #fff,inset 0 0 0 14px #000}
+.qr:before{left:0;top:0}.qr:after{right:0;top:0}
+.code{font-size:30px;letter-spacing:6px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+.payrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.payrow:first-child{border-top:0}
+.sw{width:40px;height:22px;border-radius:11px;background:var(--brand);position:relative;flex:none}
+.sw:after{content:"";position:absolute;right:2px;top:2px;width:18px;height:18px;border-radius:50%;background:#fff}
+.radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);flex:none}.radio.on{border:5px solid var(--brand)}
+.shopc{display:flex;gap:10px;align-items:center}
+.shopc .lg{width:46px;height:46px;border-radius:12px;background:#fff;color:var(--brand);display:grid;place-items:center;font-weight:800;font-size:18px;flex:none}
+/* customer pc */
+.pcwrap{max-width:1120px;margin:-60px auto 0;padding:0 20px 40px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;position:relative}
+.pctop{color:#fff;padding:16px 0 80px}
+.pctop .in{max-width:1120px;margin:0 auto;padding:0 20px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const s = new URLSearchParams(location.search).get('s') || '1';
+const P = '₱';
+function shell(active, title, sub, tabs, body){
+  const menu = [['点单',['堂食下单','外卖下单','平台下单','会员充值*']],['订单',null],['客户管理',['会员列表','送餐地址']],['菜单',null],['营销*',['营销活动*','优惠活动']],['财务',['核款','账单','对账','店铺余额']],['店铺设置',null]];
+  let side = `<div class="side"><div class="shop">一品湘 · 马卡蒂店</div><div class="who">门店 · 店主 brian</div>`;
+  for (const [g, subs] of menu){
+    const gn = g.replace('*','');
+    side += `<div class="g"><span>${gn}${g.endsWith('*')?'<span class="new">新</span>':''}</span>${subs?'<span>▾</span>':''}</div>`;
+    if (subs) for (const x of subs){ const n=x.replace('*',''); side += `<div class="s ${n===active?'on':''}">${n}${x.endsWith('*')?'<span class="new">新</span>':''}</div>`; }
+  }
+  side += `</div>`;
+  const tb = tabs ? `<div class="tabs">${tabs.map((t,i)=>`<span class="${i===0?'on':''}">${t}</span>`).join('')}</div>` : '';
+  return `<div class="shell">${side}<div class="main"><div class="ph"><div><h1>${title}</h1><p>${sub}</p></div>${PH||''}</div>${tb}<div class="body">${body}</div></div></div>`;
+}
+let PH = '';
+const tierCard = (pay, give, cp, hot) => `<div class="tier">${hot?`<span class="tag t-gold hot">${hot}</span>`:''}<div class="pay">充 <b>${P}${pay}</b></div><div class="give">送 ${P}${give}</div>${cp?`<div class="cp">＋ ${cp}</div>`:''}</div>`;
+
+function s1(){
+  PH = `<div class="row"><span class="btn g">储值规则</span><span class="btn g">预览顾客页面</span><span class="btn p">＋ 新建充值送活动</span></div>`;
+  return shell('营销活动','营销活动','设置充值送活动，顾客在店铺“优惠活动”页看到并充值；储值只在本门店使用',['充值送','顾客活动页','储值条款'],`
+  <div class="g4">
+    <div class="kpi"><div class="l">储值余额（欠顾客）</div><div class="v">${P}186,420.00</div><div class="s">本金 ${P}162,300.00 · 赠送 ${P}24,120.00</div></div>
+    <div class="kpi"><div class="l">本月充值</div><div class="v">${P}58,000.00</div><div class="s">送出赠送金 ${P}7,250.00 · 92 笔</div></div>
+    <div class="kpi"><div class="l">本月储值消费</div><div class="v">${P}41,860.00</div><div class="s">本金 ${P}36,540.00 · 赠送 ${P}5,320.00</div></div>
+    <div class="kpi"><div class="l">储值顾客</div><div class="v">318 人</div><div class="s">本月新增 47 人</div></div>
+  </div>
+  <div class="card">
+    <h3>周年庆充值送 <span class="tag t-ok">进行中</span><span class="sp"></span><span class="mini">2026-12-01 至 2027-01-31 · 一品湘、好吃党页面展示</span></h3>
+    <div class="tiers">${tierCard('500.00','50.00')}${tierCard('1,000.00','150.00','满300减30券 ×1','最受欢迎')}${tierCard('2,000.00','360.00','满300减30券 ×2')}${tierCard('5,000.00','1,000.00','','首充专享')}</div>
+    <div class="row" style="margin-top:12px"><span class="mini">也可自定义金额（最低 ${P}100.00，不送）</span><span class="sp"></span>
+      <span class="mini">参与 92 人次 · 充值 ${P}58,000.00 · 送出 ${P}7,250.00</span><span class="btn g">数据</span><span class="btn g">停用</span><span class="btn">编辑</span></div>
+  </div>
+  <div class="card">
+    <h3>中秋充值送 <span class="tag t-off">已结束</span><span class="sp"></span><span class="mini">2026-09-10 至 2026-09-30</span></h3>
+    <div class="row mini">充 ${P}500.00 送 ${P}40.00 · 充 ${P}1,000.00 送 ${P}100.00 <span class="sp"></span> 参与 133 人次 · 充值 ${P}96,500.00 · 送出 ${P}9,140.00 <span class="btn g">复制为新活动</span></div>
+  </div>
+  <div class="note"><b>同一时间只能有一个进行中的充值送活动。</b><span>改档位只影响以后的充值；顾客已经下的充值单按当时的档位入账。储值本金不过期，顾客可按规则退剩余本金（顾客原因扣回已用赠送）。</span></div>`);
+}
+
+function s2(){
+  return s1() + `<div class="mask"></div><div class="drawer"><div class="hd"><h2>编辑充值送活动</h2><span class="sp"></span><span class="mini">✕</span></div><div class="bd">
+   <div class="f"><label>活动名称</label><div class="inp">周年庆充值送 <span class="sp"></span><span class="mini">英文、他加禄语自动翻译</span></div></div>
+   <div class="f"><label>生效时间</label><div class="row"><div class="inp">2026-12-01 00:00</div>至<div class="inp">2027-01-31 23:59</div></div></div>
+   <div style="font-weight:600;font-size:13px;margin:4px 0 8px">充值档位（最多 6 档）</div>
+   <div class="trow mini"><span></span><span>充值金额</span><span>送赠送金</span><span>附送券（可选）</span><span>标签 / 限制</span><span></span></div>
+   ${[['500.00','50.00','—','—'],['1,000.00','150.00','满300减30券 ×1','最受欢迎'],['2,000.00','360.00','满300减30券 ×2','每人限 2 次'],['5,000.00','1,000.00','—','首充专享']].map(r=>`<div class="trow"><span class="mini">⋮⋮</span><div class="inp">${P} ${r[0]}</div><div class="inp">${P} ${r[1]}</div><div class="inp">${r[2]} <span class="sp"></span>▾</div><div class="inp" style="font-size:12px">${r[3]}</div><span class="mini">✕</span></div>`).join('')}
+   <div class="row" style="margin:4px 0 14px"><span class="btn g">＋ 加一档</span><span class="mini">赠送比例：10% / 15% / 18% / 20%</span></div>
+   <div class="f"><label>自定义金额</label><div class="row"><span class="chk">✓</span>允许顾客充任意金额，最低 <div class="inp" style="width:110px">${P} 100.00</div>（不送）</div></div>
+   <div class="f"><label>总名额</label><div class="row"><div class="inp" style="width:140px">不限</div><span class="mini">按档位分别限制在上面“标签 / 限制”里设</span></div></div>
+   <div class="f"><label>展示品牌</label><div class="row"><span class="chk">✓</span>一品湘 <span class="chk">✓</span>好吃党 <span class="chk off"></span>江西小吃 <span class="mini">（储值全门店通用）</span></div></div>
+   <div class="f"><label>充值方式</label><div class="row"><span class="chk">✓</span>到店现金 <span class="chk">✓</span>GCash 扫码 <span class="chk">✓</span>Maya 扫码</div></div>
+   <div class="f" style="align-items:start"><label>规则说明</label><div class="card" style="padding:10px 12px;background:var(--card);font-size:12px;line-height:1.7">
+     <div class="mini">系统条款（不能删）</div>
+     1. 储值只能在一品湘·马卡蒂店使用（门店下所有品牌），不能转让、不能提现。<br>2. 本金永不过期；赠送金不能兑换现金。<br>3. 消费时本金和赠送金按比例扣除。<br>4. 申请退储值：退剩余本金并扣回已使用的赠送金，剩余赠送金作废；因门店原因退还的，剩余本金全额退还。
+     <div class="mini" style="margin-top:6px">商家补充</div><div class="inp" style="min-height:44px">赠送的优惠券有效期 30 天。</div></div></div>
+  </div><div class="ft"><span class="btn g">取消</span><span class="btn p">保存</span></div></div>`;
+}
+
+function s3(){
+  PH = `<div class="row"><span class="btn g">充值记录</span></div>`;
+  return shell('会员充值','会员充值','扫顾客的充值码或输入手机号，收款后确认；店员发起的充值要顾客短信验证码',null,`
+  <div class="g2">
+   <div class="card"><h3>1. 找到顾客</h3>
+     <div class="seg"><span class="on">扫码 / 输充值码</span><span>手机号 / 会员号</span></div>
+     <div class="row" style="margin-top:12px"><div class="inp" style="flex:1;font-size:18px;letter-spacing:4px;font-weight:700">482 917</div><span class="btn p">查找</span></div>
+     <div class="card" style="margin-top:12px;background:var(--card)">
+       <div class="row"><b>陈小姐</b><span class="mini">+63 917 ••• 2231 · 会员 YPX-000128</span><span class="sp"></span><span class="tag t-gold">顾客自己生成的充值码</span></div>
+       <div class="row mini" style="margin-top:6px">本店余额 ${P}312.40（储值本金 ${P}260.00 · 赠送 ${P}39.00 · 退款余额 ${P}13.40）</div>
+       <div class="row mini">上次充值 2026-10-02 · 充 ${P}500.00 送 ${P}40.00</div>
+     </div>
+     <h3 style="margin-top:16px">待确认的充值码 <span class="mini">（30 分钟内有效）</span></h3>
+     <table><tr><th>充值码</th><th>顾客</th><th>档位</th><th>剩余</th></tr>
+     <tr><td><b>482 917</b></td><td>陈小姐</td><td>充 1,000 送 150</td><td>26 分</td></tr>
+     <tr><td>119 053</td><td>Mark R.</td><td>充 500 送 50</td><td>11 分</td></tr></table>
+   </div>
+   <div class="card"><h3>2. 档位和收款</h3>
+     <div class="tiers" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+       ${tierCard('500.00','50.00')}<div class="tier" style="border:2px solid var(--brand);background:#fff4ef"><span class="tag t-gold hot">顾客选的</span><div class="pay">充 <b>${P}1,000.00</b></div><div class="give">送 ${P}150.00</div><div class="cp">＋ 满300减30券 ×1</div></div>
+       ${tierCard('2,000.00','360.00','满300减30券 ×2')}${tierCard('5,000.00','1,000.00','','首充专享 · 不可选')}
+     </div>
+     <div class="f" style="margin-top:14px"><label>收款方式</label><div class="seg"><span class="on">现金</span><span>GCash</span><span>Maya</span></div></div>
+     <div class="f"><label>实收现金</label><div class="row"><div class="inp" style="width:150px">${P} 1,000.00</div><span class="mini">找零 ${P}0.00</span></div></div>
+     <table class="calc" style="margin:6px 0 12px"><tr><td>存入本金</td><td class="num">${P}1,000.00</td></tr><tr><td>赠送金</td><td class="num">${P}150.00</td></tr><tr><td>附送</td><td class="num">满300减30券 ×1</td></tr><tr class="sum"><td>充值后本店余额</td><td class="num">${P}1,462.40</td></tr></table>
+     <div class="note" style="margin-bottom:12px">现金会记进今天的钱箱（对账 → 储值充值）。确认后当天、余额没动之前，店长可用授权码撤销。</div>
+     <div class="row"><span class="sp"></span><span class="btn g">取消</span><span class="btn p" style="padding:9px 22px">确认已收款 ${P}1,000.00</span></div>
+   </div>
+  </div>`);
+}
+
+function s4(){
+  PH = `<div class="row"><span class="btn g">导出 Excel</span></div>`;
+  const rows = [['陈小姐','+63 917 ••• 2231','260.00','39.00','2026-10-02'],['Mark R.','+63 918 ••• 7710','1,840.00','276.00','2026-11-20'],['王先生','+63 905 ••• 0192','750.00','150.00','2026-11-26'],['Ana L.','+63 927 ••• 4410','95.50','9.55','2026-08-14']];
+  return shell('店铺余额','店铺余额','顾客在本门店的余额：退款存入的和充值的分开记',['储值','退款余额','流水'],`
+   <div class="g4"><div class="kpi"><div class="l">储值本金</div><div class="v">${P}162,300.00</div></div><div class="kpi"><div class="l">储值赠送</div><div class="v">${P}24,120.00</div></div><div class="kpi"><div class="l">本月退储值</div><div class="v">${P}2,150.00</div><div class="s">3 笔</div></div><div class="kpi"><div class="l">本月扣回 / 作废赠送</div><div class="v">${P}410.00</div></div></div>
+   <div class="card"><table><tr><th>顾客</th><th>手机</th><th class="num">本金</th><th class="num">赠送</th><th>最近充值</th><th></th></tr>
+   ${rows.map((r,i)=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td class="num">${P}${r[2]}</td><td class="num">${P}${r[3]}</td><td>${r[4]}</td><td class="num"><span class="btn g">流水</span> <span class="btn ${i===2?'p':''}">退储值</span></td></tr>`).join('')}</table></div>
+   <div class="mask"></div>
+   <div class="modal"><div class="hd">退储值 · 王先生</div><div class="bd">
+     <div class="row"><span style="font-weight:600;width:70px">原因</span><div class="seg"><span class="on">顾客原因</span><span>门店原因</span></div></div>
+     <table class="calc">
+      <tr><td>累计充值本金</td><td class="num">${P}1,000.00</td></tr>
+      <tr><td>累计送出赠送</td><td class="num">${P}200.00</td></tr>
+      <tr><td>剩余本金</td><td class="num">${P}750.00</td></tr>
+      <tr><td>剩余赠送（作废）</td><td class="num">${P}150.00</td></tr>
+      <tr><td>扣回已用赠送 = 200.00 − 150.00</td><td class="num">−${P}50.00</td></tr>
+      <tr class="sum"><td>退给顾客</td><td class="num" style="color:var(--brand);font-size:18px">${P}700.00</td></tr></table>
+     <div class="row"><span style="font-weight:600;width:70px">退款方式</span><div class="seg"><span class="on">现金</span><span>GCash</span><span>银行转账</span></div></div>
+     <div class="row"><span style="font-weight:600;width:70px">顾客确认</span><div class="seg"><span class="on">当面</span><span>电话</span><span>聊天</span></div></div>
+     <div class="note">选“门店原因”退 ${P}750.00（不扣回）。退完后这位顾客的储值本金和赠送都清零，退储值现金从今天钱箱出。超过 ${P}2,000.00 要店主授权码。</div>
+   </div><div class="ft"><span class="btn g">取消</span><span class="btn p">确认退 ${P}700.00</span></div></div>`);
+}
+
+function cTop(title, sub, share){ return `<div class="ctop motif"><div class="bar"><span>‹</span><span>${title}</span><span class="sp"></span>${share?'<span style="font-size:14px">分享</span>':''}</div>${sub||''}</div>`; }
+const shopLine = `<div class="shopc" style="margin-top:12px"><div class="lg">湘</div><div><div style="font-weight:600;font-size:15px">一品湘 · 马卡蒂店</div><div class="sub">储值、优惠券和活动都在这里</div></div></div>`;
+const walletCard = `<div class="ccard wallet"><div class="row"><span style="font-weight:600">本店余额</span><span class="sp"></span><span style="font-size:12px;color:#7a4a10">明细 ›</span></div>
+ <div class="bal">${P}312.40</div><div class="parts"><span>储值本金 ${P}260.00</span><span>赠送 ${P}39.00</span><span>退款余额 ${P}13.40</span></div>
+ <div style="font-size:11px;color:#8a6a3a;margin-top:6px">只在本店使用 · 下单时自动抵扣</div></div>`;
+const tiersC = (sel) => `<div class="ctiers">
+ ${[['500','50',''],['1,000','150','＋满300减30券','最受欢迎'],['2,000','360','＋满300减30券×2'],['5,000','1,000','','首充专享']].map((t,i)=>`<div class="ctier ${i===sel?'on':''}">${t[3]?`<span class="hot">${t[3]}</span>`:''}<div class="pay">充 <b>${P}${t[0]}</b></div><div class="give">送 ${P}${t[1]}</div>${t[2]?`<div class="cp">${t[2]}</div>`:'<div class="cp">&nbsp;</div>'}${i===sel?'<span class="tick">✓</span>':''}</div>`).join('')}</div>
+ <div style="font-size:12px;color:var(--muted);margin:10px 0">也可以充其他金额（最低 ${P}100，不送）</div>`;
+const rechargeCard = (sel) => `<div class="ccard"><h4>充值送 <span class="chip">12/1–1/31</span><span class="more">规则 ›</span></h4>${tiersC(sel)}
+ <div class="cbtn">充 ${P}1,000 得 ${P}1,150 · 立即充值</div>
+ <ul class="rules"><li>到店出示充值码，店员收款后到账</li><li>本金不过期；赠送金不能换现金；消费时按比例扣</li></ul></div>`;
+const couponsCard = `<div class="ccard"><h4>领优惠券<span class="more">我的券 ›</span></h4>
+ <div class="coupon"><div class="l"><div><b>${P}30</b><br><span>满 ${P}300 可用</span></div></div><div class="m"><div class="n">店铺满减券</div><div class="d">外卖、自取可用 · 领取后 7 天有效</div></div><div class="r"><span>领取</span></div></div>
+ <div class="coupon"><div class="l"><div><b>${P}50</b><br><span>无门槛</span></div></div><div class="m"><div class="n">好吃党 专享券</div><div class="d">仅好吃党菜品 · 12/31 前</div></div><div class="r"><span class="got">已领取</span></div></div>
+ <div style="font-size:12px;color:var(--muted)">🎁 下单完成后送复购礼券 ${P}20（30 天有效）</div></div>`;
+const actsCard = `<div class="ccard"><h4>店铺活动</h4>
+ <div class="act"><div class="ic" style="background:#c2412f">减</div><div><div class="t">满 ${P}500 减 ${P}60，满 ${P}800 减 ${P}120</div><div class="d"><span class="chip">外卖</span><span class="chip">自取</span>全天</div></div></div>
+ <div class="act"><div class="ic" style="background:#d98a1a">折</div><div><div class="t">剁椒鱼头 8 折</div><div class="d"><span class="chip">外卖</span><span class="chip">堂食</span>11:00–14:00 · <span style="color:var(--brand)">去看看 ›</span></div></div></div>
+ <div class="act"><div class="ic" style="background:#2f7a52">半</div><div><div class="t">招牌奶茶 第二杯半价</div><div class="d"><span class="chip">堂食</span>周一至周四</div></div></div>
+ <div class="act"><div class="ic" style="background:#3c5fa8">运</div><div><div class="t">满 ${P}350 免配送费</div><div class="d"><span class="chip">外卖</span>全天</div></div></div></div>`;
+
+function s5(){
+  return `<div class="c warm">${cTop('优惠活动', shopLine, 1)}<div class="cwrap">${walletCard}${rechargeCard(1)}${couponsCard}${actsCard}</div>
+  <div class="cfoot"><div style="flex:1;font-size:12px;color:var(--muted)">本店余额 <b style="color:var(--ink);font-size:15px">${P}312.40</b></div><div class="cbtn" style="padding:9px 26px">去点餐</div></div></div>`;
+}
+function s6(){
+  return `<div class="c warm">${cTop('充值', '')}<div class="cwrap">
+   <div class="ccard" style="text-align:center"><div style="font-size:13px;color:var(--muted)">一品湘 · 马卡蒂店</div>
+     <div style="font-size:17px;font-weight:600;margin-top:6px">充 ${P}1,000.00 送 ${P}150.00</div><div style="font-size:12px;color:#7a3e00">＋ 满300减30券 ×1</div>
+     <div class="qr"></div><div class="code">482 917</div>
+     <div style="font-size:13px;margin-top:6px">请到店出示给店员，付款后自动到账</div>
+     <div style="font-size:12px;color:var(--brand);margin-top:4px">25:41 内有效</div></div>
+   <div class="ccard"><h4>到账后</h4>
+     <div class="payrow"><span>储值本金</span><span class="sp"></span><b>${P}1,000.00</b></div>
+     <div class="payrow"><span>赠送金</span><span class="sp"></span><b style="color:var(--brand)">${P}150.00</b></div>
+     <div class="payrow"><span>本店余额</span><span class="sp"></span><b>${P}312.40 → ${P}1,462.40</b></div></div>
+   <div class="ccard" style="font-size:12px;color:var(--muted)"><div class="row" style="gap:6px;color:var(--ink);font-size:13px"><span class="chk">✓</span>我已阅读并同意《一品湘储值规则》</div>
+     <ul class="rules"><li>只在本店使用，不能转让、提现</li><li>本金不过期；退储值时扣回已用的赠送金</li><li>储值由商家发行和兑付</li></ul></div>
+   <div class="cbtn o">取消充值单</div></div></div>`;
+}
+function s7(){
+  return `<div class="c warm"><div class="pctop motif"><div class="in"><div class="row" style="font-size:13px;color:var(--gold-soft)">河马点餐 › 一品湘 · 马卡蒂店 › 优惠活动</div>
+   <div class="shopc" style="margin-top:14px"><div class="lg" style="width:56px;height:56px">湘</div><div><div style="font-weight:600;font-size:20px">一品湘 · 马卡蒂店 优惠活动</div><div style="font-size:13px;color:var(--gold-soft)">储值、优惠券和活动都在这里 · 储值全店所有品牌通用</div></div><span class="sp"></span><span class="cbtn" style="background:#fff;color:var(--brand);padding:8px 24px">去点餐</span></div></div></div>
+   <div class="pcwrap"><div style="display:grid;gap:16px;align-content:start">${walletCard}${rechargeCard(1)}</div><div style="display:grid;gap:16px;align-content:start">${couponsCard}${actsCard}</div></div></div>`;
+}
+function s8(){
+  return `<div class="c warm">${cTop('提交订单','')}<div class="cwrap">
+   <div class="ccard"><h4>订单金额</h4>
+     <div class="payrow"><span>菜品</span><span class="sp"></span>${P}1,180.00</div>
+     <div class="payrow"><span style="color:var(--brand)">满 800 减 120</span><span class="sp"></span><span style="color:var(--brand)">−${P}120.00</span></div>
+     <div class="payrow"><span>包装费 · 配送费</span><span class="sp"></span>${P}90.00</div>
+     <div class="payrow"><b>订单金额</b><span class="sp"></span><b>${P}1,150.00</b></div></div>
+   <div class="ccard"><h4>付款方式</h4>
+     <div class="payrow"><div><div style="font-weight:600">本店余额</div><div style="font-size:12px;color:var(--muted)">可用 ${P}312.40 · 先用退款余额，再按比例用储值</div></div><span class="sp"></span><span style="color:var(--brand);font-weight:600;white-space:nowrap">−${P}312.40</span><span class="sw"></span></div>
+     <div class="payrow" style="background:#fff6e2;margin:0 -14px;padding:10px 14px"><span style="font-size:13px">💰 充 ${P}1,000 送 ${P}150，本单再省</span><span class="sp"></span><span style="color:var(--brand);font-size:13px;font-weight:600">去充值 ›</span></div>
+     <div class="payrow"><span class="radio on"></span>货到付款（现金）<span class="sp"></span></div>
+     <div class="payrow"><span class="radio"></span>货到付款（GCash 扫码）</div></div>
+   <div class="ccard" style="font-size:12px;color:var(--muted)">本店余额抵扣明细：退款余额 ${P}13.40 · 储值本金 ${P}260.00 · 赠送 ${P}39.00</div></div>
+   <div class="cfoot"><div style="flex:1"><div style="font-size:12px;color:var(--muted)">还需支付</div><b style="font-size:19px">${P}837.60</b></div><div class="cbtn" style="padding:10px 28px">提交订单</div></div></div>`;
+}
+function s9(){
+  const menu = ['概览','商家','订单','顾客服务','优惠券','储值管理','系统设置'];
+  return `<div class="shell"><div class="side"><div class="shop">河马点餐 平台</div><div class="who">平台管理员</div>${menu.map(m=>`<div class="s ${m==='储值管理'?'on':''}">${m}${m==='储值管理'?'<span class="new">新</span>':''}</div>`).join('')}</div>
+  <div class="main"><div class="ph"><div><h1>储值管理</h1><p>按国家开通商家储值（充值送）和设置余额上限；平台只查看、冻结，不能改顾客余额</p></div></div>
+  <div class="body"><div class="card"><h3>国家设置</h3><table><tr><th>国家</th><th>储值</th><th class="num">每位顾客在一家门店的余额上限</th><th class="num">开通门店</th><th class="num">储值余额合计</th><th>备注</th></tr>
+   <tr><td>菲律宾</td><td><span class="tag t-ok">开</span></td><td class="num">₱50,000.00</td><td class="num">38</td><td class="num">₱2,416,300.00</td><td class="mini">RA 10962：储值不能过期</td></tr>
+   <tr><td>新加坡</td><td><span class="tag t-ok">开</span></td><td class="num">S$1,500.00</td><td class="num">6</td><td class="num">S$21,480.00</td><td class="mini">有限用途电子货币</td></tr>
+   <tr><td>马来西亚</td><td><span class="tag t-ok">开</span></td><td class="num">RM3,000.00</td><td class="num">4</td><td class="num">RM9,120.00</td><td class="mini">开通前请律师核对豁免令条件</td></tr>
+   <tr><td>泰国</td><td><span class="tag t-off">关</span></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="mini">未评估</td></tr></table></div>
+  <div class="card"><h3>门店储值（欠顾客最多的在前）</h3><table><tr><th>门店</th><th class="num">储值本金</th><th class="num">赠送</th><th class="num">本月充值</th><th class="num">本月退储值</th><th>状态</th><th></th></tr>
+   <tr><td>一品湘 · 马卡蒂店</td><td class="num">₱162,300.00</td><td class="num">₱24,120.00</td><td class="num">₱58,000.00</td><td class="num">₱2,150.00</td><td><span class="tag t-ok">正常</span></td><td class="num"><span class="btn g">明细</span> <span class="btn">冻结</span></td></tr>
+   <tr><td>老王饺子 · BGC</td><td class="num">₱141,000.00</td><td class="num">₱30,800.00</td><td class="num">₱12,000.00</td><td class="num">₱0.00</td><td><span class="tag t-red">超过提醒线</span></td><td class="num"><span class="btn g">明细</span> <span class="btn">冻结</span></td></tr>
+   <tr><td>川味小馆 · 帕赛</td><td class="num">₱8,200.00</td><td class="num">₱900.00</td><td class="num">₱0.00</td><td class="num">₱0.00</td><td><span class="tag t-off">已停业 · 已冻结</span></td><td class="num"><span class="btn g">处理退款</span></td></tr></table></div></div></div></div>`;
+}
+document.getElementById('app').innerHTML = ({1:s1,2:s2,3:s3,4:s4,5:s5,6:s6,7:s7,8:s8,9:s9}[s]||s1)();
+</script>
+</body>
+</html>
