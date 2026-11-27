@@ -3908,5 +3908,9 @@
  "br.by_brand_hint": "Les marques font le total",
  "br.platform_owe": "Dû par les plateformes",
  "br.map_color": "Colorer les points par marque (la chaleur compte toutes)",
- "ch.from_brand": "Le client a écrit à cette marque"
+ "ch.from_brand": "Le client a écrit à cette marque",
+ "sp.about_brand": "Quelle marque est concernée",
+ "sp.whole_store": "Toute la boutique",
+ "as.about_brand": "La boutique pose une question sur cette marque",
+ "as.brands": "Marques"
 }

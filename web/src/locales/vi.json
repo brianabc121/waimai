@@ -3908,5 +3908,9 @@
  "br.by_brand_hint": "Các thương hiệu cộng lại = tổng",
  "br.platform_owe": "Nền tảng phải trả",
  "br.map_color": "Tô màu điểm theo thương hiệu (bản đồ nhiệt tính tất cả)",
- "ch.from_brand": "Khách nhắn tới thương hiệu này"
+ "ch.from_brand": "Khách nhắn tới thương hiệu này",
+ "sp.about_brand": "Hỏi về thương hiệu nào",
+ "sp.whole_store": "Cả cửa hàng",
+ "as.about_brand": "Cửa hàng hỏi về thương hiệu này",
+ "as.brands": "Thương hiệu"
 }

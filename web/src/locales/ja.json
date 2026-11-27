@@ -3908,5 +3908,9 @@
  "br.by_brand_hint": "各ブランドの合計 = 総計",
  "br.platform_owe": "プラットフォーム未収",
  "br.map_color": "地点をブランド別に色分け（ヒートマップは全体）",
- "ch.from_brand": "このブランド宛てのお客様メッセージ"
+ "ch.from_brand": "このブランド宛てのお客様メッセージ",
+ "sp.about_brand": "どのブランドについての質問か",
+ "sp.whole_store": "店舗全体",
+ "as.about_brand": "店舗はこのブランドについて質問しています",
+ "as.brands": "ブランド"
 }

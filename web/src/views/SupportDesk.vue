@@ -7,13 +7,17 @@ import { useLive } from '../live'
 import { session } from '../session'
 import { connect, describeChat, storeSupport, storeSupportRead, type ChatOrder, type SupportChat } from '../chat'
 import '../officeStrings'
+import { brandsHere, multiBrand, useBrandPick } from '../brands'
 import ChatPane from './chat/ChatPane.vue'
+import BrandSeg from './brands/BrandSeg.vue'
 
 const router = useRouter()
 const bid = session.branchId!
 const info = ref<SupportChat | null>(null)
 const error = ref(''), readOnly = ref(false)
 const me = computed(() => ({ uid: session.user!.id, name: session.user!.display_name || session.user!.username }))
+// a store with several brands says which brand it writes about; 0 is the whole store
+const { pick: brandPick } = useBrandPick('support', brandsHere, true)
 
 async function load() {
   try { info.value = await storeSupport(bid) } catch (e) { error.value = (e as Error).message }
@@ -44,9 +48,14 @@ function openOrder(o: ChatOrder) { void router.push({ path: '/merchant/orders', 
       <span class="spd-ava">{{ t('sp.ava') }}</span>
       <span class="grow"><b>{{ t('sp.title') }}</b><span class="small muted">{{ t('ox.sp.shared') }}</span></span>
     </header>
+    <div v-if="multiBrand()" class="spd-brands" data-testid="support-brand">
+      <span class="small muted">{{ t('sp.about_brand') }}</span>
+      <BrandSeg v-model="brandPick" :brands="brandsHere()" all :all-label="t('sp.whole_store')" />
+    </div>
     <div v-if="error" class="banner bad" style="margin:12px" data-testid="support-error">{{ error }}</div>
     <ChatPane v-if="info" :peer="info.peer" self="store" :branch-id="bid" :staff="me" :peer-read-at="info.peer_read_at" :blocked="blocked" desk
       :upload-path="`/merchant/branches/${bid}/support/images`" :orders="info.orders" :empty-text="t('sp.store_start')"
+      :brand="brandPick || undefined" :brands="brandsHere()"
       @seen="seen" @activity="load" @order="openOrder" />
   </div>
   <aside class="spd-side">
@@ -68,6 +77,7 @@ function openOrder(o: ChatOrder) { void router.push({ path: '/merchant/orders', 
 .spd { display: flex; flex-direction: column; min-height: 0; background: #f3ece1; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .spd-head { flex: none; display: flex; gap: 12px; align-items: center; background: var(--card); border-bottom: 1px solid var(--line); padding: 12px 16px; }
 .spd-head .grow { display: grid; gap: 2px; min-width: 0; }
+.spd-brands { flex: none; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--card); border-bottom: 1px solid var(--line); padding: 8px 16px; }
 .spd-side { display: grid; gap: 14px; align-content: start; }
 .spd-side h3 { margin-top: 0; }
 .spd-list { margin: 8px 0 0; padding-inline-start: 18px; display: grid; gap: 4px; font-size: 14px; }

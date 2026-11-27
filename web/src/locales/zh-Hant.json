@@ -3908,5 +3908,9 @@
  "br.by_brand_hint": "各品牌相加 = 合計",
  "br.platform_owe": "平台應收",
  "br.map_color": "地址點按品牌上色（熱力圖按總單量）",
- "ch.from_brand": "顧客從這個品牌發來"
+ "ch.from_brand": "顧客從這個品牌發來",
+ "sp.about_brand": "這次問的是哪個品牌",
+ "sp.whole_store": "整個門店",
+ "as.about_brand": "商家問的是這個品牌",
+ "as.brands": "品牌"
 }

@@ -48,6 +48,7 @@ type supportMsg struct {
 	msgKind string
 	body    string
 	orderID int64
+	brandID int64 // the brand the message is about, 0 for none
 }
 
 func (h *ChatHook) readSupport() (*supportMsg, error) {
@@ -69,12 +70,17 @@ func (h *ChatHook) readSupport() (*supportMsg, error) {
 	if m.msgKind, m.body, m.orderID, err = h.content(); err != nil {
 		return nil, err
 	}
+	var ex struct {
+		UID   int64 `json:"uid"`
+		Brand int64 `json:"brand"`
+	}
+	_ = json.Unmarshal([]byte(h.Ex), &ex)
 	if m.sender != "customer" {
-		var ex struct {
-			UID int64 `json:"uid"`
-		}
-		_ = json.Unmarshal([]byte(h.Ex), &ex)
 		m.staffID = ex.UID
+	}
+	// a store with several brands says which brand it writes about
+	if m.sender == "store" && ex.Brand > 0 {
+		m.brandID = ex.Brand
 	}
 	return m, nil
 }
@@ -146,6 +152,14 @@ func (a *App) supportBeforeSend(ctx context.Context, h ChatHook) error {
 	if !ok {
 		return ErrValidation("the picture or the order does not belong to this conversation")
 	}
+	if m.brandID != 0 {
+		if err := a.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM brands WHERE id=$1 AND branch_id=$2)`, m.brandID, m.id).Scan(&ok); err != nil {
+			return err
+		}
+		if !ok {
+			return ErrValidation("the brand is not this store's")
+		}
+	}
 	var recent int
 	if err := a.DB.QueryRow(ctx, `SELECT count(*) FROM support_messages s JOIN support_threads t ON t.id=s.thread_id
 		WHERE t.party=$1 AND s.sender=$2 AND s.sent_at > now() - interval '1 minute'`, m.party, m.sender).Scan(&recent); err != nil {
@@ -183,17 +197,34 @@ func (a *App) supportAfterSend(ctx context.Context, h ChatHook) error {
 		if err != nil {
 			return err
 		}
-		var staff, order *int64
+		var staff, order, brand *int64
 		if m.staffID != 0 {
 			staff = &m.staffID
 		}
 		if m.orderID != 0 {
 			order = &m.orderID
+			// an order card is about its order's brand
+			var ob *int64
+			if err := tx.QueryRow(ctx, `SELECT brand_id FROM orders WHERE id=$1`, m.orderID).Scan(&ob); err != nil && !isNoRows(err) {
+				return err
+			}
+			if ob != nil {
+				m.brandID = *ob
+			}
 		}
-		tag, err := tx.Exec(ctx, `INSERT INTO support_messages (thread_id, sender, staff_user_id, kind, body, order_id, im_msg_id, sent_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (im_msg_id) DO NOTHING`, threadID, m.sender, staff, m.msgKind, m.body, order, h.ServerMsgID, at)
+		if m.brandID != 0 {
+			brand = &m.brandID
+		}
+		tag, err := tx.Exec(ctx, `INSERT INTO support_messages (thread_id, sender, staff_user_id, kind, body, order_id, im_msg_id, sent_at, brand_id)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (im_msg_id) DO NOTHING`, threadID, m.sender, staff, m.msgKind, m.body, order, h.ServerMsgID, at, brand)
 		if err != nil || tag.RowsAffected() == 0 {
 			return err
+		}
+		// the conversation keeps the brand its latest message was about
+		if brand != nil {
+			if _, err := tx.Exec(ctx, `UPDATE support_threads SET brand_id=$2 WHERE id=$1`, threadID, brand); err != nil {
+				return err
+			}
 		}
 		// as in chat.go: the writer has read what came before, and the other
 		// side may have read this message before the callback came
@@ -323,8 +354,9 @@ func supportOrders(ctx context.Context, q Querier, kind string, id int64) ([]Cha
 		col = "o.branch_id"
 	}
 	rows, err := q.Query(ctx, `SELECT o.id, o.public_no, o.acceptance_status, o.fulfillment_status, o.service_type, o.total, o.currency, o.created_at,
-			o.closed_at IS NULL AND o.acceptance_status IN ('pending','accepted'), o.token_nonce, b.name
-		FROM orders o JOIN branches b ON b.id=o.branch_id WHERE `+col+`=$1 AND o.channel <> 'dine_in' ORDER BY o.id DESC LIMIT $2`, id, supportOrdersShown)
+			o.closed_at IS NULL AND o.acceptance_status IN ('pending','accepted'), o.token_nonce, b.name,
+			COALESCE(br.id,0), COALESCE(br.name,''), COALESCE(br.color,'')
+		FROM orders o JOIN branches b ON b.id=o.branch_id LEFT JOIN brands br ON br.id=o.brand_id WHERE `+col+`=$1 AND o.channel <> 'dine_in' ORDER BY o.id DESC LIMIT $2`, id, supportOrdersShown)
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +365,8 @@ func supportOrders(ctx context.Context, q Querier, kind string, id int64) ([]Cha
 	for rows.Next() {
 		var o ChatOrder
 		var acc, ful string
-		if err := rows.Scan(&o.ID, &o.PublicNo, &acc, &ful, &o.Service, &o.Total, &o.Currency, &o.CreatedAt, &o.Open, &o.nonce, &o.StoreName); err != nil {
+		if err := rows.Scan(&o.ID, &o.PublicNo, &acc, &ful, &o.Service, &o.Total, &o.Currency, &o.CreatedAt, &o.Open, &o.nonce, &o.StoreName,
+			&o.BrandID, &o.BrandName, &o.BrandColor); err != nil {
 			return nil, err
 		}
 		o.Status = DisplayStatus(acc, ful)
@@ -412,15 +445,21 @@ func (a *App) AddSupportImage(ctx context.Context, party string, byPlatform bool
 
 // SupportRow is one conversation in the platform's support inbox.
 type SupportRow struct {
-	ID         int64      `json:"id"`
-	Party      string     `json:"party"`
-	Kind       string     `json:"kind"` // customer or store
-	CustomerID int64      `json:"customer_id,omitempty"`
-	BranchID   int64      `json:"branch_id,omitempty"`
-	Name       string     `json:"name"`
-	Phone      string     `json:"phone"`
-	PhoneTail  string     `json:"phone_tail"`
-	Merchant   string     `json:"merchant,omitempty"`
+	ID         int64  `json:"id"`
+	Party      string `json:"party"`
+	Kind       string `json:"kind"` // customer or store
+	CustomerID int64  `json:"customer_id,omitempty"`
+	BranchID   int64  `json:"branch_id,omitempty"`
+	Name       string `json:"name"`
+	Phone      string `json:"phone"`
+	PhoneTail  string `json:"phone_tail"`
+	Merchant   string `json:"merchant,omitempty"`
+	// the brand the latest message that named one was about
+	BrandID    int64  `json:"brand_id,omitempty"`
+	BrandName  string `json:"brand_name,omitempty"`
+	BrandColor string `json:"brand_color,omitempty"`
+	// StoreName is the brand's store, for a customer's conversation
+	StoreName  string     `json:"store_name,omitempty"`
 	LastKind   string     `json:"last_kind"`
 	LastText   string     `json:"last_text"`
 	LastSender string     `json:"last_sender"`
@@ -453,15 +492,18 @@ const supportName = `CASE WHEN t.customer_id IS NOT NULL THEN COALESCE(NULLIF(c.
 
 const supportCols = `t.id, t.party, COALESCE(t.customer_id,0), COALESCE(t.branch_id,0), ` + supportName + `,
 	COALESCE(c.phone, b.phone, ''), COALESCE(m.name, ''), t.last_kind, t.last_text, t.last_sender, t.last_at,
-	t.platform_unread, t.msg_count, t.party_read_at, t.resolved_at, COALESCE(NULLIF(ru.display_name,''), ru.username, '')`
+	t.platform_unread, t.msg_count, t.party_read_at, t.resolved_at, COALESCE(NULLIF(ru.display_name,''), ru.username, ''),
+	COALESCE(tb.id,0), COALESCE(tb.name,''), COALESCE(tb.color,''), COALESCE(tbb.name,'')`
 
 const supportFrom = ` FROM support_threads t LEFT JOIN customers c ON c.id=t.customer_id LEFT JOIN branches b ON b.id=t.branch_id
-	LEFT JOIN merchants m ON m.id=b.merchant_id LEFT JOIN users ru ON ru.id=t.resolved_by`
+	LEFT JOIN merchants m ON m.id=b.merchant_id LEFT JOIN users ru ON ru.id=t.resolved_by
+	LEFT JOIN brands tb ON tb.id=t.brand_id LEFT JOIN branches tbb ON tbb.id=tb.branch_id`
 
 func scanSupport(row interface{ Scan(...any) error }) (SupportRow, error) {
 	var r SupportRow
 	err := row.Scan(&r.ID, &r.Party, &r.CustomerID, &r.BranchID, &r.Name, &r.Phone, &r.Merchant, &r.LastKind, &r.LastText,
-		&r.LastSender, &r.LastAt, &r.Unread, &r.Count, &r.PeerReadAt, &r.ResolvedAt, &r.Resolver)
+		&r.LastSender, &r.LastAt, &r.Unread, &r.Count, &r.PeerReadAt, &r.ResolvedAt, &r.Resolver,
+		&r.BrandID, &r.BrandName, &r.BrandColor, &r.StoreName)
 	r.Kind = "customer"
 	if r.BranchID != 0 {
 		r.Kind = "store"
@@ -492,7 +534,8 @@ func (a *App) AdminSupport(ctx context.Context, f SupportFilter) (*SupportList, 
 		args = append(args, like(q))
 		n := len(args)
 		where += fmt.Sprintf(` AND (%s ILIKE $%d OR c.phone ILIKE $%d OR b.phone ILIKE $%d OR m.name ILIKE $%d
-			OR EXISTS (SELECT 1 FROM support_messages s WHERE s.thread_id=t.id AND s.body ILIKE $%d))`, supportName, n, n, n, n, n)
+			OR tb.name ILIKE $%d OR EXISTS (SELECT 1 FROM brands xb WHERE xb.branch_id=t.branch_id AND xb.name ILIKE $%d)
+			OR EXISTS (SELECT 1 FROM support_messages s WHERE s.thread_id=t.id AND s.body ILIKE $%d))`, supportName, n, n, n, n, n, n, n)
 	}
 	out := &SupportList{Chats: []SupportRow{}}
 	if err := a.DB.QueryRow(ctx, `SELECT count(*)`+supportFrom+` WHERE `+where, args...).Scan(&out.Total); err != nil {
@@ -538,6 +581,9 @@ type SupportDetail struct {
 	Muted    bool        `json:"muted"`
 	Since    time.Time   `json:"since"` // the customer's account, or the store, was made
 	Enabled  bool        `json:"chat_enabled"`
+	// Brands are the store's brands, or those the customer's messages and
+	// orders were about: what the page names a message's brand by
+	Brands []BrandRef `json:"brands"`
 }
 
 func (a *App) AdminSupportChat(ctx context.Context, party string) (*SupportDetail, error) {
@@ -577,6 +623,9 @@ func (a *App) AdminSupportChat(ctx context.Context, party string) (*SupportDetai
 		out.PhoneTail = last4(out.Phone)
 	}
 	if out.Orders, err = supportOrders(ctx, a.DB, kind, id); err != nil {
+		return nil, err
+	}
+	if out.Brands, err = a.supportBrands(ctx, kind, id, party); err != nil {
 		return nil, err
 	}
 	if a.IM != nil {
@@ -630,3 +679,27 @@ func (a *App) SupportThreadOf(ctx context.Context, party string) (*ChatThread, e
 // CustomerParty and StoreParty are the accounts a support conversation is with.
 func CustomerParty(id int64) string { return customerIM(id) }
 func StoreParty(id int64) string    { return branchIM(id) }
+
+// supportBrands are the brands a support conversation can be about: a
+// store's own, main first; for a customer those of their messages and orders.
+func (a *App) supportBrands(ctx context.Context, kind string, id int64, party string) ([]BrandRef, error) {
+	where, args := `br.branch_id=$1`, []any{id}
+	if kind == "customer" {
+		where, args = `br.id IN (SELECT s.brand_id FROM support_messages s JOIN support_threads t ON t.id=s.thread_id WHERE t.party=$1
+			UNION SELECT o.brand_id FROM orders o WHERE o.customer_id=$2 AND o.channel <> 'dine_in')`, []any{party, id}
+	}
+	rows, err := a.DB.Query(ctx, `SELECT br.id, br.name, br.code, br.color, br.is_main, br.status = 'active' FROM brands br WHERE `+where+` ORDER BY br.is_main DESC, br.sort, br.id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []BrandRef{}
+	for rows.Next() {
+		var b BrandRef
+		if err := rows.Scan(&b.ID, &b.Name, &b.Code, &b.Color, &b.IsMain, &b.Active); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}

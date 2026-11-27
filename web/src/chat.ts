@@ -7,6 +7,7 @@ import { toUnicode } from './zawgyi'
 import { ApiError, del, get, post, put, upload } from './api'
 import { shrink } from './photo'
 import { extend, t } from './i18n'
+import type { BrandRef } from './types'
 
 export interface ChatLogin { user_id: string; token: string; ws_url: string; api_url: string; platform_id: number }
 export interface OrderTag { id: number; public_no: string; status: string }
@@ -16,7 +17,8 @@ export interface ChatThread {
   unread: number; count: number; peer_read_at: string | null; order: OrderTag | null
   brand_id?: number; brand_name?: string; brand_color?: string
 }
-export interface ChatOrder { id: number; public_no: string; status: string; service_type: string; total: number; currency: string; created_at: string; open: boolean; token?: string; store_name?: string }
+export interface ChatOrder { id: number; public_no: string; status: string; service_type: string; total: number; currency: string; created_at: string; open: boolean; token?: string; store_name?: string
+  brand_id?: number; brand_name?: string; brand_color?: string }
 export interface CustomerChat {
   branch_id: number; slug: string; store_name: string; store_name_en: string; phone: string; open_now: boolean; open_time: string
   peer: string; enabled: boolean; muted: boolean; thread_id: number; peer_read_at: string | null; orders: ChatOrder[]; quiet: boolean
@@ -25,7 +27,8 @@ export interface CustomerChat {
 export interface StoreChat extends ChatThread { phone_masked: string; orders: ChatOrder[]; order_count: number; blocked: boolean }
 
 // ChatEx travels with a message: the store's side says which member of staff
-// is writing; the customer's side which brand's page they wrote from.
+// is writing; the customer's side which brand's page they wrote from; a store
+// writing to platform support which of its brands it writes about.
 export interface ChatEx { uid?: number; name?: string; brand?: number }
 
 // One message as the pages show it.
@@ -66,8 +69,10 @@ export interface SupportRow {
   id: number; party: string; kind: 'customer' | 'store'; customer_id?: number; branch_id?: number; name: string; phone: string; phone_tail: string; merchant?: string
   last_kind: string; last_text: string; last_sender: 'customer' | 'store' | 'platform'; last_at: string; unread: number; count: number
   peer_read_at: string | null; resolved_at: string | null; resolved_by?: string
+  brand_id?: number; brand_name?: string; brand_color?: string; store_name?: string // the brand the latest message was about
 }
-export interface SupportDetail extends SupportRow { started_at: string | null; orders: ChatOrder[]; slug?: string; merchant_id?: number; muted: boolean; since: string; chat_enabled: boolean }
+export interface SupportDetail extends SupportRow { started_at: string | null; orders: ChatOrder[]; slug?: string; merchant_id?: number; muted: boolean; since: string; chat_enabled: boolean
+  brands: BrandRef[] }
 export const customerSupport = () => get<SupportChat>('/customer/support')
 export const customerSupportRead = () => post('/customer/support/read')
 export const storeSupport = (bid: number) => get<SupportChat>(`/merchant/branches/${bid}/support`)
