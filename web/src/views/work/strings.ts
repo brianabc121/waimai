@@ -24,7 +24,7 @@ extend({
   'wk.rider_busy': ['你有 {n} 单配送任务，切到骑手身份处理', 'You have {n} deliveries. Switch to rider to handle them'],
   'wk.only_rider': ['只有骑手身份能取餐和送达', 'Only the rider identity can pick up and deliver'],
   'wk.new_task': ['新任务', 'New'], 'wk.to_pickup': ['待取餐', 'To pick up'], 'wk.go_pickup': ['去取餐', 'Pick up'], 'wk.continue': ['继续配送', 'Continue'],
-  'wk.pickup_at': ['取餐点', 'Pick up at'], 'wk.items': ['餐品', 'Items'], 'wk.payment': ['收款', 'Payment'],
+  'wk.pickup_at': ['取餐点', 'Pick up at'], 'wk.brand_bag': ['认准袋上的品牌', 'The bag is labelled'], 'wk.items': ['餐品', 'Items'], 'wk.payment': ['收款', 'Payment'],
   'wk.cod': ['货到付款，向顾客收', 'Cash on delivery'], 'wk.cod_short': ['货到付款', 'Cash on delivery'], 'wk.prepaid': ['已付款', 'Paid'], 'wk.no_cash': ['不用收钱', 'Nothing to collect'],
   'wk.packed_n': ['已打包，共 {n} 袋。请和柜台核对袋数', 'Packed, {n} bag(s). Check the count at the counter'],
   'wk.confirm_pickup_n': ['确认取餐（{n} 袋）', 'Confirm pickup ({n} bags)'],
