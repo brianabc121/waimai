@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
@@ -436,7 +437,7 @@ func TestStoredValueReconcile(t *testing.T) {
 	c1, phone1 := customer(t)
 	c2, _ := customer(t)
 	c3, _ := customer(t)
-	s.topupPaid(t, c1, s.big, "cash")  // 1,000 + 200
+	s.topupPaid(t, c1, s.big, "cash")   // 1,000 + 200
 	s.topupPaid(t, c2, s.first, "card") // 300 + 30
 	undone := s.topupPaid(t, c3, s.first, "cash")
 	noErr(t, a.RevokeTopup(ctx, s.branchID, undone.ID, "收错了", s.owner))
@@ -483,6 +484,60 @@ func TestStoredValueReconcile(t *testing.T) {
 	noErr(t, err)
 	if bs.PaidByCredit != x || bs.StoredPrincipal != x-b || bs.StoredBonus != b || bs.StoredTopups != 130000 || bs.StoredGiven != 23000 {
 		t.Fatalf("bill: %+v", bs)
+	}
+	walletClean(t)
+}
+
+// Broken numbers are caught: W11 (the order against the books), W13 (a
+// refund against the books) and W8 (a top-up against the books).
+func TestStoredValueCheckCatchesTampering(t *testing.T) {
+	s := newStoredStore(t)
+	ctx, a := context.Background(), testApp
+	cust, phone := customer(t)
+	tp := s.topupByCode(t, cust, s.big)
+	o, err := s.placeAs(t, phone, "pickup", []app.QuoteLineInput{{ItemID: s.chicken, Qty: 2, OptionIDs: []int64{s.spiceMild}}}, true, nil)
+	noErr(t, err)
+	if o.StoredPrincipalPaid == 0 || o.StoredBonusPaid == 0 {
+		t.Fatalf("not paid from stored value: %+v", o)
+	}
+	o = finishPickup(t, o, s.staff)
+	rq, _, err := a.Refund(ctx, o.ID, app.RefundInput{Lines: refundLines(itemByName(o, "chicken").ID, 1), Reason: "x", Method: "现金"}, s.staff)
+	noErr(t, err)
+	checked(t, "refund", o.ID)
+	want := func(prefix string) {
+		t.Helper()
+		bad, err := a.CheckOrderMoney(ctx, o.ID)
+		noErr(t, err)
+		for _, b := range bad {
+			if strings.HasPrefix(b, prefix) {
+				return
+			}
+		}
+		t.Fatalf("%s not caught: %v", prefix, bad)
+	}
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		_, err := a.DB.Exec(ctx, sql, args...)
+		noErr(t, err)
+	}
+	exec(`UPDATE orders SET stored_principal_paid = stored_principal_paid - 1, stored_bonus_paid = stored_bonus_paid + 1 WHERE id=$1`, o.ID)
+	want("W11")
+	exec(`UPDATE orders SET stored_principal_paid = stored_principal_paid + 1, stored_bonus_paid = stored_bonus_paid - 1 WHERE id=$1`, o.ID)
+	exec(`UPDATE order_refunds SET principal_part = principal_part - 1, bonus_part = bonus_part + 1 WHERE id=$1`, rq.RefundID)
+	want("W13")
+	exec(`UPDATE order_refunds SET principal_part = principal_part + 1, bonus_part = bonus_part - 1 WHERE id=$1`, rq.RefundID)
+	checked(t, "put back", o.ID)
+
+	exec(`UPDATE topups SET bonus = bonus + 1 WHERE id=$1`, tp.ID)
+	bad, err := a.CheckWallet(ctx)
+	noErr(t, err)
+	found := false
+	for _, b := range bad {
+		found = found || strings.HasPrefix(b, "W8")
+	}
+	exec(`UPDATE topups SET bonus = bonus - 1 WHERE id=$1`, tp.ID)
+	if !found {
+		t.Fatalf("W8 not caught: %v", bad)
 	}
 	walletClean(t)
 }

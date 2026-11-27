@@ -5,7 +5,8 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { money, t } from '../../i18n'
-import { storePath } from '../../site'
+import { offersPath, storePath } from '../../site'
+import { myStoredEntries, type StoredEntry } from '../../stored'
 import MePage from './MePage.vue'
 import { dateTime, describe, me, myStoreCreditEntries, myStoreCredits, type CreditEntry, type StoreCredit } from './me'
 
@@ -13,6 +14,7 @@ const props = defineProps<{ bid?: string }>()
 const router = useRouter()
 const items = ref<StoreCredit[] | null>(null)
 const entries = ref<CreditEntry[] | null>(null)
+const stored = ref<StoredEntry[]>([])
 const error = ref('')
 const branchID = computed(() => Number(props.bid) || 0)
 const current = computed(() => items.value?.find(c => c.branch_id === branchID.value) ?? null)
@@ -23,6 +25,7 @@ watch(() => [branchID.value, me.profile?.id], async ([bid, id]) => {
   try {
     items.value ??= await myStoreCredits()
     entries.value = bid ? await myStoreCreditEntries(bid as number) : null
+    stored.value = bid ? await myStoredEntries(bid as number).catch(() => []) : []
   } catch (e) { error.value = describe(e) }
 }, { immediate: true })
 
@@ -35,9 +38,12 @@ const open = (c: StoreCredit) => router.push(`/me/store-credit/${c.branch_id}`)
       <div v-if="current" class="card total" data-testid="credit-total">
         <span class="small">{{ current.store_name }}</span>
         <b>{{ money(current.balance, current.currency) }}</b>
+        <span v-if="current.principal || current.bonus" class="small parts" data-testid="credit-parts">{{ t('sv.c.parts', { p: money(current.principal ?? 0, current.currency), b: money(current.bonus ?? 0, current.currency) })
+          }}<template v-if="current.credit"> · {{ t('sv.c.credit', { c: money(current.credit, current.currency) }) }}</template></span>
         <span v-if="current.frozen" class="tag">{{ t('sc.frozen') }}</span>
         <span v-else-if="current.closed" class="tag">{{ t('sc.closed') }}</span>
         <router-link v-else-if="current.balance > 0" class="use" :to="storePath(current.slug)">{{ t('sc.use') }}</router-link>
+        <router-link v-if="!current.frozen && !current.closed" class="use alt" :to="offersPath(current.slug)" data-testid="credit-topup">{{ t('sv.c.go') }}</router-link>
       </div>
       <p class="note" style="padding:0 6px" data-testid="credit-note">{{ t('sc.note') }}</p>
     </div>
@@ -52,7 +58,15 @@ const open = (c: StoreCredit) => router.push(`/me/store-credit/${c.branch_id}`)
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7" /></svg>
       </button>
     </div>
-    <div v-else class="card main" data-testid="credit-entries">
+    <div v-if="branchID && stored.length" class="card main" data-testid="stored-entries">
+      <h2 style="margin-bottom:6px">{{ t('sv.me.entries') }}</h2>
+      <div v-for="e in stored" :key="e.id" class="entry" data-testid="stored-entry">
+        <div class="grow"><div>{{ t('sv.k.' + e.kind) }}<span v-if="e.public_no" class="muted"> · {{ t('sc.order', { no: e.public_no }) }}</span></div>
+          <div class="small muted">{{ dateTime(e.at) }} · {{ t('sv.c.parts', { p: money(e.principal, current?.currency), b: money(e.bonus, current?.currency) }) }}</div></div>
+        <b :class="e.principal + e.bonus > 0 ? 'in' : 'out'">{{ e.principal + e.bonus > 0 ? '+' : '−' }}{{ money(Math.abs(e.principal + e.bonus), current?.currency) }}</b>
+      </div>
+    </div>
+    <div v-if="branchID" class="card main" data-testid="credit-entries">
       <h2 style="margin-bottom:6px">{{ t('mw.records') }}</h2>
       <div v-if="entries && !entries.length" class="empty">{{ t('mw.none') }}</div>
       <div v-for="e in entries ?? []" :key="e.id" class="entry" data-testid="credit-entry">
@@ -68,6 +82,8 @@ const open = (c: StoreCredit) => router.push(`/me/store-credit/${c.branch_id}`)
 .total { display: grid; gap: 2px; padding: 16px; color: #fff; background: var(--motif) 0 0 / 56px 56px, linear-gradient(120deg, var(--red-deep) 0%, #c0503a 100%); }
 .total b { font-size: 26px; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .total .tag { justify-self: start; margin-top: 6px; background: rgba(255, 255, 255, .2); color: #fff; }
+.total .parts { opacity: .9; }
+.total .use.alt { background: rgba(255, 255, 255, .18); color: #fff; border: 1px solid rgba(255, 255, 255, .6); }
 .total .use { justify-self: start; margin-top: 8px; padding: 4px 14px; border-radius: 999px; background: #fff; color: var(--red-deep); font-weight: 600; text-decoration: none; }
 .entry { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f1f3; }
 .entry:last-child { border-bottom: 0; }

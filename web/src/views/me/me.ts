@@ -51,7 +51,8 @@ export interface Application extends ApplicationPlace {
   status: 'pending' | 'approved' | 'rejected'; reply: string; decided_at: string | null; created_at: string
 }
 // A balance a store refunded into, spent only at that store (docs/REFUND_BALANCE_DESIGN.md).
-export interface StoreCredit { account_id: number; branch_id: number; store_name: string; slug: string; currency: string; balance: number; frozen: boolean; closed: boolean }
+export interface StoreCredit { account_id: number; branch_id: number; store_name: string; slug: string; currency: string; balance: number; frozen: boolean; closed: boolean
+  credit?: number; principal?: number; bonus?: number }
 export interface CreditEntry { id: number; at: string; kind: 'refund' | 'spend' | 'return' | 'revoke'; amount: number; balance: number; order_id: number; public_no: string; brand_name: string; refund_id: number }
 export interface WalletEntry { id: number; account: string; currency: string; amount: number; note: string; created_at: string }
 export type PlatformInfo = Record<'name' | 'about' | 'about_en' | 'support_phone' | 'support_email' | 'support_hours' | 'support_chat', string>

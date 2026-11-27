@@ -109,3 +109,27 @@ func TestStoredRefundSplitSamples(t *testing.T) {
 		}
 	}
 }
+
+// SV-S5, SV-S6 (rule W14), worked out by hand.
+func TestCashoutPaySamples(t *testing.T) {
+	cases := []struct {
+		name                    string
+		principal, bonus, given int64
+		reason                  string
+		used, paid              int64
+	}{
+		// SV-S5: 1,000.00 + 200.00, spent 300.00 (250.00 + 50.00): 750.00 and 150.00 left
+		{"SV-S5 customer", 75000, 15000, 20000, "customer", 5000, 70000},
+		{"SV-S5 store", 75000, 15000, 20000, "store", 5000, 75000},
+		// SV-S6: 100.00 + 100.00, spent 180.00 (90.00 + 90.00): 10.00 and 10.00 left
+		{"SV-S6 customer", 1000, 1000, 10000, "customer", 9000, 0},
+		{"SV-S6 store", 1000, 1000, 10000, "store", 9000, 1000},
+		// nothing spent: all the principal either way
+		{"unspent", 50000, 10000, 10000, "customer", 0, 50000},
+	}
+	for _, c := range cases {
+		if used, paid := cashoutPay(c.principal, c.bonus, c.given, c.reason); used != c.used || paid != c.paid {
+			t.Errorf("%s: used %d, paid %d; want %d, %d", c.name, used, paid, c.used, c.paid)
+		}
+	}
+}

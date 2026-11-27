@@ -7,11 +7,13 @@ import { branchCredit, creditErr, revokeCredit, saveCreditLimits, type BranchCre
 import { money, t, toMajor, toMinor, whenText } from '../i18n'
 import { currentRole, session } from '../session'
 import '../officeStrings'
+import '../stored'
+import StoredPanel from './marketing/StoredPanel.vue'
 
 const data = ref<BranchCredit | null>(null)
 const error = ref('')
 const notice = ref('')
-const tab = ref<'entries' | 'holders'>('entries')
+const tab = ref<'entries' | 'holders' | 'stored'>('entries')
 const day = (d: Date) => d.toISOString().slice(0, 10)
 const f = reactive({ from: day(new Date(Date.now() - 29 * 864e5)), to: day(new Date()) })
 const lim = reactive({ over: '', daily: '' })
@@ -74,6 +76,7 @@ function alertText(a: CreditAlert) {
         <div class="ox-rail-list">
           <button class="ox-cat" :class="{ on: tab === 'entries' }" @click="tab = 'entries'"><span class="nm">{{ t('sc.p.entries') }}</span><span class="n">{{ data.entries.length }}</span></button>
           <button class="ox-cat" :class="{ on: tab === 'holders' }" @click="tab = 'holders'"><span class="nm">{{ t('sc.p.holders') }}</span><span class="n">{{ data.holders.length }}</span></button>
+          <button class="ox-cat" :class="{ on: tab === 'stored' }" data-testid="credit-tab-stored" @click="tab = 'stored'"><span class="nm">{{ t('sv.p.tab') }}</span></button>
         </div>
         <div class="limits">
           <div class="ox-rail-h">{{ t('sc.p.limits') }}</div>
@@ -102,6 +105,7 @@ function alertText(a: CreditAlert) {
             </table>
           </div>
         </template>
+        <StoredPanel v-else-if="tab === 'stored'" />
         <template v-else>
           <div v-if="!data.holders.length" class="ox-empty">{{ t('sc.p.none') }}</div>
           <div v-else class="ox-scroll">

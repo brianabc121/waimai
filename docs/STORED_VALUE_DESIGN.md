@@ -423,6 +423,18 @@ PRICING_CHECK 第 3 节加一格“20 储值充值和消费”：充值（顾客
 
 ---
 
+## 14. 实现记录（2026-11-27）
+
+brian 确认 Q1–Q11 全部按推荐，第一批、第二批合在一个 PR 里落实：
+
+- 迁移 `00084_stored_value.sql`：储值本金、赠送两种顾客账户和门店侧账户，活动、档位、充值单、退储值记录，订单 `stored_principal_paid`、`stored_bonus_paid` 两列，退款 `principal_part`、`bonus_part` 两列，国家开关表 `stored_countries`（PH、SG、MY 默认开，带上限）。
+- 后端 `internal/app/stored.go`（活动、充值、撤销、退储值、对账）；付款和退款走原来店铺余额那套（`wallet.go`：先用退款余额，再按比例扣储值；退款四份按累计目标拆）。
+- 商家后台：左侧新增“营销”组（营销活动、优惠活动），“点单”下加“会员充值”收银台，“店铺余额”页加“储值”标签（顾客、变动记录、退储值），对账页加储值卡片和钱箱储值进出，账单加储值列。
+- 顾客端：店铺页“充值送”条 → 优惠活动页（`/s/:slug/offers`，余额、档位、充值码二维码、领券、店铺活动）；结算页差一点凑档时提示去充值（Q11）；“我的 → 店铺余额”分开显示本金、赠送、退款余额和储值明细。
+- 平台后台“储值”（`/admin/stored`）：按国家开关和每人上限。
+- 验算：PRICING_CHECK.md 第 2.3 节 W8–W15、第 3 节第 20 格、第 4 节样例 SV-S1 到 SV-S7；退储值金额抽成 `cashoutPay` 单独测手算样例；改坏数据测试 `TestStoredValueCheckCatchesTampering`。
+- 浏览器测试 `e2e/stored.cjs`（建活动 → 顾客出码 → 收银确认 → 用储值下单 → 储值明细和退储值报价 → 对账 → 平台页）。
+
 ## 附录：调研来源
 
 - 菲律宾 RA 10962《礼品券法》（2017）：<https://ldr.senate.gov.ph/legislative-issuance/republic-act-no-10962>；新闻：<https://www.rappler.com/business/192522-gift-check-act-no-expiry-date-gc>、<https://www.pna.gov.ph/articles/1020112>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { checkoutPath, ownSite, site, storePath, storeURL } from '../site'
+import { checkoutPath, offersPath, ownSite, site, storePath, storeURL } from '../site'
 import LangButton from './LangButton.vue'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -21,6 +21,7 @@ import MediaCarousel from './MediaCarousel.vue'
 import MenuList from './MenuList.vue'
 import StoreReviews from './StoreReviews.vue'
 import StoreCoupons from './StoreCoupons.vue'
+import { storeStored, type StoredOffers } from '../stored'
 import './storeStrings'
 import CustomerTabs from './me/CustomerTabs.vue'
 import { isFavorite, loadProfile, rememberStore, setFavorite } from './me/me'
@@ -60,11 +61,16 @@ function canonical(href: string) {
 }
 onUnmounted(() => document.querySelector('link[rel=canonical]')?.remove())
 
+// the store's top-up offer, for the bar that leads to its offers page
+const stored = ref<StoredOffers | null>(null)
+const bestTier = computed(() => [...(stored.value?.campaign?.tiers ?? [])].filter(x => !x.closed).sort((a, b) => b.bonus * a.pay - a.bonus * b.pay)[0] ?? null)
+
 async function load() {
   error.value = ''
   try {
     const s = await get<Storefront>(`/stores/${props.slug}?lang=${locale.value}`)
     store.value = s
+    void storeStored(props.slug).then(r => { stored.value = r }).catch(() => null)
     pruneNoteTags(items.value)
     document.title = sn(s.branch)
     // the store in the mall points search engines at the store's own page
@@ -398,6 +404,10 @@ async function sendReport() {
           <button class="more" data-testid="promos-more" @click="showPromos = true">{{ t('sf.promos_n', { n: promos.length }) }} ›</button>
         </div>
         <StoreCoupons :slug="slug" :currency="cur" />
+        <router-link v-if="stored?.campaign" class="svbar" :to="offersPath(slug)" data-testid="offers-bar">
+          <span class="svtag">{{ t('sv.c.topup') }}</span>
+          <span class="grow">{{ bestTier ? t('sv.c.bar', { pay: money(bestTier.pay, cur), bonus: money(bestTier.bonus, cur) }) : stored.campaign.name }}</span>
+          <span class="more">{{ t('sv.c.title') }} ›</span></router-link>
         <div class="notice" v-if="store.branch.notice" data-testid="notice">
           <span class="lbl">{{ t('sf.notice') }}</span>
           <!-- a notice too long for the line scrolls round and round -->
@@ -663,6 +673,11 @@ async function sendReport() {
 .chips.brand { margin: 0; flex: 1; flex-wrap: nowrap; overflow: hidden; }
 .chips.brand span { border-color: var(--brand); color: var(--brand-dark); overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .promoline { display: flex; align-items: center; gap: 8px; }
+.svbar { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 7px 10px; border-radius: 10px; background: linear-gradient(90deg, #fff1d6, #fbe2b8);
+  border: 1px solid #efc983; color: #7a3e00; font-size: 13px; text-decoration: none; }
+.svbar .svtag { background: #b8392a; color: #fff; border-radius: 5px; padding: 0 6px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.svbar .grow { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.svbar .more { white-space: nowrap; color: #b8392a; }
 .more { border: 0; background: none; color: var(--muted); font-size: 14px; white-space: nowrap; cursor: pointer; padding: 0; }
 .notice { display: flex; gap: 4px; color: var(--muted); font-size: 14px; }
 .notice .lbl { flex: none; }

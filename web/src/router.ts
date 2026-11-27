@@ -13,6 +13,10 @@ export const router = createRouter({
       beforeEnter: () => ownSite() || '/' },
     { path: '/mall/s/:slug', component: () => import('./views/StoreView.vue'), props: true },
     { path: '/mall/s/:slug/checkout', component: () => import('./views/CheckoutView.vue'), props: true },
+    // the store's offers: top-ups, coupons, order offers (docs/STORED_VALUE_DESIGN.md §5)
+    { path: '/mall/s/:slug/offers', component: () => import('./views/StoreOffers.vue'), props: true },
+    { path: '/offers', component: () => import('./views/StoreOffers.vue'), props: () => ({ slug: ownSlug() }),
+      beforeEnter: () => ownSite() || '/' },
     // The link merchants used to share: now their own page, or the store in
     // the mall while the platform has no domain for those pages.
     { path: '/s/:slug', component: () => import('./views/NotFound.vue'), beforeEnter: to => oldStoreLink(to.params.slug as string, to.query, false) },
@@ -55,6 +59,7 @@ export const router = createRouter({
         { path: 'order/dine', component: () => import('./views/DineOrderView.vue') },
         { path: 'order/delivery', component: () => import('./views/ManualOrderView.vue') },
         { path: 'order/platform', component: () => import('./views/PlatformOrderView.vue') },
+        { path: 'order/topup', component: () => import('./views/marketing/TopupDesk.vue') },
         { path: 'queue', component: () => import('./views/queue/QueueView.vue') },
         { path: 'orders/new', component: () => import('./views/NotFound.vue') },
         { path: 'progress', component: () => import('./views/ProgressView.vue') },
@@ -71,6 +76,7 @@ export const router = createRouter({
         { path: 'brands', component: () => import('./views/brands/BrandsView.vue') },
         { path: 'brand-menu/:id', component: () => import('./views/brands/BrandMenuView.vue') },
         { path: 'promos', component: () => import('./views/PromosView.vue') },
+        { path: 'marketing', component: () => import('./views/marketing/MarketingView.vue') },
         { path: 'cash', component: () => import('./views/CashView.vue') },
         { path: 'bills', component: () => import('./views/BillsView.vue') },
         { path: 'reconcile', component: () => import('./views/ReconcileView.vue') },
@@ -109,6 +115,7 @@ export const router = createRouter({
         { path: 'domains', component: () => import('./views/admin/AdminDomains.vue'), meta: { title: 'ad.dom.nav' } },
         { path: 'platforms', component: () => import('./views/admin/AdminPlatforms.vue'), meta: { title: 'ad.pf.nav' } },
         { path: 'pay-methods', component: () => import('./views/admin/AdminPayMethods.vue'), meta: { title: 'ad.pay' } },
+        { path: 'stored', component: () => import('./views/admin/AdminStored.vue'), meta: { title: 'ad.sv.nav' } },
         { path: 'support', component: () => import('./views/admin/AdminSupport.vue'), meta: { title: 'ad.support' } },
         { path: 'chats', component: () => import('./views/admin/AdminChats.vue'), meta: { title: 'ad.chats' } },
         { path: 'worker', component: () => import('./views/admin/AdminWorker.vue'), meta: { title: 'ad.worker' } },

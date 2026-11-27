@@ -16,13 +16,17 @@ import ReconPlatforms, { type ReconPlatform, type ReconType } from './ReconPlatf
 import { platformName } from '../platforms'
 import { brandsHere, multiBrand, useBrandPick } from '../brands'
 import BrandSeg from './brands/BrandSeg.vue'
+import '../stored'
 
 interface Row { pay_type: string; channel_id: number; platform_id: number; name: string; names: Record<string, string>; count: number; amount: number
   dine: number; takeaway: number; ok: number; problem: number; unchecked: number }
 interface CashCount { day: string; expected: number; counted: number; note: string; counted_by: string; at: string }
 interface Summary { timezone: string; currency: string; count: number; total: number; rows: Row[]; problems: number
-  cash: { counter: number; rider_collected: number; rider_returned: number; rider_pending: number; refunded: number; expected: number }
-  refunds: { count: number; total: number; cash: number; to_credit?: number }; net: number
+  cash: { counter: number; rider_collected: number; rider_returned: number; rider_pending: number; refunded: number; expected: number
+    stored_in?: number; stored_out?: number }
+  refunds: { count: number; total: number; cash: number; to_credit?: number; to_stored?: number }; net: number
+  stored?: { count: number; paid: number; bonus: number; cash: number; card: number; online: number; revoked: number; revoked_cash: number; revoked_bonus: number
+    spent_principal: number; spent_bonus: number; cashouts: number; paid_out: number; cash_out?: number; cashout_cash: number; clawback: number }
   discounts: { promotion: number; coupon: number; staff: number; round_off: number; platform_merchant: number; platform_subsidy: number; total: number }
   cash_count: CashCount | null; platforms: ReconPlatform[]; types: ReconType[]
   whole: boolean; brands: { brand_id: number; name: string; code: string; count: number; amount: number; refunds: number; platform: number; commission: number }[] }
@@ -157,7 +161,15 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
             · {{ t('po.merchant') }} {{ m(sum.discounts.platform_merchant) }}</template></small></div>
         <div v-if="sum.refunds.count" class="ox-stat" data-testid="rc-refunds"><span class="l">{{ t('rc.c.refunds') }}</span><b class="v neg">-{{ m(sum.refunds.total) }}</b>
           <small class="s">{{ t('rc.c.count', { n: sum.refunds.count }) }} · {{ t('rc.c.net', { v: m(sum.net) }) }}</small>
-          <small v-if="sum.refunds.to_credit" class="s" data-testid="rc-to-credit">{{ t('rc.c.to_credit', { v: m(sum.refunds.to_credit) }) }}</small></div>
+          <small v-if="sum.refunds.to_credit" class="s" data-testid="rc-to-credit">{{ t('rc.c.to_credit', { v: m(sum.refunds.to_credit) }) }}</small>
+          <small v-if="sum.refunds.to_stored" class="s" data-testid="rc-to-stored">{{ t('sv.rc.to_stored', { v: m(sum.refunds.to_stored) }) }}</small></div>
+        <div v-if="sum.stored && (sum.stored.count || sum.stored.cashouts || sum.stored.spent_principal + sum.stored.spent_bonus)" class="ox-stat" data-testid="rc-stored">
+          <span class="l">{{ t('sv.rc.title') }} · {{ t('sv.rc.topups', { n: sum.stored.count }) }}</span><b class="v">{{ m(sum.stored.paid - sum.stored.revoked) }}</b>
+          <small class="s">{{ t('ck.pt.cash') }} {{ m(sum.stored.cash) }} · {{ t('ck.pt.card') }} {{ m(sum.stored.card) }} · {{ t('ck.pt.online') }} {{ m(sum.stored.online) }}<template v-if="sum.stored.revoked">
+            · {{ t('sv.rc.revoked') }} -{{ m(sum.stored.revoked) }}</template></small>
+          <small class="s">{{ t('sv.rc.given') }} {{ m(sum.stored.bonus - sum.stored.revoked_bonus) }} · {{ t('sv.rc.spent') }} {{ t('sv.rc.spent_s', { p: m(sum.stored.spent_principal), b: m(sum.stored.spent_bonus) }) }}</small>
+          <small v-if="sum.stored.cashouts" class="s">{{ t('sv.rc.cashouts', { n: sum.stored.cashouts }) }} -{{ m(sum.stored.paid_out) }}<template v-if="sum.stored.clawback"> · {{ t('sv.rc.clawback', { v: m(sum.stored.clawback) }) }}</template></small>
+          <small class="s muted">{{ t('sv.rc.hint') }}</small></div>
       </div>
       <div class="cols">
         <div class="ox-panel ox-scroll">
@@ -187,6 +199,8 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
           <div class="kv sub"><span>{{ t('rc.cash_returned') }}</span><span>{{ m(sum.cash.rider_returned) }}</span></div>
           <div class="kv sub"><span>{{ t('rc.cash_pending') }}</span><span :class="{ neg: sum.cash.rider_pending }">{{ m(sum.cash.rider_pending) }}</span></div>
           <div v-if="sum.cash.refunded" class="kv"><span>{{ t('rc.cash_refunded') }}</span><b class="neg" data-testid="rc-cash-refunded">-{{ m(sum.cash.refunded) }}</b></div>
+          <div v-if="sum.cash.stored_in" class="kv"><span>{{ t('sv.rc.cash_in') }}</span><b data-testid="rc-stored-in">{{ m(sum.cash.stored_in) }}</b></div>
+          <div v-if="sum.cash.stored_out" class="kv"><span>{{ t('sv.rc.cash_out') }}</span><b class="neg" data-testid="rc-stored-out">-{{ m(sum.cash.stored_out) }}</b></div>
           <router-link class="small" to="/merchant/cash">{{ t('rc.to_cash') }} ›</router-link>
           <h2 style="margin-top:8px">{{ t('rc.count') }}</h2>
           <template v-if="from === to">

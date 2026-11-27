@@ -1274,14 +1274,22 @@ func cashoutQuote(ctx context.Context, tx pgx.Tx, branchID, customerID int64, cu
 		return nil, err
 	}
 	q.Principal, q.Bonus = bal.Principal, bal.Bonus
-	q.BonusUsed = max(0, q.BonusGiven-q.Bonus)
-	q.PaidOut = q.Principal
-	if reason == "customer" {
-		q.PaidOut = max(0, q.Principal-q.BonusUsed)
-	}
+	q.BonusUsed, q.PaidOut = cashoutPay(q.Principal, q.Bonus, q.BonusGiven, reason)
 	q.Clawback = q.Principal - q.PaidOut
 	q.Phone = maskPhone(q.Phone)
 	return q, nil
+}
+
+// cashoutPay is the payback rule W14 on its own (samples SV-S5, SV-S6):
+// the bonus used is what was given less what is left; the customer's own
+// reasons get the principal left less that, never below 0, the store's get
+// all the principal left.
+func cashoutPay(principal, bonus, bonusGiven int64, reason string) (bonusUsed, paidOut int64) {
+	bonusUsed = max(0, bonusGiven-bonus)
+	if reason == "customer" {
+		return bonusUsed, max(0, principal-bonusUsed)
+	}
+	return bonusUsed, principal
 }
 
 func (a *App) StoredCashoutQuote(ctx context.Context, branchID, customerID int64, reason string) (*CashoutQuote, error) {

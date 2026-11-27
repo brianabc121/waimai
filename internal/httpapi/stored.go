@@ -129,7 +129,8 @@ func (s *Server) myStoredEntries(c *gin.Context) {
 }
 
 func (s *Server) storedOverview(c *gin.Context) {
-	bid, ok := branchScope(c, need(app.PermPromo, app.PermWalletView))
+	// the counter reads the running offer too
+	bid, ok := branchScope(c, need(app.PermPromo, app.PermWalletView, app.PermStoredTopup))
 	if !ok {
 		return
 	}
