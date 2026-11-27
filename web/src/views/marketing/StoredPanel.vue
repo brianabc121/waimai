@@ -4,7 +4,7 @@
 // value back. For the customer's own reasons the bonus used is kept back;
 // for the store's, all the principal left is paid.
 import { onMounted, reactive, ref, watch } from 'vue'
-import { ApiError } from '../../api'
+import { ApiError, newKey } from '../../api'
 import { money, t, whenText } from '../../i18n'
 import { can, session } from '../../session'
 import ApproveDialog from '../ApproveDialog.vue'
@@ -30,13 +30,15 @@ async function quote() {
   qErr.value = ''
   try { q.value = await cashoutQuote(bid, who.value.customer_id, f.reason) } catch (e) { qErr.value = storedErr(e) }
 }
-function open(h: StoredHolder) { who.value = h; q.value = null; Object.assign(f, { reason: 'customer', pay_type: 'cash', consent: 'in_person', note: '' }); void quote() }
+// One key per cash-out sheet, so a retry is not a second payout (rule W20).
+let idem = ''
+function open(h: StoredHolder) { idem = newKey(); who.value = h; q.value = null; Object.assign(f, { reason: 'customer', pay_type: 'cash', consent: 'in_person', note: '' }); void quote() }
 watch(() => f.reason, quote)
 async function go(headers?: Record<string, string>) {
   if (!who.value || !q.value) return
   busy.value = true; qErr.value = ''
   try {
-    const r = await storedCashout(bid, who.value.customer_id, { ...f, expect: q.value.paid_out }, headers)
+    const r = await storedCashout(bid, who.value.customer_id, { ...f, expect: q.value.paid_out }, { ...headers, 'Idempotency-Key': idem })
     notice.value = t('sv.o.done', { amt: m(r.paid_out) }); who.value = null; await load()
   } catch (e) {
     if (e instanceof ApiError && (e.code === 'STORED_CASHOUT_OWNER' || e.code === 'FORBIDDEN') && !headers) approving.value = true

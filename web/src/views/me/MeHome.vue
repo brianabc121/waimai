@@ -25,6 +25,9 @@ const wallet = computed(() => {
   const ws = profile.value?.wallets ?? []
   return ws.find(w => w.currency === home?.currency) ?? ws[0] ?? { currency: home?.currency ?? 'PHP', balance: 0, bonus: 0 }
 })
+// The platform balance is closed to new money (docs/BALANCE_REVIEW.md Q2):
+// only a customer who still has an old one sees it, to spend or ask about.
+const legacyWallet = computed(() => !ownSite() && (profile.value?.wallets ?? []).some(w => w.balance !== 0 || w.bonus !== 0))
 const symbol = computed(() => currencySymbol(wallet.value.currency))
 const offerCount = computed(() => offers.value.reduce((n, o) => n + o.promotions.length, 0))
 // A computer has room for the latest orders; on a phone they are one tap away at the bottom.
@@ -104,10 +107,10 @@ const allMore = computed<Entry[]>(() => [
     </header>
 
     <div class="body">
-      <div class="stats" :class="{ one: ownSite() }">
-        <button v-if="!ownSite()" data-testid="me-balance" @click="go('/me/wallet/balance')"><b>{{ symbol }}{{ plain(wallet.balance) }}</b><span>{{ t('me.balance') }}</span></button>
+      <div class="stats" :class="{ one: !legacyWallet }">
+        <button v-if="legacyWallet" data-testid="me-balance" @click="go('/me/wallet/balance')"><b>{{ symbol }}{{ plain(wallet.balance) }}</b><span>{{ t('me.balance') }}</span></button>
         <button class="hot" data-testid="me-coupons" @click="go('/me/coupons')"><b>{{ offerCount }}</b><span>{{ t('me.coupons') }}</span></button>
-        <button v-if="!ownSite()" data-testid="me-bonus" @click="go('/me/wallet/bonus')"><b>{{ symbol }}{{ plain(wallet.bonus) }}</b><span>{{ t('me.bonus') }}</span></button>
+        <button v-if="legacyWallet" data-testid="me-bonus" @click="go('/me/wallet/bonus')"><b>{{ symbol }}{{ plain(wallet.bonus) }}</b><span>{{ t('me.bonus') }}</span></button>
       </div>
 
       <section>

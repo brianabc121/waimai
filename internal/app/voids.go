@@ -878,14 +878,17 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		}
 		q.RefundID, q.CashPart, q.CreditPart, q.StoredPart = refundID, cashPart, creditPart, parts.Principal+parts.Bonus
 		// what came from stored value goes back to it, principal and bonus
-		// apart; the rest of what goes to a balance, to the refund balance
-		if parts.Principal+parts.Bonus > 0 {
-			if err := storedRefund(ctx, tx, o.ID, refundID, creditCustomer, parts, actor); err != nil {
+		// apart; the rest of what goes to a balance, to the refund balance.
+		// The refund balance first: the store's accounts are locked in the
+		// order store_sales, store_refund, store_stored_sales everywhere.
+		if rest := toCredit - parts.Principal - parts.Bonus; rest > 0 {
+			share := creditPart - parts.Principal - parts.Bonus
+			if err := creditRefund(ctx, tx, o.ID, refundID, creditCustomer, rest, share, actor); err != nil {
 				return err
 			}
 		}
-		if rest := toCredit - parts.Principal - parts.Bonus; rest > 0 {
-			if err := creditRefund(ctx, tx, o.ID, refundID, creditCustomer, rest, actor); err != nil {
+		if parts.Principal+parts.Bonus > 0 {
+			if err := storedRefund(ctx, tx, o.ID, refundID, creditCustomer, parts, actor); err != nil {
 				return err
 			}
 		}

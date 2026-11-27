@@ -962,6 +962,9 @@ type TopupConfirm struct {
 	PayType   string        `json:"pay_type"`
 	ChannelID int64         `json:"pay_channel_id"`
 	Verify    *CreditVerify `json:"verify"`
+	// IdemKey is the request's Idempotency-Key: the same confirmation sent
+	// twice books once (docs/BALANCE_CHECK.md W20).
+	IdemKey string `json:"-"`
 }
 
 // isManager says whether the person owns or manages the store.
@@ -984,6 +987,11 @@ func (a *App) ConfirmTopup(ctx context.Context, branchID, id int64, in TopupConf
 		return nil, err
 	}
 	err = a.inTx(ctx, func(tx pgx.Tx) error {
+		scope := fmt.Sprintf("topup_confirm:%d", id)
+		var done struct{ ID int64 }
+		if replayed, err := idemBegin(ctx, tx, scope, in.IdemKey, hashJSON(in), &done); err != nil || replayed {
+			return err
+		}
 		var custID, pay, bonus int64
 		var status, source, currency, cKind string
 		var cValue, cMin int64
@@ -1095,12 +1103,15 @@ func (a *App) ConfirmTopup(ctx context.Context, branchID, id int64, in TopupConf
 			return err
 		}
 		if cQty > 0 {
-			if err := giveTopupCoupons(ctx, tx, b, brandID, custID, cKind, cValue, cMin, cDays, cQty); err != nil {
+			if err := giveTopupCoupons(ctx, tx, b, brandID, custID, id, cKind, cValue, cMin, cDays, cQty); err != nil {
 				return err
 			}
 		}
 		if err := audit(ctx, tx, branchID, 0, actor, "stored.topup", map[string]any{"topup": id, "pay": pay, "bonus": bonus,
 			"pay_type": in.PayType, "method": method}); err != nil {
+			return err
+		}
+		if err := idemSave(ctx, tx, scope, in.IdemKey, struct{ ID int64 }{id}); err != nil {
 			return err
 		}
 		amt, gift := fmtMoney(pay, currency), fmtMoney(bonus, currency)
@@ -1123,7 +1134,7 @@ func (a *App) ConfirmTopup(ctx context.Context, branchID, id int64, in TopupConf
 
 // giveTopupCoupons gives the coupons that come with a tier. They work at the
 // brand the customer topped up at.
-func giveTopupCoupons(ctx context.Context, tx pgx.Tx, b *Branch, brandID *int64, customerID int64, kind string, value, min int64, days, qty int) error {
+func giveTopupCoupons(ctx context.Context, tx pgx.Tx, b *Branch, brandID *int64, customerID, topupID int64, kind string, value, min int64, days, qty int) error {
 	if brandID == nil {
 		main, err := loadBrand(ctx, tx, b.ID, 0)
 		if err != nil {
@@ -1146,8 +1157,8 @@ func giveTopupCoupons(ctx context.Context, tx pgx.Tx, b *Branch, brandID *int64,
 	exp := expiryFor(time.Now(), b.location(), days)
 	for range qty {
 		if _, err := tx.Exec(ctx, `INSERT INTO customer_coupons (batch_id, customer_id, issuer, kind, branch_id, currency, name,
-			name_en, value, threshold, source, expires_at, brand_id) VALUES ($1,$2,'store',$3,$4,$5,$6,$7,$8,$9,'topup',$10,$11)`,
-			batch, customerID, kind, b.ID, b.Currency, zh, en, value, min, exp, *brandID); err != nil {
+			name_en, value, threshold, source, expires_at, brand_id, topup_id) VALUES ($1,$2,'store',$3,$4,$5,$6,$7,$8,$9,'topup',$10,$11,$12)`,
+			batch, customerID, kind, b.ID, b.Currency, zh, en, value, min, exp, *brandID, topupID); err != nil {
 			return err
 		}
 	}
@@ -1217,10 +1228,9 @@ func (a *App) RevokeTopup(ctx context.Context, branchID, id int64, note string, 
 			WHERE id=$1`, id, by, note); err != nil {
 			return err
 		}
-		// coupons that came with it and were not used go too
-		if _, err := tx.Exec(ctx, `UPDATE customer_coupons c SET status='void' FROM coupon_batches cb, topups t
-			WHERE t.id=$1 AND cb.id = c.batch_id AND cb.source='topup' AND c.customer_id = t.customer_id AND c.status='unused'
-			AND c.issued_at >= t.paid_at - interval '1 second' AND c.issued_at <= t.paid_at + interval '1 second'`, id); err != nil {
+		// coupons that came with it and were not used go too (the ones used
+		// already stay used: the top-up was undone, the meal was eaten)
+		if _, err := tx.Exec(ctx, `UPDATE customer_coupons SET status='void' WHERE topup_id=$1 AND status='unused'`, id); err != nil {
 			return err
 		}
 		return audit(ctx, tx, branchID, 0, actor, "stored.topup_revoked", map[string]any{"topup": id, "pay": pay, "bonus": bonus, "note": note})
@@ -1312,6 +1322,8 @@ type CashoutInput struct {
 	Note    string `json:"note"`
 	// Expect is what the staff saw: the payback is refused if it changed.
 	Expect *int64 `json:"expect"`
+	// IdemKey is the request's Idempotency-Key (rule W20).
+	IdemKey string `json:"-"`
 }
 
 // storedCashoutApproval: the owner is not limited; anyone else paying back
@@ -1335,6 +1347,14 @@ func (a *App) StoredCashout(ctx context.Context, branchID, customerID int64, in 
 	}
 	var q *CashoutQuote
 	err = a.inTx(ctx, func(tx pgx.Tx) error {
+		scope := fmt.Sprintf("cashout:%d:%d", branchID, customerID)
+		var done CashoutQuote
+		if replayed, err := idemBegin(ctx, tx, scope, in.IdemKey, hashJSON(in), &done); err != nil {
+			return err
+		} else if replayed {
+			q = &done
+			return nil
+		}
 		if _, err := tx.Exec(ctx, `SELECT 1 FROM customers WHERE id=$1 FOR UPDATE`, customerID); err != nil {
 			return err
 		}
@@ -1383,22 +1403,31 @@ func (a *App) StoredCashout(ctx context.Context, branchID, customerID int64, in 
 			in.Consent, strings.TrimSpace(in.Note), by, approved).Scan(&cid); err != nil {
 			return err
 		}
-		topAcct, err := walletAccount(ctx, tx, acctTopup, branchID, 0, b.Currency)
+		// where it went (docs/BALANCE_REVIEW.md H1): the money paid back,
+		// the used bonus the store kept back, the bonus left made void
+		paid, err := walletAccount(ctx, tx, acctCashout, branchID, 0, b.Currency)
 		if err != nil {
 			return err
 		}
-		fund, err := walletAccount(ctx, tx, acctBonusFund, branchID, 0, b.Currency)
+		kept, err := walletAccount(ctx, tx, acctClawback, branchID, 0, b.Currency)
+		if err != nil {
+			return err
+		}
+		void, err := walletAccount(ctx, tx, acctBonusVoid, branchID, 0, b.Currency)
 		if err != nil {
 			return err
 		}
 		if _, _, err := postJournal(ctx, tx, journal{Kind: "stored_cashout", Idem: fmt.Sprintf("cashout:%d", cid),
 			BranchID: branchID, Currency: b.Currency, Cashout: cid, Actor: actor, Note: in.Reason},
-			posting{prin.ID, -q.Principal}, posting{topAcct.ID, q.Principal},
-			posting{bon.ID, -q.Bonus}, posting{fund.ID, q.Bonus}); err != nil {
+			posting{prin.ID, -q.Principal}, posting{paid.ID, q.PaidOut}, posting{kept.ID, q.Clawback},
+			posting{bon.ID, -q.Bonus}, posting{void.ID, q.Bonus}); err != nil {
 			return err
 		}
 		if err := audit(ctx, tx, branchID, 0, actor, "stored.cashout", map[string]any{"cashout": cid, "customer": customerID,
 			"reason": in.Reason, "paid_out": q.PaidOut, "clawback": q.Clawback, "bonus_void": q.Bonus}); err != nil {
+			return err
+		}
+		if err := idemSave(ctx, tx, scope, in.IdemKey, q); err != nil {
 			return err
 		}
 		amt := fmtMoney(q.PaidOut, b.Currency)

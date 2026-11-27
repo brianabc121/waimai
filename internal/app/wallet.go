@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sort"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -36,11 +35,25 @@ const (
 	acctTopup       = "store_topup"        // what the store took in top-ups (negative: owed)
 	acctBonusFund   = "store_bonus"        // what the store gave in bonuses
 	acctStoredSales = "store_stored_sales" // what was paid from stored value at the store
+
+	// Where stored value that left a customer went (docs/BALANCE_REVIEW.md
+	// H1): paid back in money, used bonus kept back by the store, bonus made
+	// void by a payback.
+	acctCashout   = "store_cashout"
+	acctClawback  = "store_clawback"
+	acctBonusVoid = "store_bonus_void"
+
+	// The platform's balance and rewards (no store; branch 0) and the
+	// platform's side of them.
+	acctPlatformBalance = "platform_balance"
+	acctPlatformBonus   = "platform_bonus"
+	acctPlatformIssued  = "platform_issued"
 )
 
 // customerAcct says whether an account kind belongs to a customer.
 func customerAcct(kind string) bool {
-	return kind == acctCredit || kind == acctPrincipal || kind == acctBonus
+	return kind == acctCredit || kind == acctPrincipal || kind == acctBonus ||
+		kind == acctPlatformBalance || kind == acctPlatformBonus
 }
 
 type walletAcct struct {
@@ -49,8 +62,13 @@ type walletAcct struct {
 	Frozen  bool
 }
 
-// walletAccount opens (when missing) and locks an account. Customer accounts
-// are locked before the store's, in that order everywhere.
+// walletAccount opens (when missing) and locks an account. A customer's
+// accounts are locked after the customer's row (lockCustomer), so that two
+// changes to one customer's balances queue there instead of locking each
+// other's accounts in a different order (docs/BALANCE_REVIEW.md M4). The
+// store's accounts are locked after them, in the order store_sales,
+// store_refund, store_stored_sales (docs/BALANCE_CHECK.md §6). branchID 0
+// is the platform's.
 func walletAccount(ctx context.Context, tx pgx.Tx, kind string, branchID, customerID int64, currency string) (*walletAcct, error) {
 	var cust *int64
 	if customerAcct(kind) {
@@ -58,16 +76,34 @@ func walletAccount(ctx context.Context, tx pgx.Tx, kind string, branchID, custom
 			return nil, ErrValidation("a store balance belongs to a customer")
 		}
 		cust = &customerID
+		if err := lockCustomer(ctx, tx, customerID); err != nil {
+			return nil, err
+		}
+	}
+	var branch *int64
+	if branchID != 0 {
+		branch = &branchID
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO wallet_accounts (kind, branch_id, customer_id, currency) VALUES ($1,$2,$3,$4)
-		ON CONFLICT DO NOTHING`, kind, branchID, cust, currency); err != nil {
+		ON CONFLICT DO NOTHING`, kind, branch, cust, currency); err != nil {
 		return nil, wrap("open wallet account", err)
 	}
 	var w walletAcct
 	err := tx.QueryRow(ctx, `SELECT id, balance, frozen FROM wallet_accounts
-		WHERE kind=$1 AND branch_id=$2 AND COALESCE(customer_id, 0)=$3 AND currency=$4 FOR UPDATE`,
+		WHERE kind=$1 AND COALESCE(branch_id, 0)=$2 AND COALESCE(customer_id, 0)=$3 AND currency=$4 FOR UPDATE`,
 		kind, branchID, customerID, currency).Scan(&w.ID, &w.Balance, &w.Frozen)
 	return &w, err
+}
+
+// lockCustomer queues every change to one customer's balances. NO KEY
+// UPDATE leaves orders free to point at the customer meanwhile.
+func lockCustomer(ctx context.Context, tx pgx.Tx, customerID int64) error {
+	var one int
+	err := tx.QueryRow(ctx, `SELECT 1 FROM customers WHERE id=$1 FOR NO KEY UPDATE`, customerID).Scan(&one)
+	if isNoRows(err) {
+		return ErrNotFound
+	}
+	return err
 }
 
 type journal struct {
@@ -89,18 +125,22 @@ type posting struct {
 	Amount  int64
 }
 
-// postJournal writes one journal and its postings. A journal whose idem key
-// was already written is not written again (fresh is false then).
+// postJournal writes one journal and its postings through the database's
+// only way into the books, wallet_post_journal (00085): it checks that they
+// balance, that every account is of the journal's store and currency and of
+// a kind the journal may post to, and extends each account's hash chain. A
+// journal whose idem key was already written is not written again (fresh is
+// false then).
 func postJournal(ctx context.Context, tx pgx.Tx, j journal, ps ...posting) (id int64, fresh bool, err error) {
 	var sum int64
-	var live []posting
+	var accts, amts []int64
 	for _, p := range ps {
 		sum += p.Amount
 		if p.Amount != 0 {
-			live = append(live, p)
+			accts, amts = append(accts, p.Account), append(amts, p.Amount)
 		}
 	}
-	if sum != 0 || len(live) < 2 {
+	if sum != 0 || len(accts) < 2 {
 		return 0, false, fmt.Errorf("wallet journal %s does not balance", j.Idem)
 	}
 	nz := func(v int64) *int64 {
@@ -109,28 +149,26 @@ func postJournal(ctx context.Context, tx pgx.Tx, j journal, ps ...posting) (id i
 		}
 		return &v
 	}
-	err = tx.QueryRow(ctx, `INSERT INTO wallet_journals (kind, idem_key, branch_id, currency, order_id, refund_id,
-		actor_type, actor_id, approved_by, note, reverses, topup_id, cashout_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,left($10, 200),$11,$12,$13)
-		ON CONFLICT (idem_key) DO NOTHING RETURNING id`, j.Kind, j.Idem, j.BranchID, j.Currency, nz(j.OrderID),
-		nz(j.RefundID), j.Actor.Type, nz(j.Actor.ID), nz(j.Actor.ApprovedBy), j.Note, nz(j.Reverses), nz(j.TopupID),
-		nz(j.Cashout)).Scan(&id)
-	if isNoRows(err) {
-		err = tx.QueryRow(ctx, `SELECT id FROM wallet_journals WHERE idem_key=$1`, j.Idem).Scan(&id)
-		return id, false, err
+	err = tx.QueryRow(ctx, `SELECT o_id, o_fresh FROM wallet_post_journal($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+		j.Kind, j.Idem, nz(j.BranchID), j.Currency, nz(j.OrderID), nz(j.RefundID), nz(j.TopupID), nz(j.Cashout),
+		j.Actor.Type, nz(j.Actor.ID), nz(j.Actor.ApprovedBy), j.Note, nz(j.Reverses), accts, amts).Scan(&id, &fresh)
+	if isCheck(err) {
+		return 0, false, Err(http.StatusConflict, "CREDIT_SHORT", "the store balance does not hold that much")
 	} else if err != nil {
 		return 0, false, wrap("wallet journal", err)
 	}
-	sort.Slice(live, func(a, b int) bool { return live[a].Account < live[b].Account })
-	for _, p := range live {
-		if _, err := tx.Exec(ctx, `INSERT INTO wallet_postings (journal_id, account_id, amount) VALUES ($1,$2,$3)`,
-			id, p.Account, p.Amount); err != nil {
-			if isCheck(err) {
-				return 0, false, Err(http.StatusConflict, "CREDIT_SHORT", "the store balance does not hold that much")
-			}
-			return 0, false, wrap("wallet posting", err)
-		}
+	return id, fresh, nil
+}
+
+// postNew is postJournal for a journal that must be new: its idem key is
+// made from what the order holds now, so finding it written already means
+// the same change would be counted twice (docs/BALANCE_CHECK.md W20).
+func postNew(ctx context.Context, tx pgx.Tx, j journal, ps ...posting) error {
+	_, fresh, err := postJournal(ctx, tx, j, ps...)
+	if err == nil && !fresh {
+		return Err(http.StatusConflict, "WALLET_DUPLICATE", "this balance change was already booked: look again")
 	}
-	return id, true, nil
+	return err
 }
 
 // orderCredit is what an order needs to know about its store balance.
@@ -227,7 +265,7 @@ func useCredit(ctx context.Context, tx pgx.Tx, orderID, customerID, want int64, 
 		if err != nil {
 			return 0, err
 		}
-		if _, _, err := postJournal(ctx, tx, journal{Kind: "spend", Idem: fmt.Sprintf("spend:%d:%d", orderID, n),
+		if err := postNew(ctx, tx, journal{Kind: "spend", Idem: fmt.Sprintf("spend:%d:%d", orderID, n),
 			BranchID: o.BranchID, Currency: o.Currency, OrderID: orderID, Actor: actor},
 			posting{acct.ID, -fromCredit}, posting{sales.ID, fromCredit}); err != nil {
 			return 0, err
@@ -242,7 +280,7 @@ func useCredit(ctx context.Context, tx pgx.Tx, orderID, customerID, want int64, 
 		if err != nil {
 			return 0, err
 		}
-		if _, _, err := postJournal(ctx, tx, journal{Kind: "stored_spend", Idem: fmt.Sprintf("sspend:%d:%d", orderID, n),
+		if err := postNew(ctx, tx, journal{Kind: "stored_spend", Idem: fmt.Sprintf("sspend:%d:%d", orderID, n),
 			BranchID: o.BranchID, Currency: o.Currency, OrderID: orderID, Actor: actor},
 			posting{prin.ID, -p}, posting{bonus.ID, -b}, posting{sales.ID, p + b}); err != nil {
 			return 0, err
@@ -319,7 +357,7 @@ func giveCreditBack(ctx context.Context, tx pgx.Tx, orderID, amount int64, actor
 		if err != nil {
 			return err
 		}
-		if _, _, err := postJournal(ctx, tx, journal{Kind: "return", Idem: fmt.Sprintf("return:%d:%d", orderID, n),
+		if err := postNew(ctx, tx, journal{Kind: "return", Idem: fmt.Sprintf("return:%d:%d", orderID, n),
 			BranchID: o.BranchID, Currency: o.Currency, OrderID: orderID, Actor: actor, Note: note},
 			posting{acct.ID, c}, posting{sales.ID, -c}); err != nil {
 			return err
@@ -342,7 +380,7 @@ func giveCreditBack(ctx context.Context, tx pgx.Tx, orderID, amount int64, actor
 		if err != nil {
 			return err
 		}
-		if _, _, err := postJournal(ctx, tx, journal{Kind: "stored_return", Idem: fmt.Sprintf("sreturn:%d:%d", orderID, n),
+		if err := postNew(ctx, tx, journal{Kind: "stored_return", Idem: fmt.Sprintf("sreturn:%d:%d", orderID, n),
 			BranchID: o.BranchID, Currency: o.Currency, OrderID: orderID, Actor: actor, Note: note},
 			posting{prin.ID, p}, posting{bonus.ID, b}, posting{sales.ID, -(p + b)}); err != nil {
 			return err
@@ -408,12 +446,22 @@ func isCheck(err error) bool {
 }
 
 // creditRefund puts amount of a refund into the customer's store balance.
-func creditRefund(ctx context.Context, tx pgx.Tx, orderID, refundID, customerID, amount int64, actor Actor) error {
+// share is the part of it the order had paid from the refund balance: it
+// goes back by reversing store_sales, as stored value's share reverses
+// store_stored_sales; only the rest, cash the customer agreed to take as a
+// balance, is new money the store put into balances (store_refund;
+// docs/BALANCE_REVIEW.md M2, rule W16).
+func creditRefund(ctx context.Context, tx pgx.Tx, orderID, refundID, customerID, amount, share int64, actor Actor) error {
 	o, err := readOrderCredit(ctx, tx, orderID)
 	if err != nil {
 		return err
 	}
+	share = max(0, min(share, amount))
 	acct, err := walletAccount(ctx, tx, acctCredit, o.BranchID, customerID, o.Currency)
+	if err != nil {
+		return err
+	}
+	sales, err := walletAccount(ctx, tx, acctSales, o.BranchID, 0, o.Currency)
 	if err != nil {
 		return err
 	}
@@ -423,7 +471,7 @@ func creditRefund(ctx context.Context, tx pgx.Tx, orderID, refundID, customerID,
 	}
 	if _, _, err := postJournal(ctx, tx, journal{Kind: "refund", Idem: fmt.Sprintf("refund:%d", refundID),
 		BranchID: o.BranchID, Currency: o.Currency, OrderID: orderID, RefundID: refundID, Actor: actor},
-		posting{acct.ID, amount}, posting{store.ID, -amount}); err != nil {
+		posting{acct.ID, amount}, posting{sales.ID, -share}, posting{store.ID, -(amount - share)}); err != nil {
 		return err
 	}
 	var storeName, publicNo string

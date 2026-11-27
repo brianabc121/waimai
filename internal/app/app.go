@@ -130,7 +130,25 @@ type Querier interface {
 }
 
 // inTx runs fn in a transaction and commits when fn returns nil.
+// inTx runs fn in a transaction. One that PostgreSQL cancelled as a
+// deadlock or a serialization failure is run once more from the start: its
+// work was all rolled back, and the other side has finished by then
+// (docs/BALANCE_REVIEW.md M4).
 func (a *App) inTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
+	err := a.inTxOnce(ctx, fn)
+	if retryableTx(err) && ctx.Err() == nil {
+		err = a.inTxOnce(ctx, fn)
+	}
+	return err
+}
+
+// retryableTx says whether err is a deadlock or a serialization failure.
+func retryableTx(err error) bool {
+	var pg *pgconn.PgError
+	return errors.As(err, &pg) && (pg.Code == "40P01" || pg.Code == "40001")
+}
+
+func (a *App) inTxOnce(ctx context.Context, fn func(tx pgx.Tx) error) error {
 	tx, err := a.DB.Begin(ctx)
 	if err != nil {
 		return err

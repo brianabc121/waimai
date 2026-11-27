@@ -116,6 +116,7 @@ export const router = createRouter({
         { path: 'platforms', component: () => import('./views/admin/AdminPlatforms.vue'), meta: { title: 'ad.pf.nav' } },
         { path: 'pay-methods', component: () => import('./views/admin/AdminPayMethods.vue'), meta: { title: 'ad.pay' } },
         { path: 'stored', component: () => import('./views/admin/AdminStored.vue'), meta: { title: 'ad.sv.nav' } },
+        { path: 'ledger', component: () => import('./views/admin/AdminLedger.vue'), meta: { title: 'wl.title' } },
         { path: 'support', component: () => import('./views/admin/AdminSupport.vue'), meta: { title: 'ad.support' } },
         { path: 'chats', component: () => import('./views/admin/AdminChats.vue'), meta: { title: 'ad.chats' } },
         { path: 'worker', component: () => import('./views/admin/AdminWorker.vue'), meta: { title: 'ad.worker' } },

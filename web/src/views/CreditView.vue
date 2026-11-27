@@ -9,13 +9,17 @@ import { currentRole, session } from '../session'
 import '../officeStrings'
 import '../stored'
 import StoredPanel from './marketing/StoredPanel.vue'
+import WalletLedger from './WalletLedger.vue'
+import WalletDays from './WalletDays.vue'
+import '../walletLedger'
 
 const data = ref<BranchCredit | null>(null)
 const error = ref('')
 const notice = ref('')
-const tab = ref<'entries' | 'holders' | 'stored'>('entries')
-const day = (d: Date) => d.toISOString().slice(0, 10)
-const f = reactive({ from: day(new Date(Date.now() - 29 * 864e5)), to: day(new Date()) })
+const tab = ref<'entries' | 'holders' | 'stored' | 'ledger' | 'days'>('entries')
+// Empty at first: the server picks the last 30 days in the store's time
+// (the browser's UTC date would leave out the store's today after 4 PM UTC).
+const f = reactive({ from: '', to: '' })
 const lim = reactive({ over: '', daily: '' })
 const isOwner = computed(() => currentRole()?.role === 'owner')
 const cur = computed(() => data.value?.currency)
@@ -25,6 +29,7 @@ async function load() {
   error.value = ''
   try {
     data.value = await branchCredit(session.branchId!, { from: f.from, to: f.to })
+    f.from = data.value.from; f.to = data.value.to
     lim.over = String(toMajor(data.value.approve_over)); lim.daily = String(toMajor(data.value.daily_limit))
   } catch (e) { error.value = creditErr(e) }
 }
@@ -77,6 +82,8 @@ function alertText(a: CreditAlert) {
           <button class="ox-cat" :class="{ on: tab === 'entries' }" @click="tab = 'entries'"><span class="nm">{{ t('sc.p.entries') }}</span><span class="n">{{ data.entries.length }}</span></button>
           <button class="ox-cat" :class="{ on: tab === 'holders' }" @click="tab = 'holders'"><span class="nm">{{ t('sc.p.holders') }}</span><span class="n">{{ data.holders.length }}</span></button>
           <button class="ox-cat" :class="{ on: tab === 'stored' }" data-testid="credit-tab-stored" @click="tab = 'stored'"><span class="nm">{{ t('sv.p.tab') }}</span></button>
+          <button class="ox-cat" :class="{ on: tab === 'ledger' }" data-testid="credit-tab-ledger" @click="tab = 'ledger'"><span class="nm">{{ t('wl.tab') }}</span></button>
+          <button class="ox-cat" :class="{ on: tab === 'days' }" data-testid="credit-tab-days" @click="tab = 'days'"><span class="nm">{{ t('wl.days') }}</span></button>
         </div>
         <div class="limits">
           <div class="ox-rail-h">{{ t('sc.p.limits') }}</div>
@@ -106,6 +113,8 @@ function alertText(a: CreditAlert) {
           </div>
         </template>
         <StoredPanel v-else-if="tab === 'stored'" />
+        <WalletLedger v-else-if="tab === 'ledger'" :branch="session.branchId" />
+        <WalletDays v-else-if="tab === 'days'" :branch="session.branchId" />
         <template v-else>
           <div v-if="!data.holders.length" class="ox-empty">{{ t('sc.p.none') }}</div>
           <div v-else class="ox-scroll">

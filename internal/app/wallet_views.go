@@ -124,6 +124,10 @@ type CreditAlert struct {
 // BranchCredit is the store's page of balances (§10.2).
 type BranchCredit struct {
 	Currency string `json:"currency"`
+	// From and To are the period, in the store's time: by default the last
+	// 30 days up to the store's today (not the browser's).
+	From string `json:"from"`
+	To   string `json:"to"`
 	// Owed is what the store owes customers in balances now; Customers how
 	// many customers hold some.
 	Owed      int64 `json:"owed"`
@@ -180,7 +184,7 @@ func (a *App) BranchCredit(ctx context.Context, branchID int64, f CreditFilter) 
 	if err := billDays(f.From, f.To); err != nil {
 		return nil, err
 	}
-	out := &BranchCredit{Holders: []CreditHolder{}, Entries: []CreditEntry{}, Alerts: []CreditAlert{}}
+	out := &BranchCredit{From: f.From, To: f.To, Holders: []CreditHolder{}, Entries: []CreditEntry{}, Alerts: []CreditAlert{}}
 	if err := a.DB.QueryRow(ctx, `SELECT currency, credit_approve_over, credit_daily_limit FROM branches WHERE id=$1`, branchID).
 		Scan(&out.Currency, &out.ApproveOver, &out.DailyLimit); err != nil {
 		if isNoRows(err) {
@@ -412,8 +416,14 @@ func (a *App) RevokeCreditRefund(ctx context.Context, refundID int64, actor Acto
 			posting{acct.ID, -back}, posting{store.ID, back}); err != nil || !fresh {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE order_refunds SET to_credit = to_credit - $2, pay_type = 'cash',
-			method = '现金' WHERE id=$1`, refundID, back); err != nil {
+		// what went in is kept: to_credit + revoked_credit stays what the
+		// refund put into the balance (00085, docs/BALANCE_REVIEW.md L1)
+		var by *int64
+		if actor.ID != 0 {
+			by = &actor.ID
+		}
+		if _, err := tx.Exec(ctx, `UPDATE order_refunds SET to_credit = to_credit - $2, revoked_credit = revoked_credit + $2,
+			revoked_at = now(), revoked_by = $3, pay_type = 'cash', method = '现金' WHERE id=$1`, refundID, back, by); err != nil {
 			return err
 		}
 		amt := fmtMoney(back, currency)

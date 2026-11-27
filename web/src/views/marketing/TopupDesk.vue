@@ -4,7 +4,7 @@
 // a top-up the staff start by phone number, which the customer confirms with
 // a texted code. Nothing goes in before the staff say the money is here.
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ApiError, get } from '../../api'
+import { ApiError, get, newKey } from '../../api'
 import { money, t, toMinor, whenText } from '../../i18n'
 import { session } from '../../session'
 import type { PayChoice, PayOptions } from '../../types'
@@ -44,7 +44,10 @@ onMounted(async () => {
   await loadToday()
 })
 
-function reset() { sel.value = null; code.value = ''; Object.assign(ph, { phone: '', tier: 0, amount: '', verifyID: 0, sentTo: '', otp: '' }) }
+// One key per top-up being confirmed, so a retry after a lost answer is
+// not a second top-up (rule W20).
+let idem = ''
+function reset() { idem = ''; sel.value = null; code.value = ''; Object.assign(ph, { phone: '', tier: 0, amount: '', verifyID: 0, sentTo: '', otp: '' }) }
 async function find() {
   error.value = ''; done.value = ''; ph.verifyID = 0
   const l = await branchTopups(bid, { status: 'pending', code: code.value.trim() }).catch(e => { error.value = storedErr(e); return [] })
@@ -64,7 +67,7 @@ async function confirm(headers?: Record<string, string>) {
   error.value = ''; busy.value = true
   try {
     const x = await confirmTopup(bid, sel.value.id, { pay_type: pay.value.type, pay_channel_id: pay.value.channel_id,
-      verify: sel.value.source === 'staff' ? { id: ph.verifyID, code: ph.otp } : undefined }, headers)
+      verify: sel.value.source === 'staff' ? { id: ph.verifyID, code: ph.otp } : undefined }, { ...headers, 'Idempotency-Key': (idem ||= newKey()) })
     done.value = t('sv.d.done', { p: x.phone, total: m(x.pay + x.bonus) })
     reset(); await loadToday()
   } catch (e) {

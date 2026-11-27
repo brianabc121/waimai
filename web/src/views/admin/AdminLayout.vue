@@ -2,11 +2,12 @@
 import './strings'
 import './i18nStrings'
 import '../../bills'
+import '../../walletLedger'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, onMounted, onUnmounted } from 'vue'
 import { locale, setLocale, t } from '../../i18n'
 import { logout, session } from '../../session'
-import { loadNewApplications, loadSupportUnread, loadWorkerStatus, monitor, poll } from './monitor'
+import { loadNewApplications, loadSupportUnread, loadWalletCheck, loadWorkerStatus, monitor, poll } from './monitor'
 import { useShell } from '../../shell'
 
 const router = useRouter()
@@ -18,7 +19,7 @@ const title = computed(() => t(String(route.meta.title ?? 'ad.title')))
 let stop = () => {}, stopSupport = () => {}
 onMounted(() => {
   if (!session.user?.is_platform_admin) return
-  stop = poll(() => loadWorkerStatus().catch(() => {}), 60)
+  stop = poll(() => Promise.all([loadWorkerStatus(), loadWalletCheck()]).catch(() => {}), 60)
   stopSupport = poll(() => Promise.all([loadSupportUnread(), loadNewApplications()]).catch(() => {}), 20)
 })
 onUnmounted(() => { stop(); stopSupport() })
@@ -50,6 +51,7 @@ async function out() { await logout(); session.loaded = true; router.replace('/a
       <router-link to="/admin/platforms" data-testid="nav-platforms">{{ t('ad.pf.nav') }}</router-link>
       <router-link to="/admin/pay-methods" data-testid="nav-pay-methods">{{ t('ad.pay') }}</router-link>
       <router-link to="/admin/stored" data-testid="nav-stored">{{ t('ad.sv.nav') }}</router-link>
+      <router-link to="/admin/ledger" data-testid="nav-ledger">{{ t('wl.title') }}<span v-if="monitor.walletProblems" class="badge" data-testid="ledger-badge">!</span></router-link>
       <router-link to="/admin/support" data-testid="nav-support">{{ t('ad.support') }}<span v-if="monitor.supportUnread" class="badge" data-testid="support-badge">{{ monitor.supportUnread > 99 ? '99+' : monitor.supportUnread }}</span></router-link>
       <router-link to="/admin/chats" data-testid="nav-chats">{{ t('ad.chats') }}</router-link>
       <div class="grp">{{ t('ad.g_system') }}</div>

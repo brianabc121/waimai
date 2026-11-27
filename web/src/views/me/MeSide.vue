@@ -14,6 +14,8 @@ interface Link { to: string; key: string; icon: string; dot?: boolean }
 const groups = computed(() => allGroups.value
   .map(g => ({ ...g, links: g.links.map(l => l.to === '/me/messages' && ownSite() ? { ...l, to: `/chat/${ownSlug()}` } : l).filter(l => onOwnSite(l.to)) }))
   .filter(g => g.links.length))
+// Only a customer with an old platform balance still sees it (BALANCE_REVIEW Q2).
+const legacy = computed(() => (me.profile?.wallets ?? []).some(w => w.balance !== 0 || w.bonus !== 0))
 const allGroups = computed<{ key: string; links: Link[] }[]>(() => [
   { key: '', links: [
     { to: '/me', key: 'cn.center', icon: 'M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z' },
@@ -21,8 +23,8 @@ const allGroups = computed<{ key: string; links: Link[] }[]>(() => [
   ] },
   { key: 'cn.g_wallet', links: [
     { to: '/me/coupons', key: 'mo.title', icon: 'M3.5 6.500h17v3a2.5 2.5 0 0 0 0 5v3h-17v-3a2.5 2.5 0 0 0 0-5zM9.5 7v10' },
-    { to: '/me/wallet/balance', key: 'me.balance', icon: 'M4 7.500A2.5 2.5 0 0 1 6.500 5H18v3M4 7.500V17a2 2 0 0 0 2 2h14V8H6.500A2.5 2.5 0 0 1 4 7.500zM16 13.500h.01' },
-    { to: '/me/wallet/bonus', key: 'me.bonus', icon: 'M12 3.500l2.500 5 5.500.8-4 3.900.9 5.500L12 16.100l-4.900 2.600.9-5.500-4-3.900 5.500-.8z' },
+    ...(legacy.value ? [{ to: '/me/wallet/balance', key: 'me.balance', icon: 'M4 7.500A2.5 2.5 0 0 1 6.500 5H18v3M4 7.500V17a2 2 0 0 0 2 2h14V8H6.500A2.5 2.5 0 0 1 4 7.500zM16 13.500h.01' },
+    { to: '/me/wallet/bonus', key: 'me.bonus', icon: 'M12 3.500l2.500 5 5.500.8-4 3.900.9 5.500L12 16.100l-4.900 2.600.9-5.500-4-3.900 5.500-.8z' }] : []),
   ] },
   { key: 'cn.g_daily', links: [
     { to: '/me/addresses', key: 'me.addresses', icon: 'M12 13a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2zM12 21s6.5-5.8 6.5-10.6a6.5 6.5 0 0 0-13 0C5.5 15.2 12 21 12 21z' },

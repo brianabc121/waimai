@@ -13,8 +13,16 @@ func main() {
 	cfg := config.Load()
 	// Migrations hold a session lock, so they use the direct connection when
 	// the main one goes through a pooler.
-	if err := db.Migrate(context.Background(), cfg.ListenDatabaseURL); err != nil {
+	ctx := context.Background()
+	if err := db.Migrate(ctx, cfg.MigrateDatabaseURL); err != nil {
 		log.Fatalf("migrate: %v", err)
 	}
 	log.Print("migrations applied")
+	// The app's restricted role (00085) logs in with APP_DB_PASSWORD.
+	if cfg.AppDBPassword != "" {
+		if err := db.SetAppRolePassword(ctx, cfg.MigrateDatabaseURL, cfg.AppDBPassword); err != nil {
+			log.Fatalf("app role: %v", err)
+		}
+		log.Print("waimai_app can log in")
+	}
 }

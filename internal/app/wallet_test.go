@@ -91,9 +91,28 @@ func walletClean(t *testing.T) {
 	}
 }
 
+// today is a window around today: the stores in the tests keep their own
+// time zone, whose date is not always the machine's. Every test store is
+// new, so the wider window holds only this test's work.
 func today() app.CreditFilter {
-	d := time.Now().Format("2006-01-02")
-	return app.CreditFilter{From: d, To: d}
+	now := time.Now()
+	return app.CreditFilter{From: now.AddDate(0, 0, -1).Format("2006-01-02"), To: now.AddDate(0, 0, 1).Format("2006-01-02")}
+}
+
+// tamper changes rows the way someone with the database's owner rights
+// could: with the triggers that refuse it switched off (00085 refuses the
+// change itself), so that the checks can be shown to catch it.
+func tamper(t *testing.T, sql string, args ...any) {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := testApp.DB.Begin(ctx)
+	noErr(t, err)
+	defer tx.Rollback(ctx) //nolint:errcheck
+	_, err = tx.Exec(ctx, `SET LOCAL session_replication_role = replica`)
+	noErr(t, err)
+	_, err = tx.Exec(ctx, sql, args...)
+	noErr(t, err)
+	noErr(t, tx.Commit(ctx))
 }
 
 func i64(v int64) *int64 { return &v }
@@ -414,6 +433,12 @@ func TestStoreCreditLimitsAndRevoke(t *testing.T) {
 	if creditAt(t, cust, s.branchID) != 6500 || refundRowOf(t, r1.RefundID).ToCredit != 0 {
 		t.Fatalf("revoked: balance %d, refund %+v", creditAt(t, cust, s.branchID), refundRowOf(t, r1.RefundID))
 	}
+	// the refund keeps what went in: put in = still in + taken back (L1)
+	var revoked int64
+	noErr(t, a.DB.QueryRow(ctx, `SELECT revoked_credit FROM order_refunds WHERE id=$1`, r1.RefundID).Scan(&revoked))
+	if revoked != 2000 {
+		t.Fatalf("taken back %d, the balance went from 8500 to 6500", revoked)
+	}
 	checked(t, "revoked", o.ID)
 	err = a.RevokeCreditRefund(ctx, r1.RefundID, s.staff)
 	wantCode(t, err, "INVALID_STATE")
@@ -529,11 +554,14 @@ func TestStoreCreditCheckCatchesTampering(t *testing.T) {
 		}
 		t.Fatalf("%s not caught: %v", prefix, bad)
 	}
+	// a refund's record cannot be changed quietly any more (00085)
 	_, err = a.DB.Exec(ctx, `UPDATE order_refunds SET to_credit = to_credit - 1 WHERE id=$1`, rq.RefundID)
-	noErr(t, err)
+	if err == nil {
+		t.Fatal("a refund's amount into the balance was changed without a revoke")
+	}
+	tamper(t, `UPDATE order_refunds SET to_credit = to_credit - 1 WHERE id=$1`, rq.RefundID)
 	want("W7")
-	_, err = a.DB.Exec(ctx, `UPDATE order_refunds SET to_credit = to_credit + 1 WHERE id=$1`, rq.RefundID)
-	noErr(t, err)
+	tamper(t, `UPDATE order_refunds SET to_credit = to_credit + 1 WHERE id=$1`, rq.RefundID)
 	_, err = a.DB.Exec(ctx, `UPDATE orders SET credit_paid = 1 WHERE id=$1`, o.ID)
 	noErr(t, err)
 	want("W4")
