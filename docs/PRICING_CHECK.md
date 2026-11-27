@@ -81,7 +81,7 @@ DATABASE_URL='postgres://...' make pricing-check-db DAYS=0   # 全部订单
 | D4 | 优惠明细（`order_discounts`）之和 = 总优惠（活动、菜品活动、每张券各一行） |
 | D5 | 退掉的菜不再分摊任何优惠、服务费、税 |
 | D6 | 金额流水（`order_money_events`）的应收变化之和 = 现在的应付（流水只追加，改或删会被数据库拒绝） |
-| D7 | 退款之和 ≤ 应付（逐单检查）；把菜全部退完时正好等于应付，不多不少一分（`TestPricingCheckChain` 验） |
+| D7 | 退款之和 ≤ 应付（逐单检查）；把菜全部退完、每次都按建议金额退时正好等于应付，不多不少一分：最后一道菜的建议金额是“还没退的全部”，包括包装费、它的税和配送费（样例 S11；`TestPricingCheckChain`、`TestRefundLastDishTakesFees` 验） |
 | D8 | 各道菜服务费之和 = 服务费；各道菜税之和 ≤ 税，没有包装费时相等 |
 | D9 | 各道菜优惠之和 = 各条优惠明细的分摊之和 + 结账打折 |
 | D10 | 平台单（`order_type='platform'`）：服务费、配送费、结账打折、抹零都是 0；优惠明细只有 `platform_merchant_promo`（商家在平台上的活动，店铺出资）和 `platform_promo`（平台出资，税后）两种，不带本店的活动和券（docs/ORDER_TYPES_DESIGN.md 9.1） |
@@ -132,7 +132,7 @@ R 这一组是最重要的：任何一条改金额的路径如果绕开了 `load
 | 7 | 代客下单 | `TestStoreMembersAndStaffOrders`、`TestPricingFixStaffOrderPromotion` |
 | 8 | 加单：活动只升不降、配送费不另收、打折跟着走、抹零清掉、新加的菜能凑第二份 | `TestStaffAddonDelivery`、`TestAddonPromotionOnlyGoesUp`、`TestDishPromotionAddon` |
 | 9 | 退菜：顾客原因按剩下的菜重算门槛；店铺原因活动按比例保留；券封顶到活动减完后的剩余 | `TestVoidDelivery`、`TestVoidDineIn`、`TestPricingFixVoidDiscountLines` |
-| 10 | 按菜退款：带上活动、券、结账打折和抹零；退款进对账 | 样例 S8；`TestPricingFixDineRefundPromo`、`TestPricingFixRefundStaffDiscount` |
+| 10 | 按菜退款：带上活动、券、结账打折和抹零；退款进对账 | 样例 S8、S11；`TestPricingFixDineRefundPromo`、`TestPricingFixRefundStaffDiscount`、`TestRefundLastDishTakesFees` |
 | 11 | 商家改了活动规则、服务费率、税率之后，老订单的改单仍按下单（开台）时的快照 | `TestPricingFixServiceChargeDrift`、`TestPricingFixPromoKindDrift`、`TestDishPromotions` |
 | 12 | 一张单走完全程：下单（菜品活动 + 满减 + 店铺券 + 平台券）→ 打 9 折 → 加单 → 店铺原因退菜 → 顾客原因退菜 → 抹零 → 取走 → 逐道退款到全部退完，每一步都验 | `TestPricingCheckChain` |
 | 13 | 金额流水：每种改动都有记录、合计等于应付、不能改删 | `TestMoneyLedgerOverAllOrders` |
@@ -264,6 +264,18 @@ PRICING_REVIEW.md 问题 1 的门店：含税 12%、服务费 5%。鸡 169.00 ×
 - 一品湘在 Grab 手填小炒肉 75.00 后：一品湘 Grab 报价小炒肉 **75.00**，好吃党 Grab 仍是 **60.00**
 - 好吃党没开 Grab 时，好吃党的 Grab 单报价被拒（PLATFORM_OFF）；事后改好吃党 Grab 的佣金、加价，已下的单金额和佣金不变
 
+### S11 退最后一道菜时连包装费、它的税和配送费一起退（真库测试 `TestRefundLastDishTakesFees`，brian 2026-11-27 定）
+
+门店：税 12% 另加、服务费 5%、包装费 10.00、配送费 69.00（不计税）。规则：这次退完后单上再没有没退的菜，建议金额 = 还没退的全部（应付 − 之前退的）；店员仍可改小。之前每道菜的建议金额只是“这道菜的那份”，包装费那份从来不在任何一道菜里，所以没有活动的单全部退完会少退包装费和它的税（有活动的单本来就封顶到“还没退的”，结果一样）。
+
+- A 自取，茶 69.00 + 水 30.00：服务费 4.95，税 12% × (99.00 + 10.00 + 4.95 = 113.95) = 13.674 → 13.67，应付 **127.62**
+  - 先退水：只剩茶的单 = 69.00 + 10.00 + 3.45 + 税 12% × 82.45 = 9.894 → 9.89 = 92.34，建议 127.62 − 92.34 = **35.28**
+  - 再退茶（最后一道）：茶自己那份 = 127.62 − 只剩水的单（30.00 + 10.00 + 1.50 + 税 12% × 41.50 = 4.98 = 46.48）= 81.14；改后建议 = 还没退的 127.62 − 35.28 = **92.34**（多出的 11.20 = 包装费 10.00 + 它的税 1.20）；合计退 127.62 = 应付
+- B 同样的单，水只退了 30.00：退茶时建议 127.62 − 30.00 = **97.62**，店员改成 92.34 也可以
+- C 外卖只点茶：69.00 + 3.45 + 10.00 + 税 9.89 + 配送费 69.00 = **161.34**；退茶（最后一道）建议 **161.34**（茶自己那份只有 161.34 − (10.00 + 1.20 + 69.00) = 71.14）
+
+---
+
 ### W-S1、W-S2、W-S3 店铺余额付的单按菜退款（`TestRefundSplitSamples`、`TestMulDivFloorSamples`；REFUND_BALANCE_DESIGN.md 第 11 节）
 
 退款金额照旧按退菜规则算；这一笔里“现金那份”按**累计目标法**：现金那份 = ⌊(之前退的 + 这次退的) × 现金实付 ÷ 应付⌋ − 之前现金那份，其余是余额那份（必须回余额）。向下取整，所以现金永远不会多退一分，全部退完时两份各自正好退完。这几步在 `refundSplit`（`internal/app/wallet.go`），所以样例写在 `internal/app/wallet_internal_test.go`。
@@ -298,6 +310,6 @@ PRICING_REVIEW.md 问题 1 的门店：含税 12%、服务费 5%。鸡 169.00 ×
 ## 6. 已知的局限（改到这些地方时要特别小心）
 
 - **币种小数位**：所有币种都按 1/100 存，日元、越南盾、韩元等会出现“半日元”（PRICING_REVIEW.md 问题 6，第 5 步，还没做）。做这一步时要给第 4 节加无小数币种的样例。
-- **税的分摊**：包装费那一份税不落在任何一道菜上，所以 C7、D8 只能要求“各道菜税之和 ≤ 税”。按菜退款时这部分不退。
+- **税的分摊**：包装费那一份税不落在任何一道菜上，所以 C7、D8 只能要求“各道菜税之和 ≤ 税”。按菜退款时这部分（连同包装费、配送费）在退最后一道菜时一起退（样例 S11）。
 - **配送费**：店员改过的配送费没有单独记原区域运费；配送费不计税。
 - **对账和账单**仍按订单和退款表汇总，流水用来核对；改对账逻辑时要同时跑 `TestReconciliation`、`TestPlatformReconciliation`、`TestBills` 和 D6。

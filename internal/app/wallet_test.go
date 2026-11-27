@@ -200,9 +200,9 @@ func TestStoreCreditFlow(t *testing.T) {
 	checked(t, "B picked up", b.ID)
 
 	// B refunds: in cash, the balance's share goes back to the balance; then
-	// every dish left into the balance. The packaging fee stays with the store
-	// (docs/VOID_ITEM_DESIGN.md §6), and the running cash part is always the
-	// rounded-down share of what was refunded (W-S2)
+	// every dish left into the balance. The last dish takes all that is left
+	// (sample S11), so it all comes back, and the cash part ends exactly at
+	// what was paid in cash (W-S2)
 	var cash, back int64
 	refund := func(ri app.RefundInput) {
 		t.Helper()
@@ -235,7 +235,7 @@ func TestStoreCreditFlow(t *testing.T) {
 		rest = append(rest, refundLines(it.ID, qty)...)
 	}
 	refund(app.RefundInput{Lines: rest, Reason: "x", ToCredit: true, Consent: "chat"})
-	if T := b.Totals.Total; back >= T || cash != back*(T-5000)/T {
+	if T := b.Totals.Total; back != T || cash != T-5000 {
 		t.Fatalf("refunded %d (cash %d) of %d", back, cash, T)
 	}
 	walletClean(t)
