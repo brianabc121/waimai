@@ -12,6 +12,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -515,5 +516,53 @@ func TestRiderBoardSeenAndTracking(t *testing.T) {
 	}
 	if _, err = a.OrderTracking(ctx, "no-such-token"); err == nil {
 		t.Fatal("an unknown token must not track anything")
+	}
+}
+
+// TestRiderBrands: a store with several brands (docs/MULTI_BRAND_DESIGN.md
+// §16.8). The rider's deliveries name their brand, and so does the push.
+func TestRiderBrands(t *testing.T) {
+	a := need(t)
+	ctx := context.Background()
+	s := newStore(t, true)
+	noErr(t, a.RunJobs(ctx))
+	push := &fakePush{}
+	a.Push = map[string]app.PushSender{"android": push}
+	defer func() { a.Push = nil }()
+	_, err := a.RegisterDevice(ctx, s.rider1, "android", uniq("tok"), "1.0", "")
+	noErr(t, err)
+
+	// one brand only: the push is as before
+	o := s.place(t, "delivery", []app.QuoteLineInput{{ItemID: s.water, Qty: 1}})
+	o, err = a.Accept(ctx, o.ID, o.Version, s.staff)
+	noErr(t, err)
+	_, err = a.AssignRider(ctx, o.ID, s.rider1, s.staff)
+	noErr(t, err)
+	noErr(t, a.RunJobs(ctx))
+	if got := push.take(); len(got) != 1 || !strings.HasPrefix(got[0].Body, o.PublicNo) {
+		t.Fatalf("one brand: %+v", got)
+	}
+
+	hcd, err := a.CreateBrand(ctx, s.branchID, s.staff, app.BrandInput{Name: "好吃党", Code: brandCode("RB"), Delivery: true, Color: "#1d7a4f"})
+	noErr(t, err)
+	o2 := s.place(t, "delivery", []app.QuoteLineInput{{ItemID: s.water, Qty: 1}})
+	_, err = a.DB.Exec(ctx, `UPDATE orders SET brand_id=$2, brand_name='好吃党' WHERE id=$1`, o2.ID, hcd.ID)
+	noErr(t, err)
+	o2, err = a.Accept(ctx, o2.ID, o2.Version, s.staff)
+	noErr(t, err)
+	_, err = a.AssignRider(ctx, o2.ID, s.rider1, s.staff)
+	noErr(t, err)
+	noErr(t, a.RunJobs(ctx))
+	if got := push.take(); len(got) != 1 || !strings.HasPrefix(got[0].Body, "好吃党 "+o2.PublicNo) {
+		t.Fatalf("the push names the brand: %+v", got)
+	}
+	tasks, err := a.RiderTasks(ctx, s.rider1)
+	noErr(t, err)
+	seen := map[int64]string{}
+	for _, x := range tasks {
+		seen[x.ID] = x.BrandName + "/" + x.BrandColor
+	}
+	if seen[o2.ID] != "好吃党/#1d7a4f" || seen[o.ID] == "" || seen[o.ID] == seen[o2.ID] {
+		t.Fatalf("the rider's deliveries name their brand: %v", seen)
 	}
 }

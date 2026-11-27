@@ -3,13 +3,13 @@
 // "all brands together" where the page can show them merged.
 import { t } from '../../i18n'
 import type { BrandRef } from '../../types'
-defineProps<{ brands: BrandRef[]; all?: boolean }>()
+defineProps<{ brands: BrandRef[]; all?: boolean; allLabel?: string }>()
 const pick = defineModel<number>({ required: true })
 </script>
 
 <template>
   <div class="brseg" role="tablist" data-testid="brand-seg">
-    <button v-if="all" type="button" role="tab" :class="{ on: pick === 0 }" :aria-selected="pick === 0" data-testid="brand-all" @click="pick = 0">{{ t('br.all') }}</button>
+    <button v-if="all" type="button" role="tab" :class="{ on: pick === 0 }" :aria-selected="pick === 0" data-testid="brand-all" @click="pick = 0">{{ allLabel || t('br.all') }}</button>
     <button v-for="b in brands" :key="b.id" type="button" role="tab" :class="{ on: pick === b.id }" :aria-selected="pick === b.id"
       :data-testid="'brand-' + b.id" @click="pick = b.id"><i :style="{ background: b.color }"></i>{{ b.name }}</button>
   </div>

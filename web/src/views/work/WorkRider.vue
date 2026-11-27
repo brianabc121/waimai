@@ -9,6 +9,7 @@ import { both, money, t, toMajor, toMinor, whenText } from '../../i18n'
 import { addons, totalBefore } from '../../addon'
 import { useLive } from '../../live'
 import { currentRole, reloadUser, session } from '../../session'
+import { multiBrand } from '../../brands'
 import type { Order, PayChannel, PayOptions } from '../../types'
 import { channelName } from '../../checkout'
 import { contactApps, contactName, contactPhone } from '../../addresses'
@@ -145,6 +146,11 @@ async function fail(o: Order) {
   if (await act(o, 'fail', { reason: prob.reason.trim() })) { prob.open = false; prob.reason = ''; void back() }
 }
 const branchName = computed(() => currentRole()?.branch_name ?? '')
+// which brand a delivery is (docs/MULTI_BRAND_DESIGN.md §16.8): the bag and
+// the customer know it by the brand. Shown when the store has several brands,
+// or the order is a brand other than the store's own name.
+const brandOf = (o: Order) => o.brand_name && (multiBrand() || o.brand_name !== branchName.value)
+  ? { name: o.brand_name, color: o.brand_color || '#a02c20' } : null
 
 // Tell the store which new assignments this rider has had on screen.
 const seen = new Set<number>()
@@ -178,7 +184,7 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
     <!-- one delivery -->
     <template v-if="cur">
       <div class="subbar row between" :data-task-page="st(cur)">
-        <button class="back" data-testid="task-back" @click="back">‹ {{ cur.public_no }}</button>
+        <button class="back" data-testid="task-back" @click="back">‹ {{ cur.public_no }} <i v-if="brandOf(cur)" class="wbrand" :style="{ background: brandOf(cur)!.color }">{{ brandOf(cur)!.name }}</i></button>
         <span class="tag" :class="st(cur) === 'assigned' ? 'brand' : 'info'">{{ st(cur) === 'assigned' ? t('wk.to_pickup') : t('f.' + cur.fulfillment_status) }}</span>
       </div>
       <div class="section stack">
@@ -190,7 +196,8 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
         <template v-if="st(cur) === 'assigned'">
           <div v-if="cur.packing_status !== 'packed'" class="banner warn">{{ t('not_packed') }}</div>
           <div v-else class="banner ok">{{ t('wk.packed_n', { n: cur.bags ?? 0 }) }}</div>
-          <div class="card"><div class="k">{{ t('wk.pickup_at') }}</div><b>{{ branchName }}</b></div>
+          <div class="card"><div class="k">{{ t('wk.pickup_at') }}</div><b>{{ branchName }}</b>
+            <div v-if="brandOf(cur)" class="small" data-testid="rider-pickup-brand">{{ t('wk.brand_bag') }} <i class="wbrand" :style="{ background: brandOf(cur)!.color }">{{ brandOf(cur)!.name }}</i></div></div>
           <div class="card"><div class="k">{{ t('wk.items') }} <span v-if="addons(cur).length" class="tag addon" data-testid="rider-addon">{{ t('ao.tag') }}</span></div>
             <div v-for="i in cur.items" :key="i.id" style="padding:3px 0">{{ i.qty }} × {{ both(i.name, i.name_en) }}<span v-if="i.batch_seq > 1" class="small" style="color:#b45309"> · {{ t('ao.n', { n: i.batch_seq - 1 }) }}</span></div></div>
           <div class="card"><div class="k">{{ t('wk.payment') }}</div>
@@ -291,7 +298,7 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
       <template v-if="tab === 'tasks'">
         <div v-if="!current.length" class="card muted" data-testid="rider-empty">{{ t('no_tasks') }}</div>
         <div v-for="o in current" :key="o.id" class="card stack" :class="{ fresh: st(o) === 'assigned' }" :data-delivery="o.public_no">
-          <div class="row between"><b class="no">{{ o.public_no }} <span v-if="o.scheduled_for" class="tag info">{{ whenText(o.scheduled_for, o.timezone) }}</span>
+          <div class="row between"><b class="no">{{ o.public_no }} <i v-if="brandOf(o)" class="wbrand" data-testid="rider-brand" :style="{ background: brandOf(o)!.color }">{{ brandOf(o)!.name }}</i> <span v-if="o.scheduled_for" class="tag info">{{ whenText(o.scheduled_for, o.timezone) }}</span>
             <span v-if="addons(o).length" class="tag addon">{{ t('ao.tag') }}</span></b>
             <span class="tag" :class="st(o) === 'assigned' ? 'brand' : 'info'">{{ st(o) === 'assigned' ? t('wk.to_pickup') : t('f.' + o.fulfillment_status) }}</span></div>
           <div v-if="st(o) === 'assigned'" class="line"><span class="pt s"></span><span>{{ branchName }} ·
@@ -310,7 +317,7 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
         </div>
         <div class="muted small">{{ t('wk.today') }}</div>
         <div v-for="o in done" :key="o.id" class="card row between" :data-done="o.public_no">
-          <span><b>{{ o.public_no }}</b> · {{ o.zone_name }}</span>
+          <span><b>{{ o.public_no }}</b> <i v-if="brandOf(o)" class="wbrand" :style="{ background: brandOf(o)!.color }">{{ brandOf(o)!.name }}</i> · {{ o.zone_name }}</span>
           <span class="tag" :class="st(o) === 'delivered' ? 'ok' : 'bad'">{{ t('f.' + o.fulfillment_status) }}</span>
         </div>
         <div v-if="!done.length" class="card muted">{{ t('wk.done_empty') }}</div>
@@ -320,5 +327,6 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
 </template>
 
 <style scoped>
+.wbrand { font-style: normal; color: #fff; font-weight: 700; font-size: 12px; border-radius: 5px; padding: 0 6px; line-height: 18px; display: inline-block; vertical-align: 1px; white-space: nowrap; }
 .tag.addon { background: #fff1e0; color: #b45309; border-color: #f5c48a; }
 </style>

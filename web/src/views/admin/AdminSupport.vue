@@ -10,6 +10,7 @@ import ChatPane from '../chat/ChatPane.vue'
 import Pager from './Pager.vue'
 import { fmtDate, fmtDateTime } from './util'
 import { monitor } from './monitor'
+import '../../brands'
 
 extend({
   'as.search': ['搜索顾客、门店、商户、手机号、消息内容', 'Search customer, store, merchant, phone or message text'],
@@ -113,6 +114,8 @@ const blocked = computed(() => enabled.value ? '' : t('as.off'))
           <span class="row between"><span class="last">{{ last(r) }}</span><i v-if="r.unread" class="num" data-testid="as-row-unread">{{ r.unread > 99 ? '99+' : r.unread }}</i></span>
           <span class="row" style="gap:6px">
             <span class="tag" :class="r.kind === 'store' ? 'info' : ''">{{ t(r.kind === 'store' ? 'as.store' : 'as.customer') }}</span>
+            <span v-if="r.brand_name" class="asp-brand" data-testid="as-row-brand" :style="{ background: r.brand_color || '#a02c20' }">{{ r.brand_name }}</span>
+            <span v-if="r.kind === 'customer' && r.store_name && r.store_name !== r.brand_name" class="small muted">{{ r.store_name }}</span>
             <span v-if="r.merchant" class="small muted">{{ r.merchant }}</span>
             <span v-if="r.resolved_at" class="tag ok">{{ t('as.resolved') }}</span>
           </span>
@@ -129,11 +132,13 @@ const blocked = computed(() => enabled.value ? '' : t('as.off'))
           <button class="btn link asp-back" @click="router.push({ query: {} })">‹ {{ t('back') }}</button>
           <b data-testid="as-title">{{ name(detail) }}</b>
           <span class="tag" :class="detail.kind === 'store' ? 'info' : ''">{{ t(detail.kind === 'store' ? 'as.store' : 'as.customer') }}</span>
+          <span v-if="detail.brand_name" class="asp-brand" data-testid="as-brand" :style="{ background: detail.brand_color || '#a02c20' }">{{ detail.brand_name }}</span>
           <span v-if="detail.resolved_at" class="tag ok">{{ t('as.resolved') }}</span>
           <button class="btn small asp-resolve" data-testid="as-resolve" :disabled="!detail.id" @click="resolve">{{ t(detail.resolved_at ? 'as.reopen' : 'as.resolve') }}</button>
         </header>
         <ChatPane :key="detail.party" :peer="detail.party" self="platform" branch-id="platform" :staff="me" :peer-read-at="detail.peer_read_at"
           :blocked="blocked" desk :upload-path="`/admin/support/${detail.party}/images`" :orders="detail.orders" :empty-text="t('as.not_started')"
+          :brands="detail.brands" :brand-note="t('as.about_brand')"
           @seen="seen" @activity="activity" />
       </template>
     </section>
@@ -147,6 +152,10 @@ const blocked = computed(() => enabled.value ? '' : t('as.off'))
         <router-link v-if="detail.merchant_id" class="lnk" :to="`/admin/merchants/${detail.merchant_id}`">{{ t('as.to_merchant') }}</router-link>
         <a v-if="detail.slug" class="lnk" :href="`/s/${detail.slug}`" target="_blank" rel="noopener">{{ t('as.to_store') }}</a>
         <div v-if="!detail.chat_enabled" class="small bad">{{ t('as.store_off') }}</div>
+        <template v-if="detail.brands.length > 1">
+          <h4>{{ t('as.brands') }}</h4>
+          <div class="asp-brands" data-testid="as-brands"><span v-for="b in detail.brands" :key="b.id" class="asp-brand" :style="{ background: b.color || '#a02c20' }">{{ b.name }}</span></div>
+        </template>
       </template>
       <template v-else>
         <div v-if="detail.muted" class="small bad">{{ t('as.muted') }}</div>
@@ -158,7 +167,7 @@ const blocked = computed(() => enabled.value ? '' : t('as.off'))
       <div v-if="detail.resolved_at" class="small">{{ t('as.resolved_by', { who: detail.resolved_by || '—', d: fmtDateTime(detail.resolved_at) }) }}</div>
       <div class="small muted">{{ t('as.resolve_hint') }}</div>
       <h4>{{ t('as.orders') }}</h4>
-      <div v-for="o in detail.orders" :key="o.id" class="small" data-testid="as-order">#{{ o.public_no }}<template v-if="detail.kind === 'customer'"> · {{ o.store_name }}</template> · {{ fmtDate(o.created_at) }} · {{ money(o.total, o.currency) }} · {{ t('s.' + o.status) }}</div>
+      <div v-for="o in detail.orders" :key="o.id" class="small" data-testid="as-order">#{{ o.public_no }}<template v-if="detail.kind === 'customer'"> · {{ o.store_name }}</template><template v-if="o.brand_name && (detail.kind === 'customer' ? o.brand_name !== o.store_name : detail.brands.length > 1)"> · <span class="asp-brand" :style="{ background: o.brand_color || '#a02c20' }">{{ o.brand_name }}</span></template> · {{ fmtDate(o.created_at) }} · {{ money(o.total, o.currency) }} · {{ t('s.' + o.status) }}</div>
       <div v-if="!detail.orders.length" class="small muted">—</div>
     </aside>
   </div>
@@ -187,6 +196,8 @@ const blocked = computed(() => enabled.value ? '' : t('as.off'))
 .asp-back { display: none; }
 .asp-info { border-inline-start: 1px solid var(--line); padding: 4px 16px 16px; overflow-y: auto; display: grid; gap: 6px; align-content: start; }
 .asp-info h4 { margin: 12px 0 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.asp-brand { display: inline-flex; align-items: center; color: #fff; border-radius: 5px; padding: 0 6px; font-size: 11.5px; font-weight: 700; line-height: 18px; white-space: nowrap; }
+.asp-brands { display: flex; flex-wrap: wrap; gap: 6px; }
 .asp-info .lnk { color: var(--brand); font-size: 13px; } .asp-info .bad { color: var(--bad, #b42318); }
 @media (max-width: 1199px) { .asp { grid-template-columns: 320px minmax(0, 1fr); } .asp-info { display: none; } }
 @media (max-width: 767px) {

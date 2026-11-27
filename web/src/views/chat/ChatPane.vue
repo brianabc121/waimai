@@ -17,11 +17,12 @@ const props = defineProps<{
   uploadPath: string // where this conversation's pictures are uploaded
   orders?: ChatOrder[] // the customer's orders with the store: what a card shows and what can be sent
   emptyText?: string // shown before the first message
-  brand?: number // the customer's side: the brand whose page this is, sent with each message
-  brands?: BrandRef[] // the desk: the store's brands, to show which one a customer wrote to
+  brand?: number // sent with each message: the brand whose page the customer is on, or the one a store writes to support about
+  brands?: BrandRef[] // the brands the other side's messages can be about, to name them
+  brandNote?: string // what the brand line says; the customer wrote to this brand by default
 }>()
-const extra = (): ChatEx | undefined => props.staff ?? (props.brand ? { brand: props.brand } : undefined)
-// the brand a customer's message went to, shown where it changes (several brands only)
+const extra = (): ChatEx | undefined => props.staff || props.brand ? { ...props.staff, ...(props.brand ? { brand: props.brand } : {}) } : undefined
+// the brand the other side's message is about, shown where it changes (several brands only)
 function brandAt(i: number): BrandRef | null {
   const m = list.value[i]
   if (!props.brands || props.brands.length < 2 || m.mine || !m.brand) return null
@@ -156,14 +157,14 @@ const stamp = (i: number) => i === 0 || list.value[i].at - list.value[i - 1].at 
       <div v-else-if="!list.length" class="cp-note" data-testid="chat-empty">{{ emptyText || t(self === 'store' ? 'ch.start_desk' : 'ch.start') }}</div>
       <template v-for="(m, i) in list" :key="m.id">
         <div v-if="stamp(i)" class="cp-day">{{ clock(m.at) }}</div>
-        <div v-if="brandAt(i)" class="cp-brand" data-testid="chat-msg-brand"><i :style="{ background: brandAt(i)!.color || '#a02c20' }">{{ brandAt(i)!.name }}</i> {{ t('ch.from_brand') }}</div>
+        <div v-if="brandAt(i)" class="cp-brand" data-testid="chat-msg-brand"><i :style="{ background: brandAt(i)!.color || '#a02c20' }">{{ brandAt(i)!.name }}</i> {{ brandNote || t('ch.from_brand') }}</div>
         <div class="cp-msg" :class="{ me: m.mine, failed: m.state === 'failed' }" data-testid="chat-msg" :data-mine="m.mine" :data-state="m.state">
           <div class="cp-bub" @click="m.state === 'failed' && deliver(m)">
             <span v-if="m.kind === 'text'">{{ m.text }}</span>
             <a v-else-if="m.kind === 'image'" class="cp-img" :href="m.image" target="_blank" rel="noopener" data-testid="chat-image" @click="m.state === 'failed' && $event.preventDefault()"><img :src="m.image" :alt="t('ch.kind_image')" @load="toBottom" @error="m.kind = 'other'; m.text = t('ch.img_gone')" /></a>
             <button v-else-if="m.kind === 'order'" type="button" class="cp-order" data-testid="chat-order-card" :disabled="!orderOf(m.orderId)" @click.stop="orderOf(m.orderId) && emit('order', orderOf(m.orderId)!)">
               <template v-if="orderOf(m.orderId)">
-                <b>{{ t('ch.order_card', { no: orderOf(m.orderId)!.public_no }) }}</b><i class="tag warn">{{ t('s.' + orderOf(m.orderId)!.status) }}</i>
+                <b>{{ t('ch.order_card', { no: orderOf(m.orderId)!.public_no }) }}<i v-if="orderOf(m.orderId)!.brand_name && (brands?.length ?? 0) > 1" class="cp-obrand" data-testid="chat-order-brand" :style="{ background: orderOf(m.orderId)!.brand_color || '#a02c20' }">{{ orderOf(m.orderId)!.brand_name }}</i></b><i class="tag warn">{{ t('s.' + orderOf(m.orderId)!.status) }}</i>
                 <small>{{ clock(orderOf(m.orderId)!.created_at) }} · {{ money(orderOf(m.orderId)!.total, orderOf(m.orderId)!.currency) }}</small>
                 <small class="go">{{ t('ch.view_order') }}</small>
               </template>
@@ -185,7 +186,7 @@ const stamp = (i: number) => i === 0 || list.value[i].at - list.value[i - 1].at 
       <div class="row between"><b>{{ t('ch.pick_order') }}</b><button type="button" class="btn link small" @click="picking = false">{{ t('close') }}</button></div>
       <div v-if="!orders?.length" class="small muted">{{ t('ch.no_orders_here') }}</div>
       <button v-for="o in orders ?? []" :key="o.id" type="button" data-testid="chat-order-pick" @click="pickOrder(o)">
-        <b>#{{ o.public_no }}</b><span v-if="o.store_name" class="small">{{ o.store_name }}</span><span class="tag warn">{{ t('s.' + o.status) }}</span><span class="small muted">{{ clock(o.created_at) }} · {{ money(o.total, o.currency) }}</span>
+        <b>#{{ o.public_no }}</b><span v-if="o.store_name" class="small">{{ o.brand_name || o.store_name }}</span><span class="tag warn">{{ t('s.' + o.status) }}</span><span class="small muted">{{ clock(o.created_at) }} · {{ money(o.total, o.currency) }}</span>
       </button>
     </div>
     <form v-if="!blocked" class="cp-box" @submit.prevent="send">
@@ -210,6 +211,7 @@ const stamp = (i: number) => i === 0 || list.value[i].at - list.value[i - 1].at 
 .cp-note { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 12px; }
 .cp-day { text-align: center; font-size: 12px; color: #9aa1ab; margin-top: 4px; }
 .cp-brand { font-size: 12px; color: #9aa1ab; margin-top: 2px; }
+.cp-obrand { font-style: normal; color: #fff; font-weight: 700; font-size: 11px; border-radius: 5px; padding: 0 5px; line-height: 16px; margin-inline-start: 6px; display: inline-block; vertical-align: 1px; }
 .cp-brand i { font-style: normal; color: #fff; font-weight: 700; border-radius: 5px; padding: 0 6px; line-height: 18px; display: inline-block; }
 .cp-msg { display: flex; max-width: 82%; }
 .cp-msg.me { align-self: flex-end; }

@@ -277,12 +277,15 @@ func (a *App) pushRider(ctx context.Context, tx pgx.Tx, riderID, orderID int64, 
 	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM rider_devices WHERE user_id=$1)`, riderID).Scan(&has); err != nil || !has {
 		return err
 	}
-	var no, line, unit string
-	if err := tx.QueryRow(ctx, `SELECT public_no, address_line, address_unit FROM orders WHERE id=$1`, orderID).
-		Scan(&no, &line, &unit); err != nil {
+	var no, line, unit, brand string
+	// a store with several brands: the rider knows the bag by its brand
+	if err := tx.QueryRow(ctx, `SELECT o.public_no, o.address_line, o.address_unit,
+			CASE WHEN (SELECT count(*) FROM brands x WHERE x.branch_id=o.branch_id) > 1 THEN o.brand_name ELSE '' END
+		FROM orders o WHERE o.id=$1`, orderID).
+		Scan(&no, &line, &unit, &brand); err != nil {
 		return err
 	}
-	body := strings.TrimSpace(no + " " + strings.TrimSpace(line+" "+unit))
+	body := strings.TrimSpace(strings.TrimSpace(brand+" "+no) + " " + strings.TrimSpace(line+" "+unit))
 	return enqueue(ctx, tx, "push", pushJob{UserID: riderID, Message: PushMessage{
 		TitleKey: "sys.push.rider." + event, Body: body, Tag: fmt.Sprintf("order-%d", orderID), URL: "/work"}})
 }

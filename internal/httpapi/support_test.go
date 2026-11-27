@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 )
 
 // Platform support: customers and stores write to the platform's shared
@@ -181,4 +182,80 @@ func TestPlatformSupport(t *testing.T) {
 		t.Fatalf("reopened: %v", d)
 	}
 	admin.want(404, "NOT_FOUND", "POST", "/admin/support/c_999999999/resolve", map[string]any{"resolved": true})
+}
+
+// TestSupportBrands: platform support by brand (docs/MULTI_BRAND_DESIGN.md
+// §16.7). A store with several brands says which brand it writes about, an
+// order card is about its order's brand, and the platform's inbox shows it.
+func TestSupportBrands(t *testing.T) {
+	f := newFixture(t)
+	im := &fakeIM{users: map[string]string{}}
+	a.IM = im
+	t.Cleanup(func() { a.IM = nil })
+	cust, admin, owner := verifiedCustomer(t), adminClient(t), login(t, f.owner)
+	bid := fmt.Sprint(f.branchID)
+	custID := int64(cust.want(200, "", "GET", "/customer/me", nil)["id"].(float64))
+	ownerID := int64(owner.want(200, "", "GET", "/auth/me", nil)["id"].(float64))
+	cIM, bIM, pIM := fmt.Sprintf("c_%d", custID), "b_"+bid, "p_1"
+	code := fmt.Sprintf("SB%05d", time.Now().UnixNano()/1000%100000)
+	br := owner.want(200, "", "POST", "/merchant/branches/"+bid+"/brands",
+		map[string]any{"name": "好吃党", "code": code, "delivery": true, "color": "#1d7a4f"})
+	hcd := int64(br["id"].(float64))
+	ex := func(brand int64) string { return fmt.Sprintf(`{"uid":%d,"brand":%d}`, ownerID, brand) }
+	pic := uniq("pic") // a word only this run's message has
+
+	// the store writes about 好吃党; another store's brand is refused
+	if why := sayEx(t, bIM, pIM, "好吃党的菜单图片不显示 "+pic, ex(hcd)); why != "" {
+		t.Fatalf("store writes about a brand: %q", why)
+	}
+	if why := sayEx(t, bIM, pIM, "x", ex(999999999)); why != "VALIDATION" {
+		t.Fatalf("another store's brand: %q", why)
+	}
+	rows := list(admin.want(200, "", "GET", "/admin/support?who=store&q="+pic, nil)["list"].(map[string]any), "chats")
+	if len(rows) != 1 {
+		t.Fatalf("inbox: %v", rows)
+	}
+	if r := rows[0].(map[string]any); r["party"] != bIM || r["name"] != "H" || int64(r["brand_id"].(float64)) != hcd ||
+		r["brand_name"] != "好吃党" || r["brand_color"] != "#1d7a4f" {
+		t.Fatalf("the inbox names the brand: %v", r)
+	}
+	// a search by a brand's name finds its store
+	if got := list(admin.want(200, "", "GET", "/admin/support?who=store&q=好吃党", nil)["list"].(map[string]any), "chats"); len(got) < 1 {
+		t.Fatal("search by brand")
+	}
+	d := admin.want(200, "", "GET", "/admin/support/"+bIM, nil)
+	if bs := list(d, "brands"); len(bs) != 2 || bs[0].(map[string]any)["is_main"] != true || int64(bs[1].(map[string]any)["id"].(float64)) != hcd {
+		t.Fatalf("the store's brands: %v", d["brands"])
+	}
+	// a message about no brand in particular leaves the conversation's brand
+	if why := sayEx(t, bIM, pIM, "还有一个问题", fmt.Sprintf(`{"uid":%d}`, ownerID)); why != "" {
+		t.Fatalf("store writes: %q", why)
+	}
+	if d := admin.want(200, "", "GET", "/admin/support/"+bIM, nil); d["brand_name"] != "好吃党" {
+		t.Fatalf("brand kept: %v", d)
+	}
+
+	// The customer orders from 好吃党 and sends the order to support.
+	slug := br["slug"].(string)
+	q := cust.want(200, "", "POST", "/stores/"+slug+"/quotes", map[string]any{"service_type": "delivery",
+		"zone_id": f.zoneID, "items": []map[string]any{{"item_id": f.itemID, "qty": 1}}})
+	o := cust.want(200, "", "POST", "/stores/"+slug+"/orders", map[string]any{"quote_id": q["id"],
+		"customer_name": "Ann", "address_line": "1 Main"}, "Idempotency-Key", uniq("key"))
+	orderID := int64(o["order_id"].(float64))
+	s := cust.want(200, "", "GET", "/customer/support", nil)
+	if so := list(s, "orders")[0].(map[string]any); int64(so["brand_id"].(float64)) != hcd || so["brand_name"] != "好吃党" || so["store_name"] != "H" {
+		t.Fatalf("the customer's order names its brand: %v", so)
+	}
+	if why := card(t, cIM, pIM, map[string]any{"t": "order", "order": orderID}, 0); why != "" {
+		t.Fatalf("order card: %q", why)
+	}
+	d = admin.want(200, "", "GET", "/admin/support/"+cIM, nil)
+	if d["brand_name"] != "好吃党" || d["store_name"] != "H" || len(list(d, "brands")) != 1 {
+		t.Fatalf("the customer's conversation is about 好吃党: %v", d)
+	}
+	var got int64
+	if err := a.DB.QueryRow(context.Background(), `SELECT s.brand_id FROM support_messages s JOIN support_threads t ON t.id=s.thread_id
+		WHERE t.party=$1 AND s.order_id=$2`, cIM, orderID).Scan(&got); err != nil || got != hcd {
+		t.Fatalf("the card's brand: %d %v", got, err)
+	}
 }
