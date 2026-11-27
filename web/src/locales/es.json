@@ -3907,5 +3907,6 @@
  "br.by_brand": "Ventas por marca",
  "br.by_brand_hint": "Las marcas suman el total",
  "br.platform_owe": "Deben las plataformas",
- "br.map_color": "Colorear puntos por marca (el mapa de calor cuenta todas)"
+ "br.map_color": "Colorear puntos por marca (el mapa de calor cuenta todas)",
+ "ch.from_brand": "El cliente escribió a esta marca"
 }

@@ -3907,5 +3907,6 @@
  "br.by_brand": "營業額按品牌",
  "br.by_brand_hint": "各品牌相加 = 合計",
  "br.platform_owe": "平台應收",
- "br.map_color": "地址點按品牌上色（熱力圖按總單量）"
+ "br.map_color": "地址點按品牌上色（熱力圖按總單量）",
+ "ch.from_brand": "顧客從這個品牌發來"
 }

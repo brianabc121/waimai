@@ -54,13 +54,23 @@ var msgSeq int
 // the reason it was refused ("" when it went out).
 func say(t *testing.T, from, to, text string, uid int64) string {
 	t.Helper()
+	ex := ""
+	if uid != 0 {
+		ex = fmt.Sprintf(`{"uid":%d}`, uid)
+	}
+	return sayEx(t, from, to, text, ex)
+}
+
+// sayEx is say with the message's extra as the browser sends it.
+func sayEx(t *testing.T, from, to, text, ex string) string {
+	t.Helper()
 	msgSeq++
 	time.Sleep(3 * time.Millisecond) // later than a "read" just before it, as real messages are
 	content, _ := json.Marshal(map[string]string{"content": text})
 	body := map[string]any{"sendID": from, "recvID": to, "contentType": 101, "sessionType": 1, "content": string(content),
 		"serverMsgID": fmt.Sprintf("m-%d-%d", time.Now().UnixNano(), msgSeq), "sendTime": time.Now().UnixMilli()}
-	if uid != 0 {
-		body["ex"] = fmt.Sprintf(`{"uid":%d}`, uid)
+	if ex != "" {
+		body["ex"] = ex
 	}
 	st, out := hook(t, "hook-key", "callbackBeforeSendSingleMsgCommand", body)
 	if st != 200 {
@@ -616,5 +626,90 @@ func TestChatAlerts(t *testing.T) {
 	// the platform's front page says whether the chat server answers
 	if chat := admin.want(200, "", "GET", "/admin/overview", nil)["chat"].(map[string]any); chat["on"] != true || chat["state"] != "ok" {
 		t.Fatalf("health: %v", chat)
+	}
+}
+
+// TestChatBrands: a customer writes to a brand (docs/MULTI_BRAND_DESIGN.md §9).
+// The conversation is the store's; the desk sees which brand's page the
+// customer wrote from, and can list one brand's conversations.
+func TestChatBrands(t *testing.T) {
+	f := newFixture(t)
+	im := &fakeIM{users: map[string]string{}}
+	a.IM = im
+	t.Cleanup(func() { a.IM = nil })
+	cust, owner := verifiedCustomer(t), login(t, f.owner)
+	bid := fmt.Sprint(f.branchID)
+	custID := int64(cust.want(200, "", "GET", "/customer/me", nil)["id"].(float64))
+	cIM, bIM := fmt.Sprintf("c_%d", custID), "b_"+bid
+	code := fmt.Sprintf("CB%05d", time.Now().UnixNano()/1000%100000)
+	br := owner.want(200, "", "POST", "/merchant/branches/"+bid+"/brands",
+		map[string]any{"name": "好吃党", "code": code, "delivery": true, "color": "#1d7a4f"})
+	hcd := int64(br["id"].(float64))
+	main := int64(0)
+	for _, x := range owner.want(200, "", "GET", "/merchant/branches/"+bid+"/brands", nil)["brands"].([]any) {
+		if m := x.(map[string]any); m["is_main"] == true {
+			main = int64(m["id"].(float64))
+		}
+	}
+
+	// The chat opened on 好吃党's page says so; the customer's messages carry it.
+	chat := cust.want(200, "", "GET", "/customer/chats/"+br["slug"].(string), nil)
+	if int64(chat["brand_id"].(float64)) != hcd || chat["store_name"] != "好吃党" || chat["peer"] != bIM {
+		t.Fatalf("brand chat: %v", chat)
+	}
+	if why := sayEx(t, cIM, bIM, "辣椒炒肉还有吗", fmt.Sprintf(`{"brand":%d}`, hcd)); why != "" {
+		t.Fatalf("customer writes to 好吃党: %q", why)
+	}
+	if why := sayEx(t, cIM, bIM, "x", `{"brand":999999999}`); why != "VALIDATION" {
+		t.Fatalf("another store's brand: %q", why)
+	}
+	row := func(q string) []any {
+		return list(owner.want(200, "", "GET", "/merchant/branches/"+bid+"/chats"+q, nil), "chats")
+	}
+	rows := row("")
+	if len(rows) != 1 {
+		t.Fatalf("store chats: %v", rows)
+	}
+	r := rows[0].(map[string]any)
+	if int64(r["brand_id"].(float64)) != hcd || r["brand_name"] != "好吃党" || r["brand_color"] != "#1d7a4f" {
+		t.Fatalf("the desk sees the brand: %v", r)
+	}
+	if len(row(fmt.Sprintf("?brand=%d", hcd))) != 1 || len(row(fmt.Sprintf("?brand=%d", main))) != 0 {
+		t.Fatal("one brand's conversations")
+	}
+	sc := owner.want(200, "", "GET", fmt.Sprintf("/merchant/branches/%s/chats/%d", bid, custID), nil)
+	if sc["brand_name"] != "好吃党" {
+		t.Fatalf("conversation header: %v", sc)
+	}
+	// the customer's own list names the brand and its page
+	cl := list(cust.want(200, "", "GET", "/customer/chats", nil), "chats")
+	if c := cl[0].(map[string]any); c["store_name"] != "好吃党" || c["slug"] != br["slug"] {
+		t.Fatalf("customer's list: %v", c)
+	}
+
+	// The same customer writes from the main brand's page: the conversation follows.
+	if why := sayEx(t, cIM, bIM, "还有一份堂食的问题", fmt.Sprintf(`{"brand":%d}`, main)); why != "" {
+		t.Fatalf("customer writes to the main brand: %q", why)
+	}
+	if len(row(fmt.Sprintf("?brand=%d", main))) != 1 || len(row(fmt.Sprintf("?brand=%d", hcd))) != 0 {
+		t.Fatal("the conversation is with the brand last written to")
+	}
+	// The store's answer keeps the conversation's brand, and every message records its own.
+	var brands []int64
+	rs, err := a.DB.Query(context.Background(), `SELECT m.brand_id FROM chat_messages m JOIN chat_threads t ON t.id=m.thread_id
+		WHERE t.customer_id=$1 ORDER BY m.id`, custID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rs.Next() {
+		var b int64
+		if err := rs.Scan(&b); err != nil {
+			t.Fatal(err)
+		}
+		brands = append(brands, b)
+	}
+	rs.Close()
+	if len(brands) != 2 || brands[0] != hcd || brands[1] != main {
+		t.Fatalf("message brands: %v", brands)
 	}
 }

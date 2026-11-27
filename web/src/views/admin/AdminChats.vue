@@ -35,9 +35,12 @@ interface Tag { id: number; public_no: string; status: string }
 interface Row {
   id: number; branch_id: number; slug: string; store_name: string; merchant: string; customer_id: number; customer: string; phone: string; phone_tail: string
   last_kind: string; last_text: string; last_sender: string; last_at: string; count: number; order: Tag | null; muted: boolean; chat_enabled: boolean; reports: number; blocked: boolean
+  brand_name?: string
 }
 interface Report { id: number; reported_by: 'customer' | 'store'; staff?: string; reason: string; detail: string; created_at: string; resolved_at: string | null }
-interface Line { id: number; sender: 'customer' | 'store' | 'system'; staff?: string; kind: string; body: string; order_no: string; sent_at: string }
+interface Line { id: number; sender: 'customer' | 'store' | 'system'; staff?: string; kind: string; body: string; order_no: string; sent_at: string; brand?: string }
+// the store, with the brand the customer wrote to when it is not the store's own name (docs/MULTI_BRAND_DESIGN.md §9)
+const storeOf = (r: Row) => r.brand_name && r.brand_name !== r.store_name ? `${r.store_name} · ${r.brand_name}` : r.store_name
 interface Order { id: number; public_no: string; status: string; total: number; currency: string; created_at: string }
 interface Detail extends Row { started_at: string; messages: Line[]; orders: Order[]; report_list: Report[] }
 
@@ -115,7 +118,7 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
       <button v-for="r in list?.chats ?? []" :key="r.id" class="ax-row" :class="{ on: r.id === selectedId }" data-testid="ax-row" :data-id="r.id" @click="router.push({ query: { id: r.id } })">
         <span class="ax-ava">{{ r.store_name.slice(0, 1) }}</span>
         <span class="grow">
-          <span class="row between"><b>{{ r.store_name }} ↔ {{ who(r) }} {{ r.phone_tail }}</b><span class="small muted">{{ day(r.last_at) }}</span></span>
+          <span class="row between"><b>{{ storeOf(r) }} ↔ {{ who(r) }} {{ r.phone_tail }}</b><span class="small muted">{{ day(r.last_at) }}</span></span>
           <span class="last">{{ last(r) }}</span>
           <span class="row" style="gap:6px">
             <span v-if="r.order" class="tag warn">#{{ r.order.public_no }} {{ t('s.' + r.order.status) }}</span>
@@ -134,7 +137,7 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
       <template v-else-if="detail">
         <header class="ax-head">
           <button class="btn link ax-back" @click="router.push({ query: {} })">‹ {{ t('back') }}</button>
-          <b data-testid="ax-title">{{ detail.store_name }} ↔ {{ who(detail) }} {{ detail.phone_tail }}</b><span class="tag">{{ t('ax.read_only') }}</span>
+          <b data-testid="ax-title">{{ storeOf(detail) }} ↔ {{ who(detail) }} {{ detail.phone_tail }}</b><span class="tag">{{ t('ax.read_only') }}</span>
         </header>
         <div class="ax-msgs" data-testid="ax-messages">
           <button v-if="more" class="btn link small" style="align-self:center" data-testid="ax-earlier" @click="earlier">{{ t('ax.earlier') }}</button>
@@ -142,7 +145,7 @@ const last = (r: Row) => (r.last_sender === 'store' ? t('ax.from_store') : t('ax
             <div class="bub"><span v-if="m.kind === 'text' || m.kind === 'system'">{{ m.body }}</span>
               <a v-else-if="m.kind === 'image'" :href="m.body" target="_blank" rel="noopener" data-testid="ax-image"><img :src="m.body" alt="" @error="m.kind = 'system'; m.body = t('ax.img_gone')" /></a>
               <span v-else data-testid="ax-order">{{ t('ax.order') }} #{{ m.order_no }}</span>
-              <em>{{ m.sender === 'store' ? t('ax.from_store') + ' · ' + (m.staff || t('ch.auto')) : t('ax.from_customer') }} · {{ fmtDateTime(m.sent_at) }}</em></div>
+              <em>{{ m.sender === 'store' ? t('ax.from_store') + ' · ' + (m.staff || t('ch.auto')) : t('ax.from_customer') + (m.brand && m.brand !== detail.store_name ? ' → ' + m.brand : '') }} · {{ fmtDateTime(m.sent_at) }}</em></div>
           </div>
         </div>
         <div class="ax-note">{{ t('ax.note') }}</div>

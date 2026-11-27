@@ -3,7 +3,8 @@
 // page, the store's message page and the platform's support pages all use it.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { money, t } from '../../i18n'
-import { chat, clock, connect, history, listen, sendImage, sendOrder, sendText, type ChatMsg, type ChatOrder, type Side } from '../../chat'
+import { chat, clock, connect, history, listen, sendImage, sendOrder, sendText, type ChatEx, type ChatMsg, type ChatOrder, type Side } from '../../chat'
+import type { BrandRef } from '../../types'
 
 const props = defineProps<{
   peer: string
@@ -16,7 +17,20 @@ const props = defineProps<{
   uploadPath: string // where this conversation's pictures are uploaded
   orders?: ChatOrder[] // the customer's orders with the store: what a card shows and what can be sent
   emptyText?: string // shown before the first message
+  brand?: number // the customer's side: the brand whose page this is, sent with each message
+  brands?: BrandRef[] // the desk: the store's brands, to show which one a customer wrote to
 }>()
+const extra = (): ChatEx | undefined => props.staff ?? (props.brand ? { brand: props.brand } : undefined)
+// the brand a customer's message went to, shown where it changes (several brands only)
+function brandAt(i: number): BrandRef | null {
+  const m = list.value[i]
+  if (!props.brands || props.brands.length < 2 || m.mine || !m.brand) return null
+  for (let j = i - 1; j >= 0; j--) {
+    const p = list.value[j]
+    if (!p.mine && p.brand) return p.brand === m.brand ? null : props.brands.find(b => b.id === m.brand) ?? null
+  }
+  return props.brands.find(b => b.id === m.brand) ?? null
+}
 const emit = defineEmits<{ seen: []; activity: []; order: [order: ChatOrder] }>()
 
 const list = ref<ChatMsg[]>([])
@@ -54,7 +68,7 @@ async function earlier() {
 async function deliver(m: ChatMsg) {
   m.state = 'sending'; m.error = ''
   try {
-    const sent = await (m.retry ? m.retry() : sendText(props.branchId, props.peer, m.text, props.staff))
+    const sent = await (m.retry ? m.retry() : sendText(props.branchId, props.peer, m.text, extra()))
     Object.assign(m, sent, { state: 'sent' })
     emit('activity')
   } catch (e) { m.state = 'failed'; m.error = (e as Error).message }
@@ -78,13 +92,13 @@ function pickImage(e: Event) {
   const input = e.target as HTMLInputElement, file = input.files?.[0]
   input.value = ''
   if (!file || props.blocked) return
-  const peer = props.peer, branch = props.branchId, path = props.uploadPath, staff = props.staff
+  const peer = props.peer, branch = props.branchId, path = props.uploadPath, staff = extra()
   void deliver(local('image', { image: URL.createObjectURL(file), retry: () => sendImage(branch, peer, path, file, staff) }))
 }
 const picking = ref(false)
 function pickOrder(o: ChatOrder) {
   picking.value = false
-  const peer = props.peer, branch = props.branchId, staff = props.staff
+  const peer = props.peer, branch = props.branchId, staff = extra()
   void deliver(local('order', { orderId: o.id, retry: () => sendOrder(branch, peer, o.id, staff) }))
 }
 const orderOf = (id?: number) => props.orders?.find(o => o.id === id)
@@ -142,6 +156,7 @@ const stamp = (i: number) => i === 0 || list.value[i].at - list.value[i - 1].at 
       <div v-else-if="!list.length" class="cp-note" data-testid="chat-empty">{{ emptyText || t(self === 'store' ? 'ch.start_desk' : 'ch.start') }}</div>
       <template v-for="(m, i) in list" :key="m.id">
         <div v-if="stamp(i)" class="cp-day">{{ clock(m.at) }}</div>
+        <div v-if="brandAt(i)" class="cp-brand" data-testid="chat-msg-brand"><i :style="{ background: brandAt(i)!.color || '#a02c20' }">{{ brandAt(i)!.name }}</i> {{ t('ch.from_brand') }}</div>
         <div class="cp-msg" :class="{ me: m.mine, failed: m.state === 'failed' }" data-testid="chat-msg" :data-mine="m.mine" :data-state="m.state">
           <div class="cp-bub" @click="m.state === 'failed' && deliver(m)">
             <span v-if="m.kind === 'text'">{{ m.text }}</span>
@@ -194,6 +209,8 @@ const stamp = (i: number) => i === 0 || list.value[i].at - list.value[i - 1].at 
 .cp-more { align-self: center; }
 .cp-note { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 12px; }
 .cp-day { text-align: center; font-size: 12px; color: #9aa1ab; margin-top: 4px; }
+.cp-brand { font-size: 12px; color: #9aa1ab; margin-top: 2px; }
+.cp-brand i { font-style: normal; color: #fff; font-weight: 700; border-radius: 5px; padding: 0 6px; line-height: 18px; display: inline-block; }
 .cp-msg { display: flex; max-width: 82%; }
 .cp-msg.me { align-self: flex-end; }
 .cp-bub { background: #fff; border-radius: 14px 14px 14px 4px; padding: 8px 12px; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: 0 1px 1px rgba(0,0,0,.04); font-size: 15px; line-height: 1.45; }

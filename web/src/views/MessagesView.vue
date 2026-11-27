@@ -10,6 +10,9 @@ import { chatPush, disableChatPush, enableChatPush, setupChatPush } from '../web
 import '../officeStrings'
 import ChatPane from './chat/ChatPane.vue'
 import ChatReport from './chat/ChatReport.vue'
+import { brandsHere, multiBrand, useBrandPick } from '../brands'
+import BrandSeg from './brands/BrandSeg.vue'
+import BrandTag from './brands/BrandTag.vue'
 
 const route = useRoute(), router = useRouter()
 const bid = session.branchId!
@@ -20,14 +23,16 @@ const selectedId = computed(() => Number(route.query.c) || 0)
 const current = ref<StoreChat | null>(null)
 const me = computed(() => ({ uid: session.user!.id, name: session.user!.display_name || session.user!.username }))
 
+// one brand's conversations, or every brand's (docs/MULTI_BRAND_DESIGN.md §9)
+const { pick: brandPick } = useBrandPick('messages', brandsHere, true)
 async function load() {
-  const r = await storeChats(bid, filter)
+  const r = await storeChats(bid, { ...filter, brand: brandPick.value })
   chats.value = r.chats; unread.value = r.unread; enabled.value = r.enabled
 }
 const live = useLive(() => `/merchant/branches/${bid}/events`, load)
 let typing = 0
 watch(() => filter.q, () => { clearTimeout(typing); typing = window.setTimeout(() => void live.refreshNow(), 250) })
-watch(() => [filter.unread, filter.active], () => void live.refreshNow())
+watch(() => [filter.unread, filter.active, brandPick.value], () => void live.refreshNow())
 
 async function openChat(id: number) {
   current.value = null; error.value = ''; note.value = ''
@@ -125,12 +130,13 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
         <button :class="{ on: filter.unread }" data-testid="chat-f-unread" @click="filter.unread = !filter.unread">{{ t('ch.f_unread') }}<template v-if="unread"> {{ unread }}</template></button>
         <button :class="{ on: filter.active }" data-testid="chat-f-active" @click="filter.active = !filter.active">{{ t('ch.f_active') }}</button>
       </div>
+      <div v-if="multiBrand()" class="ms-brands"><BrandSeg v-model="brandPick" :brands="brandsHere()" all data-testid="chat-brand" /></div>
       <div v-if="!enabled" class="banner warn" style="margin:10px">{{ t('ch.off') }}</div>
       <div v-if="chats && !chats.length" class="ms-empty" data-testid="chats-empty">{{ t('ch.none_desk') }}</div>
       <button v-for="c in chats ?? []" :key="c.id" class="ms-row" :class="{ on: c.customer_id === selectedId }" data-testid="chat-row" :data-customer="c.customer_id" @click="pick(c)">
         <span class="ms-ava">{{ name(c).slice(0, 1) }}</span>
         <span class="grow">
-          <span class="row between"><b>{{ name(c) }} · {{ t('ch.tail', { n: c.phone_tail ?? '' }) }}</b><span class="small muted">{{ day(c.last_at) }}</span></span>
+          <span class="row between"><b><BrandTag :name="c.brand_name" :color="c.brand_color" /> {{ name(c) }} · {{ t('ch.tail', { n: c.phone_tail ?? '' }) }}</b><span class="small muted">{{ day(c.last_at) }}</span></span>
           <span class="row between"><span class="last">{{ lastLine(c, 'store') }}</span><i v-if="c.unread" class="num" data-testid="chat-row-unread">{{ c.unread > 99 ? '99+' : c.unread }}</i></span>
           <span v-if="c.order" class="tag warn">#{{ c.order.public_no }} {{ t('s.' + c.order.status) }}</span>
         </span>
@@ -149,7 +155,7 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
       <template v-else-if="current">
         <header class="ms-head">
           <button class="btn link ms-back" data-testid="chat-back" @click="router.push({ query: {} })">‹ {{ t('back') }}</button>
-          <b data-testid="chat-with">{{ name(current) }} · {{ t('ch.tail', { n: current.phone_tail ?? '' }) }}</b>
+          <b data-testid="chat-with"><BrandTag :name="current.brand_name" :color="current.brand_color" /> {{ name(current) }} · {{ t('ch.tail', { n: current.phone_tail ?? '' }) }}</b>
           <span class="small muted">{{ t('ch.orders_here', { n: current.order_count }) }}</span>
           <span v-if="!readOnly" class="ms-acts">
             <button class="btn link small" data-testid="chat-block" :data-on="current.blocked || null" @click="block">{{ t(current.blocked ? 'ch.unblock' : 'ch.block') }}</button>
@@ -159,7 +165,7 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
         <div v-if="current.blocked" class="banner warn" style="margin:10px 12px 0" data-testid="chat-blocked-note">{{ t('ch.blocked_note') }}</div>
         <div v-if="note" class="banner ok" style="margin:10px 12px 0" data-testid="chat-note">{{ note }}</div>
         <ChatPane ref="pane" :key="current.peer" :peer="current.peer" self="store" :branch-id="bid" :staff="me" :peer-read-at="peerReadAt"
-          :blocked="blocked" desk :upload-path="`/merchant/branches/${bid}/chats/${current.customer_id}/images`" :orders="current.orders"
+          :blocked="blocked" desk :upload-path="`/merchant/branches/${bid}/chats/${current.customer_id}/images`" :orders="current.orders" :brands="brandsHere()"
           @seen="seen" @activity="activity" @order="openOrder">
           <template #above>
             <div v-if="setup && !blocked" class="ms-quick" data-testid="chat-quick">
@@ -225,6 +231,7 @@ const blocked = computed(() => readOnly.value ? t('admin_viewing') : '')
 .ms-list { overflow-y: auto; min-width: 0; }
 .ms-search { padding: 12px 12px 8px; } .ms-search .ox-search { max-width: none; display: block; }
 .ms-filters { padding: 2px 12px 10px; border-bottom: 1px solid var(--line); }
+.ms-brands { padding: 8px 12px; border-bottom: 1px solid var(--line); overflow-x: auto; }
 .ms-row { display: flex; gap: 12px; padding: 12px; border: 0; border-bottom: 1px solid #f0e6d8; background: none; width: 100%; text-align: start; cursor: pointer; align-items: flex-start; color: var(--ink); font: inherit;
   border-inline-start: 3px solid transparent; }
 .ms-row:hover { background: #fbf4ea; }
