@@ -160,6 +160,17 @@ extend({
   'sc.frozen': ['已冻结', 'Frozen'], 'sc.closed': ['店铺已停业', 'Store closed'], 'sc.use': ['去下单', 'Order'],
   'sc.k_refund': ['退款存入', 'Refund in'], 'sc.k_spend': ['下单使用', 'Spent'], 'sc.k_return': ['订单退回', 'Returned'], 'sc.k_revoke': ['改为现金退款', 'Paid in cash instead'],
   'sc.after': ['余额 {amt}', 'Balance {amt}'], 'sc.order': ['订单 {no}', 'Order {no}'],
+  // store balances, two kinds (brian 2026-11-27)
+  'sb.cash': ['现金余额', 'Cash balance'], 'sb.bonus': ['充值赠送金', 'Top-up bonus'], 'sb.total': ['本店余额合计', 'Total at this store'],
+  'sb.all': ['全部', 'All'], 'sb.detail': ['查看明细', 'Details'], 'sb.how': ['余额说明', 'How it works'],
+  'sb.split': ['现金 {c} · 赠送金 {b}', 'Cash {c} · bonus {b}'],
+  'sb.cash_tip': ['你充值的本金，加上店铺退款存进来的钱。', 'What you topped up, plus refunds the store paid in.'],
+  'sb.bonus_tip': ['充值时店铺送你的钱，下单时和现金余额一起按比例使用。', 'What the store gave you with a top-up; spent together with your cash balance, in proportion.'],
+  'sb.r1': ['只能在本店使用，不能转给别人。', 'Only for this store, and cannot be passed on.'],
+  'sb.r2': ['下单时先用退款存入的钱，再按比例用充值本金和赠送金。', 'An order uses refunds paid in first, then your top-up and bonus in proportion.'],
+  'sb.r3': ['退款、退菜时，按这笔消费用掉的比例原路退回现金余额和赠送金。', 'Refunds and removed dishes go back to the cash balance and the bonus in the shares the order used.'],
+  'sb.r4': ['要退充值请联系门店：可退剩余充值本金，顾客原因会扣回已用的赠送金；赠送金和退款存入的钱不能提现。',
+    'To get a top-up back, ask the store: what is left of the top-up is paid back, less any bonus used if it is your choice. The bonus and refunds paid in cannot be cashed out.'],
   // offers
   'mo.title': ['我的优惠', 'My offers'], 'mo.hint': ['下面是你常去的店铺正在进行的优惠。满足条件时下单会自动使用最划算的一个，不用领取。',
     'These are the offers running at your stores. The best one that applies is used by itself at checkout.'],

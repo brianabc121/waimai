@@ -230,10 +230,13 @@ func TestStoredValueFlow(t *testing.T) {
 	checked(t, "add-on", b.ID)
 
 	// 7. a void and a discount shrink it below what the balances paid:
-	// stored value goes back first, the refund balance's 50 stays paid
+	// each balance gets back its share of what the order paid (brian
+	// 2026-11-27): principal and refund balance rounded down, the bonus
+	// takes the cents left over
 	for _, step := range []string{"void", "discount"} {
 		before := storedAt(t, cust, s.branchID)
-		paid := b.CreditPaid
+		paid, pP, pB := b.CreditPaid, b.StoredPrincipalPaid, b.StoredBonusPaid
+		pC := paid - pP - pB
 		if step == "void" {
 			r, err := a.VoidLine(ctx, itemByName(b, "tea").ID, app.VoidInput{Qty: 2, Reason: "不要了", ReasonKind: "customer"}, s.staff, false)
 			noErr(t, err)
@@ -247,9 +250,14 @@ func TestStoredValueFlow(t *testing.T) {
 		if b.Totals.Total >= paid || b.CreditPaid != b.Totals.Total || b.Due != 0 || back <= 0 {
 			t.Fatalf("%s: total %d paid %d (was %d)", step, b.Totals.Total, b.CreditPaid, paid)
 		}
-		if after.Credit != before.Credit || after.Principal+after.Bonus != before.Principal+before.Bonus+back ||
-			b.CreditPaid-b.StoredPrincipalPaid-b.StoredBonusPaid != 5000 {
-			t.Fatalf("%s gave back %d: %+v -> %+v, order %+v", step, back, before, after, b)
+		wantP, wantC := back*pP/paid, back*pC/paid
+		wantB := back - wantP - wantC
+		if wantB > pB {
+			t.Fatalf("%s: the bonus share %d is over what it paid %d", step, wantB, pB)
+		}
+		if after.Credit != before.Credit+wantC || after.Principal != before.Principal+wantP || after.Bonus != before.Bonus+wantB ||
+			b.StoredPrincipalPaid != pP-wantP || b.StoredBonusPaid != pB-wantB {
+			t.Fatalf("%s gave back %d (want %d + %d + %d): %+v -> %+v, order %+v", step, back, wantC, wantP, wantB, before, after, b)
 		}
 		checked(t, step, b.ID)
 	}

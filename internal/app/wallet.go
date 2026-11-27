@@ -269,25 +269,33 @@ func storedTake(x, principal, bonus int64) (p, b int64) {
 	return x - b, b
 }
 
-// storedGiveBack splits x given back to stored value of what an order paid
-// from it (principal p, bonus b) the same way, with the principal share
-// rounded down.
-func storedGiveBack(x, p, b int64) (int64, int64) {
-	if x <= 0 || p+b <= 0 {
-		return 0, 0
+// creditGiveBack splits x given back of what an order paid from the refund
+// balance c, stored principal p and bonus b in the shares it paid them
+// (brian 2026-11-27: the cash balance, c + p, and the bonus each get back
+// their share). The refund balance's and the principal's shares are rounded
+// down, the bonus takes the cents left over, never more than it paid.
+func creditGiveBack(x, c, p, b int64) (cc, pp, bb int64) {
+	tot := c + p + b
+	if x <= 0 || tot <= 0 {
+		return 0, 0, 0
 	}
-	x = min(x, p+b)
-	pp := min(pricing.MulDivFloor(x, p, p+b), p)
-	bb := x - pp
+	x = min(x, tot)
+	pp = min(pricing.MulDivFloor(x, p, tot), p)
+	cc = min(pricing.MulDivFloor(x, c, tot), c)
+	bb = x - pp - cc
 	if bb > b {
-		pp, bb = pp+bb-b, b
+		over := bb - b
+		bb = b
+		more := min(over, c-cc)
+		cc, over = cc+more, over-more
+		pp += over
 	}
-	return pp, bb
+	return cc, pp, bb
 }
 
 // giveCreditBack puts back into the balances up to amount of what the order
-// paid from them (the order row locked): stored value first, in proportion,
-// then the refund balance (docs/STORED_VALUE_DESIGN.md §8.2).
+// paid from them (the order row locked), in the shares the order paid each
+// (creditGiveBack; docs/STORED_VALUE_DESIGN.md §8.2).
 func giveCreditBack(ctx context.Context, tx pgx.Tx, orderID, amount int64, actor Actor, note string) error {
 	o, err := readOrderCredit(ctx, tx, orderID)
 	if err != nil {
@@ -297,8 +305,7 @@ func giveCreditBack(ctx context.Context, tx pgx.Tx, orderID, amount int64, actor
 	if amount <= 0 {
 		return nil
 	}
-	p, b := storedGiveBack(amount, o.StoredPrincipal, o.StoredBonus)
-	c := min(amount-p-b, o.refundCredit())
+	c, p, b := creditGiveBack(amount, o.refundCredit(), o.StoredPrincipal, o.StoredBonus)
 	if c > 0 {
 		acct, err := walletAccount(ctx, tx, acctCredit, o.BranchID, o.CreditCustomer, o.Currency)
 		if err != nil {

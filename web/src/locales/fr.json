@@ -4221,5 +4221,18 @@
  "msg.stored_refund": "{store} a remboursé {amount} sur votre solde prépayé",
  "msg.stored_refund.body": "Commande {no}",
  "msg.stored_cashout": "{store} vous a remboursé {amount} de votre solde prépayé",
- "msg.stored_cashout.body": "Votre solde prépayé dans ce magasin est maintenant à 0."
+ "msg.stored_cashout.body": "Votre solde prépayé dans ce magasin est maintenant à 0.",
+ "sb.cash": "Solde en espèces",
+ "sb.bonus": "Bonus de recharge",
+ "sb.total": "Total dans cette boutique",
+ "sb.all": "Tout",
+ "sb.detail": "Voir le détail",
+ "sb.how": "Comment ça marche",
+ "sb.split": "Espèces {c} · bonus {b}",
+ "sb.cash_tip": "Ce que vous avez rechargé, plus les remboursements versés par la boutique.",
+ "sb.bonus_tip": "Ce que la boutique vous a offert avec une recharge ; utilisé avec le solde en espèces, au prorata.",
+ "sb.r1": "Uniquement dans cette boutique, non transférable.",
+ "sb.r2": "Une commande utilise d'abord les remboursements versés, puis la recharge et le bonus au prorata.",
+ "sb.r3": "Les remboursements et plats retirés reviennent au solde en espèces et au bonus dans les proportions utilisées par la commande.",
+ "sb.r4": "Pour récupérer une recharge, demandez à la boutique : le reste de la recharge est rendu, moins le bonus utilisé si c'est votre choix. Le bonus et les remboursements versés ne sont pas retirables."
 }

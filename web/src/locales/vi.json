@@ -4221,5 +4221,18 @@
  "msg.stored_refund": "{store} đã hoàn {amount} vào tiền trả trước của bạn",
  "msg.stored_refund.body": "Đơn {no}",
  "msg.stored_cashout": "{store} đã hoàn cho bạn {amount} tiền trả trước",
- "msg.stored_cashout.body": "Tiền trả trước của bạn tại cửa hàng giờ là 0."
+ "msg.stored_cashout.body": "Tiền trả trước của bạn tại cửa hàng giờ là 0.",
+ "sb.cash": "Số dư tiền mặt",
+ "sb.bonus": "Tiền tặng khi nạp",
+ "sb.total": "Tổng tại cửa hàng này",
+ "sb.all": "Tất cả",
+ "sb.detail": "Xem chi tiết",
+ "sb.how": "Cách hoạt động",
+ "sb.split": "Tiền mặt {c} · tiền tặng {b}",
+ "sb.cash_tip": "Số tiền bạn đã nạp, cộng với tiền hoàn mà cửa hàng gửi vào.",
+ "sb.bonus_tip": "Tiền cửa hàng tặng khi bạn nạp; được dùng cùng số dư tiền mặt theo tỷ lệ.",
+ "sb.r1": "Chỉ dùng tại cửa hàng này, không chuyển cho người khác.",
+ "sb.r2": "Đơn hàng dùng trước tiền hoàn gửi vào, sau đó dùng tiền nạp và tiền tặng theo tỷ lệ.",
+ "sb.r3": "Khi hoàn tiền hoặc bỏ món, tiền trả về số dư tiền mặt và tiền tặng theo đúng tỷ lệ đơn đã dùng.",
+ "sb.r4": "Muốn rút tiền nạp, hãy liên hệ cửa hàng: hoàn lại phần tiền nạp còn lại, nếu do bạn muốn thì trừ phần tiền tặng đã dùng. Tiền tặng và tiền hoàn gửi vào không rút được."
 }
