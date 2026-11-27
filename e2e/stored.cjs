@@ -118,6 +118,16 @@ step('an order paid from stored value')
 await cust.goto(BASE + '/me/store-credit')
 await cust.waitForSelector(tid('credit-store'))
 await shot(cust, 'sv11-me-store-credit')
+// two balances: cash (top-up + refunds paid in) and the top-up bonus
+await cust.click(tid('credit-store'))
+await cust.waitForSelector(tid('credit-cash'))
+await cust.waitForSelector(tid('credit-entry'))
+expect(/充值/.test(await cust.locator(tid('credit-entries')).innerText()), 'the top-up is in the history')
+await shot(cust, 'sv11b-me-balance-detail')
+await cust.click(tid('credit-bonus'))
+await cust.waitForSelector(`${tid('credit-tab-bonus')}.on`)
+await shot(cust, 'sv11c-me-balance-bonus')
+step('the customer sees the cash balance and the bonus apart')
 
 // ---- the store's pages ----
 await owner.goto(BASE + '/merchant/marketing')

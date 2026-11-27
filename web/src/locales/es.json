@@ -4221,5 +4221,18 @@
  "msg.stored_refund": "{store} reembolsó {amount} a tu saldo prepago",
  "msg.stored_refund.body": "Pedido {no}",
  "msg.stored_cashout": "{store} te devolvió {amount} de tu saldo prepago",
- "msg.stored_cashout.body": "Tu saldo prepago en la tienda ahora es 0."
+ "msg.stored_cashout.body": "Tu saldo prepago en la tienda ahora es 0.",
+ "sb.cash": "Saldo en efectivo",
+ "sb.bonus": "Bono de recarga",
+ "sb.total": "Total en esta tienda",
+ "sb.all": "Todo",
+ "sb.detail": "Ver detalle",
+ "sb.how": "Cómo funciona",
+ "sb.split": "Efectivo {c} · bono {b}",
+ "sb.cash_tip": "Lo que recargaste más los reembolsos que la tienda te abonó.",
+ "sb.bonus_tip": "Lo que la tienda te regaló con una recarga; se usa junto con el saldo en efectivo, en proporción.",
+ "sb.r1": "Solo para esta tienda y no se puede transferir.",
+ "sb.r2": "Un pedido usa primero los reembolsos abonados y luego la recarga y el bono en proporción.",
+ "sb.r3": "Los reembolsos y platos retirados vuelven al saldo en efectivo y al bono en la misma proporción que usó el pedido.",
+ "sb.r4": "Para recuperar una recarga, pídelo a la tienda: se devuelve lo que queda de la recarga, menos el bono usado si es decisión tuya. El bono y los reembolsos abonados no se pueden retirar."
 }
