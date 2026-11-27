@@ -2,6 +2,7 @@
 import '../checkout'
 import LangButton from './LangButton.vue'
 import '../bills'
+import '../credit'
 import './members/memberStrings'
 import './addresses/deliveryStrings'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -33,7 +34,7 @@ const showPlatform = computed(() => show('/merchant/order/platform') && !!curren
 const groupPages: Record<string, string[]> = {
   pos: ['/merchant/order/', '/merchant/queue'], orders: ['/merchant/progress', '/merchant/voids'],
   cm: ['/merchant/members', '/merchant/addresses'], msg: ['/merchant/messages', '/merchant/support'],
-  deco: ['/merchant/media', '/merchant/templates', '/merchant/site-link'], fin: ['/merchant/cash', '/merchant/bills', '/merchant/reconcile'],
+  deco: ['/merchant/media', '/merchant/templates', '/merchant/site-link'], fin: ['/merchant/cash', '/merchant/bills', '/merchant/reconcile', '/merchant/credit'],
   dlv: ['/merchant/riders', '/merchant/delivery-map'],
 }
 const openGrps = ref<Record<string, boolean>>({})
@@ -157,12 +158,13 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
           </template>
         </template>
         <router-link v-if="show('/merchant/promos')" to="/merchant/promos">{{ t('promos') }}</router-link>
-        <template v-if="show('/merchant/cash') || show('/merchant/bills') || show('/merchant/reconcile')">
+        <template v-if="show('/merchant/cash') || show('/merchant/bills') || show('/merchant/reconcile') || show('/merchant/credit')">
           <button class="navgrp" :class="{ open: isOpen('fin') }" :aria-expanded="isOpen('fin')" data-testid="nav-fin" @click="toggleGrp('fin')"><span class="grow">{{ t('fin.nav') }}</span><i class="caret"></i></button>
           <template v-if="isOpen('fin')">
             <router-link v-if="show('/merchant/cash')" to="/merchant/cash" class="navsub" data-testid="nav-cash">{{ t('cash') }}</router-link>
             <router-link v-if="show('/merchant/bills')" to="/merchant/bills" class="navsub" data-testid="nav-bills">{{ t('bl.nav') }}</router-link>
             <router-link v-if="show('/merchant/reconcile')" to="/merchant/reconcile" class="navsub" data-testid="nav-reconcile">{{ t('rc.nav') }}</router-link>
+            <router-link v-if="show('/merchant/credit')" to="/merchant/credit" class="navsub" data-testid="nav-credit">{{ t('sc.p.title') }}</router-link>
           </template>
         </template>
         <template v-if="show('/merchant/riders') || show('/merchant/delivery-map')">

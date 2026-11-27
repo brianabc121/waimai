@@ -69,6 +69,7 @@ const allCommon = computed<Entry[]>(() => [
 ])
 // the rest, as rows
 const allMore = computed<Entry[]>(() => [
+  { key: 'store_credit', to: '/me/store-credit', icon: 'M4 8.500h16V19H4zM4 8.500 6 5h12l2 3.500M15.500 13.500h2' },
   { key: 'reviews', to: '/me/reviews', icon: 'M19 12v5.500a2 2 0 0 1-2 2H6.500a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2H14M8 10h4M8 14h3M14.5 13.500l6-6-2-2-6 6-.5 2.500z' },
   { key: 'feedback', to: '/me/feedback', icon: 'M4 6.500h16v11H4zM4.5 7l7.5 6 7.5-6' },
   { key: 'help', to: '/me/help', open: true, icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.500a2.5 2.5 0 1 1 3.7 2.200c-.8.5-1.2 1-1.2 1.900M12 16.800h.01' },

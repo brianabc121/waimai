@@ -22,7 +22,7 @@ interface Row { pay_type: string; channel_id: number; platform_id: number; name:
 interface CashCount { day: string; expected: number; counted: number; note: string; counted_by: string; at: string }
 interface Summary { timezone: string; currency: string; count: number; total: number; rows: Row[]; problems: number
   cash: { counter: number; rider_collected: number; rider_returned: number; rider_pending: number; refunded: number; expected: number }
-  refunds: { count: number; total: number; cash: number }; net: number
+  refunds: { count: number; total: number; cash: number; to_credit?: number }; net: number
   discounts: { promotion: number; coupon: number; staff: number; round_off: number; platform_merchant: number; platform_subsidy: number; total: number }
   cash_count: CashCount | null; platforms: ReconPlatform[]; types: ReconType[]
   whole: boolean; brands: { brand_id: number; name: string; code: string; count: number; amount: number; refunds: number; platform: number; commission: number }[] }
@@ -156,7 +156,8 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
           <small class="s">{{ t('rc.d.promo') }} {{ m(sum.discounts.promotion) }} · {{ t('rc.d.staff') }} {{ m(sum.discounts.staff) }} · {{ t('rc.d.round') }} {{ m(sum.discounts.round_off) }}<template v-if="sum.discounts.platform_merchant">
             · {{ t('po.merchant') }} {{ m(sum.discounts.platform_merchant) }}</template></small></div>
         <div v-if="sum.refunds.count" class="ox-stat" data-testid="rc-refunds"><span class="l">{{ t('rc.c.refunds') }}</span><b class="v neg">-{{ m(sum.refunds.total) }}</b>
-          <small class="s">{{ t('rc.c.count', { n: sum.refunds.count }) }} · {{ t('rc.c.net', { v: m(sum.net) }) }}</small></div>
+          <small class="s">{{ t('rc.c.count', { n: sum.refunds.count }) }} · {{ t('rc.c.net', { v: m(sum.net) }) }}</small>
+          <small v-if="sum.refunds.to_credit" class="s" data-testid="rc-to-credit">{{ t('rc.c.to_credit', { v: m(sum.refunds.to_credit) }) }}</small></div>
       </div>
       <div class="cols">
         <div class="ox-panel ox-scroll">

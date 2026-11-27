@@ -67,7 +67,9 @@ watch([openId, tasks], () => {
   }
 })
 
-const due = (o: Order) => o.payment_status === 'unpaid'
+// what the rider collects: the total less what the store balance paid (docs/REFUND_BALANCE_DESIGN.md §5)
+const collect = (o: Order) => o.due ?? o.totals.total
+const due = (o: Order) => o.payment_status === 'unpaid' && collect(o) > 0
 const itemsText = (o: Order) => o.items.map(i => `${i.qty}× ${both(i.name, i.name_en)}`).join('、')
 // The customer's pin when there is one: an exact point beats a typed address.
 const mapUrl = (o: Order) => 'https://www.google.com/maps/dir/?api=1&destination=' +
@@ -96,16 +98,16 @@ async function act(o: Order, action: string, body: Record<string, unknown> = {})
 const cash = reactive<{ id: number; value: string }>({ id: 0, value: '' })
 // an add-on changes what is due: the box follows the new total
 const cashTotal = ref(0)
-watch(cur, o => { if (o && (cash.id !== o.id || cashTotal.value !== o.totals.total)) { cash.id = o.id; cashTotal.value = o.totals.total; cash.value = String(toMajor(o.totals.total)) } }, { immediate: true })
+watch(cur, o => { if (o && (cash.id !== o.id || cashTotal.value !== collect(o))) { cash.id = o.id; cashTotal.value = collect(o); cash.value = String(toMajor(collect(o))) } }, { immediate: true })
 // "was ₱379" next to the amount of an order with dishes added (docs/ADD_ON_ORDER_DESIGN.md §7.3)
 const was = (o: Order) => { const b = totalBefore(o); return b != null && b !== o.totals.total ? t('ao.was', { s: money(b, o.currency) }) : '' }
 const quick = computed(() => {
-  const d = cur.value ? toMajor(cur.value.totals.total) : 0
+  const d = cur.value ? toMajor(collect(cur.value)) : 0
   const ups = [100, 500, 1000].map(n => Math.ceil((d + 0.001) / n) * n)
   return [...new Set(ups)].filter(v => v > d).slice(0, 3)
 })
 const got = computed(() => toMinor(cash.value))
-const diff = computed(() => cur.value ? got.value - cur.value.totals.total : 0)
+const diff = computed(() => cur.value ? got.value - collect(cur.value) : 0)
 // a customer may pay the rider online at the door (docs/CHECKOUT_DISCOUNT_DESIGN.md §6.2)
 const door = reactive<{ online: boolean; channel: number; list: PayChannel[] | null }>({ online: false, channel: 0, list: null })
 watch(() => cur.value?.id, () => { door.online = false; door.channel = 0 })
@@ -202,7 +204,7 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
             <div v-for="i in cur.items" :key="i.id" style="padding:3px 0">{{ i.qty }} × {{ both(i.name, i.name_en) }}<span v-if="i.batch_seq > 1" class="small" style="color:#b45309"> · {{ t('ao.n', { n: i.batch_seq - 1 }) }}</span></div></div>
           <div class="card"><div class="k">{{ t('wk.payment') }}</div>
             <div class="row between"><span>{{ due(cur) ? t('wk.cod') : t('wk.prepaid') }}</span>
-              <span v-if="due(cur)"><span v-if="was(cur)" class="small muted" data-testid="rider-was">{{ was(cur) }} </span><b class="amt">{{ money(cur.totals.total, cur.currency) }}</b></span><b v-else style="color:var(--ok)">{{ t('wk.no_cash') }}</b></div></div>
+              <span v-if="due(cur)"><span v-if="was(cur)" class="small muted" data-testid="rider-was">{{ was(cur) }} </span><b class="amt">{{ money(collect(cur), cur.currency) }}</b></span><b v-else style="color:var(--ok)">{{ t('wk.no_cash') }}</b></div></div>
           <button class="btn primary block big" :disabled="cur.packing_status !== 'packed' || busy" data-act="pickup" @click="act(cur, 'pickup')">{{ t('wk.confirm_pickup_n', { n: cur.bags ?? 0 }) }}</button>
         </template>
 
@@ -222,14 +224,14 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
               <a v-if="cur.address_photo" :href="`/api/v1/rider/tasks/${cur.delivery!.id}/address-photo`" target="_blank" rel="noopener" data-testid="rider-door-photo">{{ t('oc.door_photo') }} ›</a>
             </div>
             <div class="row between"><span class="muted">{{ t('bags') }} {{ cur.bags }} · {{ due(cur) ? t('wk.cod_short') : t('wk.prepaid') }}</span>
-              <b v-if="due(cur)" class="amt">{{ money(cur.totals.total, cur.currency) }}</b></div>
+              <b v-if="due(cur)" class="amt">{{ money(collect(cur), cur.currency) }}</b></div>
           </div>
 
           <button v-if="st(cur) === 'picked_up'" class="btn primary block big" :disabled="busy" data-act="arrive" @click="act(cur, 'arrive')">{{ t('wk.i_arrived') }}</button>
 
           <template v-else>
             <div v-if="due(cur)" class="card stack cash">
-              <div class="row between"><span class="k">{{ t('wk.due') }}</span><b class="amt" style="font-size:28px">{{ money(cur.totals.total, cur.currency) }}</b></div>
+              <div class="row between"><span class="k">{{ t('wk.due') }}</span><b class="amt" style="font-size:28px">{{ money(collect(cur), cur.currency) }}</b></div>
               <div class="seg" data-testid="door-pay">
                 <button :class="{ on: !door.online }" data-testid="door-cash" @click="door.online = false">{{ t('ck.rider_cash') }}</button>
                 <button :class="{ on: door.online }" data-testid="door-online" @click="payOnline">{{ t('ck.rider_online') }}</button>
@@ -242,7 +244,7 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
               <label class="field" style="margin:0"><span>{{ t('wk.received') }}</span>
                 <input v-model="cash.value" type="number" inputmode="decimal" min="0" step="0.01" name="collected" /></label>
               <div class="quick">
-                <button :class="{ on: diff === 0 }" @click="cash.value = String(toMajor(cur.totals.total))">{{ t('wk.exact', { amt: money(cur.totals.total, cur.currency) }) }}</button>
+                <button :class="{ on: diff === 0 }" @click="cash.value = String(toMajor(collect(cur)))">{{ t('wk.exact', { amt: money(collect(cur), cur.currency) }) }}</button>
                 <button v-for="v in quick" :key="v" :class="{ on: got === toMinor(v) }" :data-quick="v" @click="cash.value = String(v)">{{ money(toMinor(v), cur.currency) }}</button>
               </div>
               <div v-if="diff > 0" class="muted small" data-testid="change">{{ t('wk.change', { got: money(got, cur.currency), change: money(diff, cur.currency) }) }}</div>
@@ -260,7 +262,7 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
               <div v-if="photo.error" class="banner bad small">{{ photo.error }}</div>
             </div>
             <button class="btn primary block big" :disabled="busy || (due(cur) && door.online && !door.channel)" data-act="deliver" @click="deliver(cur)">
-              {{ due(cur) && door.online ? t('wk.confirm_deliver') : due(cur) ? t('wk.confirm_deliver_cash', { amt: money(cur.totals.total, cur.currency) }) : t('wk.confirm_deliver') }}</button>
+              {{ due(cur) && door.online ? t('wk.confirm_deliver') : due(cur) ? t('wk.confirm_deliver_cash', { amt: money(collect(cur), cur.currency) }) : t('wk.confirm_deliver') }}</button>
           </template>
           <button class="btn link block" style="color:var(--bad)" data-act="problem" @click="prob.open = true">{{ t('wk.cannot_deliver') }}</button>
         </template>
@@ -305,7 +307,7 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
             <b :style="{ color: o.packing_status === 'packed' ? 'var(--ok)' : 'var(--warn)' }">{{ o.packing_status === 'packed' ? `${t('p.packed')} ${o.bags ?? ''} ${t('bags')}` : t('not_packed') }}</b></span></div>
           <div class="line"><span class="pt"></span><span>{{ o.zone_name }} · {{ o.address_line }} {{ o.address_unit }}</span></div>
           <div class="row between small muted"><span>{{ itemsText(o) }}</span>
-            <span style="white-space:nowrap">{{ due(o) ? t('wk.cod_short') : t('wk.prepaid') }} <span v-if="due(o) && was(o)" class="small muted">{{ was(o) }} </span><b v-if="due(o)" style="color:var(--brand-dark);font-size:16px">{{ money(o.totals.total, o.currency) }}</b></span></div>
+            <span style="white-space:nowrap">{{ due(o) ? t('wk.cod_short') : t('wk.prepaid') }} <span v-if="due(o) && was(o)" class="small muted">{{ was(o) }} </span><b v-if="due(o)" style="color:var(--brand-dark);font-size:16px">{{ money(collect(o), o.currency) }}</b></span></div>
           <button class="btn block" :class="{ primary: st(o) === 'assigned' }" data-act="open" @click="open(o)">{{ st(o) === 'assigned' ? t('wk.go_pickup') : t('wk.continue') }}</button>
         </div>
       </template>

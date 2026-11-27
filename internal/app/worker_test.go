@@ -33,7 +33,7 @@ func TestWorkerHeartbeatAndTasks(t *testing.T) {
 	// before the first run every task is listed and counts as fine
 	st, err := a.WorkerStatus(ctx)
 	noErr(t, err)
-	if len(st.Tasks) != 6 || st.Tasks[0].Task != "expire_pending" || st.Tasks[5].IntervalSeconds != 600 {
+	if len(st.Tasks) != 7 || st.Tasks[0].Task != "expire_pending" || st.Tasks[5].IntervalSeconds != 600 || st.Tasks[6].Task != "wallet_check" {
 		t.Fatalf("tasks: %+v", st.Tasks)
 	}
 	for _, task := range st.Tasks {
@@ -66,6 +66,9 @@ func TestWorkerHeartbeatAndTasks(t *testing.T) {
 	}
 	if c := find(st, "cleanup"); c.Runs != 1 {
 		t.Fatalf("cleanup runs on the first tick: %+v", c)
+	}
+	if c := find(st, "wallet_check"); !c.OK || c.Failures != 0 {
+		t.Fatalf("wallet check on the first tick: %+v", c)
 	}
 	inst := func(st *app.WorkerStatus) *app.WorkerInstance {
 		for i := range st.Instances {

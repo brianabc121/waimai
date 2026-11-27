@@ -59,6 +59,10 @@ func (a *App) CheckOrderMoney(ctx context.Context, orderID int64) ([]string, err
 	if o.ledger != o.total {
 		fail("D6 money ledger adds up to %d, total %d", o.ledger, o.total)
 	}
+	// W4–W7 the order's store balance (docs/REFUND_BALANCE_DESIGN.md §11)
+	for _, b := range checkOrderCredit(ctx, a.DB, orderID) {
+		fail("%s", b)
+	}
 	// D12 platform coupons are for the mall: an order on the store's own page
 	// has no platform-funded discount (docs/ORDER_TYPES_DESIGN.md §9.4)
 	if o.otype == "web" && (o.platf != 0 || o.platfRows != 0) {

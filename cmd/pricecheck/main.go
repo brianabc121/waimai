@@ -65,7 +65,16 @@ func main() {
 		}
 	}
 	fmt.Printf("%d stores with several brands checked, %d broken\n", stores, len(bad))
-	if len(broken) > 0 || len(bad) > 0 {
+	// W1–W2: the store balance books as a whole (docs/REFUND_BALANCE_DESIGN.md §11)
+	books, err := app.New(pool, "").CheckWallet(ctx)
+	if err != nil {
+		log.Fatalf("check store balances: %v", err)
+	}
+	for _, l := range books {
+		fmt.Printf("  %s\n", l)
+	}
+	fmt.Printf("store balance books: %d problems\n", len(books))
+	if len(broken) > 0 || len(bad) > 0 || len(books) > 0 {
 		os.Exit(1)
 	}
 }

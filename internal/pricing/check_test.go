@@ -352,3 +352,20 @@ func TestPricingCheckCatches(t *testing.T) {
 		}
 	}
 }
+
+// W-S1, W-S2 (docs/PRICING_CHECK.md §4): the cash share of a refund from an
+// order paid partly from a store balance is rounded down, worked out by hand.
+// The whole split (running total, what was refunded before) is
+// TestRefundSplitSamples in internal/app.
+func TestMulDivFloorSamples(t *testing.T) {
+	for _, c := range []struct{ a, b, d, want int64 }{
+		{6000, 10000, 15000, 4000},   // W-S1: 60.00 × 100/150 = 40.00
+		{9999, 24900, 29900, 8326},   // W-S2: 8326.93 → 8326
+		{29900, 24900, 29900, 24900}, // W-S2, all of it: exactly the cash paid
+		{1, 2, 3, 0},                 // 0.67 → 0
+	} {
+		if got := MulDivFloor(c.a, c.b, c.d); got != c.want {
+			t.Errorf("MulDivFloor(%d, %d, %d) = %d, want %d", c.a, c.b, c.d, got, c.want)
+		}
+	}
+}

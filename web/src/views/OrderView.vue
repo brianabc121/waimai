@@ -330,7 +330,7 @@ async function copyNo() {
               </div>
             </template>
           </div>
-          <div class="od-sums"><TotalsTable :totals="order.totals" :currency="order.currency" :delivery="order.service_type === 'delivery'" :discounts="order.discounts" />
+          <div class="od-sums"><TotalsTable :totals="order.totals" :currency="order.currency" :delivery="order.service_type === 'delivery'" :discounts="order.discounts" :credit-paid="order.credit_paid" />
             <div v-if="firstTotal != null && firstTotal !== order.totals.total" class="od-was" data-testid="od-was">{{ t('vd.c.was', { s: money(firstTotal, order.currency) }) }}</div></div>
         </section>
 

@@ -69,7 +69,7 @@ const sorted = computed(() => [...mine.value].sort((a, b) => a.basket - b.basket
     <hr />
     <p v-if="batch" class="line"><span>{{ t('vo.total') }}</span> <b>{{ money(batchSum, o.currency) }}</b>
       <template v-if="batchInfo?.total_after != null"> · {{ t('ao.changed', { a: money(batchInfo.total_before ?? 0, o.currency), b: money(batchInfo.total_after, o.currency) }) }}</template></p>
-    <TotalsTable v-else :totals="o.totals" :currency="o.currency" :delivery="o.service_type === 'delivery'" :discounts="o.discounts" />
+    <TotalsTable v-else :totals="o.totals" :currency="o.currency" :delivery="o.service_type === 'delivery'" :discounts="o.discounts" :credit-paid="o.credit_paid" />
     <p v-if="o.service_type === 'dine_in' && o.amount_received != null" data-testid="ticket-paid">
       {{ o.pay_method || t('dd.paid') }} {{ money(o.amount_received, o.currency) }} · {{ t('dd.change') }} {{ money(o.amount_received - o.totals.total, o.currency) }}</p>
     <p v-else>{{ t(o.payment_method) }} · {{ t(o.payment_status) }}</p>

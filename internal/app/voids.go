@@ -64,6 +64,10 @@ type OrderRefund struct {
 	By         string       `json:"by,omitempty"`
 	ApprovedBy string       `json:"approved_by,omitempty"`
 	At         time.Time    `json:"at"`
+	// ToCredit is how much went into the customer's store balance; the rest
+	// was given back as Method says (docs/REFUND_BALANCE_DESIGN.md §6).
+	ToCredit int64  `json:"to_credit"`
+	PayType  string `json:"pay_type"`
 }
 
 // VoidInput is what the void sheet sends.
@@ -547,7 +551,7 @@ func loadVoids(ctx context.Context, q Querier, byID map[int64]*Order, ids []int6
 	}
 	rows, err = q.Query(ctx, `SELECT r.id, r.order_id, r.lines, r.amount, r.method, r.reason, r.reason_kind,
 		COALESCE((SELECT u.display_name FROM users u WHERE u.id = r.refunded_by), ''),
-		COALESCE((SELECT u.display_name FROM users u WHERE u.id = r.approved_by), ''), r.created_at
+		COALESCE((SELECT u.display_name FROM users u WHERE u.id = r.approved_by), ''), r.created_at, r.to_credit, r.pay_type
 		FROM order_refunds r WHERE r.order_id = ANY($1) ORDER BY r.id`, ids)
 	if err != nil {
 		return err
@@ -558,7 +562,7 @@ func loadVoids(ctx context.Context, q Querier, byID map[int64]*Order, ids []int6
 		var orderID int64
 		var lines []byte
 		if err := rows.Scan(&r.ID, &orderID, &lines, &r.Amount, &r.Method, &r.Reason, &r.ReasonKind, &r.By,
-			&r.ApprovedBy, &r.At); err != nil {
+			&r.ApprovedBy, &r.At, &r.ToCredit, &r.PayType); err != nil {
 			return err
 		}
 		r.Lines = []RefundLine{}
@@ -600,6 +604,17 @@ type RefundInput struct {
 	ReasonKind string `json:"reason_kind"`
 	// Dry only works the amount out.
 	Dry bool `json:"dry"`
+	// ToCredit puts the part the customer paid in cash into their store
+	// balance instead (docs/REFUND_BALANCE_DESIGN.md §6.3); Consent is how
+	// they agreed: in_person, phone or chat. What was paid from the balance
+	// always goes back to it.
+	ToCredit bool   `json:"to_credit"`
+	Consent  string `json:"consent"`
+	// Verify is a code the customer was texted (§5.3), for an order the
+	// staff entered: it names whose balance takes the refund.
+	Verify *CreditVerify `json:"verify"`
+	// IdemKey (the Idempotency-Key header) makes a retried refund record nothing twice.
+	IdemKey string `json:"-"`
 }
 
 // RefundQuote is the suggested amount of a refund.
@@ -608,6 +623,20 @@ type RefundQuote struct {
 	Dishes    int64        `json:"dishes"`
 	Suggested int64        `json:"suggested"`
 	Left      int64        `json:"left"`
+	// The order's split (§6.1): what it paid from the store balance, and
+	// whether the cash part may go into a balance without a texted code.
+	CreditPaid int64 `json:"credit_paid"`
+	CanCredit  bool  `json:"can_credit"`
+	// CashPart and CreditPart split the suggested (or given) amount: the
+	// credit part goes back to the balance it came from.
+	CashPart   int64 `json:"cash_part"`
+	CreditPart int64 `json:"credit_part"`
+	// Refund is the refund recorded (not on a dry run).
+	RefundID int64 `json:"refund_id,omitempty"`
+}
+
+type refundRecord struct {
+	RefundID int64 `json:"refund_id"`
 }
 
 // Refund records money given back by dish once the customer paid. The
@@ -622,6 +651,20 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 	if in.ReasonKind != "store" && in.ReasonKind != "customer" {
 		return nil, nil, ErrValidation("reason_kind is store or customer")
 	}
+	if in.ToCredit {
+		if in.Method == "" {
+			in.Method = "店铺余额"
+		}
+		in.PayType = "store_credit"
+		if in.Verify != nil {
+			in.Consent = "sms"
+		}
+		if !in.Dry && in.Consent != "in_person" && in.Consent != "phone" && in.Consent != "chat" && in.Consent != "sms" {
+			return nil, nil, Err(http.StatusUnprocessableEntity, "CREDIT_CONSENT", "say how the customer agreed to a store balance")
+		}
+	} else {
+		in.Consent = ""
+	}
 	if !in.Dry && (in.Reason == "" || len(in.Reason) > 200 || in.Method == "" || len([]rune(in.Method)) > 20) {
 		return nil, nil, ErrValidation("reason and method are required")
 	}
@@ -631,7 +674,8 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 	if in.PayType == "" {
 		in.PayType = refundPayType(in.Method)
 	}
-	if in.PayType != "cash" && in.PayType != "transfer" && in.PayType != "online" && in.PayType != "other" {
+	if in.PayType != "cash" && in.PayType != "transfer" && in.PayType != "online" && in.PayType != "other" &&
+		in.PayType != "store_credit" {
 		return nil, nil, ErrValidation("pay_type is cash, transfer, online or other")
 	}
 	var out *RefundQuote
@@ -639,6 +683,18 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		o, err := lockOrder(ctx, tx, orderID)
 		if err != nil {
 			return err
+		}
+		scope := fmt.Sprintf("refund:%d", orderID)
+		if !in.Dry {
+			var rec refundRecord
+			replayed, err := idemBegin(ctx, tx, scope, in.IdemKey, hashJSON(in), &rec)
+			if err != nil {
+				return err
+			}
+			if replayed {
+				out = &RefundQuote{Lines: []RefundLine{}, RefundID: rec.RefundID}
+				return nil
+			}
 		}
 		if o.Acceptance != "accepted" ||
 			(o.Fulfillment != "delivered" && o.Fulfillment != "picked_up" && o.Fulfillment != "dined") {
@@ -657,18 +713,19 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		}
 		// What each line still has that was not refunded.
 		refunded := map[int64]int{}
-		var paidBack int64
-		rows, err := tx.Query(ctx, `SELECT lines, amount FROM order_refunds WHERE order_id=$1`, o.ID)
+		var paidBack, cashBack int64
+		rows, err := tx.Query(ctx, `SELECT lines, amount, cash_part FROM order_refunds WHERE order_id=$1`, o.ID)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			var raw []byte
-			var amt int64
-			if err := rows.Scan(&raw, &amt); err != nil {
+			var amt, cashPart int64
+			if err := rows.Scan(&raw, &amt, &cashPart); err != nil {
 				rows.Close()
 				return err
 			}
+			cashBack += cashPart
 			var ls []RefundLine
 			_ = json.Unmarshal(raw, &ls)
 			for _, l := range ls {
@@ -724,15 +781,55 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		q.Left = o.Total - paidBack
 		q.Suggested = max(0, min(o.Total-after.Total, q.Left))
 		out = q
+		oc, err := readOrderCredit(ctx, tx, o.ID)
+		if err != nil {
+			return err
+		}
+		q.CreditPaid = oc.CreditPaid
+		// Only an order the customer placed themselves names whose balance
+		// it is; one the staff entered needs the customer's texted code.
+		q.CanCredit = oc.CreditCustomer != 0 || ((oc.Type == TypeMall || oc.Type == TypeWeb) && oc.CustomerID != 0)
+		amount := q.Suggested
+		if in.Amount != nil && *in.Amount > 0 && *in.Amount <= q.Suggested {
+			amount = *in.Amount
+		}
+		q.CashPart = refundSplit(o.Total, oc.CreditPaid, paidBack, cashBack, amount)
+		q.CreditPart = amount - q.CashPart
 		if in.Dry {
 			return nil
 		}
-		amount := q.Suggested
 		if in.Amount != nil {
 			amount = *in.Amount
 		}
 		if amount <= 0 || amount > q.Suggested {
 			return ErrValidation("the amount must be more than 0 and at most the suggested amount")
+		}
+		cashPart := refundSplit(o.Total, oc.CreditPaid, paidBack, cashBack, amount)
+		creditPart := amount - cashPart
+		toCredit := creditPart
+		if in.ToCredit {
+			toCredit = amount
+		}
+		// whose balance: the one the order was paid from, or the customer who
+		// placed it, or the one whose texted code the staff entered
+		creditCustomer := oc.CreditCustomer
+		if toCredit > 0 && creditCustomer == 0 {
+			switch {
+			case in.Verify != nil:
+				if creditCustomer, err = a.useCreditVerify(ctx, tx, o.ID, "refund", *in.Verify); err != nil {
+					return err
+				}
+			case q.CanCredit:
+				creditCustomer = oc.CustomerID
+			default:
+				return Err(http.StatusConflict, "CREDIT_NO_CUSTOMER",
+					"this order has no customer account: text the customer a code first")
+			}
+		}
+		if in.ToCredit && cashPart > 0 {
+			if err := creditRefundLimits(ctx, tx, o.BranchID, cashPart, actor); err != nil {
+				return err
+			}
 		}
 		var by, approvedBy *int64
 		if actor.ID != 0 {
@@ -746,9 +843,21 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 			return err
 		}
 		lines, _ := json.Marshal(q.Lines)
-		if _, err := tx.Exec(ctx, `INSERT INTO order_refunds (order_id, branch_id, lines, amount, method, reason, reason_kind,
-			refunded_by, approved_by, aftersale_id, pay_type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, o.ID, o.BranchID, lines,
-			amount, in.Method, in.Reason, in.ReasonKind, by, approvedBy, asID, in.PayType); err != nil {
+		var refundID int64
+		if err := tx.QueryRow(ctx, `INSERT INTO order_refunds (order_id, branch_id, lines, amount, method, reason, reason_kind,
+			refunded_by, approved_by, aftersale_id, pay_type, cash_part, to_credit, consent)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`, o.ID, o.BranchID, lines,
+			amount, in.Method, in.Reason, in.ReasonKind, by, approvedBy, asID, in.PayType, cashPart, toCredit, in.Consent).
+			Scan(&refundID); err != nil {
+			return err
+		}
+		q.RefundID, q.CashPart, q.CreditPart = refundID, cashPart, creditPart
+		if toCredit > 0 {
+			if err := creditRefund(ctx, tx, o.ID, refundID, creditCustomer, toCredit, actor); err != nil {
+				return err
+			}
+		}
+		if err := idemSave(ctx, tx, scope, in.IdemKey, refundRecord{RefundID: refundID}); err != nil {
 			return err
 		}
 		if asID != nil {

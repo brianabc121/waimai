@@ -57,6 +57,10 @@ const (
 	// PermBrandManage: add, rename and switch off the store's brands
 	// (docs/MULTI_BRAND_DESIGN.md §13); the owner's unless given.
 	PermBrandManage = "brand.manage"
+	// Store credit (docs/REFUND_BALANCE_DESIGN.md §6.4): refund into a
+	// customer's store balance, and see the balances.
+	PermWalletRefund = "wallet.refund"
+	PermWalletView   = "wallet.view"
 )
 
 // PermDef is one line of the role permissions table.
@@ -103,6 +107,8 @@ var PermCatalog = []PermDef{
 	{Code: PermCash, Group: "money", Cashier: false, Manager: true},
 	{Code: PermBills, Group: "money", Cashier: false, Manager: true},
 	{Code: PermReconcile, Group: "money", Cashier: false, Manager: true},
+	{Code: PermWalletRefund, Group: "money", Cashier: false, Manager: true, Requires: []string{PermOrderAftersale}},
+	{Code: PermWalletView, Group: "money", Cashier: false, Manager: true},
 	{Code: PermRiderView, Group: "delivery", Cashier: true, Manager: true},
 	{Code: PermDeliveryMap, Group: "delivery", Cashier: false, Manager: true},
 	{Code: PermStaffView, Group: "staff", Cashier: false, Manager: true},

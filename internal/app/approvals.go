@@ -17,7 +17,8 @@ import (
 // the one action goes ahead; the log says who approved it.
 
 // ApprovablePerms are the permissions an approval can stand in for.
-var ApprovablePerms = map[string]bool{PermOrderCancel: true, PermOrderAftersale: true, PermCheckoutDiscount: true, PermOrderVoid: true}
+var ApprovablePerms = map[string]bool{PermOrderCancel: true, PermOrderAftersale: true, PermCheckoutDiscount: true, PermOrderVoid: true,
+	PermWalletRefund: true}
 
 const (
 	approvalTTL      = 5 * time.Minute

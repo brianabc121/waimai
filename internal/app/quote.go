@@ -125,8 +125,13 @@ type Quote struct {
 	// DishDiscounts are the dish promotions applied (part of Totals.Discount).
 	DishDiscounts []DishDiscount `json:"dish_discounts"`
 	CouponChoices []CouponChoice `json:"coupon_choices"`
-	ExpiresAt     time.Time      `json:"expires_at"`
-	Input         QuoteInput     `json:"input"`
+	// StoreCredit is what the logged-in customer holds in their balance at
+	// this store, and Credit how much of it would pay this order
+	// (docs/REFUND_BALANCE_DESIGN.md §5.2). Neither changes the amount.
+	StoreCredit int64      `json:"store_credit"`
+	Credit      int64      `json:"credit"`
+	ExpiresAt   time.Time  `json:"expires_at"`
+	Input       QuoteInput `json:"input"`
 	// address is the saved address named by Input.AddressID, as it is now.
 	address *Address
 	// promo is the promotion applied, nil when none; pr the engine's pricing.
@@ -510,6 +515,10 @@ func (a *App) CreateQuote(ctx context.Context, slug string, in QuoteInput, phone
 	if err != nil {
 		return nil, err
 	}
+	if quote.StoreCredit, err = storeCreditOf(ctx, a.DB, b.ID, phone, b.Currency); err != nil {
+		return nil, err
+	}
+	quote.Credit = min(quote.StoreCredit, quote.Totals.Total)
 	quote.ExpiresAt = time.Now().Add(quoteTTL).UTC().Truncate(time.Second)
 	payload, _ := json.Marshal(quote)
 	err = a.DB.QueryRow(ctx, `INSERT INTO quotes (id, branch_id, payload, total, expires_at)

@@ -21,6 +21,10 @@ extend({
   'ac.decide_ph': ['给申请人的话（不通过时必填）', 'A word to the applicant (required when turning down)'],
   'ac.approve_hint': ['通过只是通知申请人，商户账号还要到“商户”里新建。', 'Approving only tells the applicant. Create the merchant under Merchants.'],
   'ac.search': ['搜索手机号、昵称或会员号', 'Search phone, nickname or member no.'], 'ac.member': ['会员号', 'Member no.'], 'ac.nickname': ['昵称', 'Nickname'],
+  'ac.sc': ['店铺余额', 'Store balances'], 'ac.sc_title': ['{who} 的店铺余额', 'Store balances of {who}'],
+  'ac.sc_hint': ['商家退款存给顾客的余额，只能在那家店用。冻结后不能再用（账号被盗、纠纷、店铺停业）。', 'Refunds stores kept for the customer, only for that store. A frozen one cannot be spent (account taken over, a dispute, a store that closed).'],
+  'ac.sc_none': ['没有店铺余额', 'No store balances'], 'ac.sc_closed': ['店铺已停业', 'store closed'],
+  'ac.sc_freeze': ['冻结', 'Freeze'], 'ac.sc_unfreeze': ['解冻', 'Unfreeze'],
   'ac.orders': ['订单数', 'Orders'], 'ac.balance': ['余额', 'Balance'], 'ac.bonus': ['奖励金', 'Rewards'], 'ac.adjust': ['调整', 'Adjust'], 'ac.joined': ['注册时间', 'Joined'],
   'ac.adjust_title': ['调整 {who} 的钱包', 'Adjust the wallet of {who}'], 'ac.account': ['账户', 'Account'], 'ac.currency': ['币种', 'Currency'],
   'ac.amount': ['金额（负数为扣减）', 'Amount (negative takes away)'], 'ac.note': ['原因（顾客能看到）', 'Reason (the customer sees it)'], 'ac.save': ['保存', 'Save'],
@@ -126,6 +130,15 @@ async function saveAdjust() {
     adj.who = null
     await loadCu()
   } catch (e) { fail(e) }
+}
+// store balances (docs/REFUND_BALANCE_DESIGN.md §8.3): each store's, and freezing one
+interface StoreCredit { account_id: number; branch_id: number; store_name: string; currency: string; balance: number; frozen: boolean; closed: boolean }
+const sc = reactive({ who: null as Cust | null, items: [] as StoreCredit[], note: '' })
+async function storeCredits(c: Cust) {
+  try { sc.items = (await get<{ items: StoreCredit[] }>(`/admin/customers/${c.id}/store-credits`)).items; sc.who = c; sc.note = '' } catch (e) { fail(e) }
+}
+async function freeze(x: StoreCredit) {
+  try { await post(`/admin/store-credits/${x.account_id}/freeze`, { frozen: !x.frozen, note: sc.note }); if (sc.who) await storeCredits(sc.who) } catch (e) { fail(e) }
 }
 const walletText = (c: Cust, k: 'balance' | 'bonus') => c.wallets.filter(w => w[k]).map(w => money(w[k], w.currency)).join(' / ') || '0'
 
@@ -236,13 +249,35 @@ onMounted(() => { void loadFb(); void loadAp() })
             <tr v-for="c in cu.items" :key="c.id" data-testid="ac-customer">
               <td class="mono">{{ c.member_no }}</td><td>{{ c.phone }}</td><td>{{ c.nickname || '—' }}</td><td class="num">{{ c.orders }}</td>
               <td class="num" data-testid="ac-balance">{{ walletText(c, 'balance') }}</td><td class="num">{{ walletText(c, 'bonus') }}</td><td class="num">{{ fmtDateTime(c.created_at) }}</td>
-              <td><button class="btn small" data-testid="ac-adjust" @click="adjust(c)">{{ t('ac.adjust') }}</button></td>
+              <td class="row"><button class="btn small" data-testid="ac-adjust" @click="adjust(c)">{{ t('ac.adjust') }}</button>
+                <button class="btn small" data-testid="ac-store-credits" @click="storeCredits(c)">{{ t('ac.sc') }}</button></td>
             </tr>
             <tr v-if="!cu.items.length"><td colspan="8" class="muted">{{ t('ac.none') }}</td></tr>
           </tbody>
         </table>
       </div>
       <Pager :total="cu.total" :page="cu.page" :size="SIZE" @go="p => { cu.page = p; loadCu() }" />
+      <div v-if="sc.who" class="sheet-mask" @click.self="sc.who = null">
+        <div class="sheet center" data-testid="ac-sc-sheet">
+          <div class="sheet-head"><h2>{{ t('ac.sc_title', { who: sc.who.phone }) }}</h2></div>
+          <div class="sheet-body">
+            <div class="banner info" style="margin-bottom:12px">{{ t('ac.sc_hint') }}</div>
+            <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
+            <div v-if="!sc.items.length" class="muted">{{ t('ac.sc_none') }}</div>
+            <table v-else class="data">
+              <tbody>
+                <tr v-for="x in sc.items" :key="x.account_id" data-testid="ac-sc-row">
+                  <td>{{ x.store_name }}<span v-if="x.closed" class="muted small"> · {{ t('ac.sc_closed') }}</span></td>
+                  <td class="num">{{ money(x.balance, x.currency) }}</td>
+                  <td><button class="btn small" :class="{ danger: !x.frozen }" data-testid="ac-sc-freeze" @click="freeze(x)">{{ t(x.frozen ? 'ac.sc_unfreeze' : 'ac.sc_freeze') }}</button></td>
+                </tr>
+              </tbody>
+            </table>
+            <label v-if="sc.items.length" class="field" style="margin-top:10px"><span>{{ t('ac.note') }}</span><input v-model="sc.note" maxlength="200" /></label>
+          </div>
+          <div class="sheet-foot row"><button type="button" class="btn grow" @click="sc.who = null">{{ t('cancel') }}</button></div>
+        </div>
+      </div>
       <div v-if="adj.who" class="sheet-mask" @click.self="adj.who = null">
         <form class="sheet center" data-testid="ac-adjust-form" @submit.prevent="saveAdjust">
           <div class="sheet-head"><h2>{{ t('ac.adjust_title', { who: adj.who.phone }) }}</h2></div>

@@ -101,15 +101,36 @@ func (s *Server) refundOrder(c *gin.Context) {
 	if !bind(c, &in) {
 		return
 	}
-	// A dry run only works the amount out: it spends no approval.
+	// A dry run only works the amount out: it spends no approval. Cash put
+	// into a store balance needs its own permission (which includes after-sales),
+	// and a manager's (or the owner's) approval above the store's limits
+	// (docs/REFUND_BALANCE_DESIGN.md §6.4): one approval covers both.
 	perms := pAftersale
 	if in.Dry {
 		perms = pOrderView
+	} else if in.ToCredit {
+		perms = pWalletRefund
 	}
 	id, ok := s.orderScope(c, perms)
 	if !ok {
 		return
 	}
+	if in.ToCredit && !in.Dry && c.GetInt64("approved_by") == 0 {
+		if tok := c.GetHeader("X-Approval"); tok != "" {
+			bid, err := s.App.OrderBranch(c, id)
+			if err != nil {
+				fail(c, err)
+				return
+			}
+			by, err := s.App.UseApproval(c, tok, bid, currentUser(c).ID, pWalletRefund)
+			if err != nil {
+				fail(c, err)
+				return
+			}
+			c.Set("approved_by", by)
+		}
+	}
+	in.IdemKey = c.GetHeader("Idempotency-Key")
 	q, o, err := s.App.Refund(c, id, in, staffActor(c))
 	if err != nil {
 		fail(c, err)

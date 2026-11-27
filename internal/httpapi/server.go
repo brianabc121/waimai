@@ -578,6 +578,7 @@ func (s *Server) Router() *gin.Engine {
 	s.memberRoutes(auth)
 	s.brandRoutes(auth)
 	s.deliveryStatsRoutes(auth)
+	s.walletRoutes(api, auth, admin)
 
 	s.static(r)
 	return r

@@ -70,6 +70,9 @@ type ReconRefunds struct {
 	Count int   `json:"count"`
 	Total int64 `json:"total"`
 	Cash  int64 `json:"cash"`
+	// ToCredit went into customers' store balances: no money left the store
+	// (docs/REFUND_BALANCE_DESIGN.md §10.2).
+	ToCredit int64 `json:"to_credit"`
 }
 
 // CashCount is the cash counted in the drawer on one day.
@@ -152,9 +155,9 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64
 	rows, err := a.DB.Query(ctx, `SELECT `+payTypeSQL+` AS pt, COALESCE(o.pay_channel_id, 0),
 			CASE WHEN `+payTypeSQL+` = 'platform' THEN COALESCE(o.platform_id, 0) ELSE 0 END,
 			COALESCE(max(c.name), max(dp.name), max(o.pay_method), ''), COALESCE(max(c.names::text), max(dp.names::text), '{}'),
-			count(*), COALESCE(sum(`+receivableSQL+`), 0),
-			COALESCE(sum(`+receivableSQL+`) FILTER (WHERE o.service_type = 'dine_in'), 0),
-			COALESCE(sum(`+receivableSQL+`) FILTER (WHERE o.service_type <> 'dine_in'), 0),
+			count(*), COALESCE(sum(`+receivableSQL+` - o.credit_paid), 0),
+			COALESCE(sum(`+receivableSQL+` - o.credit_paid) FILTER (WHERE o.service_type = 'dine_in'), 0),
+			COALESCE(sum(`+receivableSQL+` - o.credit_paid) FILTER (WHERE o.service_type <> 'dine_in'), 0),
 			count(*) FILTER (WHERE pc.status = 'ok'), count(*) FILTER (WHERE pc.status = 'problem'),
 			count(*) FILTER (WHERE pc.status IS NULL)
 		FROM orders o JOIN branches b ON b.id = o.branch_id
@@ -176,6 +179,11 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64
 			return nil, err
 		}
 		r.Names = jsonNames(names)
+		if r.PayType == "credit" {
+			// paid in full from a store balance: the balance row below has the money
+			out.Count += r.Count
+			continue
+		}
 		if r.PayType != "online" {
 			r.OK, r.Problem, r.Unchecked = 0, 0, 0
 			if r.PayType != "platform" {
@@ -190,9 +198,23 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	// what store balances paid (docs/REFUND_BALANCE_DESIGN.md §10.2): its own
+	// row, whatever paid the rest; its orders are already counted above
+	credit := ReconRow{PayType: "store_credit", Names: map[string]string{}}
+	if err := a.DB.QueryRow(ctx, `SELECT count(*), COALESCE(sum(o.credit_paid), 0),
+			COALESCE(sum(o.credit_paid) FILTER (WHERE o.service_type = 'dine_in'), 0),
+			COALESCE(sum(o.credit_paid) FILTER (WHERE o.service_type <> 'dine_in'), 0)
+		FROM orders o JOIN branches b ON b.id = o.branch_id WHERE `+paidInPeriod+` AND o.credit_paid > 0`,
+		branchID, from, to, brands).Scan(&credit.Count, &credit.Amount, &credit.Dine, &credit.Takeaway); err != nil {
+		return nil, err
+	}
+	if credit.Count > 0 {
+		out.Total += credit.Amount
+		out.Rows = append(out.Rows, credit)
+	}
 	// cash: at the counter, and what riders took in and handed back
 	if err := a.DB.QueryRow(ctx, `SELECT
-			COALESCE(sum(o.total) FILTER (WHERE `+payTypeSQL+` = 'cash' AND cc.id IS NULL), 0),
+			COALESCE(sum(o.total - o.credit_paid) FILTER (WHERE `+payTypeSQL+` = 'cash' AND cc.id IS NULL), 0),
 			COALESCE(sum(cc.amount_collected), 0),
 			COALESCE(sum(COALESCE(cc.amount_returned, cc.amount_collected)) FILTER (WHERE cc.reconcile_status <> 'pending'), 0),
 			COALESCE(sum(cc.amount_collected) FILTER (WHERE cc.reconcile_status = 'pending'), 0),
@@ -206,11 +228,11 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64
 		return nil, err
 	}
 	if err := a.DB.QueryRow(ctx, `SELECT count(*), COALESCE(sum(r.amount), 0),
-			COALESCE(sum(r.amount) FILTER (WHERE r.pay_type = 'cash'), 0)
+			COALESCE(sum(r.amount - r.to_credit) FILTER (WHERE r.pay_type = 'cash'), 0), COALESCE(sum(r.to_credit), 0)
 		FROM order_refunds r JOIN branches b ON b.id = r.branch_id JOIN orders o ON o.id = r.order_id
 		WHERE r.branch_id = $1 AND (r.created_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date
 			AND ($4::bigint[] IS NULL OR o.brand_id = ANY($4))`,
-		branchID, from, to, brands).Scan(&out.Refunds.Count, &out.Refunds.Total, &out.Refunds.Cash); err != nil {
+		branchID, from, to, brands).Scan(&out.Refunds.Count, &out.Refunds.Total, &out.Refunds.Cash, &out.Refunds.ToCredit); err != nil {
 		return nil, err
 	}
 	out.Cash.Refunded = out.Refunds.Cash

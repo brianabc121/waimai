@@ -150,7 +150,7 @@ export interface Order {
   session_id: number | null; table_name: string; amount_received: number | null; payment_note: string
   pay_method?: string; table_tags?: string[]
   // how it was paid and who gave the discount at checkout (staff only)
-  pay_type?: '' | 'cash' | 'card' | 'online' | 'platform'; pay_channel_id?: number; adj_reason?: string; adj_by?: string; adj_approved_by?: string; adj_at?: string | null
+  pay_type?: '' | 'cash' | 'card' | 'online' | 'platform' | 'credit'; pay_channel_id?: number; adj_reason?: string; adj_by?: string; adj_approved_by?: string; adj_at?: string | null
   pay_check?: '' | 'ok' | 'problem'; pay_check_note?: string
   aftersale: Aftersale | null; store?: OrderStore; completed_at?: string | null; accepted_at?: string | null; closed_at?: string | null
   // the promotion and each coupon taken off; the coupon this order earned (customer page only)
@@ -161,6 +161,8 @@ export interface Order {
   batches?: OrderBatch[]; addon?: AddonState
   // dishes taken off and money given back by dish (docs/VOID_ITEM_DESIGN.md)
   voids?: OrderVoid[]; refunds?: OrderRefund[]; void_open?: boolean; refund_open?: boolean; refunded?: number
+  // paid from the customer's store balance, and what is left to collect (docs/REFUND_BALANCE_DESIGN.md §5)
+  credit_paid?: number; due?: number
   // an order from a delivery platform (docs/ORDER_TYPES_DESIGN.md §7, §9): staff pages only
   platform?: PlatformInfo
 }
@@ -185,13 +187,18 @@ export interface OrderVoid {
   by?: string; approved_by?: string; needs_ack: boolean; ack_at: string | null; ack_by?: string; at: string
 }
 export interface RefundLine { item_id: number; name: string; qty: number; amount: number }
-export interface OrderRefund { id: number; lines: RefundLine[]; amount: number; method: string; reason: string; reason_kind: string; by?: string; approved_by?: string; at: string }
+export interface OrderRefund { id: number; lines: RefundLine[]; amount: number; method: string; reason: string; reason_kind: string; by?: string; approved_by?: string; at: string
+  // how much went into the customer's store balance
+  to_credit?: number; pay_type?: string }
 export interface VoidQuote {
   name: string; qty: number; max_qty: number; amount: number; was_status: string; started_at: string | null; wasted: boolean
   needs_approval: boolean; before: Totals; after: Totals; less: number; promo_before: string; promo_after: string; promo_down: boolean
   rider: string; packed: boolean; version: number
 }
-export interface RefundQuote { lines: RefundLine[]; dishes: number; suggested: number; left: number }
+export interface RefundQuote { lines: RefundLine[]; dishes: number; suggested: number; left: number
+  // the order's split (docs/REFUND_BALANCE_DESIGN.md §6): paid from the store balance, whether the customer is known,
+  // and how the suggested (or given) amount splits between the money paid and the balance
+  credit_paid?: number; can_credit?: boolean; cash_part?: number; credit_part?: number; refund_id?: number }
 export interface QuoteLine { item_id: number; name: string; name_en: string; name_tr?: string; unit_price: number; qty: number; line_total: number
   options: LineOption[]; note: string; note_tags?: LineNoteTag[]; needs_prep?: boolean; basket?: number }
 export interface OrderBatch {
@@ -221,6 +228,8 @@ export interface DinePresets { table_tags: string[] | null; round_tags: string[]
 export interface TableAccess { slug: string; store_name: string; table_name: string; mode: 'qr' | 'ipad' }
 export interface BatchLine { item_id: number; qty: number; option_ids: number[]; note: string; note_tag_ids?: number[] }
 export interface Quote { id: string; currency: string; service_type: string; zone_name: string; zone_distance_m: number | null; scheduled_for: string | null; totals: Totals; expires_at: string
+  // the logged-in customer's balance at this store, and how much of it would pay this order
+  store_credit?: number; credit?: number
   coupons: AppliedCoupon[]; coupon_choices: CouponChoice[]
   dish_discounts?: { promotion_id: number; name: string; name_en: string; kind: string; amount: number }[]
   lines: { item_id: number; name: string; name_en: string; unit_price: number; qty: number; line_total: number; options: LineOption[]; note: string; note_tags?: LineNoteTag[]; basket?: number }[] }
@@ -295,7 +304,7 @@ export interface Settlement {
 }
 export interface BillSummary {
   from: string; to: string; currency: string; orders: number; cancelled: number; food: number; merchant_discount: number
-  platform_discount: number; paid: number; takings: number; refunded: number
+  platform_discount: number; paid: number; takings: number; refunded: number; refunded_to_credit?: number; paid_by_credit?: number
   kinds: { kind: 'promotion' | CouponKind; funded_by: 'store' | 'platform'; orders: number; amount: number }[]
   repurchase: { issued: number; used: number; sales: number }
   days: { day: string; orders: number; food: number; discount: number; paid: number; takings: number }[]
