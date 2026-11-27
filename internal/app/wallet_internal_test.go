@@ -65,14 +65,38 @@ func TestStoredTakeSamples(t *testing.T) {
 			t.Errorf("%s: %d + %d, want %d + %d", c.name, p, b, c.p, c.b)
 		}
 	}
-	// SV-S7: the order paid 100.00 + 20.00 from stored value and 60.00 goes
-	// back: principal floor(6000 × 10000 / 12000) = 5000, bonus 1000
-	if p, b := storedGiveBack(6000, 10000, 2000); p != 5000 || b != 1000 {
-		t.Errorf("SV-S7: %d + %d, want 5000 + 1000", p, b)
+}
+
+// What goes back to the balances when an order shrinks (brian 2026-11-27):
+// the refund balance, the principal and the bonus each in the share the
+// order paid them. Worked out by hand.
+func TestCreditGiveBackSamples(t *testing.T) {
+	cases := []struct {
+		name       string
+		x, c, p, b int64
+		cc, pp, bb int64
+	}{
+		// SV-S7: paid 50.00 refund balance + 100.00 + 20.00 stored value, 60.00 back of 170.00:
+		// principal floor(6000 × 10000 / 17000) = floor(3529.41) = 3529,
+		// refund balance floor(6000 × 5000 / 17000) = floor(1764.70) = 1764, bonus 6000 − 3529 − 1764 = 707
+		{"SV-S7", 6000, 5000, 10000, 2000, 1764, 3529, 707},
+		// stored value only, 100.00 + 20.00, 60.00 back: principal floor(6000 × 10000 / 12000) = 5000, bonus 1000
+		{"stored only", 6000, 0, 10000, 2000, 0, 5000, 1000},
+		// refund balance only
+		{"refund balance only", 2500, 5000, 0, 0, 2500, 0, 0},
+		// 1 cent of 1 + 1: principal floor(1 / 2) = 0, the cent is bonus
+		{"one cent", 1, 0, 1, 1, 0, 0, 1},
+		// 2 cents of 1 + 1 + 1: principal and refund balance floor(2 / 3) = 0, bonus 2 > 1:
+		// the cent over goes to the refund balance
+		{"bonus capped", 2, 1, 1, 1, 1, 0, 1},
+		// all of it, and more than it paid: exactly what each paid
+		{"all", 99999, 5000, 10000, 2000, 5000, 10000, 2000},
+		{"nothing", 0, 5000, 10000, 2000, 0, 0, 0},
 	}
-	// 1 cent back of 1 + 1: principal floor(1 × 1 / 2) = 0, the cent is bonus
-	if p, b := storedGiveBack(1, 1, 1); p != 0 || b != 1 {
-		t.Errorf("one cent back: %d + %d, want 0 + 1", p, b)
+	for _, c := range cases {
+		if cc, pp, bb := creditGiveBack(c.x, c.c, c.p, c.b); cc != c.cc || pp != c.pp || bb != c.bb {
+			t.Errorf("%s: %d + %d + %d, want %d + %d + %d", c.name, cc, pp, bb, c.cc, c.pp, c.bb)
+		}
 	}
 }
 

@@ -110,7 +110,7 @@ DATABASE_URL='postgres://...' make pricing-check-db DAYS=0   # 全部订单
 | W7 | 退款记录写着存入余额多少，账本上这张单的退款凭证（减去撤回）就是多少，一分不差 |
 
 | W8 | 每张充值单和账本一一对应：已付款的充值单记进储值本金 = 实收、赠送 = 档位快照；待付款、已取消的不在账上；撤销的充值单净额为 0 |
-| W9 | 每次储值消费：赠送那份 = ⌊x × 赠送余额 ÷ (本金余额 + 赠送余额)⌋（扣之前的余额），本金那份 = x − 赠送那份；先用退款余额，再用储值 |
+| W9 | 订单金额变小时退回的余额按这张单用掉的比例拆成退款余额、本金、赠送三份（前两份向下取整，零头算赠送，每份不超过用掉的）；每次储值消费：赠送那份 = ⌊x × 赠送余额 ÷ (本金余额 + 赠送余额)⌋（扣之前的余额），本金那份 = x − 赠送那份；先用退款余额，再用储值 |
 | W10 | 每张单：0 ≤ 储值本金付的 + 储值赠送付的 ≤ credit_paid ≤ 应付（credit_paid 是所有余额合计付的）；取消、拒单后都 = 0 |
 | W11 | 订单的 `stored_principal_paid`、`stored_bonus_paid` = 账本上这张单从本金、赠送扣掉的（扣减 − 退回），分开相等 |
 | W12 | 退款按累计目标拆成现金、退款余额、本金、赠送四份，前三份向下取整、零头落在赠送；每份累计 ≤ 原来付的，全部退完各自正好退回 |
@@ -153,7 +153,7 @@ R 这一组是最重要的：任何一条改金额的路径如果绕开了 `load
 | 17 | 商城单和网店单：同一购物车在商城和店铺专属页面下单金额一分不差（没有平台券时）；网店单不用平台券（不列、点名要也不用），顾客多付的正好是平台券的钱；商城报价不能拿到专属页面下单 | `TestMallVsWebOrder`、`TestStoreSiteOverHTTP` |
 | 18 | 一店多品牌：同一购物车在两个品牌下单按各自的品牌价；活动、券不跨品牌（列表里不出现、点名也不用）；加单按订单品牌的菜单价；代客单号和会员按品牌；顾客在品牌专属页面/商城品牌卡片下单按该品牌的价和活动（S10 的 150.00 / 157.00），一个品牌页面的报价不能拿到另一个品牌下单，商城单号按品牌各自编；平台单按“品牌 + 平台”的店：平台价从品牌价加价、佣金按这家店（S10a）；对账、账单按品牌相加 = 合并，平台到账按“品牌 + 平台”录（规则 R） | 样例 S10、S10a；`TestBrandPricing`、`TestBrandPromoCouponScope`、`TestBrandAddonPrice`、`TestBrands`、`TestBrandSites`、`TestBrandPlatformOrder`、`TestBrandReconciliation`（规则 R） |
 | 19 | 店铺余额付款和退到店铺余额：下单用余额（结账页显示的金额变了要重新确认）→ 加单 → 退菜 → 结账打折（订单变小时先减还没收的现金，再把多出的余额退回）→ 取走（只用余额付清的单记“店铺余额”）→ 按菜退款两种去向（退钱时余额付的那份回余额；顾客同意后全部存入余额）→ 全部退完现金那份正好是向下取整的比例 → 取消单退回余额 → 两单同时抢同一笔余额只扣一次 → 重复提交退款只记一次 → 别的门店、别的币种看不到也用不了 → 冻结后不能用 → 限额（单笔要经理、每日要店主）和撤回（顾客已用掉就不能撤）→ 店员录入的单要短信验证码，A 品牌退进去、B 品牌用掉 → 改坏数据能被 W4、W7 抓到 | 样例 W-S1、W-S2、W-S3；`TestStoreCreditFlow`、`TestStoreCreditOrderShrinks`、`TestStoreCreditConcurrentSpend`、`TestStoreCreditLimitsAndRevoke`、`TestStoreCreditByCode`、`TestStoreCreditCheckCatchesTampering`、`TestWalletCheckOverAll`、`TestStoreCreditRoutes` |
-| 20 | 储值充值和消费（充值送）：充值（顾客出示充值码 / 店员按手机号发短信验证码）→ 首充限一次、档位关了不能充 → 用储值下单（先用退款余额，再按比例扣本金和赠送）→ 加单 → 退菜、结账打折让订单变小（先减没收的现金，再退回储值）→ 取走 → 按菜退款两次退完（储值那份回储值，本金、赠送各自正好退回）→ 和现金混合付、取消单全退回 → 充值用过了不能撤销 → 退储值（顾客原因扣掉已用赠送 / 门店原因退全部本金，金额变了要重新确认）→ 多张单同时抢同一笔储值只扣一次 → 别的门店、别的币种看不到 → 国家关掉后不能再充 → 超过上限要经理授权 → 对账钱箱、储值卡片和账单列对上 → 改坏数据能被 W8、W11、W13 抓到 | 样例 SV-S1 到 SV-S7；`TestStoredTakeSamples`、`TestStoredRefundSplitSamples`、`TestCashoutPaySamples`、`TestStoredValueFlow`、`TestStoredValueCashout`、`TestStoredValueConcurrentSpend`、`TestStoredValueReconcile`、`TestStoredValueCheckCatchesTampering` |
+| 20 | 储值充值和消费（充值送）：充值（顾客出示充值码 / 店员按手机号发短信验证码）→ 首充限一次、档位关了不能充 → 用储值下单（先用退款余额，再按比例扣本金和赠送）→ 加单 → 退菜、结账打折让订单变小（先减没收的现金，再按这张单用掉的比例退回退款余额、本金、赠送）→ 取走 → 按菜退款两次退完（储值那份回储值，本金、赠送各自正好退回）→ 和现金混合付、取消单全退回 → 充值用过了不能撤销 → 退储值（顾客原因扣掉已用赠送 / 门店原因退全部本金，金额变了要重新确认）→ 多张单同时抢同一笔储值只扣一次 → 别的门店、别的币种看不到 → 国家关掉后不能再充 → 超过上限要经理授权 → 对账钱箱、储值卡片和账单列对上 → 改坏数据能被 W8、W11、W13 抓到 | 样例 SV-S1 到 SV-S7；`TestStoredTakeSamples`、`TestCreditGiveBackSamples`、`TestStoredRefundSplitSamples`、`TestCashoutPaySamples`、`TestStoredValueFlow`、`TestStoredValueCashout`、`TestStoredValueConcurrentSpend`、`TestStoredValueReconcile`、`TestStoredValueCheckCatchesTampering` |
 
 ---
 
@@ -297,9 +297,9 @@ PRICING_REVIEW.md 问题 1 的门店：含税 12%、服务费 5%。鸡 169.00 ×
 - **W-S3**（真库 `TestStoreCreditOrderShrinks`）：用余额付了一部分后退菜让应付小于已用余额：先减还没收的现金到 0，再把多出的余额退回，订单最后 应付 = 用余额付的、还要收 0，取走时记“店铺余额”
 - 另外几个边界：没用余额 → 全是现金；全用余额 → 现金 0；应付 0.03 = 余额 0.01 + 现金 0.02，一分一分退：现金 0、0.01、0.01
 
-### SV-S1 到 SV-S7 储值（`TestStoredTakeSamples`、`TestStoredRefundSplitSamples`、`TestCashoutPaySamples`；STORED_VALUE_DESIGN.md 第 11 节）
+### SV-S1 到 SV-S7 储值（`TestStoredTakeSamples`、`TestStoredRefundSplitSamples`、`TestCashoutPaySamples`、`TestCreditGiveBackSamples`；STORED_VALUE_DESIGN.md 第 11 节）
 
-储值不进计价引擎，几步拆分都在 `internal/app/wallet.go`（`storedTake`、`storedGiveBack`、`storedRefundSplit`）和 `stored.go`（`cashoutPay`），样例写在 `internal/app/wallet_internal_test.go`。
+储值不进计价引擎，几步拆分都在 `internal/app/wallet.go`（`storedTake`、`creditGiveBack`、`storedRefundSplit`）和 `stored.go`（`cashoutPay`），样例写在 `internal/app/wallet_internal_test.go`。
 
 - **SV-S1**：充 1000.00 送 200.00，用储值 300.00：赠送 ⌊30000 × 20000 ÷ 120000⌋ = **50.00**，本金 **250.00**；剩本金 750.00、赠送 150.00
 - **SV-S2**：本金 1000.00、赠送 150.00，用 99.99：赠送 ⌊9999 × 15000 ÷ 115000⌋ = ⌊1304.217⌋ = **13.04**，本金 **86.95**
@@ -307,7 +307,7 @@ PRICING_REVIEW.md 问题 1 的门店：含税 12%、服务费 5%。鸡 169.00 ×
 - **SV-S4**：订单 500.00 = 现金 100.00 + 退款余额 100.00 + 本金 250.00 + 赠送 50.00，先退 99.99：现金 ⌊1999.8⌋ = **19.99**、本金 ⌊4999.5⌋ = **49.99**、退款余额 **19.99**、赠送 9999 − 1999 − 4999 − 1999 = **10.02**；再退 400.01：现金 **80.01**、本金 **200.01**、退款余额 **80.01**、赠送 **39.98**；四份各自正好退完
 - **SV-S5**：充 1000.00 送 200.00，用了 300.00（本金 250.00 + 赠送 50.00），退储值：顾客原因 750.00 − 50.00 = **700.00**，门店原因 **750.00**；剩的赠送 150.00 作废
 - **SV-S6**：充 100.00 送 100.00，用了 180.00（各 90.00），剩各 10.00：顾客原因 max(0, 10.00 − 90.00) = **0.00**（本金 10.00 记扣回），门店原因 **10.00**
-- **SV-S7**：订单 200.00 = 退款余额 50.00 + 储值 120.00（本金 100.00 + 赠送 20.00）+ 到付 30.00，退菜后变 110.00：到付减到 0，再退回储值 60.00：本金 ⌊6000 × 10000 ÷ 12000⌋ = **50.00**、赠送 **10.00**；订单 110.00 = 50.00 + 50.00 + 10.00
+- **SV-S7**（2026-11-27 改，`TestCreditGiveBackSamples`）：订单 200.00 = 退款余额 50.00 + 储值 120.00（本金 100.00 + 赠送 20.00）+ 到付 30.00，退菜后变 110.00：到付减到 0，再把 60.00 按这张单用掉的 170.00 拆：本金 ⌊6000 × 10000 ÷ 17000⌋ = ⌊3529.41⌋ = **35.29**、退款余额 ⌊6000 × 5000 ÷ 17000⌋ = ⌊1764.70⌋ = **17.64**、赠送 6000 − 3529 − 1764 = **7.07**；订单 110.00 = 32.36 + 64.71 + 12.93
 
 ## 5. 改动流程（每个涉及金额的 PR 都要做）
 
