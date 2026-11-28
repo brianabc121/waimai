@@ -168,7 +168,7 @@ extend({
   'sb.bonus_tip': ['充值时店铺送你的钱，下单时和现金余额一起按比例使用。', 'What the store gave you with a top-up; spent together with your cash balance, in proportion.'],
   'sb.r1': ['只能在本店使用，不能转给别人。', 'Only for this store, and cannot be passed on.'],
   'sb.r2': ['下单时先用退款存入的钱，再按比例用充值本金和赠送金。', 'An order uses refunds paid in first, then your top-up and bonus in proportion.'],
-  'sb.r3': ['退款、退菜时，按这笔消费用掉的比例原路退回现金余额和赠送金。', 'Refunds and removed dishes go back to the cash balance and the bonus in the shares the order used.'],
+  'sb.r3': ['退款、退货时，按这笔消费用掉的比例原路退回现金余额和赠送金。', 'Refunds and removed items go back to the cash balance and the bonus in the shares the order used.'],
   'sb.r4': ['要退充值请联系门店：可退剩余充值本金，顾客原因会扣回已用的赠送金；赠送金和退款存入的钱不能提现。',
     'To get a top-up back, ask the store: what is left of the top-up is paid back, less any bonus used if it is your choice. The bonus and refunds paid in cannot be cashed out.'],
   // offers

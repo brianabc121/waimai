@@ -77,7 +77,7 @@ extend({
   'wl.k.spend': ['用退款余额付款', 'Paid from refund balance'], 'wl.k.return': ['订单变小或取消，退回余额', 'Order went down: back to balance'],
   'wl.k.topup': ['充值', 'Top-up'], 'wl.k.topup_revoke': ['撤销充值', 'Top-up undone'],
   'wl.k.stored_spend': ['用储值付款', 'Paid from stored value'], 'wl.k.stored_return': ['订单变小或取消，退回储值', 'Order went down: back to stored value'],
-  'wl.k.stored_refund': ['按菜退款回储值', 'Refund back to stored value'], 'wl.k.stored_cashout': ['退储值', 'Stored value paid back'],
+  'wl.k.stored_refund': ['按商品退款回储值', 'Refund back to stored value'], 'wl.k.stored_cashout': ['退储值', 'Stored value paid back'],
   'wl.k.reclass': ['科目调整（金额不变）', 'Reclassified (no balance moved)'], 'wl.k.platform_adjust': ['平台调整', 'Platform adjustment'],
   // account kinds
   'wl.a.store_credit': ['顾客·退款余额', 'Customer · refund balance'], 'wl.a.stored_principal': ['顾客·储值本金', 'Customer · stored principal'],

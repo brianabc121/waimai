@@ -149,7 +149,7 @@ export const bannerSub = (b: MallBanner) => b.subtitle_tr || pick(b.subtitle, b.
 export const mallName = (h: MallHome | null) => h?.name || t('ml.brand')
 
 extend({
-  'ml.brand': ['外卖商城', 'Food Market'], 'ml.search_ph': ['搜索店铺或菜品', 'Search stores or dishes'], 'ml.search': ['搜索', 'Search'],
+  'ml.brand': ['外卖商城', 'Food Market'], 'ml.search_ph': ['搜索店铺或商品', 'Search stores or items'], 'ml.search': ['搜索', 'Search'],
   'ml.messages': ['消息', 'Messages'], 'ml.locating': ['正在定位…', 'Finding you…'], 'ml.choose_loc': ['选择位置', 'Choose a place'],
   'ml.here': ['当前位置', 'Current location'], 'ml.all': ['全部', 'All'],
   'ml.frequent': ['常点的店', 'Your stores'], 'ml.nearby': ['附近的店', 'Stores near you'], 'ml.nearby_n': ['{n} 家可配送', '{n} deliver here'],

@@ -119,9 +119,9 @@ for (const size of Object.keys(SIZES)) {
   } else {
     if (await visible(p, '.staffbar')) throw new Error(`office ${size}: the navigation should be closed`)
     await p.click('[data-testid=nav-open]')
-    await p.locator('.staffbar a:has-text("菜单")').waitFor()
+    await p.locator('.staffbar a:has-text("商品")').waitFor()
     await shot(p, `v03-office-nav-${size}`)
-    await p.click('.staffbar a:has-text("菜单")')
+    await p.click('.staffbar a:has-text("商品")')
     await p.waitForURL('**/merchant/menu')
     await p.locator('.staffbar').waitFor({ state: 'hidden' })   // choosing a page closes the drawer
     await p.goto(BASE + '/merchant/staff'); await p.waitForSelector('tr[data-staff=owner1]')

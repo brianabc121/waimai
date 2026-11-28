@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The merchant's menu page (菜单管理), in the customer pages' deep red, paper
+// The merchant's menu page (商品管理), in the customer pages' deep red, paper
 // and gold. Three tabs: the dishes (a category rail with counts, search and
 // filters, the dishes grouped by category as a list or a grid, paging, drag
 // to reorder), the flavour note templates (NoteTemplates.vue) and the topping

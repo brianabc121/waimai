@@ -36,7 +36,7 @@ const p1 = watch(await tw.newPage())
 await p1.goto(BASE + '/')
 await p1.waitForSelector(tid('lang-btn'))
 expect((await html(p1)).lang === 'zh-Hant', 'a Taiwanese browser should get Traditional Chinese')
-expect(await ph(p1) === '搜尋店鋪或菜品', 'the page should be in Traditional Chinese: ' + await ph(p1))
+expect(await ph(p1) === '搜尋店鋪或商品', 'the page should be in Traditional Chinese: ' + await ph(p1))
 expect(await cookie(tw) === undefined, 'following the browser sets no cookie')
 step('a zh-TW browser opens in Traditional Chinese')
 

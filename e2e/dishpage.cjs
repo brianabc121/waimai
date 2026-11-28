@@ -121,7 +121,7 @@ step('promo media and a cover take the same height at the top, on a phone, a tab
 
 // ---- where a dish is offered: dine-in, delivery, pickup, all ticked by default ----
 await owner.goto(BASE + '/merchant/menu')
-await owner.click('button:has-text("新增菜品")')
+await owner.click('button:has-text("新增商品")')
 await owner.waitForSelector(tid('item-form'))
 for (const c of ['item-dine-in', 'item-delivery', 'item-pickup']) expect(await owner.isChecked(tid(c)), true, `${c} is ticked for a new dish`)
 await owner.click(`${tid('item-form')} .sheet-foot .btn:not(.primary)`)

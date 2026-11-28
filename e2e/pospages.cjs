@@ -66,7 +66,7 @@ for (const [name, opts] of sizes) {
   await page.locator(tid('nav-pos')).waitFor({ state: 'visible' })
   const menu = () => page.locator('.shell-links > *').evaluateAll(els => els.map(e => e.getAttribute('data-testid') || e.textContent.trim()))
   // every group with pages under it starts folded (the orders page is in none of them)
-  expect((await menu()).slice(0, 11).join(','), 'nav-pos,订单,nav-cm,桌台,后厨,nav-msg,菜单,nav-deco,优惠,nav-fin,nav-dlv', `${name}: folded menu`)
+  expect((await menu()).slice(0, 11).join(','), 'nav-pos,订单,nav-cm,桌台,后厨,nav-msg,商品,nav-deco,优惠,nav-fin,nav-dlv', `${name}: folded menu`)
   for (const id of ['nav-pos-dine', 'nav-progress', 'nav-members', 'nav-messages', 'nav-media', 'nav-cash', 'nav-riders'])
     expect(await page.locator(tid(id)).count(), 0, `${name}: ${id} folded away`)
   await page.waitForTimeout(300)   // the drawer slides in

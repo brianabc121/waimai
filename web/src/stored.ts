@@ -130,7 +130,7 @@ extend({
   'sv.m.always': ['长期有效', 'No end date'],
   'sv.m.period': ['{from} 至 {to}', '{from} to {to}'],
   'sv.m.stats': ['已充 {n} 笔 · 实收 {paid} · 送出 {given}', '{n} top-ups · {paid} taken · {given} given'],
-  'sv.m.promos': ['满减、菜品活动和优惠券在“优惠活动”里设置', 'Order offers, dish deals and coupons are under Promotions'],
+  'sv.m.promos': ['满减、商品活动和优惠券在“优惠活动”里设置', 'Order offers, item deals and coupons are under Promotions'],
   'sv.m.topups': ['最近充值', 'Recent top-ups'],
   'sv.m.approve_over': ['单笔充值超过这个金额要经理授权', 'A top-up above this needs a manager'],
   'sv.m.saved': ['已保存', 'Saved'],

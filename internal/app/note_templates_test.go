@@ -231,7 +231,7 @@ func TestNoteTemplatesInMenuImport(t *testing.T) {
 	noErr(t, err)
 	f, err := excelize.OpenReader(bytes.NewReader(b))
 	noErr(t, err)
-	rows, err := f.GetRows("菜品")
+	rows, err := f.GetRows("商品")
 	noErr(t, err)
 	found := false
 	for _, r := range rows {
