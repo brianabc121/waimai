@@ -91,7 +91,7 @@ onMounted(() => { void countChats(); chatTimer = window.setInterval(countChats, 
 onBeforeUnmount(() => { clearInterval(chatTimer); clearTimeout(chatSoon); window.removeEventListener('live-refresh', countSoon) })
 watch(() => route.path, p => { if (p === '/merchant/messages') chatNew.value = false })
 
-async function out() { await logout(); session.loaded = true; router.replace('/login') }
+async function out() { if (!(await logout())) return; session.loaded = true; router.replace('/login') }
 const viewing = computed(() => !!session.user?.is_platform_admin)
 // Managers and owners keep their own approval code (docs/STAFF_ACCESS_DESIGN.md §7).
 const pinOpen = ref(false)

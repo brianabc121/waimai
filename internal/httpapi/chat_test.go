@@ -18,6 +18,7 @@ type fakeIM struct {
 	users map[string]string
 	read  []string
 	sent  []string
+	out   []string
 }
 
 func (f *fakeIM) EnsureUser(_ context.Context, id, nick string) error { f.users[id] = nick; return nil }
@@ -33,6 +34,10 @@ func (f *fakeIM) SendText(_ context.Context, from, to, text, ex string) error {
 	return nil
 }
 func (f *fakeIM) Check(context.Context) error { return nil }
+func (f *fakeIM) Logout(_ context.Context, id string) error {
+	f.out = append(f.out, id)
+	return nil
+}
 
 // hook posts what OpenIM would call back with and returns its answer.
 func hook(t *testing.T, key, command string, body map[string]any) (int, map[string]any) {
@@ -713,5 +718,75 @@ func TestChatBrands(t *testing.T) {
 	rs.Close()
 	if len(brands) != 2 || brands[0] != hcd || brands[1] != main {
 		t.Fatalf("message brands: %v", brands)
+	}
+}
+
+// docs/CODE_REVIEW_FIX_PLAN.md H06 (the small fix): someone who works on some
+// brands cannot open or mark read another brand's conversation by its
+// number; and when a person loses access, the store's shared chat sign-in is
+// ended so that a token they still hold stops working.
+func TestChatBrandScopeAndSignOut(t *testing.T) {
+	f := newFixture(t)
+	im := &fakeIM{users: map[string]string{}}
+	a.IM = im
+	t.Cleanup(func() { a.IM = nil })
+	cust, owner := verifiedCustomer(t), login(t, f.owner)
+	bid := fmt.Sprint(f.branchID)
+	custID := int64(cust.want(200, "", "GET", "/customer/me", nil)["id"].(float64))
+	cIM, bIM := fmt.Sprintf("c_%d", custID), "b_"+bid
+	code := fmt.Sprintf("CS%05d", time.Now().UnixNano()/1000%100000)
+	br := owner.want(200, "", "POST", "/merchant/branches/"+bid+"/brands",
+		map[string]any{"name": "好吃党", "code": code, "delivery": true})
+	other := int64(br["id"].(float64))
+	main := int64(0)
+	for _, x := range owner.want(200, "", "GET", "/merchant/branches/"+bid+"/brands", nil)["brands"].([]any) {
+		if m := x.(map[string]any); m["is_main"] == true {
+			main = int64(m["id"].(float64))
+		}
+	}
+	// a cashier who works on the new brand only
+	limited := uniq("lc")
+	st := owner.want(200, "", "POST", "/merchant/branches/"+bid+"/staff",
+		map[string]any{"username": limited, "password": "password1", "display_name": "L", "role": "cashier"})
+	sid := fmt.Sprintf("%.0f", st["id"].(float64))
+	owner.want(200, "", "PUT", "/merchant/branches/"+bid+"/staff/"+sid+"/brands", map[string]any{"brand_ids": []any{other}})
+	desk := login(t, limited)
+
+	// the customer talks to the main brand: not the limited cashier's business
+	if why := sayEx(t, cIM, bIM, "在吗", fmt.Sprintf(`{"brand":%d}`, main)); why != "" {
+		t.Fatalf("customer writes: %q", why)
+	}
+	url := fmt.Sprintf("/merchant/branches/%s/chats/%d", bid, custID)
+	if n := len(list(desk.want(200, "", "GET", "/merchant/branches/"+bid+"/chats", nil), "chats")); n != 0 {
+		t.Fatalf("the list shows %d conversations of another brand", n)
+	}
+	desk.want(403, "FORBIDDEN", "GET", url, nil)
+	desk.want(403, "FORBIDDEN", "POST", url+"/read", nil)
+	var unread int
+	if err := a.DB.QueryRow(context.Background(), `SELECT store_unread FROM chat_threads WHERE branch_id=$1 AND customer_id=$2`,
+		f.branchID, custID).Scan(&unread); err != nil || unread != 1 {
+		t.Fatalf("the refused read changed the conversation: unread %d, %v", unread, err)
+	}
+	owner.want(200, "", "GET", url, nil)
+	// the conversation moves to the cashier's brand: now it is theirs
+	if why := sayEx(t, cIM, bIM, "换个牌子问", fmt.Sprintf(`{"brand":%d}`, other)); why != "" {
+		t.Fatalf("customer writes to the other brand: %q", why)
+	}
+	desk.want(200, "", "GET", url, nil)
+	desk.want(200, "", "POST", url+"/read", nil)
+
+	// losing access ends the store's shared sign-in
+	im.out = nil
+	owner.want(200, "", "PATCH", "/merchant/branches/"+bid+"/staff/"+sid, map[string]any{"display_name": "LL"})
+	if len(im.out) != 0 {
+		t.Fatalf("a new display name signed the store out: %v", im.out)
+	}
+	owner.want(200, "", "PATCH", "/merchant/branches/"+bid+"/staff/"+sid, map[string]any{"active": false})
+	if len(im.out) != 1 || im.out[0] != bIM {
+		t.Fatalf("disabling a person: %v", im.out)
+	}
+	owner.want(200, "", "DELETE", "/merchant/branches/"+bid+"/staff/"+sid, nil)
+	if len(im.out) != 2 {
+		t.Fatalf("removing a person: %v", im.out)
 	}
 }

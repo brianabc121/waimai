@@ -313,6 +313,7 @@ func (a *App) SaveRolePerms(ctx context.Context, actor int64, branchID int64, in
 	if err != nil {
 		return nil, err
 	}
+	a.chatAccessChanged(ctx, branchID)
 	return a.RolePerms(ctx, branchID)
 }
 

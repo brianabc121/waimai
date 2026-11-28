@@ -2,6 +2,7 @@
 // The tables of a store: managers add them (name, area, seats) and pair
 // tablets; everyone sees which are in use and the bills closed today. Opening,
 // ordering and payment are on the dine-in desk (代客下单 > 堂食).
+import { useNow } from '../now'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import QRCode from 'qrcode'
@@ -23,8 +24,7 @@ const cur = role.currency
 const tables = ref<DiningTable[]>([])
 const recent = ref<Bill[]>([])
 const error = ref('')
-const now = ref(Date.now())
-setInterval(() => (now.value = Date.now()), 30000)
+const now = useNow(30000)
 
 const { online, refreshNow } = useLive(() => `/merchant/branches/${bid}/events`, async () => {
   const r = await get<{ tables: DiningTable[]; recent: Bill[] }>(`/merchant/branches/${bid}/tables`)

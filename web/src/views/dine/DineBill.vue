@@ -2,6 +2,7 @@
 // A table's bill by round, what can be done to each dish (serve, one more,
 // rush, void with a tapped reason), and taking payment with tapped amounts
 // (docs/DINE_IN_ORDER_DESIGN.md §8, §9).
+import { useNow } from '../../now'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ApiError, get, post } from '../../api'
 import { money, pick, t, toMinor } from '../../i18n'
@@ -23,8 +24,7 @@ import { voidNote, voidsOf } from '../../voids'
 const props = defineProps<{ bill: Bill; presets: DinePresets | null; currency: string; country: string; phone: boolean; payFirst: boolean; items?: Map<number, Item> }>()
 const emit = defineEmits<{ back: []; update: [bill: Bill]; again: [line: DeskLine]; closed: []; add: [] }>()
 const m = (v: number) => money(v, props.currency)
-const now = ref(Date.now())
-setInterval(() => (now.value = Date.now()), 30000)
+const now = useNow(30000)
 const error = ref('')
 
 // ---- rounds ----

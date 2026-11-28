@@ -29,7 +29,7 @@ async function pickPhoto(ev: Event) {
 }
 async function logout() {
   if (!confirm(t('mp.logout_confirm'))) return
-  await customerLogout()
+  if (!(await customerLogout())) return
   me.profile = null
   await router.replace('/me')
 }

@@ -26,7 +26,7 @@ const TOP = ['PH', 'MY', 'SG', 'TH', 'ID', 'VN', 'KH', 'MM', 'LA', 'US', 'CA', '
     </div>
 
     <div>
-      <form class="form" id="lead" novalidate data-lang={lang} data-tag={TAG[lang]} data-top={TOP.join(',')} data-err={JSON.stringify(p.err)}
+      <form class="form" id="lead" method="post" novalidate data-lang={lang} data-tag={TAG[lang]} data-top={TOP.join(',')} data-err={JSON.stringify(p.err)}
         data-choose={f.choose}>
         <h2>{p.formTitle}</h2>
         <div class="fgrid">
@@ -77,23 +77,29 @@ const TOP = ['PH', 'MY', 'SG', 'TH', 'ID', 'VN', 'KH', 'MM', 'LA', 'US', 'CA', '
   import { CODES, localDigits } from '../../../../web/src/dial'
 
   const form = document.getElementById('lead') as HTMLFormElement
+  // First of all: the browser never submits this form by itself. Whatever
+  // goes wrong further down, the visitor's details stay out of the address.
+  form.addEventListener('submit', e => e.preventDefault())
   const opened = Date.now()
   const err = JSON.parse(form.dataset.err!) as Record<string, string>
   const country = form.querySelector<HTMLSelectElement>('#country_code')!
   const dial = document.getElementById('dial')!
 
   // Countries, named in the page's language, the usual ones first.
-  const names = new Intl.DisplayNames([form.dataset.tag!, 'en'], { type: 'region' })
-  const name = (cc: string) => { try { return names.of(cc) ?? cc } catch { return cc } }
+  // An old browser without Intl.DisplayNames shows the country codes instead;
+  // it must not stop the rest of this script (CODE_REVIEW_FIX_PLAN M17).
+  let names: Intl.DisplayNames | null = null
+  try { names = new Intl.DisplayNames([form.dataset.tag!, 'en'], { type: 'region' }) } catch { /* codes will do */ }
+  const name = (cc: string) => { try { return names?.of(cc) ?? cc } catch { return cc } }
   const top = form.dataset.top!.split(',')
-  const rest = Object.keys(CODES).filter(cc => !top.includes(cc)).sort((a, b) => name(a).localeCompare(name(b), form.dataset.tag))
+  const rest = Object.keys(CODES).filter(cc => !top.includes(cc)).sort((a, b) => { try { return name(a).localeCompare(name(b), form.dataset.tag) } catch { return name(a) < name(b) ? -1 : 1 } })
   const add = (cc: string) => country.add(new Option(`${name(cc)} +${CODES[cc]}`, cc))
   top.forEach(add)
   const sep = new Option('──────────', ''); sep.disabled = true; country.add(sep)
   rest.forEach(add)
   // A guess from the browser's language region (zh-SG, en-MY…); the visitor can change it.
   // en-US and zh-CN are many devices' default rather than where the restaurant is, so they suggest nothing.
-  const guess = navigator.languages.filter(l => !/^(en-US|zh-CN)$/i.test(l)).map(l => l.split('-').pop()!.toUpperCase()).find(r => r.length === 2 && CODES[r])
+  const guess = (navigator.languages ?? []).filter(l => !/^(en-US|zh-CN)$/i.test(l)).map(l => l.split('-').pop()!.toUpperCase()).find(r => r.length === 2 && CODES[r])
   if (guess) country.value = guess
   const showDial = () => { dial.textContent = country.value ? '+' + CODES[country.value] : '+' }
   country.addEventListener('change', showDial); showDial()

@@ -133,6 +133,32 @@ func (a *App) CustomerChatLogin(ctx context.Context, customerID int64) (*ChatLog
 	return a.chatLogin(ctx, customerIM(customerID))
 }
 
+// chatAccessChanged is called after someone lost access to a store's
+// conversations (disabled, removed, another role, the role's permissions
+// changed). The store's front desk shares one chat account, so the tokens
+// already handed out are ended; pages of people who may still chat sign in
+// again by themselves, the others are refused (CODE_REVIEW_FIX_PLAN H06).
+func (a *App) chatAccessChanged(ctx context.Context, branchID int64) {
+	if a.IM == nil {
+		return
+	}
+	if err := a.IM.Logout(ctx, branchIM(branchID)); err != nil {
+		log.Printf("chat: sign out store %d after an access change: %v", branchID, err)
+	}
+}
+
+// ChatInBrands says whether the store's conversation with a customer belongs
+// to one of brands: the conversation's brand when they have talked, otherwise
+// a brand the customer has ordered from.
+func (a *App) ChatInBrands(ctx context.Context, branchID, customerID int64, brands []int64) (bool, error) {
+	var ok bool
+	err := a.DB.QueryRow(ctx, `SELECT COALESCE(
+		(SELECT tb.id = ANY($3::bigint[]) FROM chat_threads t `+threadBrand+` WHERE t.branch_id=$1 AND t.customer_id=$2),
+		EXISTS (SELECT 1 FROM orders o WHERE o.branch_id=$1 AND o.customer_id=$2 AND o.brand_id = ANY($3::bigint[])))`,
+		branchID, customerID, brands).Scan(&ok)
+	return ok, err
+}
+
 func (a *App) StoreChatLogin(ctx context.Context, branchID int64) (*ChatLogin, error) {
 	if err := a.storeAccount(ctx, branchID); err != nil {
 		return nil, err

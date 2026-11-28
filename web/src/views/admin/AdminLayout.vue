@@ -23,7 +23,7 @@ onMounted(() => {
   stopSupport = poll(() => Promise.all([loadSupportUnread(), loadNewApplications()]).catch(() => {}), 20)
 })
 onUnmounted(() => { stop(); stopSupport() })
-async function out() { await logout(); session.loaded = true; router.replace('/admin/login') }
+async function out() { if (!(await logout())) return; session.loaded = true; router.replace('/admin/login') }
 </script>
 
 <template>

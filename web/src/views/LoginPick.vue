@@ -42,7 +42,7 @@ async function work() {
     router.replace('/work')
   } catch (e) { error.value = (e as Error).message } finally { busy.value = false }
 }
-async function out() { await logout(); session.loaded = true; router.replace('/login') }
+async function out() { if (!(await logout())) return; session.loaded = true; router.replace('/login') }
 </script>
 
 <template>

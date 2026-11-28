@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useNow } from '../now'
 import { colorOf, typeLabel } from '../orderTypes'
 import './dine/strings'
 import '../officeStrings'
@@ -7,6 +8,7 @@ import { computed, reactive, ref } from 'vue'
 import { ApiError, get, post } from '../api'
 import { both, minutesSince, t, whenText } from '../i18n'
 import { useLive } from '../live'
+import { parts, screenState } from '../retry'
 import { session } from '../session'
 import type { Order, OrderItem, Station } from '../types'
 import { timerClass } from '../progress'
@@ -45,8 +47,7 @@ const station = ref<'all' | 'none' | number>(JSON.parse(localStorage.getItem(`kd
 function setStation(v: 'all' | 'none' | number) { station.value = v; localStorage.setItem(`kds-station-${bid}`, JSON.stringify(v)) }
 const tab = ref<'cook' | 'pack' | 'serve'>('cook')
 const error = ref('')
-const now = ref(Date.now())
-setInterval(() => (now.value = Date.now()), 30000)
+const now = useNow(30000)
 
 // Per-order packing check state: which lines the packer ticked, and bag count.
 // It is tied to the manifest version, so any change to the order clears it.
@@ -57,11 +58,26 @@ function check(o: Order) {
   return checks[o.id]
 }
 
-const { online, lastSync, refreshNow } = useLive(() => `/merchant/branches/${bid}/events`, async () => {
-  const [b, s] = await Promise.all([get<{ orders: Order[]; target_minutes?: number }>(`/kitchen/branches/${bid}/board`), get<{ stations: Station[] }>(`/merchant/branches/${bid}/stations`)])
-  orders.value = b.orders; stations.value = s.stations
+// The board and the stations are read on their own: a failed stations read
+// must not keep new tickets off the screen, and a failed board read is shown,
+// never passed off as "no orders" (docs/CODE_REVIEW_FIX_PLAN.md M12).
+const { online, lastSync, error: syncError, refreshNow } = useLive(() => `/merchant/branches/${bid}/events`, async () => {
+  const r = await parts({
+    board: () => get<{ orders: Order[]; target_minutes?: number }>(`/kitchen/branches/${bid}/board`),
+    stations: () => get<{ stations: Station[] }>(`/merchant/branches/${bid}/stations`),
+  })
+  const s = r.values.stations
+  if (s) {
+    stations.value = s.stations
+    if (typeof station.value === 'number' && !s.stations.some(x => x.id === station.value)) setStation('all')
+  }
+  const b = r.values.board
+  if (!b) throw r.errors.board ?? new Error('board')
+  orders.value = b.orders
   if (b.target_minutes) target.value = b.target_minutes
-  if (typeof station.value === 'number' && !s.stations.some(x => x.id === station.value)) setStation('all')
+  // ticks of orders that left the screen are forgotten
+  const here = new Set(b.orders.map(o => o.id))
+  for (const id of Object.keys(checks)) if (!here.has(Number(id))) delete checks[Number(id)]
   const ids = new Set(unacked.value.map(x => x.v.id))
   if (!firstLoad && [...ids].some(id => !knownVoids.has(id))) voidBeep()
   knownVoids = ids; firstLoad = false
@@ -98,6 +114,8 @@ function move(it: OrderItem, e: Event) {
   void run(() => post(`/kitchen/items/${it.id}/station`, { station_id: v === '' ? null : Number(v), reason: 'kitchen screen' }))
 }
 const missing = (o: Order) => live(o).filter(i => i.prep_status !== 'ready')
+// what the screen may claim about its data: see screenState
+const screen = computed(() => screenState(lastSync.value ? lastSync.value.getTime() : null, !!syncError.value, now.value, 90000))
 const waited = (o: Order) => { void now.value; return minutesSince(o.release_at ?? o.created_at) }
 
 async function run(fn: () => Promise<unknown>) {
@@ -131,7 +149,11 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
       <button :class="{ on: tab === 'pack' }" @click="tab = 'pack'">{{ t('to_pack') }} <span class="kn">{{ packing.length }}</span></button>
       <button :class="{ on: tab === 'serve' }" data-test="tab-serve" @click="tab = 'serve'">{{ t('to_serve') }} <span class="kn">{{ serveCount }}</span></button>
     </nav>
-    <div v-if="!online" class="banner warn">{{ t('offline') }}</div>
+    <div v-if="screen === 'never' || screen === 'stale' || screen === 'failing'" class="banner bad" data-testid="k-sync-bad">
+      <b>{{ screen === 'never' ? t('kt.never') : screen === 'stale' ? t('kt.stale', { t: lastSync?.toLocaleTimeString() ?? '' }) : t('kt.failing') }}</b>
+      <button class="btn small" @click="refreshNow()">{{ t('kt.retry') }}</button>
+    </div>
+    <div v-else-if="!online" class="banner warn">{{ t('offline') }}</div>
     <div v-if="error" class="banner bad">{{ error }}</div>
 
     <div v-if="unacked.length" class="stack" data-testid="k-voids">
@@ -164,7 +186,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
       </aside>
       <section class="kmain">
       <div v-if="unassigned > 0" class="banner warn">{{ t('unassigned_warn', { n: unassigned }) }}</div>
-      <div v-if="shown.length === 0" class="card muted ox-empty">{{ t('kitchen_empty') }}</div>
+      <div v-if="shown.length === 0 && screen !== 'never'" class="card muted ox-empty">{{ t('kitchen_empty') }}</div>
       <div class="cols">
         <div v-for="o in shown" :key="o.id" class="card stack" :class="{ kfresh: freshAdd(o), kvoid: hasUnacked(o) }">
           <div class="row between">
@@ -205,7 +227,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
 
     <!-- serving: dine-in dishes ready for the table -->
     <template v-else-if="tab === 'serve'">
-      <div v-if="serving.length === 0" class="card muted ox-empty">{{ t('kitchen_empty') }}</div>
+      <div v-if="serving.length === 0 && screen !== 'never'" class="card muted ox-empty">{{ t('kitchen_empty') }}</div>
       <div class="cols">
         <div v-for="o in serving" :key="o.id" class="card stack">
           <div class="row between"><h2>{{ t('table') }} {{ o.table_name }}</h2><span class="small muted">{{ o.public_no }}</span></div>
@@ -223,7 +245,7 @@ const allTicked = (o: Order) => live(o).every(i => check(o).ticked.has(i.id))
 
     <!-- packing: whole-order check and handoff (K03/K04) -->
     <template v-else>
-      <div v-if="packing.length === 0" class="card muted ox-empty">{{ t('kitchen_empty') }}</div>
+      <div v-if="packing.length === 0 && screen !== 'never'" class="card muted ox-empty">{{ t('kitchen_empty') }}</div>
       <div class="cols">
         <div v-for="o in packing" :key="o.id" class="card stack">
           <div class="row between">

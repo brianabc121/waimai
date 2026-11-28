@@ -59,3 +59,60 @@ jobs:
       # builds every page and checks titles, descriptions and links (scripts/check.mjs)
       - run: npm run build
         working-directory: site
+
+  # A smoke test in a real browser: one delivery order from the customer's
+  # phone to the rider's cash, and an order whose answer is lost on the way
+  # back. The other e2e scripts stay manual (make e2e).
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: waimai
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/waimai?sslmode=disable
+      BASE_URL: http://localhost:8080
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the pages
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: Build, migrate, demo data
+        run: |
+          go build -o bin/ ./cmd/...
+          ./bin/migrate
+          ./bin/seed
+      - name: Browser
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Start the server
+        run: |
+          STATIC_DIR=web/dist EMBED_WORKER=true OTP_DEV_ECHO=true GOOGLE_MAPS_API_KEY=stub nohup ./bin/api > api.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf "$BASE_URL/api/v1/config" > /dev/null && exit 0; sleep 1; done
+          cat api.log; exit 1
+      - name: Delivery order, start to finish
+        run: node -r ./e2e/patient-login.cjs e2e/flow.cjs
+      - name: Order whose answer is lost
+        run: node -r ./e2e/patient-login.cjs e2e/lostorder.cjs
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failure
+          path: |
+            api.log
+            e2e/shots
+          retention-days: 7

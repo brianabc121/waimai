@@ -127,6 +127,7 @@ function toMsg(m: any, self: string): ChatMsg {
   return out
 }
 
+let kickedAt = 0
 async function open(loginPath: string): Promise<Sdk> {
   chat.state = 'connecting'
   const login = await post<ChatLogin>(loginPath)
@@ -147,7 +148,19 @@ async function open(loginPath: string): Promise<Sdk> {
     s.on(E.OnConnectSuccess, () => { chat.state = 'on' })
     s.on(E.OnConnecting, () => { if (chat.state !== 'kicked') chat.state = 'connecting' })
     s.on(E.OnConnectFailed, () => { chat.state = 'down' })
-    s.on(E.OnKickedOffline, () => { chat.state = 'kicked' })
+    // The store's desk shares one account. When someone loses access the
+    // server ends every sign-in of it (CODE_REVIEW_FIX_PLAN H06): a page
+    // whose person may still chat signs in again, once; the others are
+    // refused by the login and stay out.
+    s.on(E.OnKickedOffline, () => {
+      const path = wanted
+      pending = null; wanted = ''; chat.state = 'kicked'
+      if (!path || Date.now() - kickedAt < 60000) return
+      kickedAt = Date.now()
+      wanted = path
+      pending = open(path).catch(e => { pending = null; wanted = ''; chat.state = 'kicked'; throw e })
+      pending.catch(() => null)
+    })
     const expired = () => { pending = null; wanted = ''; chat.state = 'down' }
     s.on(E.OnUserTokenExpired, expired)
     s.on(E.OnUserTokenInvalid, expired)

@@ -967,7 +967,7 @@ func (a *App) textCalled(ctx context.Context, tx pgx.Tx, branchID int64, t *Queu
 	if names, err := storeNames(ctx, tx, lang, []int64{branchID}); err == nil && names[branchID] != "" {
 		store = names[branchID]
 	}
-	msg := a.sysText(ctx, lang, "sys.sms.queue_called", "store", store, "no", t.Number)
+	msg := a.sysTextIn(ctx, tx, lang, "sys.sms.queue_called", "store", store, "no", t.Number)
 	if a.PublicBaseURL != "" {
 		msg += " " + strings.TrimRight(a.PublicBaseURL, "/") + "/q/t/" + a.ticketToken(t.nonce)
 	}

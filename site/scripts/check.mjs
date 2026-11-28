@@ -14,6 +14,9 @@ for (const p of pages) {
   if (!/<title>[^<]+<\/title>/.test(html)) bad.push(`${at}: no title`)
   if (!at.endsWith('/index.html') || at === '/index.html' || at.startsWith('/404')) { /* root redirect and 404 */ }
   else if (!/<meta name="description" content="[^"]+"/.test(html)) bad.push(`${at}: no description`)
+  // A form that the browser could submit by itself must not put what the
+  // visitor typed into the address (CODE_REVIEW_FIX_PLAN M17).
+  for (const [tag] of html.matchAll(/<form\b[^>]*>/g)) if (!/\bmethod="post"/i.test(tag)) bad.push(`${at}: a form without method="post"`)
   for (const [, link] of html.matchAll(/(?:href|src)="(\/[^"#?]*)"/g)) {
     if (link.startsWith('/api/') || link.startsWith('//')) continue
     const file = link.endsWith('/') ? join(dist, link, 'index.html') : join(dist, link)

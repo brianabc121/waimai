@@ -47,6 +47,7 @@ run: build
 E2E_NODE = node -r ./e2e/patient-login.cjs
 e2e:
 	$(E2E_NODE) e2e/flow.cjs
+	$(E2E_NODE) e2e/lostorder.cjs
 	$(E2E_NODE) e2e/dinein.cjs
 	$(E2E_NODE) e2e/notetemplates.cjs
 	$(E2E_NODE) e2e/templates.cjs

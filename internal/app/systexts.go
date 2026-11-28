@@ -35,7 +35,10 @@ type sysFixes struct {
 	texts map[string]string
 }
 
-func (a *App) sysFix(ctx context.Context, lang string) map[string]string {
+// sysFix reads the corrections through q: inside a transaction that is the
+// transaction itself, so that a cold cache never waits for a second
+// connection while holding the first.
+func (a *App) sysFix(ctx context.Context, q Querier, lang string) map[string]string {
 	c := a.fixed
 	if c == nil {
 		return nil
@@ -47,7 +50,7 @@ func (a *App) sysFix(ctx context.Context, lang string) map[string]string {
 		return f.texts
 	}
 	texts := map[string]string{}
-	rows, err := a.DB.Query(ctx, `SELECT key, text FROM ui_translations WHERE lang=$1 AND key LIKE 'sys.%'`, lang)
+	rows, err := q.Query(ctx, `SELECT key, text FROM ui_translations WHERE lang=$1 AND key LIKE 'sys.%'`, lang)
 	if err == nil {
 		for rows.Next() {
 			var k, t string
@@ -69,10 +72,15 @@ func (a *App) sysFix(ctx context.Context, lang string) map[string]string {
 // sysText is a system text in lang (English when the language is unknown),
 // with {name} filled in from args.
 func (a *App) sysText(ctx context.Context, lang, key string, args ...string) string {
+	return a.sysTextIn(ctx, a.DB, lang, key, args...)
+}
+
+// sysTextIn is sysText for code that already holds a transaction.
+func (a *App) sysTextIn(ctx context.Context, q Querier, lang, key string, args ...string) string {
 	if !IsLang(lang) {
 		lang = "en"
 	}
-	s, ok := a.sysFix(ctx, lang)[key]
+	s, ok := a.sysFix(ctx, q, lang)[key]
 	if !ok {
 		s = sysTexts[key][lang]
 	}

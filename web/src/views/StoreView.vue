@@ -125,7 +125,7 @@ async function account() {
   if (await loadCustomer()) showAccount.value = !showAccount.value
   else router.push(loginRoute(storePath(props.slug), props.slug))
 }
-async function logout() { await customerLogout(); showAccount.value = false }
+async function logout() { if (await customerLogout()) showAccount.value = false }
 const showAddresses = ref(false)
 // Keeping the store among the customer's favourites needs an account.
 const favorite = ref(false)

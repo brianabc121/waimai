@@ -9,6 +9,7 @@ export interface DeskLine { item_id: number; option_ids: number[]; note_tags: nu
 // adds one; a dish with a required option or flavour notes opens the choice
 // sheet), this round on the right, then "send to kitchen". A phone shows the
 // dishes as a list and the round in a bar at the bottom.
+import { useNow } from '../../now'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ApiError, newKey, post } from '../../api'
 import { mn, money, t } from '../../i18n'
@@ -23,8 +24,7 @@ const emit = defineEmits<{ back: []; sent: [bill: Bill, round: number]; bill: []
 
 const cur = computed(() => props.store?.branch.currency ?? props.bill.order.currency)
 const m = (v: number) => money(v, cur.value)
-const now = ref(Date.now())
-setInterval(() => (now.value = Date.now()), 30000)
+const now = useNow(30000)
 
 // ---- the menu: dishes offered at the table ----
 const TOP = -1

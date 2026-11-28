@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 import { get, post, put } from './api'
-import { chosen, locale, onLocaleChosen, setLocale } from './i18n'
+import { chosen, locale, onLocaleChosen, setLocale, t } from './i18n'
+import { signOut } from './retry'
 import { isLocale } from './langs'
 
 // The logged-in customer (a phone number confirmed by a texted code). One
@@ -25,9 +26,14 @@ onLocaleChosen(l => {
   if (customer.verified) void put('/customer/lang', { lang: l ?? '' }).catch(() => null)
 })
 
-export async function customerLogout() {
-  await post('/customer/logout').catch(() => null)
+// See session.ts logout: a sign-out the server did not confirm is not one.
+export async function customerLogout(): Promise<boolean> {
+  if (!(await signOut(() => post('/customer/logout')))) {
+    window.alert(t('logout_failed'))
+    return false
+  }
   Object.assign(customer, { loaded: true, verified: false, phone: '' })
+  return true
 }
 
 // Where to send someone who has to log in first; they come back to `next`.

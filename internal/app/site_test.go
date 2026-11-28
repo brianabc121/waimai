@@ -3,6 +3,7 @@ package app_test
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/brianabc121/waimai/internal/app"
@@ -192,6 +193,47 @@ func TestSiteAndDomains(t *testing.T) {
 	}
 	if ok, _ := a.TLSAllowed(ctx, own); !ok {
 		t.Fatal("certificate not allowed for the checked domain")
+	}
+
+	// A lookup that fails without an answer (the resolver timed out) does not
+	// take a working domain out; it is looked at again soon. An answer that
+	// says the record is gone does.
+	due := func() {
+		t.Helper()
+		_, err := a.DB.Exec(ctx, `UPDATE branch_domains SET checked_at = now() - interval '2 hours' WHERE id=$1`, d.ID)
+		noErr(t, err)
+	}
+	good := a.LookupCNAME
+	a.LookupCNAME = func(context.Context, string) (string, error) {
+		return "", &net.DNSError{Err: "i/o timeout", IsTimeout: true, IsTemporary: true}
+	}
+	due()
+	_, err = a.CheckDomains(ctx)
+	noErr(t, err)
+	if mode(own) != s.slug {
+		t.Fatal("a DNS timeout took the store's own domain out")
+	}
+	var note string
+	var soon bool
+	noErr(t, a.DB.QueryRow(ctx, `SELECT check_error, checked_at < now() - interval '50 minutes' FROM branch_domains WHERE id=$1`, d.ID).Scan(&note, &soon))
+	if note != "DNS lookup failed" || !soon {
+		t.Fatalf("after a timeout: note %q, checked again soon %v", note, soon)
+	}
+	a.LookupCNAME = func(context.Context, string) (string, error) {
+		return "", &net.DNSError{Err: "no such host", IsNotFound: true}
+	}
+	due()
+	_, err = a.CheckDomains(ctx)
+	noErr(t, err)
+	if mode(own) != "mall" {
+		t.Fatal("a domain whose record is gone still serves the store")
+	}
+	a.LookupCNAME = good
+	due()
+	_, err = a.CheckDomains(ctx)
+	noErr(t, err)
+	if mode(own) != s.slug {
+		t.Fatal("the domain did not come back when its record did")
 	}
 
 	// Asking the platform to buy a domain.

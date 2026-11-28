@@ -29,6 +29,9 @@ type IM interface {
 	SendText(ctx context.Context, from, to, text, ex string) error
 	// Check reports whether the server answers.
 	Check(ctx context.Context) error
+	// Logout ends every browser sign-in of userID: tokens handed out before
+	// stop working, and a page that may still chat signs in again.
+	Logout(ctx context.Context, userID string) error
 }
 
 // imPlatformWeb is OpenIM's number for a browser.
@@ -220,6 +223,12 @@ func (o *OpenIM) SendText(ctx context.Context, from, to, text, ex string) error 
 		"content": map[string]any{"content": text}, "contentType": 101, "sessionType": 1,
 		"isOnlineOnly": false, "notOfflinePush": false, "ex": ex,
 	}, nil)
+}
+
+// Logout uses OpenIM's force_logout, which kicks the account's tokens for
+// the web platform.
+func (o *OpenIM) Logout(ctx context.Context, userID string) error {
+	return o.admin(ctx, "/auth/force_logout", map[string]any{"platformID": imPlatformWeb, "userID": userID}, nil)
 }
 
 func (o *OpenIM) Check(ctx context.Context) error {

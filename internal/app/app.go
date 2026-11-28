@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -83,6 +84,10 @@ type App struct {
 
 	// fixed caches the language page's corrections of system texts.
 	fixed *sysFixCache
+
+	// JobLease and JobRenewEvery override how long a claimed job is held and
+	// how often a running one renews; zero means the defaults. Tests shorten them.
+	JobLease, JobRenewEvery time.Duration
 }
 
 // forCustomer applies platform-wide limits to a store as customers use it.
