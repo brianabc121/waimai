@@ -2,6 +2,7 @@
 // In-store identity: the dishes waiting at the person's own stations, and the
 // orders to pack when they hold the packing post. It reads the same kitchen
 // board as the big kitchen screen, so both always agree.
+import { useNow } from '../../now'
 import KitchenNote from '../KitchenNote.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { ApiError, get, post } from '../../api'
@@ -18,8 +19,7 @@ const emit = defineEmits<{ count: [n: number]; switch: [] }>()
 const bid = session.branchId!
 const orders = ref<Order[]>([])
 const error = ref('')
-const now = ref(Date.now())
-setInterval(() => (now.value = Date.now()), 30000)
+const now = useNow(30000)
 
 const posts = computed(() => currentRole()?.posts ?? [])
 const myStations = computed(() => posts.value.filter(p => p.kind === 'station'))

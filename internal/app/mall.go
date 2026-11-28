@@ -164,34 +164,32 @@ type MallList struct {
 const mallStoreSQL = `SELECT b.id,
 	coalesce(t.published->>'logo_url', ''), coalesce(t.published->>'cover_url', ''), b.tagline,
 	coalesce((SELECT array_agg(c.code ORDER BY c.sort, c.id) FROM branch_categories bc JOIN store_categories c ON c.id = bc.category_id
-		WHERE bc.branch_id = b.id AND c.active), '{}'),
-	(SELECT count(*) FROM reviews r WHERE r.branch_id = b.id),
-	coalesce((SELECT round(avg(r.rating), 1) FROM reviews r WHERE r.branch_id = b.id), 0)::float8,
-	(SELECT count(*) FROM orders o WHERE o.branch_id = b.id AND o.acceptance_status = 'accepted' AND o.created_at > now() - interval '30 days')
+		WHERE bc.branch_id = b.id AND c.active), '{}')
 	FROM branches b
 	JOIN merchants m ON m.id = b.merchant_id
 	LEFT JOIN channel_templates t ON t.branch_id = b.id AND t.channel = 'delivery'
 	WHERE b.deleted_at IS NULL AND m.deleted_at IS NULL AND m.status = 'active'
 		AND b.mall_listed AND NOT b.mall_hidden AND (b.delivery_enabled OR b.pickup_enabled) AND `
 
-// mallCandidates loads the listed stores a condition selects, with what a card shows.
+// mallCandidates loads the listed stores a condition selects, with what a card
+// shows. Reviews and sales are counted per brand below, once, since a card is
+// a brand's. The order makes the cut at 1000 stores the same every time; a
+// spatial index comes before a region gets near that many.
 func (a *App) mallCandidates(ctx context.Context, where string, args ...any) ([]*MallStore, error) {
-	rows, err := a.DB.Query(ctx, mallStoreSQL+where+` LIMIT 1000`, args...)
+	rows, err := a.DB.Query(ctx, mallStoreSQL+where+` ORDER BY b.id LIMIT 1000`, args...)
 	if err != nil {
 		return nil, err
 	}
 	type extra struct {
 		logo, cover, tagline string
 		cats                 []string
-		reviews, sales       int
-		rating               float64
 	}
 	byID := map[int64]extra{}
 	ids := []int64{}
 	for rows.Next() {
 		var id int64
 		var e extra
-		if err := rows.Scan(&id, &e.logo, &e.cover, &e.tagline, &e.cats, &e.reviews, &e.rating, &e.sales); err != nil {
+		if err := rows.Scan(&id, &e.logo, &e.cover, &e.tagline, &e.cats); err != nil {
 			rows.Close()
 			return nil, err
 		}

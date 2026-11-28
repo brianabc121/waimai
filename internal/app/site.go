@@ -331,12 +331,21 @@ func (a *App) CheckDomains(ctx context.Context) (int, error) {
 		if ok {
 			status = "active"
 		}
+		// A lookup that failed without an answer (a timeout, the resolver
+		// down) says nothing about the domain: one that is in use stays in
+		// use, the trouble is noted, and it is looked at again in five
+		// minutes instead of an hour. Only an answer takes a domain out: no
+		// such record, or a CNAME that points elsewhere.
+		again := "0 minutes"
+		if d.Status == "active" && msg == "DNS lookup failed" {
+			status, again = "active", "55 minutes"
+		}
 		if status != d.Status {
 			changed++
 		}
-		if _, err := a.DB.Exec(ctx, `UPDATE branch_domains SET status=$2, check_error=$3, checked_at=now(),
+		if _, err := a.DB.Exec(ctx, `UPDATE branch_domains SET status=$2, check_error=$3, checked_at=now() - $4::interval,
 			verified_at = CASE WHEN $2='active' THEN COALESCE(verified_at, now()) ELSE NULL END WHERE id=$1`,
-			d.ID, status, msg); err != nil {
+			d.ID, status, msg, again); err != nil {
 			return changed, err
 		}
 	}

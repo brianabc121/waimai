@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -111,5 +112,57 @@ func TestNotifyInsideTransactionNeedsNoSecondConnection(t *testing.T) {
 		AND payload->>'phone' = $1`, o1.CustomerPhone).Scan(&n))
 	if n < 2 {
 		t.Fatalf("texts queued: %d, want one per accepted order", n)
+	}
+}
+
+// Side boundary 1 of the review: a newer verification code ends the older
+// ones (an old code does not work again after the new one was used), and the
+// daily cap per address holds when many numbers ask at the same moment.
+func TestOTPOldCodeAndAddressCap(t *testing.T) {
+	a := need(t)
+	ctx := context.Background()
+	phone := fmt.Sprintf("+63917%07d", time.Now().UnixNano()%1e7)
+	old, err := a.RequestOTP(ctx, phone, "")
+	noErr(t, err)
+	// the minute between two codes has passed
+	_, err = a.DB.Exec(ctx, `UPDATE phone_verifications SET created_at = created_at - interval '2 minutes' WHERE phone=$1`, phone)
+	noErr(t, err)
+	fresh, err := a.RequestOTP(ctx, phone, "")
+	noErr(t, err)
+	if old == fresh {
+		t.Skip("the two random codes happen to be equal")
+	}
+	_, _, err = a.VerifyOTP(ctx, phone, old)
+	wantCode(t, err, "OTP_INVALID")
+	_, _, err = a.VerifyOTP(ctx, phone, fresh)
+	noErr(t, err)
+	_, _, err = a.VerifyOTP(ctx, phone, old) // the new one is used: the old one stays dead
+	wantCode(t, err, "OTP_INVALID")
+
+	// 40 numbers at once from one address that has 3 codes left today
+	echo := a.OTPDevEcho
+	a.OTPDevEcho = false
+	t.Cleanup(func() { a.OTPDevEcho = echo })
+	ip := "198.51.100." + fmt.Sprint(time.Now().UnixNano()%250+1)
+	_, err = a.DB.Exec(ctx, `DELETE FROM phone_verifications WHERE ip=$1`, ip)
+	noErr(t, err)
+	_, err = a.DB.Exec(ctx, `INSERT INTO phone_verifications (phone, code_hash, expires_at, ip, consumed_at)
+		SELECT '+6390000' || lpad(g::text, 5, '0'), '\x00', now(), $1, now() FROM generate_series(1, $2::int) g`, ip, app.OTPDailyPerIP-3)
+	noErr(t, err)
+	var wg sync.WaitGroup
+	var sent atomic.Int32
+	base := time.Now().UnixNano() % 9e6
+	for i := 0; i < 40; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := a.RequestOTP(ctx, fmt.Sprintf("+63918%07d", base+int64(i)), ip); err == nil {
+				sent.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if n := sent.Load(); n != 3 {
+		t.Fatalf("%d codes went out from an address with 3 left", n)
 	}
 }

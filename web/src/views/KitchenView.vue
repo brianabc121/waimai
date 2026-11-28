@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useNow } from '../now'
 import { colorOf, typeLabel } from '../orderTypes'
 import './dine/strings'
 import '../officeStrings'
@@ -46,8 +47,7 @@ const station = ref<'all' | 'none' | number>(JSON.parse(localStorage.getItem(`kd
 function setStation(v: 'all' | 'none' | number) { station.value = v; localStorage.setItem(`kds-station-${bid}`, JSON.stringify(v)) }
 const tab = ref<'cook' | 'pack' | 'serve'>('cook')
 const error = ref('')
-const now = ref(Date.now())
-setInterval(() => (now.value = Date.now()), 30000)
+const now = useNow(30000)
 
 // Per-order packing check state: which lines the packer ticked, and bag count.
 // It is tied to the manifest version, so any change to the order clears it.

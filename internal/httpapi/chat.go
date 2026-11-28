@@ -150,12 +150,34 @@ func (s *Server) storeChatLogin(c *gin.Context) {
 	}
 }
 
+// chatInView answers 403 when the person works on some brands only and the
+// conversation is another brand's: the list already leaves it out, and its
+// header and "read" must not be reachable by its number either.
+func (s *Server) chatInView(c *gin.Context, bid, customerID int64) bool {
+	brands, ok := s.brandView(c, bid)
+	if !ok {
+		return false
+	}
+	if brands == nil {
+		return true
+	}
+	in, err := s.App.ChatInBrands(c, bid, customerID, brands)
+	if err != nil {
+		fail(c, err)
+		return false
+	}
+	if !in {
+		fail(c, app.Err(http.StatusForbidden, "FORBIDDEN", "this conversation belongs to a brand you do not work on"))
+	}
+	return in
+}
+
 func (s *Server) storeChat(c *gin.Context) {
 	bid, ok := branchScope(c, pChat)
 	if !ok {
 		return
 	}
-	if cid, ok := idParam(c, "cid"); ok {
+	if cid, ok := idParam(c, "cid"); ok && s.chatInView(c, bid, cid) {
 		chat, err := s.App.StoreChatWith(c, bid, cid)
 		reply(c, chat, err)
 	}
@@ -166,7 +188,7 @@ func (s *Server) storeChatRead(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if cid, ok := idParam(c, "cid"); ok {
+	if cid, ok := idParam(c, "cid"); ok && s.chatInView(c, bid, cid) {
 		reply(c, gin.H{"ok": true}, s.App.ReadChat(c, "store", bid, cid))
 	}
 }

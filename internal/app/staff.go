@@ -297,7 +297,9 @@ func keepAnOwner(ctx context.Context, tx pgx.Tx, branchID, leaving int64) error 
 // UpdateStaff edits a person's details, back-office role, posts or active flag.
 func (a *App) UpdateStaff(ctx context.Context, branchID, userID int64, in StaffPatch, by *User) error {
 	byRole := by.RoleIn(branchID)
-	return a.inTx(ctx, func(tx pgx.Tx) error {
+	lost := false // the person may have lost access to the store's chat
+	err := a.inTx(ctx, func(tx pgx.Tx) error {
+		lost = false
 		cur, err := lockStaff(ctx, tx, branchID, userID)
 		if err != nil {
 			return err
@@ -326,6 +328,7 @@ func (a *App) UpdateStaff(ctx context.Context, branchID, userID int64, in StaffP
 				return err
 			}
 			changed["role"] = *in.Role
+			lost = true
 		}
 		if in.Active != nil && *in.Active != cur.active {
 			if !*in.Active {
@@ -350,6 +353,7 @@ func (a *App) UpdateStaff(ctx context.Context, branchID, userID int64, in StaffP
 				return err
 			}
 			changed["active"] = *in.Active
+			lost = lost || !*in.Active
 		}
 		if in.Username != nil {
 			name := strings.ToLower(strings.TrimSpace(*in.Username))
@@ -396,6 +400,10 @@ func (a *App) UpdateStaff(ctx context.Context, branchID, userID int64, in StaffP
 		}
 		return staffChanged(ctx, tx, branchID, userID)
 	})
+	if err == nil && lost {
+		a.chatAccessChanged(ctx, branchID)
+	}
+	return err
 }
 
 // ResetStaffPassword sets a new password and signs the person out everywhere.
@@ -431,7 +439,7 @@ func (a *App) DeleteStaff(ctx context.Context, branchID, userID int64, by *User)
 	if userID == by.ID {
 		return ErrValidation("you cannot delete your own account")
 	}
-	return a.inTx(ctx, func(tx pgx.Tx) error {
+	err := a.inTx(ctx, func(tx pgx.Tx) error {
 		cur, err := lockStaff(ctx, tx, branchID, userID)
 		if err != nil {
 			return err
@@ -474,4 +482,8 @@ func (a *App) DeleteStaff(ctx context.Context, branchID, userID int64, by *User)
 		}
 		return staffChanged(ctx, tx, branchID, userID)
 	})
+	if err == nil {
+		a.chatAccessChanged(ctx, branchID)
+	}
+	return err
 }

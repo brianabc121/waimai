@@ -520,7 +520,15 @@ func (a *App) RequestOTP(ctx context.Context, phone, ip string) (devCode string,
 	}
 	code := fmt.Sprintf("%06d", n.Int64())
 	err = a.inTx(ctx, func(tx pgx.Tx) error {
-		// Serialise requests per phone so the limits cannot be raced.
+		// Serialise requests per address and per phone so the limits cannot be
+		// raced: many numbers asked for at once from one address would
+		// otherwise all pass the address's daily cap together. Always the
+		// address first, so that two requests never wait for each other.
+		if ip != "" {
+			if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "otp-ip:"+ip); err != nil {
+				return err
+			}
+		}
 		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "otp:"+phone); err != nil {
 			return err
 		}
@@ -538,6 +546,11 @@ func (a *App) RequestOTP(ctx context.Context, phone, ip string) (devCode string,
 		}
 		if today >= OTPDailyPerPhone || (!a.OTPDevEcho && fromIP >= OTPDailyPerIP) {
 			return Err(http.StatusTooManyRequests, "OTP_DAILY_LIMIT", "too many codes today, please try again tomorrow")
+		}
+		// A new code ends the ones before it: an older code must not come
+		// back to life once the newer one has been used.
+		if _, err := tx.Exec(ctx, `UPDATE phone_verifications SET consumed_at = now() WHERE phone=$1 AND consumed_at IS NULL`, phone); err != nil {
+			return err
 		}
 		_, err := tx.Exec(ctx, `INSERT INTO phone_verifications (phone, code_hash, expires_at, ip) VALUES ($1,$2,$3,$4)`,
 			phone, a.otpHash(phone, code), time.Now().Add(otpTTL), ip)

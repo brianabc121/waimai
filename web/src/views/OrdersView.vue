@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useNow } from '../now'
 import AddrText from './AddrText.vue'
 import { googleMapsLink } from '../maps'
 import { ORDER_TYPES, colorOf, typeLabel } from '../orderTypes'
@@ -115,8 +116,7 @@ const riders = ref<RiderInfo[]>([])
 const selectedId = ref<number | null>(Number(useRoute().query.order) || null)
 const error = ref('')
 const sound = ref(localStorage.getItem('order-sound') !== 'off')
-const now = ref(Date.now())
-setInterval(() => (now.value = Date.now()), 15000)
+const now = useNow(15000)
 
 let knownPending = new Set<number | string>()
 let first = true

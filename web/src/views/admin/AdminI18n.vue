@@ -134,13 +134,16 @@ function applyHere() {
 
 async function save(edits: { key: string; text: string }[], done: string) {
   busy.value = true; error.value = ''; note.value = ''
+  const to = lang.value // the language this was started for, whatever is picked meanwhile
   try {
-    await put(`/admin/i18n/${lang.value}`, { edits })
-    const fx = await get<{ fixes: Fix[] }>(`/admin/i18n/${lang.value}`)
-    fixes.value = Object.fromEntries(fx.fixes.map(f => [f.key, f]))
-    editing.value = ''
-    note.value = done
-    applyHere()
+    await put(`/admin/i18n/${to}`, { edits })
+    const fx = await get<{ fixes: Fix[] }>(`/admin/i18n/${to}`)
+    if (lang.value === to) {
+      fixes.value = Object.fromEntries(fx.fixes.map(f => [f.key, f]))
+      editing.value = ''
+      note.value = done
+      applyHere()
+    }
   } catch (e) { error.value = (e as Error).message }
   busy.value = false
 }
@@ -155,14 +158,17 @@ async function fill() {
   if (!missing.length) { note.value = t('ad.i18n.none_missing'); return }
   if (!confirm(t('ad.i18n.fill_confirm', { n: missing.length }))) return
   busy.value = true; error.value = ''; note.value = ''
+  // every batch goes to the language the filling was started for, even if
+  // another one is picked while it runs
+  const to = lang.value
   try {
     let n = 0
     for (let i = 0; i < missing.length; i += 200) {
-      const r = await post<{ texts: Record<string, string> }>(`/admin/i18n/${lang.value}/fill`,
+      const r = await post<{ texts: Record<string, string> }>(`/admin/i18n/${to}/fill`,
         { texts: missing.slice(i, i + 200).map(m => ({ key: m.key, en: m.en, zh: m.zh })) })
       n += Object.keys(r.texts).length
     }
-    await load()
+    if (lang.value === to) await load()
     note.value = t('ad.i18n.filled', { n })
     applyHere()
   } catch (e) { error.value = (e as Error).message }
@@ -236,7 +242,7 @@ const statusText = (s: Status) => t('ad.i18n.st_' + s)
   <div class="adm-page stack" data-testid="admin-i18n">
     <div class="card row wrap" style="gap:10px;align-items:center">
       <label class="row" style="gap:6px">{{ t('ad.i18n.lang') }}
-        <select v-model="lang" data-testid="i18n-lang"><option v-for="l in LANGS" :key="l.code" :value="l.code">{{ l.name }} · {{ l.en }}</option></select></label>
+        <select v-model="lang" :disabled="busy" data-testid="i18n-lang"><option v-for="l in LANGS" :key="l.code" :value="l.code">{{ l.name }} · {{ l.en }}</option></select></label>
       <span class="grow"></span>
       <button class="btn" :disabled="busy" data-testid="i18n-fill" @click="fill">{{ t('ad.i18n.fill') }}</button>
       <button class="btn" :disabled="busy" data-testid="i18n-export" @click="exportSheet">{{ t('ad.i18n.export') }}</button>
