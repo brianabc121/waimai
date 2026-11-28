@@ -575,6 +575,7 @@ func (s *Server) Router() *gin.Engine {
 	auth.GET("/merchant/branches/:bid/trips/:id", s.tripDetail)
 	auth.GET("/merchant/branches/:bid/cash-collections", s.listCash)
 	auth.POST("/merchant/cash-collections/:id/reconcile", s.reconcile)
+	auth.POST("/merchant/cash-collections/:id/settle-short", s.settleShort)
 
 	// kitchen and packing
 	auth.GET("/kitchen/branches/:bid/board", s.kitchenBoard)

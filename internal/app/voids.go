@@ -1188,14 +1188,20 @@ func refundPayType(method string) string {
 	return "other"
 }
 
+// receivedSQL is the money order o actually took in: all of it once it is
+// paid, less what the store decided not to collect; before that what a
+// store balance paid, what was paid in advance and what the rider collected
+// at the door, never more than the order's amount.
+const receivedSQL = `(CASE WHEN o.payment_status = 'paid' THEN o.total - o.short_waived
+	ELSE LEAST(o.total, o.credit_paid + COALESCE(o.amount_received, 0) + COALESCE((SELECT c.amount_collected
+		FROM cash_collections c WHERE c.order_id = o.id), 0)) END)`
+
 // orderReceived is the money an order actually took in: all of it once it
 // is paid, and before that what a store balance paid and what the rider
 // collected at the door, never more than the order's amount.
 func orderReceived(ctx context.Context, q Querier, orderID int64) (int64, error) {
 	var got int64
-	err := q.QueryRow(ctx, `SELECT CASE WHEN o.payment_status = 'paid' THEN o.total
-		ELSE LEAST(o.total, o.credit_paid + COALESCE((SELECT c.amount_collected FROM cash_collections c
-			WHERE c.order_id = o.id), 0)) END FROM orders o WHERE o.id=$1`, orderID).Scan(&got)
+	err := q.QueryRow(ctx, `SELECT `+receivedSQL+` FROM orders o WHERE o.id=$1`, orderID).Scan(&got)
 	return got, err
 }
 

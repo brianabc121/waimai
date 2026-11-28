@@ -92,6 +92,12 @@ type CashCollection struct {
 	ReconciledAt    *time.Time `json:"reconciled_at"`
 	Note            string     `json:"note"`
 	CreatedAt       time.Time  `json:"created_at"`
+	// Short is what the rider did not collect of an order that is still
+	// unpaid: the store says whether it got the rest or lets it go.
+	Short int64 `json:"short"`
+	// LateCash and Waived are how a short order was settled.
+	LateCash int64 `json:"late_cash"`
+	Waived   int64 `json:"waived"`
 }
 
 // Order is the full staff-facing view. Customer and rider views are trimmed
@@ -304,6 +310,10 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		return nil, err
 	}
 	o.Due = max(0, t.Total-o.CreditPaid)
+	// paid in advance, then dishes were added: only the difference is owed
+	if o.PaymentStatus == "unpaid" && o.AmountReceived != nil {
+		o.Due = max(0, o.Due-*o.AmountReceived)
+	}
 	o.DisplayStatus = DisplayStatus(o.AcceptanceStatus, o.FulfillmentStatus)
 	// An accepted scheduled order that the kitchen has not started on yet.
 	if o.DisplayStatus == "preparing" && o.ReleaseAt != nil && o.ReleaseAt.After(time.Now()) {

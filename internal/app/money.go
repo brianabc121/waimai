@@ -607,7 +607,25 @@ func saveMoney(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, p *pric
 	}
 	// what was paid from a store balance stays within the new amount
 	// (docs/REFUND_BALANCE_DESIGN.md §5.4)
-	return settleTenders(ctx, tx, orderID)
+	if err := settleTenders(ctx, tx, orderID); err != nil {
+		return err
+	}
+	return prepaidDue(ctx, tx, orderID)
+}
+
+// prepaidDue keeps "paid" true for an order that was paid before it left the
+// store (a staff order marked as paid): when dishes are added and it now
+// costs more than was received, the difference is owed and the order is
+// unpaid again until the rider (or the counter, for a pickup) collects it
+// (docs/PRICING_CHECK.md P1). Taking the added dishes off again makes it
+// paid as before. amount_received keeps what was paid in advance.
+func prepaidDue(ctx context.Context, tx pgx.Tx, orderID int64) error {
+	_, err := tx.Exec(ctx, `UPDATE orders SET payment_status = CASE WHEN total - credit_paid > amount_received THEN 'unpaid' ELSE 'paid' END
+		WHERE id=$1 AND amount_received IS NOT NULL AND order_type <> 'platform' AND service_type <> 'dine_in'
+			AND acceptance_status IN ('pending', 'accepted')
+			AND fulfillment_status IN ('none', 'awaiting_handoff', 'awaiting_pickup')
+			AND payment_status <> CASE WHEN total - credit_paid > amount_received THEN 'unpaid' ELSE 'paid' END`, orderID)
+	return err
 }
 
 // saveDiscountRows replaces the order's discount rows: one for the

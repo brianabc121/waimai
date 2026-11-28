@@ -1038,6 +1038,32 @@ func (s *Server) listCash(c *gin.Context) {
 	c.JSON(200, gin.H{"collections": cash})
 }
 
+// settleShort closes an order the rider collected too little for: the store
+// got the rest, or lets it go.
+func (s *Server) settleShort(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	bid, err := s.App.CashBranch(c, id)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	if !allowed(c, bid, pCash) {
+		return
+	}
+	var in struct {
+		Action string `json:"action"`
+		Note   string `json:"note"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	out, err := s.App.SettleShort(c, id, in.Action, in.Note, staffActor(c))
+	reply(c, out, err)
+}
+
 func (s *Server) reconcile(c *gin.Context) {
 	id, ok := idParam(c, "id")
 	if !ok {

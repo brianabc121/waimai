@@ -60,8 +60,20 @@ type ReconCash struct {
 	RiderCollected int64 `json:"rider_collected"` // riders took in cash at the door
 	RiderReturned  int64 `json:"rider_returned"`  // of which already handed in and checked
 	RiderPending   int64 `json:"rider_pending"`   // still with the riders or not checked
-	// Refunded is cash given back for dishes in the period.
+	// Refunded is cash given back for dishes in the period: on the day the
+	// cash left the drawer, which for a refund first put into a balance and
+	// then paid in cash after all is the day it was changed.
 	Refunded int64 `json:"refunded"`
+	// TopUp is the difference of orders paid in advance that came in cash
+	// (dishes added after they were paid), part of the cash row. LateCash is
+	// cash taken at the store for orders a rider collected too little for,
+	// part of Counter. Waived is what the store let go of such orders, in no
+	// row. RiderShort is what riders did not collect in the period on orders
+	// still unpaid: nobody has said yet whether it came in.
+	TopUp      int64 `json:"top_up"`
+	LateCash   int64 `json:"late_cash"`
+	Waived     int64 `json:"waived"`
+	RiderShort int64 `json:"rider_short"`
 	// StoredIn is cash taken for stored value, less top-ups undone; StoredOut
 	// stored value paid back in cash (docs/STORED_VALUE_DESIGN.md §10).
 	StoredIn  int64 `json:"stored_in"`
@@ -192,11 +204,11 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64
 	rows, err := a.DB.Query(ctx, `SELECT `+payTypeSQL+` AS pt, COALESCE(o.pay_channel_id, 0),
 			CASE WHEN `+payTypeSQL+` = 'platform' THEN COALESCE(o.platform_id, 0) ELSE 0 END,
 			COALESCE(max(c.name), max(dp.name), max(o.pay_method), ''), COALESCE(max(c.names::text), max(dp.names::text), '{}'),
-			count(*), COALESCE(sum(`+receivableSQL+` - o.credit_paid), 0),
-			COALESCE(sum(`+receivableSQL+` - o.credit_paid) FILTER (WHERE o.service_type = 'dine_in'), 0),
-			COALESCE(sum(`+receivableSQL+` - o.credit_paid) FILTER (WHERE o.service_type <> 'dine_in'), 0),
+			count(*), COALESCE(sum(`+receivableSQL+` - o.credit_paid - o.topup_cash), 0),
+			COALESCE(sum(`+receivableSQL+` - o.credit_paid - o.topup_cash) FILTER (WHERE o.service_type = 'dine_in'), 0),
+			COALESCE(sum(`+receivableSQL+` - o.credit_paid - o.topup_cash) FILTER (WHERE o.service_type <> 'dine_in'), 0),
 			count(*) FILTER (WHERE pc.status = 'ok'), count(*) FILTER (WHERE pc.status = 'problem'),
-			count(*) FILTER (WHERE pc.status IS NULL)
+			count(*) FILTER (WHERE pc.status IS NULL), COALESCE(sum(o.topup_cash), 0)
 		FROM orders o JOIN branches b ON b.id = o.branch_id
 			LEFT JOIN pay_channels c ON c.id = o.pay_channel_id
 			LEFT JOIN payment_checks pc ON pc.order_id = o.id
@@ -210,11 +222,15 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64
 	for rows.Next() {
 		var r ReconRow
 		var names string
+		var topUp int64
 		if err := rows.Scan(&r.PayType, &r.ChannelID, &r.PlatformID, &r.Name, &names, &r.Count, &r.Amount, &r.Dine, &r.Takeaway,
-			&r.OK, &r.Problem, &r.Unchecked); err != nil {
+			&r.OK, &r.Problem, &r.Unchecked, &topUp); err != nil {
 			rows.Close()
 			return nil, err
 		}
+		// the cash part of orders paid in advance another way is cash
+		// (rule P1): it is in the cash row, not in the row of their method
+		out.Cash.TopUp += topUp
 		r.Names = jsonNames(names)
 		if r.PayType == "credit" {
 			// paid in full from a store balance: the balance row below has the money
@@ -234,6 +250,16 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	if out.Cash.TopUp > 0 {
+		i := slices.IndexFunc(out.Rows, func(r ReconRow) bool { return r.PayType == "cash" })
+		if i < 0 {
+			out.Rows = slices.Insert(out.Rows, 0, ReconRow{PayType: "cash", Names: map[string]string{}})
+			i = 0
+		}
+		out.Rows[i].Amount += out.Cash.TopUp
+		out.Rows[i].Takeaway += out.Cash.TopUp
+		out.Total += out.Cash.TopUp
 	}
 	// what store balances paid (docs/REFUND_BALANCE_DESIGN.md §10.2): its own
 	// row, whatever paid the rest; its orders are already counted above
@@ -264,19 +290,46 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64
 	if err := storedRecon(ctx, a.DB, branchID, brands, from, to, &out.Stored); err != nil {
 		return nil, err
 	}
-	// cash: at the counter, and what riders took in and handed back
+	// cash at the counter: orders paid in cash at the store, the difference
+	// of prepaid pickups (P1), and what came in afterwards for orders a
+	// rider collected too little for (P2)
 	if err := a.DB.QueryRow(ctx, `SELECT
-			COALESCE(sum(o.total - o.credit_paid) FILTER (WHERE `+payTypeSQL+` = 'cash' AND cc.id IS NULL), 0),
-			COALESCE(sum(cc.amount_collected), 0),
-			COALESCE(sum(COALESCE(cc.amount_returned, cc.amount_collected)) FILTER (WHERE cc.reconcile_status <> 'pending'), 0),
-			COALESCE(sum(cc.amount_collected) FILTER (WHERE cc.reconcile_status = 'pending'), 0),
+			COALESCE(sum(o.total - o.credit_paid) FILTER (WHERE `+payTypeSQL+` = 'cash' AND cc.id IS NULL), 0)
+				+ COALESCE(sum(o.topup_cash) FILTER (WHERE cc.id IS NULL), 0) + COALESCE(sum(o.late_cash), 0),
+			COALESCE(sum(o.late_cash), 0), COALESCE(sum(o.short_waived), 0),
 			COALESCE(sum(GREATEST(0, o.discount - o.platform_subsidy - COALESCE((SELECT sum(d.amount) FROM order_discounts d
 				WHERE d.order_id = o.id AND d.kind NOT IN ('promotion','dish_promotion') AND d.funded_by = 'store'), 0))), 0),
 			COALESCE(sum(o.staff_discount), 0), COALESCE(sum(o.round_off), 0)
 		FROM orders o JOIN branches b ON b.id = o.branch_id
 			LEFT JOIN cash_collections cc ON cc.order_id = o.id
-		WHERE `+paidInPeriod, branchID, from, to, brands).Scan(&out.Cash.Counter, &out.Cash.RiderCollected, &out.Cash.RiderReturned,
-		&out.Cash.RiderPending, &out.Discounts.Promotion, &out.Discounts.Staff, &out.Discounts.RoundOff); err != nil {
+		WHERE `+paidInPeriod, branchID, from, to, brands).Scan(&out.Cash.Counter, &out.Cash.LateCash, &out.Cash.Waived,
+		&out.Discounts.Promotion, &out.Discounts.Staff, &out.Discounts.RoundOff); err != nil {
+		return nil, err
+	}
+	// What riders took in counts on the day they took it, whether or not it
+	// was all that was due: the cash of an order collected short is in the
+	// rider's hands, then in the drawer, like any other (P3).
+	if err := a.DB.QueryRow(ctx, `SELECT COALESCE(sum(cc.amount_collected), 0),
+			COALESCE(sum(COALESCE(cc.amount_returned, cc.amount_collected)) FILTER (WHERE cc.reconcile_status <> 'pending'), 0),
+			COALESCE(sum(cc.amount_collected) FILTER (WHERE cc.reconcile_status = 'pending'), 0),
+			COALESCE(sum(GREATEST(0, cc.amount_due - cc.amount_collected)) FILTER (WHERE o.payment_status = 'unpaid'), 0)
+		FROM cash_collections cc JOIN orders o ON o.id = cc.order_id JOIN branches b ON b.id = cc.branch_id
+		WHERE cc.branch_id = $1 AND (cc.created_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date
+			AND ($4::bigint[] IS NULL OR o.brand_id = ANY($4))`, branchID, from, to, brands).Scan(&out.Cash.RiderCollected,
+		&out.Cash.RiderReturned, &out.Cash.RiderPending, &out.Cash.RiderShort); err != nil {
+		return nil, err
+	}
+	// The cash of a refund left the drawer on the day of the refund; of one
+	// first put into a balance and paid in cash after all, on the day it was
+	// changed (the amount taken back out of the balance).
+	if err := a.DB.QueryRow(ctx, `SELECT
+			COALESCE((SELECT sum(r.amount - r.to_credit - r.revoked_credit) FROM order_refunds r JOIN orders o ON o.id = r.order_id
+				WHERE r.branch_id = b.id AND r.pay_type = 'cash' AND (r.created_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date
+					AND ($4::bigint[] IS NULL OR o.brand_id = ANY($4))), 0)
+			+ COALESCE((SELECT sum(r.revoked_credit) FROM order_refunds r JOIN orders o ON o.id = r.order_id
+				WHERE r.branch_id = b.id AND r.revoked_at IS NOT NULL AND (r.revoked_at AT TIME ZONE b.timezone)::date BETWEEN $2::date AND $3::date
+					AND ($4::bigint[] IS NULL OR o.brand_id = ANY($4))), 0)
+		FROM branches b WHERE b.id = $1`, branchID, from, to, brands).Scan(&out.Cash.Refunded); err != nil {
 		return nil, err
 	}
 	if err := a.DB.QueryRow(ctx, `SELECT count(*), COALESCE(sum(r.amount), 0),
@@ -289,7 +342,6 @@ func (a *App) Reconciliation(ctx context.Context, branchID int64, brands []int64
 		&out.Refunds.ToStored); err != nil {
 		return nil, err
 	}
-	out.Cash.Refunded = out.Refunds.Cash
 	out.Net = out.Total - out.Refunds.Total
 	out.Cash.StoredIn = out.Stored.Cash - out.Stored.RevokedCash
 	out.Cash.StoredOut = out.Stored.CashoutCash

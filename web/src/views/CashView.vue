@@ -5,6 +5,7 @@ import { money, t, toMajor, toMinor } from '../i18n'
 import { currentRole, session } from '../session'
 import type { Cash } from '../types'
 import '../officeStrings'
+import '../checkout'
 
 const bid = session.branchId!
 const cur = currentRole()?.currency ?? 'PHP'
@@ -29,6 +30,23 @@ async function reconcile(r: Cash) {
   error.value = ''
   try { await post(`/merchant/cash-collections/${r.id}/reconcile`, { amount_returned: toMinor(input[r.id]) }) }
   catch (e) { error.value = (e as Error).message }
+  await load()
+}
+
+// An order the rider collected too little for stays unpaid until the store
+// says what happened to the rest: it came in afterwards, or it is let go.
+const settling = ref<{ row: Cash; action: 'collected' | 'waived' } | null>(null), settleNote = ref(''), busy = ref(false)
+function ask(r: Cash, action: 'collected' | 'waived') { settling.value = { row: r, action }; settleNote.value = ''; error.value = '' }
+async function settle() {
+  const s = settling.value
+  if (!s || busy.value) return
+  if (s.action === 'waived' && !settleNote.value.trim()) { error.value = t('cs.short_why'); return }
+  busy.value = true; error.value = ''
+  try {
+    await post(`/merchant/cash-collections/${s.row.id}/settle-short`, { action: s.action, note: settleNote.value.trim() })
+    settling.value = null
+  } catch (e) { error.value = (e as Error).message }
+  finally { busy.value = false }
   await load()
 }
 </script>
@@ -70,7 +88,14 @@ async function reconcile(r: Cash) {
                 <td>{{ r.rider_name }}</td>
                 <td class="num"><span class="ox-money">{{ money(r.amount_due, cur) }}</span></td>
                 <td class="num"><span class="ox-money">{{ money(r.amount_collected, cur) }}</span>
-                  <div v-if="r.amount_collected !== r.amount_due" class="small" style="color:var(--bad)">{{ t('diff') }} {{ money(r.amount_collected - r.amount_due, cur) }}</div></td>
+                  <div v-if="r.amount_collected !== r.amount_due" class="small" style="color:var(--bad)">{{ t('diff') }} {{ money(r.amount_collected - r.amount_due, cur) }}</div>
+                  <div v-if="r.short" class="cs-short" data-testid="cash-short">
+                    <span class="small">{{ t('cs.short', { m: money(r.short, cur) }) }}</span>
+                    <button class="btn small" data-testid="cash-short-collected" @click="ask(r, 'collected')">{{ t('cs.short_collected') }}</button>
+                    <button class="btn small" data-testid="cash-short-waived" @click="ask(r, 'waived')">{{ t('cs.short_waived') }}</button>
+                  </div>
+                  <div v-else-if="r.late_cash" class="small muted">{{ t('cs.late_done', { m: money(r.late_cash, cur) }) }}</div>
+                  <div v-else-if="r.waived" class="small muted">{{ t('cs.waived_done', { m: money(r.waived, cur) }) }}</div></td>
                 <td style="width:170px">
                   <input v-if="r.reconcile_status === 'pending'" type="number" min="0" step="0.01" v-model="input[r.id]" />
                   <span v-else class="ox-money">{{ money(r.amount_returned ?? 0, cur) }}</span>
@@ -87,5 +112,23 @@ async function reconcile(r: Cash) {
       </section>
     </div>
   </div>
+  <div v-if="settling" class="sheet-mask" @click.self="settling = null">
+    <form class="sheet center" data-testid="cash-short-sheet" @submit.prevent="settle">
+      <div class="sheet-head"><h2>{{ t(settling.action === 'collected' ? 'cs.short_collected' : 'cs.short_waived') }}</h2></div>
+      <div class="sheet-body stack">
+        <p class="small" style="margin:0">{{ t(settling.action === 'collected' ? 'cs.short_collected_tip' : 'cs.short_waived_tip', { no: settling.row.public_no, m: money(settling.row.short ?? 0, cur) }) }}</p>
+        <label class="field"><span>{{ t(settling.action === 'waived' ? 'cs.short_why' : 'cs.short_note') }}</span><input v-model="settleNote" maxlength="200" data-testid="cash-short-note" /></label>
+        <div v-if="error" class="banner bad">{{ error }}</div>
+      </div>
+      <div class="sheet-foot row">
+        <button type="button" class="btn" @click="settling = null">{{ t('cancel') }}</button>
+        <button class="btn primary" :disabled="busy" data-testid="cash-short-ok">{{ t('cs.ok') }}</button>
+      </div>
+    </form>
+  </div>
   </div>
 </template>
+
+<style scoped>
+.cs-short { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; margin-top: 4px; color: var(--bad); }
+</style>

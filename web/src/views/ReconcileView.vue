@@ -22,7 +22,7 @@ interface Row { pay_type: string; channel_id: number; platform_id: number; name:
   dine: number; takeaway: number; ok: number; problem: number; unchecked: number }
 interface CashCount { day: string; expected: number; counted: number; note: string; counted_by: string; at: string }
 interface Summary { timezone: string; currency: string; count: number; total: number; rows: Row[]; problems: number
-  cash: { counter: number; rider_collected: number; rider_returned: number; rider_pending: number; refunded: number; expected: number
+  cash: { counter: number; rider_collected: number; rider_returned: number; rider_pending: number; refunded: number; expected: number; top_up?: number; late_cash?: number; waived?: number; rider_short?: number
     stored_in?: number; stored_out?: number }
   refunds: { count: number; total: number; cash: number; to_credit?: number; to_stored?: number }; net: number
   stored?: { count: number; paid: number; bonus: number; cash: number; card: number; online: number; revoked: number; revoked_cash: number; revoked_bonus: number
@@ -198,6 +198,10 @@ const kindText = (e: Entry) => [e.percent_bp ? pctText(e.percent_bp) : '', e.mod
           <div class="kv"><span>{{ t('rc.cash_rider') }}</span><b>{{ m(sum.cash.rider_collected) }}</b></div>
           <div class="kv sub"><span>{{ t('rc.cash_returned') }}</span><span>{{ m(sum.cash.rider_returned) }}</span></div>
           <div class="kv sub"><span>{{ t('rc.cash_pending') }}</span><span :class="{ neg: sum.cash.rider_pending }">{{ m(sum.cash.rider_pending) }}</span></div>
+          <div v-if="sum.cash.rider_short" class="kv sub"><span>{{ t('rc.cash_short') }}</span><span class="neg" data-testid="rc-cash-short">{{ m(sum.cash.rider_short) }}</span></div>
+          <div v-if="sum.cash.top_up" class="kv sub"><span>{{ t('rc.cash_top_up') }}</span><span data-testid="rc-cash-topup">{{ m(sum.cash.top_up) }}</span></div>
+          <div v-if="sum.cash.late_cash" class="kv sub"><span>{{ t('rc.cash_late') }}</span><span>{{ m(sum.cash.late_cash) }}</span></div>
+          <div v-if="sum.cash.waived" class="kv sub"><span>{{ t('rc.cash_waived') }}</span><span class="neg">{{ m(sum.cash.waived) }}</span></div>
           <div v-if="sum.cash.refunded" class="kv"><span>{{ t('rc.cash_refunded') }}</span><b class="neg" data-testid="rc-cash-refunded">-{{ m(sum.cash.refunded) }}</b></div>
           <div v-if="sum.cash.stored_in" class="kv"><span>{{ t('sv.rc.cash_in') }}</span><b data-testid="rc-stored-in">{{ m(sum.cash.stored_in) }}</b></div>
           <div v-if="sum.cash.stored_out" class="kv"><span>{{ t('sv.rc.cash_out') }}</span><b class="neg" data-testid="rc-stored-out">-{{ m(sum.cash.stored_out) }}</b></div>

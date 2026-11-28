@@ -187,3 +187,46 @@ func TestOrderRetryAfterLostAnswer(t *testing.T) {
 	// someone else's key says nothing
 	verifiedCustomer(t).want(404, "NOT_FOUND", "GET", placed, nil, "Idempotency-Key", key)
 }
+
+// Q1 (docs/PRICING_CHECK.md P2): an order the rider collected too little for
+// is settled on the rider cash page, by those who may check rider cash.
+func TestSettleShortOverHTTP(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	desk, kitchen := login(t, f.owner), login(t, f.kitchen)
+	id, _ := f.order(t, verifiedCustomer(t))
+	staff := app.Actor{Type: "staff", ID: 1}
+	o, err := a.Accept(ctx, id, 0, staff)
+	noErr(t, err)
+	for _, it := range o.Items {
+		o, err = a.SetItemStatus(ctx, id, it.ID, "ready", app.Actor{Type: "system"})
+		noErr(t, err)
+	}
+	o, err = a.Pack(ctx, id, 1, o.ManifestVersion, staff)
+	noErr(t, err)
+	o, err = a.AssignRider(ctx, id, f.riderID, staff)
+	noErr(t, err)
+	_, err = a.RiderPickup(ctx, o.Delivery.ID, f.riderID)
+	noErr(t, err)
+	_, err = a.StaffHandoff(ctx, id, staff)
+	noErr(t, err)
+	o, err = a.RiderDeliver(ctx, o.Delivery.ID, f.riderID, o.Totals.Total-500)
+	noErr(t, err)
+	list := desk.want(200, "", "GET", fmt.Sprintf("/merchant/branches/%d/cash-collections", f.branchID), nil)["collections"].([]any)
+	row := list[0].(map[string]any)
+	if row["short"].(float64) != 500 {
+		t.Fatalf("short: %v", row)
+	}
+	url := fmt.Sprintf("/merchant/cash-collections/%.0f/settle-short", row["id"].(float64))
+	kitchen.want(403, "FORBIDDEN", "POST", url, map[string]any{"action": "collected"})
+	desk.want(422, "VALIDATION", "POST", url, map[string]any{"action": "waived"})
+	desk.want(422, "VALIDATION", "POST", url, map[string]any{"action": "forget"})
+	out := desk.want(200, "", "POST", url, map[string]any{"action": "waived", "note": "熟客"})
+	if out["short"].(float64) != 0 || out["waived"].(float64) != 500 {
+		t.Fatalf("settled: %v", out)
+	}
+	desk.want(409, "INVALID_STATE", "POST", url, map[string]any{"action": "collected"})
+	if got := desk.want(200, "", "GET", fmt.Sprintf("/merchant/orders/%d", id), nil); got["payment_status"] != "paid" {
+		t.Fatalf("order: %v", got["payment_status"])
+	}
+}

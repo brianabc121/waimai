@@ -18,7 +18,7 @@ import (
 // receivableSQL is what an order brought the store: what the customer paid,
 // and on a platform order the platform's own discount, which the platform
 // pays the store back.
-const receivableSQL = `(o.total + CASE WHEN o.order_type = 'platform' THEN o.platform_subsidy ELSE 0 END)`
+const receivableSQL = `(o.total - o.short_waived + CASE WHEN o.order_type = 'platform' THEN o.platform_subsidy ELSE 0 END)`
 
 // ReconPlatform is one shop's orders on a platform in the period: a brand
 // on a platform ("一品湘 Grab"), since each brand is a shop of its own there.
