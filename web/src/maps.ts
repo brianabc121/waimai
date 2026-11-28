@@ -13,8 +13,9 @@ import { get } from './api'
 //   weak  it came from the geocoder because Places is not enabled on the key:
 //         a street address for typed words, with no place name of its own
 //   open  everything known once chosen: the pin and the full street address
+//   own   it is one of our own addresses (the address book), not Google's
 export interface Place {
-  label: string; detail?: string; at?: LatLng; distance_m?: number; id?: string; weak?: boolean
+  label: string; detail?: string; at?: LatLng; distance_m?: number; id?: string; weak?: boolean; own?: boolean
   locate?: () => Promise<LatLng | null>; open?: () => Promise<Opened | null>
 }
 export interface Opened { at: LatLng; address: string; id: string; types: string[] }

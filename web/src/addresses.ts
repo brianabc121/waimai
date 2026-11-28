@@ -97,6 +97,7 @@ extend({
   'pp.title': ['选择位置', 'Choose the location'], 'pp.search': ['搜索大楼、街道或地标', 'Search a building, street or landmark'],
   'pp.results': ['搜索结果', 'Results'], 'pp.nearby': ['图钉附近的地址', 'Near the pin'], 'pp.done': ['完成', 'Done'],
   'pp.drag': ['拖动地图，把图钉对准门口', 'Move the map until the pin is on your door'],
+  'pp.more': ['更多（谷歌推荐）', 'More from Google'],
   'pp.none': ['没有找到，换个写法试试，或者直接拖动地图', 'Nothing found. Try other words, or just move the map.'],
   'pp.looking': ['正在查找…', 'Looking…'], 'pp.metres': ['距图钉 {n} 米', '{n} m from the pin'], 'pp.pin_only': ['就用图钉的位置', 'Use the pin itself'],
   'pp.can': ['这个位置可以配送', 'We deliver to this spot'], 'pp.terms': ['配送费 {fee} · 起送 {min}', 'Fee {fee} · min. {min}'],

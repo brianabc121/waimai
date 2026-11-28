@@ -2,6 +2,9 @@ package app_test
 
 import (
 	"context"
+	"errors"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/brianabc121/waimai/internal/app"
@@ -195,5 +198,84 @@ func TestPlaceName(t *testing.T) {
 	noErr(t, err)
 	if g.PlaceName != "" || g.PlaceID != "" {
 		t.Fatalf("name removed: %+v", g)
+	}
+}
+
+// One module answers staff and customers (SuggestAddresses). A customer is
+// offered only the book's public places: those Google knows by name and
+// those the platform wrote, never a line staff typed for one customer, and
+// never anybody's unit, note or delivery area.
+func TestPublicAddressSuggest(t *testing.T) {
+	s := newStore(t, false)
+	ctx := context.Background()
+	a := testApp
+	city := uniq("Pasig")
+	_, err := a.DB.Exec(ctx, `UPDATE branches SET country_code='PH', country='Philippines', province='Metro Manila', city=$2
+		WHERE id=$1`, s.branchID, city)
+	noErr(t, err)
+	// far from every other test's addresses, so "around a point" finds only these
+	lat, lng := -41.2865, 174.7762
+	place := func(phone string, m app.MemberInput) {
+		t.Helper()
+		m.Phone, m.Source, m.Lat, m.Lng = phone, "wechat", &lat, &lng
+		p, err := a.PlaceStaffOrder(ctx, s.branchID, s.staff, uniq("k"), app.StaffOrderInput{Member: m, ServiceType: "delivery",
+			ZoneID: &s.zoneID, Items: []app.StaffLine{{ItemID: s.tea, Qty: 1}}})
+		noErr(t, err)
+		checked(t, "staff order for the address book", p.Order.ID)
+	}
+	tag := uniq("Zephyr")
+	name := tag + " Tower"
+	place("+639170002001", app.MemberInput{AddressLine: name + ", Meralco Ave", AddressUnit: "18F Unit 1803", AddressNote: "call first",
+		PlaceName: name, PlaceID: "ChIJ-" + tag})
+	place("+639170002002", app.MemberInput{AddressLine: tag + " house, 12 Private Lane", AddressUnit: "back door"})
+	_, err = a.SaveBookAddress(ctx, adminActor(t), 0, app.BookInput{AddrRegion: app.AddrRegion{CountryCode: "PH", Country: "Philippines",
+		Province: "Metro Manila", City: city}, Line: tag + " Mall, Ortigas Ave", Lat: lat, Lng: lng})
+	noErr(t, err)
+
+	lines := func(hs []app.AddressHint) string {
+		var out []string
+		for _, h := range hs {
+			out = append(out, h.Line)
+		}
+		sort.Strings(out)
+		return strings.Join(out, " | ")
+	}
+	want := tag + " Mall, Ortigas Ave | " + name + ", Meralco Ave"
+
+	// Staff see all three.
+	hs, err := a.SuggestAddresses(ctx, app.AddressAsk{Q: tag, Staff: true, BranchID: s.branchID})
+	noErr(t, err)
+	if len(hs) != 3 {
+		t.Fatalf("staff: %s", lines(hs))
+	}
+	// A customer at the store sees the place and the platform's entry, bare.
+	for _, ask := range []app.AddressAsk{{Q: tag, Slug: s.slug}, {Q: tag, Near: &app.LatLng{lat + 0.01, lng - 0.01}}} {
+		hs, err = a.SuggestAddresses(ctx, ask)
+		noErr(t, err)
+		if lines(hs) != want {
+			t.Fatalf("customer %+v: %s", ask, lines(hs))
+		}
+		for _, h := range hs {
+			if h.Unit != "" || h.Note != "" || h.Mine || h.Kind != "book" || h.ZoneName != "" || h.Fee != nil || h.Lat == nil {
+				t.Fatalf("customer sees more than a place: %+v", h)
+			}
+		}
+	}
+	// Staff arguments mean nothing without Staff: the HTTP layer sets it only after checking the session.
+	hs, err = a.SuggestAddresses(ctx, app.AddressAsk{Q: tag, BranchID: s.branchID, Phone: "+639170002002", Slug: s.slug})
+	noErr(t, err)
+	if lines(hs) != want {
+		t.Fatalf("customer with staff arguments: %s", lines(hs))
+	}
+	// Nothing for one letter, for a point far away, or with neither store nor point.
+	for _, ask := range []app.AddressAsk{{Q: "Z", Slug: s.slug}, {Q: tag, Near: &app.LatLng{lat + 2, lng}}, {Q: tag}, {Q: tag, Near: &app.LatLng{999, 0}}} {
+		hs, err = a.SuggestAddresses(ctx, ask)
+		noErr(t, err)
+		if len(hs) != 0 {
+			t.Fatalf("%+v: %s", ask, lines(hs))
+		}
+	}
+	if _, err = a.SuggestAddresses(ctx, app.AddressAsk{Q: tag, Slug: uniq("no-such-store")}); !errors.Is(err, app.ErrNotFound) {
+		t.Fatalf("unknown store: %v", err)
 	}
 }

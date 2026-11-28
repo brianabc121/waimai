@@ -6,11 +6,14 @@
 //   - with Places on, the chosen place brings its full street address, in the
 //     language of the store's country whatever the browser speaks, and "View"
 //     opens that place by its id;
+//   - a customer typing the same name in the map is offered that place from
+//     the address book first, bare of the order it came from;
 //   - the keys page tells which Google services answer.
 // Usage: BASE_URL=http://localhost:8080 node e2e/placename.cjs   (needs seed data)
 const { chromium } = require('playwright')
 const { mkdirSync } = require('node:fs')
 const path = require('node:path')
+const { openAddressMap } = require('./lib.cjs')
 
 ;(async () => {
 
@@ -158,6 +161,52 @@ async function ask(page, words) {
   await addr.fill('somewhere else')
   expect(await page.locator(tid('mo-view')).getAttribute('href'), null, 'no view link once the address is retyped')
   expect(await page.locator(tid('mo-place-name')).count(), 0, 'no place name once the address is retyped')
+  await ctx.close()
+}
+
+// 2b. A customer typing in the map is offered the same place from the address
+// book first, with nothing of the order it came from; Google only for "more",
+// or when the book has nothing.
+{
+  const { ctx, page } = await open({ __fakeGeocodes: true, __fakePlaces: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  const asked = [], seen = []
+  page.on('response', async r => { if (/\/api\/v1\/address-suggest\?/.test(r.url())) { asked.push(r.url()); seen.push(await r.text().catch(() => '')) } })
+  await page.goto(BASE + '/s/makati')
+  await page.click('.item .stepper button.fill')
+  await openAddressMap(page)
+  await page.waitForSelector(tid('pin-result'))
+  const googled = () => page.evaluate(() => window.__fakeAsked.suggest.length)
+  const before = await googled()
+  await page.fill(tid('pin-search'), 'trump tower')
+  const own = page.locator(`${tid('pin-place')}[data-own]`).first()
+  await own.waitFor()
+  expect(await own.locator('.n').innerText(), 'trump tower', 'the book\'s place, by name')
+  expect(await own.locator('.d').innerText(), '1 Kalayaan Ave, Poblacion, Makati (en)', 'its street under the name')
+  expect(await googled(), before, 'Google is not asked while the book answers')
+  if (!asked.at(-1).includes('slug=makati')) throw new Error('asked: ' + asked.at(-1))
+  const body = seen.join('\n')
+  for (const secret of ['3205', '32F', '"unit":"3', 'phone', 'zone_name":"M']) if (body.includes(secret)) throw new Error(`the customer was sent "${secret}": ${body}`)
+  await page.screenshot({ path: `${SHOTS}/pn7-customer-book.png` })
+  step('a customer typing "trump tower" is offered the address book\'s place first, without asking Google, and with no unit or phone')
+
+  await page.click(tid('pin-more'))
+  await page.waitForFunction(n => window.__fakeAsked.suggest.length === n, before + 1)
+  expect(await page.locator(tid('pin-more')).count(), 0, '"more" goes once it was used')
+  // the stand-in answers with the very place the book has (same Google id): it is not listed twice
+  expect(await page.locator(tid('pin-place')).count(), await page.locator(`${tid('pin-place')}[data-own]`).count(), 'a place the book already listed is not repeated')
+  step('"more" asks Google once, and a place the book already listed is not repeated')
+
+  await own.click()
+  await page.locator(`${tid('pin-place')}.on:has-text("trump tower")`).waitFor()
+  await page.waitForSelector(tid('pin-confirm') + ':not([disabled])')
+  step('choosing the book\'s place moves the pin there with the place chosen')
+
+  await page.fill(tid('pin-search'), 'qqzz nowhere')
+  await page.locator(`${tid('pin-place')}:has-text("qqzz nowhere")`).waitFor()
+  expect(await page.locator(`${tid('pin-place')}[data-own]`).count(), 0, 'nothing of the book')
+  expect(await googled(), before + 2, 'Google is asked by itself when the book has nothing')
+  step('with nothing in the address book, Google is asked straight away')
   await ctx.close()
 }
 

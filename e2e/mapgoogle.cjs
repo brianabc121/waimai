@@ -194,21 +194,21 @@ try {
   close(c[0], STORE[0], 'the customer map opens on the store (lat)', 0.0001); close(c[1], STORE[1], 'the customer map opens on the store (lng)', 0.0001)
   // Without the Places library the search is the geocoder's.
   await cust.evaluate(() => { window.__fakeGeocodes = true })
-  await cust.fill(tid('pin-search'), 'trump tower')
+  await cust.fill(tid('pin-search'), 'zenith tower')
   // The geocoder answers a building's name with its street: the typed name is kept in front.
-  await cust.locator(`${tid('pin-place')}:has-text("trump tower"):has-text("Makati Ave, Makati City, Metro Manila, PH")`).waitFor()
+  await cust.locator(`${tid('pin-place')}:has-text("zenith tower"):has-text("Makati Ave, Makati City, Metro Manila, PH")`).waitFor()
   const g = await cust.evaluate(() => { const r = window.__fakeAsked.geocode.filter(x => x.address).at(-1); return { country: r.componentRestrictions?.country, region: r.region } })
   expect(g.country + '/' + g.region, 'PH/ph', 'the geocoder is kept to the store\'s country')
   // With it, suggestions are.
   await cust.evaluate(() => { window.__fakePlaces = true })
-  await cust.fill(tid('pin-search'), 'trump towers')
+  await cust.fill(tid('pin-search'), 'zenith towers')
   await cust.locator(`${tid('pin-place')}:has-text("Places, ph")`).waitFor()
   const s = await cust.evaluate(() => { const r = window.__fakeAsked.suggest.at(-1); return { codes: r.includedRegionCodes, bias: r.locationBias } })
   expect(s.codes.join(), 'ph', 'suggestions are kept to the store\'s country')
   close(s.bias.center.lat, STORE[0], 'suggestions look near the store first (lat)', 0.0001); close(s.bias.center.lng, STORE[1], 'suggestions look near the store first (lng)', 0.0001)
   expect(await cust.locator(tid('picker') + ' svg polygon').count(), 0, 'no zone outlines on the customer map')
   await cust.close()
-  step('a customer searching "trump tower" is only offered places in the store\'s country, near the store')
+  step('a customer searching "zenith tower" is only offered places in the store\'s country, near the store')
 } finally { /* nothing to put back */ }
 
 await own('DELETE', `/merchant/branches/${bid}/zones/${zone.id}`)
