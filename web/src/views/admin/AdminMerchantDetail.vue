@@ -103,7 +103,7 @@ const rolesOf = (u: MerchantUser) => [...new Set(u.roles.map(r => r.role))]
     </div>
 
     <template v-if="d && m">
-      <div class="adm-grid2" style="grid-template-columns:1fr 1.4fr">
+      <div class="adm-grid2 amd-split">
         <div class="card">
           <div class="head"><h2>{{ t('ad.basic') }}</h2><button v-if="live" class="btn small" @click="editing = true">{{ t('edit') }}</button></div>
           <dl class="kv">
@@ -240,3 +240,8 @@ const rolesOf = (u: MerchantUser) => [...new Set(u.roles.map(r => r.role))]
     </template>
   </div>
 </template>
+
+<style scoped>
+/* side by side on a computer, one under the other on a phone */
+@media (min-width: 768px) { .amd-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); } }
+</style>

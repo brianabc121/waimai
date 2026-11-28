@@ -564,10 +564,15 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
 @container (max-width: 720px) {
   .mx-tools select { flex: 1 1 140px; width: auto; }
   .mx-search { flex-basis: 100%; max-width: none; }
+  .mx-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .mx-foot { justify-content: center; }
+}
+/* an upright iPad too: long words in other languages do not fit the table there */
+@container (max-width: 800px) {
   .mx-table thead { display: none; }
   .mx-table, .mx-table tbody { display: block; }
   .mx-gh, .mx-gh td { display: block; }
-  .mx-row { display: grid; grid-template-columns: 26px 72px minmax(0, 1fr) auto; grid-template-areas: "ck img info price" "ck img stock st" "ops ops ops ops";
+  .mx-row { display: grid; grid-template-columns: 26px 72px minmax(0, 1fr) fit-content(110px); grid-template-areas: "ck img info price" "ck img stock st" "ops ops ops ops";
     column-gap: 10px; row-gap: 4px; padding: 10px 2px; border-bottom: 1px solid #f0e6d8; }
   .mx-row td { padding: 0; border: 0; width: auto; }
   .mx-row .c-h, .mx-row .c-stn { display: none; }
@@ -576,8 +581,8 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
   .mx-row .c-ops { grid-area: ops; border-top: 1px dashed #efe3d2; padding-top: 4px; }
   .c-img img, .mx-noimg { width: 72px; height: 60px; }
   .mx-nm { font-size: 15px; } .price { font-size: 16px; }
-  .mx-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .mx-foot { justify-content: center; }
+  /* a long status wraps instead of squeezing the name */
+  .mx-row .pill { white-space: normal; text-align: start; border-radius: 12px; }
 }
 @media (max-width: 1180px) {
   .mx-body { grid-template-columns: 200px minmax(0, 1fr); }
