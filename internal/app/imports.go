@@ -703,6 +703,10 @@ func (a *App) parseMenuImport(ctx context.Context, id int64) error {
 
 // writeGroups replaces a dish's option groups.
 func writeGroups(ctx context.Context, tx pgx.Tx, itemID int64, groups []OptionGroupInput) error {
+	before, err := itemOptionNames(ctx, tx, itemID)
+	if err != nil {
+		return err
+	}
 	if _, err := tx.Exec(ctx, `DELETE FROM option_groups WHERE item_id=$1 AND topping_template_id IS NULL`, itemID); err != nil {
 		return err
 	}
@@ -719,7 +723,7 @@ func writeGroups(ctx context.Context, tx pgx.Tx, itemID int64, groups []OptionGr
 			}
 		}
 	}
-	return nil
+	return carryOptionTranslations(ctx, tx, itemID, before)
 }
 
 // ApplyMenuImport writes the valid rows of a parsed import. New dishes are

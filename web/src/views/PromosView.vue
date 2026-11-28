@@ -12,6 +12,8 @@ import { brandById, brandsHere, multiBrand, useBrandPick } from '../brands'
 import '../coupons'
 import '../checkout'
 import '../officeStrings'
+import LangsButton from './LangsButton.vue'
+import './langsStrings'
 
 // Three tabs: delivery promotions, dine-in promotions (the two never mix,
 // docs/CHECKOUT_DISCOUNT_DESIGN.md §4) and coupons. The tab is kept in the address.
@@ -233,13 +235,13 @@ async function runTrial() {
 
     <div class="sheet-mask" v-if="form.open" @click.self="form.open = false">
       <form class="sheet center" @submit.prevent="save">
-        <div class="sheet-head"><h2>{{ form.f.id ? t('edit') : form.f.scope === 'dine_in' ? t('ck.new_dine') : t('new_promo') }}
-          <span v-if="form.f.scope === 'dine_in'" class="tag">{{ t('dine_in') }}</span></h2></div>
+        <div class="sheet-head row between"><h2>{{ form.f.id ? t('edit') : form.f.scope === 'dine_in' ? t('ck.new_dine') : t('new_promo') }}
+          <span v-if="form.f.scope === 'dine_in'" class="tag">{{ t('dine_in') }}</span></h2>
+          <LangsButton :base="`/merchant/branches/${bid}`" :scope="form.f.id ? `promotion/${form.f.id}` : null" :name="form.f.name" /></div>
         <div class="sheet-body">
           <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
           <div class="grid2">
-            <label class="field"><span>{{ t('name_zh') }}</span><input v-model="form.f.name" required :placeholder="t('promo_name_ph')" /></label>
-            <label class="field"><span>{{ t('name_en') }}</span><input v-model="form.f.name_en" /></label>
+            <label class="field" style="grid-column:1 / -1"><span>{{ t('lg.name') }}</span><input v-model="form.f.name" name="promo_name" required :placeholder="t('promo_name_ph')" /></label>
             <label class="field"><span>{{ t('promo_kind') }}</span><select v-model="form.f.kind">
               <option value="amount_off">{{ t('kind.amount_off') }}</option>
               <option value="percent_off">{{ t('kind.percent_off') }}</option>

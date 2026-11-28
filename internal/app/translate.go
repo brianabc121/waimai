@@ -114,14 +114,38 @@ func (t *claudeTranslator) Translate(ctx context.Context, from, to string, texts
 	return t.translate(ctx, menuPrompt, from, to, texts)
 }
 
+// HintTranslator is a service that can be shown how the merchant put an
+// earlier wording of a text, so that a new translation keeps their words.
+type HintTranslator interface {
+	// TranslateWithHints is Translate with, for each text, the merchant's own
+	// translation of its earlier wording, or "".
+	TranslateWithHints(ctx context.Context, from, to string, texts, earlier []string) ([]string, error)
+}
+
+const hintPrompt = `
+
+Some texts come with "earlier": how the restaurant itself translated an earlier wording of that text. Keep the restaurant's words wherever they still fit the new text, and change only what the new wording changes. "earlier" is a reference, not something to translate.`
+
+func (t *claudeTranslator) TranslateWithHints(ctx context.Context, from, to string, texts, earlier []string) ([]string, error) {
+	return t.translateHinted(ctx, menuPrompt+hintPrompt, from, to, texts, earlier)
+}
+
 func (t *claudeTranslator) translate(ctx context.Context, prompt, from, to string, texts []string) ([]string, error) {
+	return t.translateHinted(ctx, prompt, from, to, texts, nil)
+}
+
+func (t *claudeTranslator) translateHinted(ctx context.Context, prompt, from, to string, texts, earlier []string) ([]string, error) {
 	type in struct {
-		ID   int    `json:"id"`
-		Text string `json:"text"`
+		ID      int    `json:"id"`
+		Text    string `json:"text"`
+		Earlier string `json:"earlier,omitempty"`
 	}
 	list := make([]in, len(texts))
 	for i, s := range texts {
-		list[i] = in{i + 1, s}
+		list[i] = in{ID: i + 1, Text: s}
+		if i < len(earlier) {
+			list[i].Earlier = earlier[i]
+		}
 	}
 	body, _ := json.Marshal(map[string]any{"from": langNames[from], "to": langNames[to], "texts": list})
 	msg, err := t.client.Messages.New(ctx, anthropic.MessageNewParams{

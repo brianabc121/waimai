@@ -122,11 +122,11 @@ step('the store sees the tags and the note on the order')
 // ---- the template in other languages ----
 await owner.goto(BASE + '/merchant/menu?tab=notes')
 await owner.click(tid('nt-item-奶茶类'))
-await owner.click(tid('nt-langs'))
-await owner.waitForSelector(tid('tr-dialog'))
-await owner.locator(`${tid('tr-dialog')} :text("少糖")`).first().waitFor()
+await owner.click(tid('langs-btn'))
+await owner.waitForSelector(tid('langs-sheet'))
+await owner.locator(`${tid('langs-sheet')} :text("少糖")`).first().waitFor()
 await shot(owner, 'nt-09-template-langs')
-await owner.click(tid('tr-close'))
+await owner.click(tid('langs-close'))
 step('the template opens its own translations')
 
 // ---- an order taken by staff: the note cell offers the tags ----

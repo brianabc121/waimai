@@ -128,11 +128,10 @@ await admin.fill('[data-testid=cats-drawer] [name=cat_name]', '饺子')
 await admin.click('[data-testid=cats-drawer] form .btn.primary')
 await admin.waitForSelector('[data-cat="饺子"]')
 await admin.click('[data-testid=cats-drawer] .df .btn')
-for (const [name, en, price] of [['猪肉白菜饺', 'Pork & Cabbage Dumplings', '168'], ['三鲜饺', 'Three Delicacies Dumplings', '188']]) {
+for (const [name, price] of [['猪肉白菜饺', '168'], ['三鲜饺', '188']]) {
   await admin.click('[data-testid=new-item]')
   const f = admin.locator('[data-testid=item-form]')
   await f.locator('input').nth(0).fill(name)
-  await f.locator('input').nth(1).fill(en)
   await f.locator('input[type=number]').first().fill(price)
   await f.locator('[data-testid=item-published]').check()
   await f.locator('.sheet-foot .btn.primary').click()
