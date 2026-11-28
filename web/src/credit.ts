@@ -36,7 +36,7 @@ export function creditErr(e: unknown): string {
 extend({
   // role permissions
   'rp.p.wallet.refund': ['退到店铺余额', 'Refund into store balances'],
-  'rp.d.wallet.refund': ['按菜退款时把钱存进顾客在本店的余额；超过店主设的限额要经理或店主授权', "Put a refund into the customer's balance at this store; above the owner's limits a manager or the owner approves"],
+  'rp.d.wallet.refund': ['按商品退款时把钱存进顾客在本店的余额；超过店主设的限额要经理或店主授权', "Put a refund into the customer's balance at this store; above the owner's limits a manager or the owner approves"],
   'rp.p.wallet.view': ['看店铺余额', 'See store balances'],
   'rp.d.wallet.view': ['看顾客在本店的余额、变动记录和提醒', 'See what customers hold here, the history and the alerts'],
   // the refund sheet

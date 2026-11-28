@@ -112,9 +112,9 @@
   "km": "ការកម្ម៉ង់ត្រូវបានលុបចោល"
  },
  "sys.order.appended": {
-  "zh": "商家为你的订单加了菜",
-  "en": "The store added dishes to your order",
-  "zh-Hant": "商家為你的訂單加了菜",
+  "zh": "商家为你的订单加了商品",
+  "en": "The store added items to your order",
+  "zh-Hant": "商家為你的訂單加了商品",
   "th": "ร้านเพิ่มอาหารในออเดอร์ของคุณแล้ว",
   "vi": "Cửa hàng đã thêm món vào đơn của bạn",
   "fr": "Le restaurant a ajouté des plats à votre commande",
@@ -126,9 +126,9 @@
   "km": "ហាងបានបន្ថែមម្ហូបទៅក្នុងការកម្ម៉ង់របស់អ្នក"
  },
  "sys.order.item_voided": {
-  "zh": "商家退了你订单里的菜",
-  "en": "The store took dishes off your order",
-  "zh-Hant": "商家退了你訂單裡的菜",
+  "zh": "商家退了你订单里的商品",
+  "en": "The store took items off your order",
+  "zh-Hant": "商家退了你訂單裡的商品",
   "th": "ร้านได้ยกเลิกบางรายการในออเดอร์ของคุณ",
   "vi": "Cửa hàng đã bỏ bớt món trong đơn của bạn",
   "fr": "Le restaurant a retiré des plats de votre commande",
@@ -154,9 +154,9 @@
   "km": "ហាងបានសងប្រាក់ខ្លះនៃការកម្ម៉ង់របស់អ្នកវិញ"
  },
  "sys.order.addon_accepted": {
-  "zh": "商家已确认你加的菜",
-  "en": "The store accepted the dishes you added",
-  "zh-Hant": "商家已確認你加的菜",
+  "zh": "商家已确认你加的商品",
+  "en": "The store accepted the items you added",
+  "zh-Hant": "商家已確認你加的商品",
   "th": "ร้านยืนยันอาหารที่คุณสั่งเพิ่มแล้ว",
   "vi": "Cửa hàng đã nhận các món bạn thêm",
   "fr": "Le restaurant a accepté les plats ajoutés",
@@ -168,9 +168,9 @@
   "km": "ហាងបានទទួលម្ហូបដែលអ្នកបន្ថែម"
  },
  "sys.order.addon_rejected": {
-  "zh": "商家没有接受你加的菜，原订单不变",
-  "en": "The store declined the dishes you added; your order is unchanged",
-  "zh-Hant": "商家沒有接受你加的菜，原訂單不變",
+  "zh": "商家没有接受你加的商品，原订单不变",
+  "en": "The store declined the items you added; your order is unchanged",
+  "zh-Hant": "商家沒有接受你加的商品，原訂單不變",
   "th": "ร้านไม่รับอาหารที่สั่งเพิ่ม ออเดอร์เดิมไม่เปลี่ยน",
   "vi": "Cửa hàng không nhận món thêm; đơn cũ giữ nguyên",
   "fr": "Le restaurant a refusé les plats ajoutés ; votre commande reste inchangée",
@@ -182,9 +182,9 @@
   "km": "ហាងមិនទទួលម្ហូបដែលបន្ថែមទេ ការកម្ម៉ង់ដើមនៅដដែល"
  },
  "sys.order.addon_expired": {
-  "zh": "商家没有及时确认，加的菜已失效",
-  "en": "The store did not confirm in time, so the added dishes were dropped",
-  "zh-Hant": "商家沒有及時確認，加的菜已失效",
+  "zh": "商家没有及时确认，加的商品已失效",
+  "en": "The store did not confirm in time, so the added items were dropped",
+  "zh-Hant": "商家沒有及時確認，加的商品已失效",
   "th": "ร้านไม่ได้ยืนยันทันเวลา รายการที่สั่งเพิ่มถูกยกเลิก",
   "vi": "Cửa hàng không xác nhận kịp, món thêm đã bị hủy",
   "fr": "Le restaurant n’a pas confirmé à temps ; les plats ajoutés sont annulés",
@@ -252,9 +252,9 @@
   "km": "រួចរាល់សម្រាប់មកយក"
  },
  "sys.push.rider.appended": {
-  "zh": "订单加了菜，等店里重新打包",
-  "en": "Dishes were added; wait for the store to repack",
-  "zh-Hant": "訂單加了菜，等店裡重新打包",
+  "zh": "订单加了商品，等店里重新打包",
+  "en": "Items were added; wait for the store to repack",
+  "zh-Hant": "訂單加了商品，等店裡重新打包",
   "th": "มีการเพิ่มอาหาร รอร้านแพ็กใหม่",
   "vi": "Đơn có thêm món, chờ cửa hàng đóng gói lại",
   "fr": "Des plats ont été ajoutés ; attendez le nouvel emballage",
@@ -266,9 +266,9 @@
   "km": "មានម្ហូបបន្ថែម សូមរង់ចាំហាងវេចខ្ចប់ឡើងវិញ"
  },
  "sys.push.rider.voided": {
-  "zh": "订单退了菜，收款金额变了",
-  "en": "Dishes were taken off; the amount to collect changed",
-  "zh-Hant": "訂單退了菜，收款金額變了",
+  "zh": "订单退了商品，收款金额变了",
+  "en": "Items were taken off; the amount to collect changed",
+  "zh-Hant": "訂單退了商品，收款金額變了",
   "th": "มีการยกเลิกบางรายการ ยอดเงินที่ต้องเก็บเปลี่ยนไป",
   "vi": "Đơn bị bỏ bớt món, số tiền cần thu đã thay đổi",
   "fr": "Des plats ont été retirés ; le montant à encaisser a changé",

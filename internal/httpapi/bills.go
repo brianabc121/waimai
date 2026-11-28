@@ -58,7 +58,7 @@ func (s *Server) bills(c *gin.Context) {
 		app.CouponStoreThreshold: w("商家满减券", "Spend-and-save coupon"), app.CouponStoreDelivery: w("满减配送费券", "Delivery fee coupon"),
 		app.CouponPlatformFree: w("平台无门槛券", "Platform coupon")}
 	payer := map[string]string{"store": w("商家", "store"), "platform": w("平台", "platform")}
-	head := []any{w("订单号", "Order"), w("下单时间", "Placed"), w("方式", "Type"), w("状态", "Status"), w("菜品原价", "Food"),
+	head := []any{w("订单号", "Order"), w("下单时间", "Placed"), w("方式", "Type"), w("状态", "Status"), w("商品原价", "Food"),
 		w("配送费", "Delivery fee"), w("门店活动", "Promotion"), w("商家无门槛券", "Store coupon"), w("商家满减券", "Spend-and-save"),
 		w("满减配送费券", "Delivery coupon"), w("平台券", "Platform coupon"), w("顾客实付", "Customer paid"),
 		w("商家应收", "Store takings"), w("用了哪些券", "Coupons used")}
@@ -89,7 +89,7 @@ func (s *Server) bills(c *gin.Context) {
 		{w("货币", "Currency"), sum.Currency},
 		{w("完成订单", "Completed orders"), sum.Orders},
 		{w("取消订单", "Cancelled orders"), sum.Cancelled},
-		{w("菜品原价合计", "Food at full price"), m(sum.Food)},
+		{w("商品原价合计", "Food at full price"), m(sum.Food)},
 		{w("商家承担的优惠", "Discounts paid by the store"), m(sum.MerchantDiscount)},
 		{w("平台承担的优惠", "Discounts paid by the platform"), m(sum.PlatformDiscount)},
 		{w("顾客实付合计", "Customers paid"), m(sum.Paid)},

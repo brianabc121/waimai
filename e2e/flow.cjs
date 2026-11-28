@@ -103,7 +103,7 @@ await kitchen.click('button:has-text("全部")')
 await shot(kitchen, '06-kitchen')
 step('kitchen stations each see only their own items')
 await kitchen.click('.seg button:has-text("打包")')
-await kitchen.locator(`.card:has-text("${orderNo}") :text("待齐菜")`).waitFor()   // cannot pack yet
+await kitchen.locator(`.card:has-text("${orderNo}") :text("待齐")`).waitFor()   // cannot pack yet
 await kitchen.click('.seg button:has-text("制作")')
 
 // ---- workbench, in-store identity: 小张 works the fryer and the hot kitchen ----

@@ -180,7 +180,7 @@ func TestMenuImportPlatformPrices(t *testing.T) {
 	noErr(t, err)
 	f, err := excelize.OpenReader(bytes.NewReader(file))
 	noErr(t, err)
-	rows, err := f.GetRows("菜品")
+	rows, err := f.GetRows("商品")
 	noErr(t, err)
 	last := rows[0][len(rows[0])-1]
 	if last != "平台价:Grab" {
