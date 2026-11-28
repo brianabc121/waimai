@@ -3032,6 +3032,8 @@
  "vd.r.total": "Reembolsado en total {s}",
  "vd.r.need": "Los reembolsos necesitan el permiso de posventa",
  "vd.err.REFUND_NOT_YET": "El cliente aún no lo recibió: anula el plato",
+ "vd.err.REFUND_NOT_PAID": "No se recibió nada por este pedido que no se haya reembolsado ya",
+ "vd.r.received": "Este pedido era de {t} pero solo se recibió {r}: como máximo se reembolsa eso",
  "vd.k.alert": "Anulación {n}: {name} ({r})",
  "vd.k.ack": "Entendido",
  "vd.k.voided": "Anulado",

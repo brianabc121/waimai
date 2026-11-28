@@ -623,6 +623,9 @@ type RefundQuote struct {
 	Dishes    int64        `json:"dishes"`
 	Suggested int64        `json:"suggested"`
 	Left      int64        `json:"left"`
+	// Received is what the order actually took in; Left is what of it is
+	// not refunded yet.
+	Received int64 `json:"received"`
 	// The order's split (§6.1): what it paid from the store balance, and
 	// whether the cash part may go into a balance without a texted code.
 	CreditPaid int64 `json:"credit_paid"`
@@ -777,14 +780,46 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		if o.ServiceType == "dine_in" {
 			pol = dinePolicy(m, in.ReasonKind == "store")
 		}
-		p, _, err := m.reprice(ctx, tx, b, m.without(less), pol)
+		// The dishes refunded before are gone as well: a refund is the
+		// difference between the order without them and the order without
+		// them and these, so that refunding dish by dish gives back what
+		// refunding them together does (docs/PRICING_CHECK.md D7a, samples
+		// S12 and S13). Until 2026-11 each refund was priced against the
+		// whole order, and a second one took a promotion's change again.
+		before := o.Total
+		gone := map[int64]int64{}
+		for _, l := range m.Lines {
+			if n := refunded[l.ID]; n > 0 {
+				gone[l.ID] = l.Unit * int64(n)
+			}
+		}
+		if len(gone) > 0 {
+			pb, _, err := m.reprice(ctx, tx, b, m.without(gone), pol)
+			if err != nil {
+				return err
+			}
+			before = max(0, pb.Totals.Total-m.RoundOff)
+			for id, amt := range less {
+				gone[id] += amt
+			}
+		} else {
+			gone = less
+		}
+		p, _, err := m.reprice(ctx, tx, b, m.without(gone), pol)
 		if err != nil {
 			return err
 		}
 		after := p.Totals
 		after.Total = max(0, after.Total-m.RoundOff)
-		q.Left = o.Total - paidBack
-		q.Suggested = max(0, min(o.Total-after.Total, q.Left))
+		// Only what was received can be given back (brian, 2026-11-28;
+		// sample S14): a delivery the rider collected less for is refunded
+		// up to what the rider collected and a store balance paid.
+		q.Received, err = orderReceived(ctx, tx, o.ID)
+		if err != nil {
+			return err
+		}
+		q.Left = max(0, q.Received-paidBack)
+		q.Suggested = max(0, min(before-after.Total, q.Left))
 		// The last dish refunded gives back everything left of what was paid:
 		// the packaging fee, its tax, the delivery fee and any cent the
 		// dishes' shares left over (brian, 2026-11-27; sample S11). A dish's
@@ -811,10 +846,10 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		if in.Amount != nil && *in.Amount > 0 && *in.Amount <= q.Suggested {
 			amount = *in.Amount
 		}
-		q.CashPart = refundSplit(o.Total, oc.CreditPaid, paidBack, cashBack, amount)
+		q.CashPart = refundSplit(q.Received, oc.CreditPaid, paidBack, cashBack, amount)
 		q.CreditPart = amount - q.CashPart
 		split := func(amount, cashPart int64) storedParts {
-			return storedRefundSplit(o.Total, oc, paidBack, cashBack, prinBack, bonusBack, amount, amount-cashPart)
+			return storedRefundSplit(q.Received, oc, paidBack, cashBack, prinBack, bonusBack, amount, amount-cashPart)
 		}
 		dry := split(amount, q.CashPart)
 		q.StoredPart = dry.Principal + dry.Bonus
@@ -824,10 +859,13 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		if in.Amount != nil {
 			amount = *in.Amount
 		}
+		if q.Left <= 0 {
+			return Err(http.StatusConflict, "REFUND_NOT_PAID", "nothing was received for this order that is not refunded yet")
+		}
 		if amount <= 0 || amount > q.Suggested {
 			return ErrValidation("the amount must be more than 0 and at most the suggested amount")
 		}
-		cashPart := refundSplit(o.Total, oc.CreditPaid, paidBack, cashBack, amount)
+		cashPart := refundSplit(q.Received, oc.CreditPaid, paidBack, cashBack, amount)
 		creditPart := amount - cashPart
 		parts := split(amount, cashPart)
 		toCredit := creditPart
@@ -1137,6 +1175,17 @@ func refundPayType(method string) string {
 		return "cash"
 	}
 	return "other"
+}
+
+// orderReceived is the money an order actually took in: all of it once it
+// is paid, and before that what a store balance paid and what the rider
+// collected at the door, never more than the order's amount.
+func orderReceived(ctx context.Context, q Querier, orderID int64) (int64, error) {
+	var got int64
+	err := q.QueryRow(ctx, `SELECT CASE WHEN o.payment_status = 'paid' THEN o.total
+		ELSE LEAST(o.total, o.credit_paid + COALESCE((SELECT c.amount_collected FROM cash_collections c
+			WHERE c.order_id = o.id), 0)) END FROM orders o WHERE o.id=$1`, orderID).Scan(&got)
+	return got, err
 }
 
 // refundEmptiesOrder says whether a refund of these lines leaves no portion

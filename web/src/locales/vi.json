@@ -3032,6 +3032,8 @@
  "vd.r.total": "Tổng đã hoàn {s}",
  "vd.r.need": "Hoàn tiền cần quyền hậu mãi",
  "vd.err.REFUND_NOT_YET": "Khách chưa nhận: hãy hủy món",
+ "vd.err.REFUND_NOT_PAID": "Đơn này không còn khoản đã thu nào chưa hoàn nên không thể hoàn tiền",
+ "vd.r.received": "Đơn này {t} nhưng chỉ thu được {r}: chỉ hoàn tối đa số đã thu",
  "vd.k.alert": "Hủy {n}: {name} ({r})",
  "vd.k.ack": "Đã biết",
  "vd.k.voided": "Đã hủy",

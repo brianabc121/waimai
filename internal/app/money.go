@@ -585,6 +585,11 @@ func saveMoney(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, p *pric
 	if err := refreshPlatformFees(ctx, tx, orderID); err != nil {
 		return err
 	}
+	// and its charges are never more than it brings in (D11): a void that
+	// would leave less is refused until the charges are corrected
+	if err := checkPayout(ctx, tx, orderID); err != nil {
+		return err
+	}
 	// what was paid from a store balance stays within the new amount
 	// (docs/REFUND_BALANCE_DESIGN.md §5.4)
 	return settleTenders(ctx, tx, orderID)

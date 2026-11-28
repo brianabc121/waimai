@@ -360,10 +360,14 @@ func (a *App) Image(ctx context.Context, token string) ([]byte, error) {
 	return image, err
 }
 
-// purgeUnusedImages is part of the daily clean-up: pictures that no dish and
-// no template (published or draft) points at any more, a week after upload.
+// purgeUnusedImages is part of the daily clean-up: pictures that no dish, no
+// brand (its logo, its cover, a dish's picture on its menu) and no template
+// (published or draft) points at any more, a week after upload. Whatever
+// stores a picture's address must be listed here.
 const purgeUnusedImages = `DELETE FROM store_images i WHERE i.created_at < now() - interval '7 days'
 	AND NOT EXISTS (SELECT 1 FROM menu_items m WHERE m.image_url = '` + imagePath + `' || i.token
 		OR m.photos @> jsonb_build_array('` + imagePath + `' || i.token))
+	AND NOT EXISTS (SELECT 1 FROM brands b WHERE ('` + imagePath + `' || i.token) IN (b.logo_url, b.cover_url))
+	AND NOT EXISTS (SELECT 1 FROM brand_items bi WHERE bi.image_url = '` + imagePath + `' || i.token)
 	AND NOT EXISTS (SELECT 1 FROM channel_templates t WHERE ('` + imagePath + `' || i.token) IN (
 		t.published->>'logo_url', t.published->>'cover_url', t.draft->>'logo_url', t.draft->>'cover_url'))`

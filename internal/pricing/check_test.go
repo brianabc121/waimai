@@ -72,6 +72,7 @@ func TestPlatformCommission(t *testing.T) {
 func TestPricingCheckSamples(t *testing.T) {
 	store := Fees{TaxRateBP: 1200, ServiceChargeBP: 500, Packaging: 1000, Delivery: 6900}
 	two := []Line{{Key: "chicken", Amount: 33800}, {Key: "water", Amount: 3000}}
+	pickup := Fees{TaxRateBP: 1200, ServiceChargeBP: 500, Packaging: 1000}
 	type want struct {
 		goods, staff, ship, svc, tax, platform, round, total int64
 		disc, svcs, taxs                                     []int64 // per line
@@ -154,6 +155,24 @@ func TestPricingCheckSamples(t *testing.T) {
 			Fees:  Fees{TaxRateBP: 1200, TaxInclusive: true, Delivery: 5000}},
 			want{tax: 1179, total: 16000,
 				disc: []int64{0, 0}, svcs: []int64{0, 0}, taxs: []int64{1115, 64}}},
+		// S12, S13 (docs/CODE_REVIEW_FIX_PLAN.md H07): a pickup of three waters, 15.00 off, and
+		// the order after one and after two of them are refunded.
+		{"S12 自取三瓶水，第二份半价", Input{Lines: []Line{{Key: "water", Amount: 9000}}, Fees: pickup, Adjustments: []Adjustment{
+			{Kind: "dish_second", Stage: StageItem, Amount: 1500, Lines: []string{"water"}}}},
+			want{goods: 1500, svc: 375, tax: 1065, total: 9940, disc: []int64{1500}, svcs: []int64{375}, taxs: []int64{945}}},
+		{"S12 退一瓶后：两瓶，第二份半价", Input{Lines: []Line{{Key: "water", Amount: 6000}}, Fees: pickup, Adjustments: []Adjustment{
+			{Kind: "dish_second", Stage: StageItem, Amount: 1500, Lines: []string{"water"}}}},
+			want{goods: 1500, svc: 225, tax: 687, total: 6412, disc: []int64{1500}, svcs: []int64{225}, taxs: []int64{567}}},
+		{"S13 退一瓶后：两瓶，不到满减门槛", Input{Lines: []Line{{Key: "water", Amount: 6000}}, Fees: pickup},
+			want{svc: 300, tax: 876, total: 8176, disc: []int64{0}, svcs: []int64{300}, taxs: []int64{756}}},
+		{"S12 S13 退两瓶后：一瓶", Input{Lines: []Line{{Key: "water", Amount: 3000}}, Fees: pickup},
+			want{svc: 150, tax: 498, total: 4648, disc: []int64{0}, svcs: []int64{150}, taxs: []int64{378}}},
+		{"S13 店铺原因退一瓶后：满减留 10.00", Input{Lines: []Line{{Key: "water", Amount: 6000}}, Fees: pickup, Adjustments: []Adjustment{
+			{Kind: "promotion", Stage: StageOrder, Amount: 1000}}},
+			want{goods: 1000, svc: 250, tax: 750, total: 7000, disc: []int64{1000}, svcs: []int64{250}, taxs: []int64{630}}},
+		{"S13 店铺原因退两瓶后：满减留 5.00", Input{Lines: []Line{{Key: "water", Amount: 3000}}, Fees: pickup, Adjustments: []Adjustment{
+			{Kind: "promotion", Stage: StageOrder, Amount: 500}}},
+			want{goods: 500, svc: 125, tax: 435, total: 4060, disc: []int64{500}, svcs: []int64{125}, taxs: []int64{315}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

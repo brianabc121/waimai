@@ -195,7 +195,7 @@ export interface VoidQuote {
   needs_approval: boolean; before: Totals; after: Totals; less: number; promo_before: string; promo_after: string; promo_down: boolean
   rider: string; packed: boolean; version: number
 }
-export interface RefundQuote { lines: RefundLine[]; dishes: number; suggested: number; left: number
+export interface RefundQuote { lines: RefundLine[]; dishes: number; suggested: number; left: number; received?: number
   // the order's split (docs/REFUND_BALANCE_DESIGN.md §6): paid from the store balance, whether the customer is known,
   // and how the suggested (or given) amount splits between the money paid and the balance
   credit_paid?: number; can_credit?: boolean; cash_part?: number; credit_part?: number; stored_part?: number; refund_id?: number }
