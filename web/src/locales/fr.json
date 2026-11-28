@@ -2291,6 +2291,7 @@
  "vo.more_hint": "Placez-vous ici pour charger les suggestions Google",
  "vo.more_loading": "Chargement des suggestions Google…",
  "vo.more_none": "Google n'a rien trouvé : appuyez sur « Ouvrir la carte » et placez le repère",
+ "vo.more_weak": "La recherche de lieux Google n'est pas activée : les résultats ci-dessous peuvent n'indiquer que la rue. Demandez à l'administrateur de la plateforme de lancer la vérification dans « Clés ».",
  "vo.view": "🔍 Voir",
  "vo.view_short": "Voir",
  "vo.view_hint": "Ouvrir ce lieu dans Google Maps dans une nouvelle fenêtre",

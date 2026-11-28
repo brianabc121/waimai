@@ -42,6 +42,7 @@ extend({
   'vo.more': ['更多…', 'More…'], 'vo.more_hint': ['移到这里加载谷歌推荐', 'Move here to load Google suggestions'],
   'vo.more_loading': ['正在加载谷歌推荐…', 'Loading Google suggestions…'],
   'vo.more_none': ['谷歌也没找到，可以点“打开谷歌地图”手动定位', 'Google found nothing: press "Open map" and set the pin'],
+  'vo.more_weak': ['谷歌“地点搜索”没有开启，下面的结果可能只有街道名，请让平台管理员到“密钥设置”里检测。', 'Google place search is off, so results below may be street names only. Ask the platform admin to run the check in Key settings.'],
   'vo.view': ['🔍 查看', '🔍 View'], 'vo.view_short': ['查看', 'View'],
   'vo.view_hint': ['在新窗口打开谷歌地图看这个位置', 'Open this spot in Google Maps in a new window'],
   'vo.view_none': ['这个地址还没有经纬度，先从推荐里选或点“打开谷歌地图”定位', 'No position yet: pick a suggestion or press "Open map"'],

@@ -2291,6 +2291,7 @@
  "vo.more_hint": "ここに移動すると Google の候補を読み込みます",
  "vo.more_loading": "Google の候補を読み込み中…",
  "vo.more_none": "Google でも見つかりません。「地図を開く」でピンを置いてください",
+ "vo.more_weak": "Google の場所検索が有効になっていないため、下の結果は通り名だけの場合があります。プラットフォーム管理者に「キー設定」で確認を依頼してください。",
  "vo.view": "🔍 表示",
  "vo.view_short": "表示",
  "vo.view_hint": "この位置を新しいウィンドウの Google マップで開く",

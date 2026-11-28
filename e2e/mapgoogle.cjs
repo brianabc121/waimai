@@ -195,7 +195,8 @@ try {
   // Without the Places library the search is the geocoder's.
   await cust.evaluate(() => { window.__fakeGeocodes = true })
   await cust.fill(tid('pin-search'), 'trump tower')
-  await cust.locator(`${tid('pin-place')}:has-text("trump tower, PH")`).waitFor()
+  // The geocoder answers a building's name with its street: the typed name is kept in front.
+  await cust.locator(`${tid('pin-place')}:has-text("trump tower"):has-text("Makati Ave, Makati City, Metro Manila, PH")`).waitFor()
   const g = await cust.evaluate(() => { const r = window.__fakeAsked.geocode.filter(x => x.address).at(-1); return { country: r.componentRestrictions?.country, region: r.region } })
   expect(g.country + '/' + g.region, 'PH/ph', 'the geocoder is kept to the store\'s country')
   // With it, suggestions are.

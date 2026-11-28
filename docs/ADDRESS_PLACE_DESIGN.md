@@ -1,8 +1,10 @@
-# 地标型地址优化方案（2026-11-28，v0.1，待 brian 确认）
+# 地标型地址优化方案（2026-11-28，v0.2）
+
+> 状态：brian 2026-11-28 确认“按这个方案落实”，Q1–Q7 全按推荐。**第一批已实现**（见第 7 节），第二批另开 PR。
 
 brian 的问题：外卖代客下单（`/merchant/order/delivery`）地址框输入 `trump tower`，谷歌推荐只有一条“Makati Ave, Makati City, Metro Manila, 菲律宾”，没有地点名，也没有门牌号。点“查看”打开的经纬度却是对的 Trump Tower。这样的地址给骑手，骑手看不懂。
 
-本文先说原因，再说业内怎么做，最后是优化方案和要 brian 决定的问题。**这次只有方案，没有改业务代码。**
+本文先说原因，再说业内怎么做，最后是优化方案和 brian 决定的问题。
 
 效果图：`docs/address-place-screens/01-overview.png`（原型 `docs/address-place-prototype/index.html`）。
 
@@ -41,9 +43,10 @@ Places 调不通时页面没有任何提示，店员和管理员都不知道现�
 
 对比：顾客自己下单的地址表（`customer_addresses`）从一开始就是 `place_name`（地点名）+ `place_address`（地址）+ `unit`（房号）+ `note` 分开存的。代客下单、会员地址（`store_member_addresses`）、平台地址库（`address_book`）、订单（`orders.address_line`）都只有一串。
 
-### 1.4 “打开谷歌地图”弹窗里的搜索也是地理编码
+### 1.4 地图上的搜索同样会退到地理编码
 
-`maps.ts` 地图适配器的 `search()` 一直用地理编码，搜楼名同样只回街道。顾客端地图选点用的是同一段代码。
+- “打开谷歌地图”弹窗和顾客端地图选点用的是地点推荐，但 Places 不通时一样退到地理编码，一样只回街道，楼名丢掉。
+- 商家“配送地图”页的搜索框（`maps.ts` 地图适配器的 `search()`）一直只用地理编码，搜楼名只回街道。
 
 ## 2. 业内怎么处理
 
@@ -79,7 +82,7 @@ Places 调不通时页面没有任何提示，店员和管理员都不知道现�
    - 费用：这三个字段都属于 Place Details **Essentials** 这一档，和现在只取 `location` 同档；`displayName` 属于更贵的 Pro 档，所以不取（[字段和计费档](https://developers.google.com/maps/documentation/places/web-service/data-fields)）。也就是**不增加谷歌费用档次**。具体单价我没有核实。
    - 第一批里先把它们拼成“地点名, 完整街道地址”写进现有的 `address_line`，比现在多了门牌和 Barangay。
 4. **地址语言固定**，不跟店员浏览器走（见问题 Q3）。
-5. **地图弹窗的搜索**（1.4）改成先用地点搜索，不通再退回地理编码。顾客端地图选点跟着一起好。
+5. **地图上的搜索**（1.4）：配送地图页的搜索框改成先用地点搜索（Places 文本搜索），不通再退回地理编码；地图弹窗和顾客端地图选点退到地理编码时，同样保留输入的名字。
 6. **“查看”链接带上地点 ID**（`query_place_id`），打开的是这个地点的页面，不是一个光秃秃的坐标点。不调 API，不花钱。
 
 ### 第二批：地点名分开存，骑手看到的格式统一
@@ -136,3 +139,21 @@ Places 调不通时页面没有任何提示，店员和管理员都不知道现�
 - `mainText` 对商家类地点返回的就是地点名，这是谷歌参考文档对该字段的定义（“地点的名称”），没有用真实请求验证 Trump Tower 这一条的实际返回。
 - `addressComponents` 在菲律宾能不能稳定给出门牌号，要看谷歌的数据。Trump Tower 这栋楼谷歌登记的地址本身可能就没有门牌，这种情况只能靠地点名加坐标，所以地点名必须保住。
 - 谷歌各档的单价没有核实，只核实了字段属于哪一档。
+
+## 7. 第一批实现记录（2026-11-28）
+
+改的都是前端，没有动数据库和后端接口。
+
+- `web/src/maps.ts`
+  - `suggestPlaces` 返回 `{ places, weak }`，`weak` 表示这次是地理编码退路。
+  - 选中一条推荐时用 `new Place({ id, requestedLanguage })` 取 `location`、`formattedAddress`、`types`（都是 Essentials 档）。不用 `prediction.toPlace()` 是因为它不能指定语言。代价是这次取详情不带会话令牌；代客下单只在光标到“更多”时才问一次谷歌，会话计费本来也省不到钱。
+  - 地址语言 `addressLanguage(国家)`：中国、台湾、香港、澳门、日本、韩国、泰国、越南、印尼、缅甸、柬埔寨、老挝用当地语言，其余（含菲律宾）用英文。推荐列表和选中后的地址都按这个语言问谷歌，不跟浏览器。
+  - `named()`：地理编码的回答里不含输入的词时，把输入的词当名字放在前面；输入的本来就是街道地址（回答里已经有）就不重复。
+  - 地图适配器 `search()` 先用 `Place.searchByText`，没有结果或 Places 不通再用地理编码。
+  - `checkGoogle()`：依次试 Maps JavaScript API、Geocoding API、Places API (New)，Places 用和代客下单一样的请求去试。
+  - `googleMapsLink(lat, lng, placeId)`：带 `query_place_id`。
+- 代客下单页：推荐每条两行（地点名粗体、地址小字）；退路时“更多”下面一行黄色提示；选中后地址 = “地点名, 完整街道地址”；“查看”带地点 ID（重新打字后清掉）。
+- 平台后台“密钥设置”页 Google 地图卡片加“检测谷歌服务”按钮，三项各显示通过或不通过，Places 不通时写明去哪里开，并显示谷歌返回的错误原文。
+- 测试：新增 `e2e/placename.cjs`（Places 关 / 开两种情况、街道地址不重复、语言、查看链接、密钥页检测），`e2e/fake-google.js` 会模拟“楼名只回街道”和选中后的完整地址；`e2e/addressbook.cjs`、`e2e/mapgoogle.cjs` 跟着改。
+- 第一批里地点 ID 只在页面上用，没有存库；地点名和地址还是拼在一行 `address_line` 里。分开存是第二批。
+- 仍然没验证：真实谷歌密钥下的效果。

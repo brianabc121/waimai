@@ -2291,6 +2291,7 @@
  "vo.more_hint": "Ve aquí para cargar sugerencias de Google",
  "vo.more_loading": "Cargando sugerencias de Google…",
  "vo.more_none": "Google no encontró nada: pulsa \"Abrir mapa\" y coloca el pin",
+ "vo.more_weak": "La búsqueda de lugares de Google no está activada; los resultados de abajo pueden ser solo nombres de calles. Pida al administrador de la plataforma que ejecute la comprobación en «Claves».",
  "vo.view": "🔍 Ver",
  "vo.view_short": "Ver",
  "vo.view_hint": "Abrir este punto en Google Maps en una ventana nueva",

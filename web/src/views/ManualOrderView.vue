@@ -17,7 +17,7 @@ import { channelName, pctText } from '../checkout'
 import { addonErr, addonNo, batchSource, batchTitle, itemsByBatch } from '../addon'
 import { presetList } from './dine/strings'
 import type { Picked } from './PlacePicker.vue'
-import { googleMapsLink, mapsKey, suggestPlaces, type Place } from '../maps'
+import { googleMapsLink, joined, mapsKey, suggestPlaces, type Place } from '../maps'
 import './manualStrings'
 import './dine/strings'
 import NotePicker from './NotePicker.vue'
@@ -238,7 +238,9 @@ function specAdd() {
 
 // ---------- the member ----------
 const f = reactive({ no: 0, status: '' as '' | 'temp' | 'active', expires: null as string | null, phone: '', name: '', source: '',
-  contact: '', line: '', unit: '', addrNote: '', lat: null as number | null, lng: null as number | null, note: '' })
+  contact: '', line: '', unit: '', addrNote: '', lat: null as number | null, lng: null as number | null, note: '',
+  // Google's id of the place the pin was taken from: "View" opens that place. Gone once the address is retyped.
+  placeId: '' })
 const stats = ref<StoreMember['stats'] | null>(null)
 const memberQ = ref(''), memberHits = ref<StoreMember[]>([]), memberAt = ref(0), memberOpen = ref(false)
 const memberMsg = ref<'' | 'found' | 'not_found'>('')
@@ -265,7 +267,7 @@ function memberKey(e: KeyboardEvent) {
 function fill(x: StoreMember) {
   const sp = splitPhone(x.phone)
   Object.assign(f, { no: x.no, status: x.status, expires: x.expires_at, name: x.name, source: x.source, contact: x.contact,
-    line: x.address_line, unit: x.address_unit, addrNote: x.address_note, lat: x.lat, lng: x.lng, note: x.note,
+    line: x.address_line, unit: x.address_unit, addrNote: x.address_note, lat: x.lat, lng: x.lng, note: x.note, placeId: '',
     phone: sp && sp.dial === dial.value ? sp.local : x.phone })
   stats.value = x.stats ?? null
   showNo(x.no)
@@ -301,7 +303,7 @@ async function newMember() {
   } catch (e) { error.value = errText(e) }
 }
 function clearMember() {
-  Object.assign(f, { no: 0, status: '', expires: null, phone: '', name: '', source: '', contact: '', line: '', unit: '', addrNote: '', lat: null, lng: null, note: '' })
+  Object.assign(f, { no: 0, status: '', expires: null, phone: '', name: '', source: '', contact: '', line: '', unit: '', addrNote: '', lat: null, lng: null, note: '', placeId: '' })
   stats.value = null; memberQ.value = ''; memberMsg.value = ''
 }
 const now = ref(Date.now())
@@ -336,7 +338,8 @@ let hintTimer = 0, hintSeq = 0
 // since every Google lookup is paid for.
 const mapKey = ref('')
 onMounted(() => { void mapsKey().then(k => (mapKey.value = k)) })
-const gq = reactive({ list: [] as Place[], loading: false, asked: '' })
+// weak: Places could not be asked, so the list is the geocoder's (streets, not named places)
+const gq = reactive({ list: [] as Place[], loading: false, asked: '', weak: false })
 type Row = { k: 'hint'; h: AddressHint; head?: string } | { k: 'more' } | { k: 'google'; p: Place; head?: string }
 const HEADS: Record<string, string> = { mine: 'vo.hints_mine', book: 'vo.hints_book', store: 'vo.hints_store' }
 const rows = computed<Row[]>(() => {
@@ -354,8 +357,8 @@ const rows = computed<Row[]>(() => {
 const hintAt = ref(-1)
 function lineInput() {
   // a typed address is no longer where the pin is
-  f.lat = f.lng = null
-  gq.list = []; gq.asked = ''; hintAt.value = -1
+  f.lat = f.lng = null; f.placeId = ''
+  gq.list = []; gq.asked = ''; gq.weak = false; hintAt.value = -1
   clearTimeout(hintTimer)
   hintTimer = window.setTimeout(loadHints, 250)
 }
@@ -375,21 +378,25 @@ async function loadGoogle() {
   gq.asked = q; gq.loading = true
   const b = store.value?.branch
   const near = b?.lat != null && b?.lng != null ? [b.lat, b.lng] as [number, number] : undefined
-  const list = await suggestPlaces(mapKey.value, q, { country: b?.country_code || undefined, near }).catch(() => [])
+  const r = await suggestPlaces(mapKey.value, q, { country: b?.country_code || undefined, near }).catch(() => ({ places: [] as Place[], weak: false }))
   if (gq.asked !== q) return
-  gq.list = list; gq.loading = false
+  gq.list = r.places; gq.weak = r.weak; gq.loading = false
 }
 function useHint(h: AddressHint) {
-  Object.assign(f, { line: h.line, unit: h.unit || f.unit, addrNote: h.note || f.addrNote, lat: h.lat, lng: h.lng })
+  Object.assign(f, { line: h.line, unit: h.unit || f.unit, addrNote: h.note || f.addrNote, lat: h.lat, lng: h.lng, placeId: '' })
   hintsOpen.value = false
 }
 async function useGoogle(p: Place) {
   hintsOpen.value = false
-  const line = [p.label, p.detail].filter(Boolean).join(', ')
-  const at = p.at ?? await p.locate?.() ?? null
-  f.line = line.slice(0, 300)
+  // The place's name first, then its full street address (house number,
+  // street, district), which only comes once it is chosen. What the list
+  // showed beside the name is just enough to tell two places apart.
+  const full = p.at ? null : await p.open?.() ?? null
+  const at = p.at ?? full?.at ?? null
+  f.line = joined(p.label, full?.address || p.detail || '').slice(0, 300)
   f.lat = at ? at[0] : null; f.lng = at ? at[1] : null
-  gq.list = []; gq.asked = ''
+  f.placeId = at ? full?.id || p.id || '' : ''
+  gq.list = []; gq.asked = ''; gq.weak = false
 }
 function pickRow(r: Row) {
   if (r.k === 'hint') useHint(r.h)
@@ -412,13 +419,13 @@ function addrKey(e: KeyboardEvent) {
     if (r) pickRow(r)
   } else if (e.key === 'Escape') hintsOpen.value = false
 }
-const viewLink = (lat: number | null, lng: number | null) => lat != null && lng != null ? googleMapsLink(lat, lng) : ''
+const viewLink = (lat: number | null, lng: number | null, placeId = '') => lat != null && lng != null ? googleMapsLink(lat, lng, placeId) : ''
 const later = (fn: () => void) => setTimeout(fn, 150)
 const closeHints = () => later(() => (hintsOpen.value = false))
 const origin = location.origin
 function picked(p: Picked) {
-  f.lat = p.lat; f.lng = p.lng
-  if (!f.line.trim()) f.line = [p.name, p.address].filter(Boolean).join(', ')
+  f.lat = p.lat; f.lng = p.lng; f.placeId = ''
+  if (!f.line.trim()) f.line = joined(p.name, p.address)
   picking.value = false
 }
 function adjustFee() {
@@ -830,7 +837,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
             <div class="btnrow rel">
               <button class="btn blue" :disabled="service === 'pickup'" data-testid="mo-map" @click="picking = true">{{ t('vo.open_map') }}</button>
               <a class="btn blue" :class="{ off: service === 'pickup' || f.lat == null }" data-testid="mo-view" target="_blank" rel="noopener"
-                :href="viewLink(f.lat, f.lng) || undefined" :title="f.lat == null ? t('vo.view_none') : t('vo.view_hint')"
+                :href="viewLink(f.lat, f.lng, f.placeId) || undefined" :title="f.lat == null ? t('vo.view_none') : t('vo.view_hint')"
                 @click="f.lat == null && $event.preventDefault()">{{ t('vo.view') }}</a>
               <button class="btn blue" :class="{ on: feeOverride != null }" :disabled="service === 'pickup'" data-testid="mo-fee" @click="adjustFee">{{ t('vo.fee_adjust') }}</button>
               <button class="btn blue" :class="{ on: service === 'pickup' }" data-testid="mo-pickup"
@@ -885,8 +892,9 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
                     <span class="muted small">{{ gq.loading ? t('vo.more_loading') : gq.asked && !gq.list.length ? t('vo.more_none') : t('vo.more_hint') }}</span>
                   </div>
                   <div v-else class="it" :class="{ on: i === hintAt }" data-testid="mo-google" @mousedown.prevent="pickRow(r)" @mouseenter="hover(i)">
-                    <span class="grow">{{ r.p.label }}<span v-if="r.p.detail" class="muted"> · {{ r.p.detail }}</span></span>
+                    <span class="grow gplace"><b>{{ r.p.label }}</b><span v-if="r.p.detail" class="muted small">{{ r.p.detail }}</span></span>
                   </div>
+                  <div v-if="r.k === 'more' && gq.weak" class="weak" data-testid="mo-weak">⚠ {{ t('vo.more_weak') }}</div>
                 </template>
                 <div class="hint">{{ t('vo.hints_map') }}</div>
               </div>
@@ -1122,6 +1130,8 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 .drop .it.more { color: var(--brand-dark); font-weight: 700; border-top: 1px dashed var(--edge); }
 .drop .it .look { font-size: 12px; white-space: nowrap; }
 .btnrow a.btn.off { opacity: .45; cursor: not-allowed; }
+.drop .it .gplace { display: flex; flex-direction: column; min-width: 0; }
+.drop .weak { padding: 6px 12px; font-size: 12px; color: #7a5200; background: #fff4d6; border-bottom: 1px solid var(--row); }
 .drop .hint { padding: 6px 12px; font-size: 12px; color: var(--muted); background: var(--paper); }
 .pick .inp { background: #fff; border-color: var(--brand); font-weight: 700; font-size: 15px; }
 .pickhint { padding-inline-start: 80px; }
