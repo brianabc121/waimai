@@ -313,7 +313,7 @@ function clearMember() {
 }
 const now = ref(Date.now())
 const clock = window.setInterval(() => (now.value = Date.now()), 20000)
-onBeforeUnmount(() => clearInterval(clock))
+onBeforeUnmount(() => { clearInterval(clock); clearTimeout(hintTimer); clearTimeout(autoTimer) })
 const minutesLeft = computed(() => f.expires ? Math.max(0, Math.ceil((new Date(f.expires).getTime() - now.value) / 60000)) : 0)
 
 const phoneE164 = computed(() => f.phone.trim().startsWith('+') ? '+' + f.phone.replace(/\D/g, '') : f.phone.trim() ? e164(dial.value, f.phone) : '')
@@ -337,11 +337,14 @@ const listMode = computed(() => store.value?.branch.zone_mode === 'list')
 const feeOverride = ref<number | null>(null)
 const picking = ref(false)
 const hintsOpen = ref(false), hints = ref<AddressHint[]>([])
-let hintTimer = 0, hintSeq = 0
+let hintTimer = 0, hintSeq = 0, autoTimer = 0
 // The address box offers, in order: this number's own addresses, the
 // platform's address book (this store's region), the store's past deliveries,
-// and last "More": Google's suggestions, fetched only once staff move onto it,
-// since every Google lookup is paid for.
+// and last "More": Google's suggestions. While our own data has something to
+// offer, Google is asked only once staff move onto "More", since every Google
+// lookup is paid for. When it has nothing for what is typed, there is nothing
+// to choose from, so Google is asked without waiting to be told: once typing
+// has paused, and for three letters or more.
 const mapKey = ref('')
 onMounted(() => { void mapsKey().then(k => (mapKey.value = k)) })
 // weak: Places could not be asked, so the list is the geocoder's (streets, not named places)
@@ -366,7 +369,7 @@ function lineInput() {
   f.lat = f.lng = null; f.placeId = ''
   if (!keepsName(f.line, f.placeName)) f.placeName = ''
   gq.list = []; gq.asked = ''; gq.weak = false; hintAt.value = -1
-  clearTimeout(hintTimer)
+  clearTimeout(hintTimer); clearTimeout(autoTimer)
   hintTimer = window.setTimeout(loadHints, 250)
 }
 async function loadHints() {
@@ -377,7 +380,13 @@ async function loadHints() {
   hints.value = r.addresses
   // only while the address is still being typed in
   hintsOpen.value = document.activeElement?.getAttribute('data-testid') === 'mo-address'
+  clearTimeout(autoTimer)
+  if (hintsOpen.value && !r.addresses.length && mapKey.value && f.lat == null && [...f.line.trim()].length >= AUTO_MIN) {
+    autoTimer = window.setTimeout(() => { if (n === hintSeq && hintsOpen.value) void loadGoogle() }, AUTO_WAIT)
+  }
 }
+// Nothing of ours matches: Google is asked by itself after this pause, for at least this many letters.
+const AUTO_WAIT = 400, AUTO_MIN = 3
 // "More" was reached: ask Google once for what is typed now.
 async function loadGoogle() {
   const q = f.line.trim()
