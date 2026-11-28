@@ -290,7 +290,7 @@ func (m *orderMoney) choosePromo(ctx context.Context, q Querier, b *Branch, sub 
 		phone = ""
 	}
 	// only the order's brand's promotions (docs/MULTI_BRAND_DESIGN.md §10)
-	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope="+scopeSQL(scope)+" AND "+brandPromoSQL(m.BrandID), phone)
+	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND "+notLimitSQL+" AND p.scope="+scopeSQL(scope)+" AND "+brandPromoSQL(m.BrandID), phone)
 	if err != nil {
 		return nil, Discount{}, false, err
 	}

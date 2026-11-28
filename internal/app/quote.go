@@ -258,7 +258,10 @@ func computeQuote(ctx context.Context, q Querier, b *Branch, in QuoteInput, phon
 		return nil, ErrD(http.StatusUnprocessableEntity, "BELOW_MINIMUM", "order is below the minimum amount",
 			map[string]any{"minimum": minOrder, "subtotal": subtotal})
 	}
-	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope='delivery' AND "+brandPromoSQL(brand.ID), phone)
+	if err := checkItemLimits(ctx, q, b, brand.ID, in.ServiceType, phone, 0, lines); err != nil {
+		return nil, err
+	}
+	promos, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND "+notLimitSQL+" AND p.scope='delivery' AND "+brandPromoSQL(brand.ID), phone)
 	if err != nil {
 		return nil, err
 	}

@@ -4375,5 +4375,18 @@
  "lg.f.coupon_batch.name": "Nombre del cupón",
  "lg.f.media.title": "Título de la imagen",
  "lg.f.queue_group.label": "Tipo de mesa",
- "mtr.k_brand": "Marcas"
+ "mtr.k_brand": "Marcas",
+ "kind.dish_limit_order": "Límite por pedido",
+ "kind.dish_limit_day": "Límite por día",
+ "promo.limit_n": "Como máximo (unidades)",
+ "promo.limit_hint": "Por pedido: como máximo esta cantidad del artículo en un pedido, incluidos los añadidos. Por día: como máximo esta cantidad para un mismo cliente (según su número de teléfono) en este local en el día; los pedidos cancelados y los artículos devueltos no cuentan. Una mesa sin número de teléfono solo queda sujeta al límite por pedido. Un límite no descuenta dinero y funciona junto con el segundo a mitad de precio.",
+ "ip.page": "Marketing de artículos",
+ "ip.sub": "Ofertas y límites en artículos elegidos: límite por pedido, límite por día, segundo a mitad de precio, artículos con descuento",
+ "ip.new": "Nueva oferta de artículo",
+ "ip.none": "Aún no hay ofertas de artículos",
+ "ip.second_note": "Se cuenta por pares: el 2.º, 4.º y 6.º llevan el descuento, el 3.º y el 5.º van a precio normal; con opciones distintas, lo llevan los más baratos.",
+ "pr.limit_order": "Máx. {n} por pedido",
+ "pr.limit_day": "Máx. {n} por persona al día",
+ "lim.order": "«{name}»: como máximo {n} por pedido",
+ "lim.day": "«{name}»: como máximo {n} por persona al día; hoy quedan {left}"
 }

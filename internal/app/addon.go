@@ -197,6 +197,13 @@ func quoteAddon(ctx context.Context, q Querier, b *Branch, o *lockedOrder, in Ad
 	if err != nil {
 		return nil, err
 	}
+	// a platform order was already sold on the platform; the store's limits
+	// are for its own orders
+	if pp == nil {
+		if err := checkOrderLimits(ctx, q, b, o.ID, service, lines); err != nil {
+			return nil, err
+		}
+	}
 	for i := range lines {
 		lines[i].Basket = 1
 	}

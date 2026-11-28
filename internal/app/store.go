@@ -500,6 +500,10 @@ type Storefront struct {
 	// DinePromotions are the dine-in offers running now, shown on the table's
 	// QR menu; the delivery storefront never shows them.
 	DinePromotions []Promotion `json:"dine_promotions"`
+	// ItemLimits are the purchase limits on items running now (item_limits.go)
+	// for delivery and pickup orders; DineItemLimits those of table bills.
+	ItemLimits     []ItemLimit `json:"item_limits"`
+	DineItemLimits []ItemLimit `json:"dine_item_limits"`
 	// Slots are the times an order can be scheduled for (empty when the store
 	// does not take scheduled orders).
 	Slots []time.Time `json:"slots"`
@@ -585,6 +589,14 @@ func (a *App) StorefrontOf(ctx context.Context, slug string, brandID int64) (*St
 	if err != nil {
 		return nil, err
 	}
+	limits, err := storeLimits(ctx, a.DB, b, brand.ID, "delivery")
+	if err != nil {
+		return nil, err
+	}
+	dineLimits, err := storeLimits(ctx, a.DB, b, brand.ID, "dine_in")
+	if err != nil {
+		return nil, err
+	}
 	tpl, err := a.PublishedTemplates(ctx, b.ID)
 	if err != nil {
 		return nil, err
@@ -607,6 +619,6 @@ func (a *App) StorefrontOf(ctx context.Context, slug string, brandID int64) (*St
 		}
 	}
 	ref := brand.Ref()
-	return &Storefront{Brand: &ref, Branch: b, Zones: zones, Categories: cats, Promotions: promos, DinePromotions: dinePromos, Slots: b.Slots(time.Now()), Templates: tpl,
+	return &Storefront{Brand: &ref, Branch: b, Zones: zones, Categories: cats, Promotions: promos, DinePromotions: dinePromos, ItemLimits: limits, DineItemLimits: dineLimits, Slots: b.Slots(time.Now()), Templates: tpl,
 		Sales: sales, Rating: *rating, Media: media}, nil
 }

@@ -171,12 +171,17 @@ const nextPromo = computed(() => {
   const ahead = livePromos.value.filter(p => !isDishPromo(p) && p.threshold > goods.value).sort((a, b) => a.threshold - b.threshold)[0]
   return ahead && subtotal.value > 0 && !appendTok ? ahead : null
 })
+// The purchase limits on an item (商品营销), as "每单限购 2 件".
+const limitOf = (it: Item) => {
+  const l = (store.value?.item_limits ?? []).find(x => x.item_id === it.id)
+  return [l?.per_order ? t('pr.limit_order', { n: l.per_order }) : '', l?.per_day ? t('pr.limit_day', { n: l.per_day }) : ''].filter(Boolean)
+}
 const dealOf = (it: Item) => {
   const p = dishPromoOf(livePromos.value, it.id)
-  if (!p) return ''
   // on the dish itself "8折" says it all; "second one half price" stays whole
-  const pct = p.value / 100
-  return p.kind === 'dish_percent' ? t('pr.percent_off', { pct, zhe: (100 - pct) / 10 }) : promoLabel({ ...p, threshold: 0 }, cur.value)
+  const pct = p ? p.value / 100 : 0
+  const deal = !p ? '' : p.kind === 'dish_percent' ? t('pr.percent_off', { pct, zhe: (100 - pct) / 10 }) : promoLabel({ ...p, threshold: 0 }, cur.value)
+  return [deal, ...limitOf(it)].filter(Boolean).join(' · ')
 }
 // The offer the cart already earns, worked out as the server will at checkout:
 // the one that saves the most. The delivery fee is known only once there is an

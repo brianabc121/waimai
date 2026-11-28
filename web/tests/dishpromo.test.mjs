@@ -15,6 +15,9 @@ test('second at half price and a dish at 20% off', () => {
   assert.equal(dishSavings([half, pct, m5], lines), 3450 + 3380)
   assert.equal(dishSavings([half], [{ item_id: tea, unit: 6900, qty: 1 }]), 0)
   assert.equal(dishSavings([half], [{ item_id: tea, unit: 6900, qty: 4 }]), 6900)
+  // docs/PRICING_CHECK.md S19: in pairs, so the fifth is at its price again
+  assert.equal(dishSavings([half], [{ item_id: tea, unit: 3000, qty: 4 }]), 3000)
+  assert.equal(dishSavings([half], [{ item_id: tea, unit: 3000, qty: 5 }]), 3000)
 })
 
 test('the cheaper units get the second-one price, and a dish takes its best promotion', () => {

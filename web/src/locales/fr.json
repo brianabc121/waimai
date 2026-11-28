@@ -4375,5 +4375,18 @@
  "lg.f.coupon_batch.name": "Nom du coupon",
  "lg.f.media.title": "Titre du visuel",
  "lg.f.queue_group.label": "Type de table",
- "mtr.k_brand": "Marques"
+ "mtr.k_brand": "Marques",
+ "kind.dish_limit_order": "Limite par commande",
+ "kind.dish_limit_day": "Limite par jour",
+ "promo.limit_n": "Au plus (pièces)",
+ "promo.limit_hint": "Par commande : au plus ce nombre de l'article sur une commande, ajouts compris. Par jour : au plus ce nombre pour un même client (selon son numéro de téléphone) dans cet établissement sur la journée ; les commandes annulées et les articles retournés ne comptent pas. Une table sans numéro de téléphone n'est soumise qu'à la limite par commande. Une limite n'enlève rien au prix et se combine avec le deuxième à moitié prix.",
+ "ip.page": "Marketing des articles",
+ "ip.sub": "Offres et limites sur des articles choisis : limite par commande, limite par jour, deuxième à moitié prix, articles en promotion",
+ "ip.new": "Nouvelle offre sur article",
+ "ip.none": "Pas encore d'offre sur article",
+ "ip.second_note": "Compté par paires : les 2e, 4e et 6e ont la remise, les 3e et 5e sont au prix normal ; avec des options différentes, ce sont les moins chers qui l'obtiennent.",
+ "pr.limit_order": "{n} max. par commande",
+ "pr.limit_day": "{n} max. par personne et par jour",
+ "lim.order": "« {name} » : {n} au plus par commande",
+ "lim.day": "« {name} » : {n} au plus par personne et par jour ; encore {left} aujourd'hui"
 }

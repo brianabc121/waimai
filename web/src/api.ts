@@ -3,6 +3,8 @@ import { extend, t } from './i18n'
 import { fixZawgyi, notice } from './zawgyi'
 
 extend({
+  'lim.order': ['“{name}”每单限购 {n} 件', '"{name}": at most {n} per order'],
+  'lim.day': ['“{name}”每人每天限购 {n} 件，今天还可以买 {left} 件', '"{name}": at most {n} per person per day; {left} more today'],
   zawgyi_converted: ['检测到旧的 Zawgyi 编码缅甸文，已自动转换成 Unicode 再保存：“{text}”', 'Burmese in the old Zawgyi encoding was converted to Unicode before saving: "{text}"'],
 })
 
@@ -36,9 +38,17 @@ export async function api<T = any>(method: string, path: string, body?: unknown,
   const data = await res.json().catch(() => null)
   if (!res.ok) {
     const e = data?.error ?? {}
-    throw new ApiError(res.status, e.code ?? 'UNKNOWN', e.message ?? res.statusText, e.details)
+    throw new ApiError(res.status, e.code ?? 'UNKNOWN', limitText(e) ?? e.message ?? res.statusText, e.details)
   }
   return data as T
+}
+
+// limitText is what a purchase limit that refused the order says (ITEM_LIMIT),
+// so that every page shows it without a case of its own.
+function limitText(e: { code?: string; details?: any }): string | undefined {
+  if (e.code !== 'ITEM_LIMIT' || !e.details) return undefined
+  const d = e.details
+  return t(d.kind === 'day' ? 'lim.day' : 'lim.order', { name: d.name ?? '', n: d.limit ?? 0, left: d.left ?? 0 })
 }
 
 export const get = <T = any>(path: string) => api<T>('GET', path)

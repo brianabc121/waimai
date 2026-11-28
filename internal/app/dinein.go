@@ -509,6 +509,9 @@ func (a *App) AddBatch(ctx context.Context, sessionID int64, source, idemKey str
 		if err != nil {
 			return err
 		}
+		if err := checkOrderLimits(ctx, tx, b, s.OrderID, "dine_in", lines); err != nil {
+			return err
+		}
 		if source != "staff" {
 			if err := localizeLines(ctx, tx, b, in.Lang, lines); err != nil {
 				return err
