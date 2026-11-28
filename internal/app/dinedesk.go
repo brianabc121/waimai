@@ -252,3 +252,55 @@ func (a *App) SaveDinePresets(ctx context.Context, branchID int64, in DinePreset
 	}
 	return notify(ctx, a.DB, Event{BranchID: branchID})
 }
+
+// ReleaseTable frees a table that was opened but never ordered from: the
+// sitting ends and its empty bill is cancelled, so no sale is recorded. A
+// table that has ordered anything, even dishes voided since, is refused; it
+// leaves through the bill (void, then close) like every other.
+func (a *App) ReleaseTable(ctx context.Context, sessionID int64, actor Actor) (*Bill, error) {
+	err := a.inTx(ctx, func(tx pgx.Tx) error {
+		s, err := lockSession(ctx, tx, sessionID)
+		if err != nil {
+			return err
+		}
+		o, err := lockOrder(ctx, tx, s.OrderID)
+		if err != nil {
+			return err
+		}
+		if s.Status != "open" {
+			if o.Acceptance == "cancelled" {
+				return nil // released already: a second tap changes nothing
+			}
+			return ErrSessionClosed
+		}
+		var used bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM order_items WHERE order_id=$1)
+			OR EXISTS (SELECT 1 FROM order_batches WHERE order_id=$1)
+			OR (SELECT total <> 0 OR credit_paid <> 0 FROM orders WHERE id=$1)`, o.ID).Scan(&used); err != nil {
+			return err
+		}
+		if used {
+			return Err(http.StatusConflict, "TABLE_HAS_ORDER", "this table has ordered; void the items or close the bill instead")
+		}
+		if _, err := tx.Exec(ctx, `UPDATE orders SET acceptance_status='cancelled', close_reason='退桌',
+			closed_at=now(), version=version+1, updated_at=now() WHERE id=$1`, o.ID); err != nil {
+			return err
+		}
+		var closer *int64
+		if actor.ID != 0 {
+			closer = &actor.ID
+		}
+		if _, err := tx.Exec(ctx, `UPDATE dining_sessions SET status='closed', closed_at=now(), closed_by=$2 WHERE id=$1`,
+			s.ID, closer); err != nil {
+			return err
+		}
+		if err := audit(ctx, tx, s.BranchID, o.ID, actor, "table.released", map[string]any{"table": s.TableName}); err != nil {
+			return err
+		}
+		return notify(ctx, tx, Event{BranchID: s.BranchID, OrderID: o.ID})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return loadBill(ctx, a.DB, sessionID)
+}

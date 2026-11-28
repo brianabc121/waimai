@@ -158,6 +158,23 @@ async function moveTo(tb: DiningTable) {
   } catch (e) { error.value = errText(e); moving.value = false; void refreshNow() }
 }
 
+// 退桌: a table that was opened but has not ordered goes back to free
+const canRelease = computed(() => !!bill.value && bill.value.status === 'open' && !bill.value.order.items.length)
+const releaseAsk = ref(false)
+const releasing = ref(false)
+async function release() {
+  const b = bill.value
+  if (!b || releasing.value) return
+  releasing.value = true
+  try {
+    await post<Bill>(`/merchant/table-sessions/${b.session_id}/release`, {})
+    onClosed()
+    flash(t('dd.released', { name: b.table_name }))
+  } catch (e) { error.value = e instanceof ApiError && e.code === 'TABLE_HAS_ORDER' ? t('dd.release_no') : errText(e) }
+  releasing.value = false; releaseAsk.value = false
+  void refreshNow()
+}
+
 function errText(e: unknown) {
   if (e instanceof ApiError && e.status === 0) return t('submit_failed')
   return (e as Error).message
@@ -274,6 +291,7 @@ function stText(it: { prep_status: string; served_at: string | null; batch_at?: 
                 <button class="dd-big gold" data-testid="dd-pay" @click="goBill(true)">{{ t('dd.pay') }}</button></div>
               <div class="two"><button class="dd-big ghost sm" data-testid="dd-move" @click="moving = true">{{ t('dd.move') }}</button>
                 <button class="dd-big ghost sm" data-testid="dd-guests" @click="startGuests">{{ t('dd.guests_btn') }}</button></div>
+              <button v-if="canRelease" class="dd-big ghost sm" data-testid="dd-release" @click="releaseAsk = true">{{ t('dd.release') }}</button>
             </div>
           </template>
           <div v-else class="sb muted dd-pick">{{ t('dd.pick_table') }}
@@ -287,7 +305,7 @@ function stText(it: { prep_status: string; served_at: string | null; batch_at?: 
     </template>
 
     <DineOrder v-else-if="screen === 'order' && bill" :key="bill.session_id" :bill="bill" :store="store" :presets="presets" :top="top" :phone="phone" :again="again"
-      :sent="sentTotals" @back="back" @sent="onSent" @bill="goBill(false)" @pay="goBill(true)" @move="moving = true" @guests="startGuests" />
+      :sent="sentTotals" @back="back" @sent="onSent" @bill="goBill(false)" @pay="goBill(true)" @move="moving = true" @guests="startGuests" @release="releaseAsk = true" />
     <DineBill v-else-if="screen === 'bill' && bill" :bill="bill" :presets="presets" :currency="cur" :country="store?.branch.country_code ?? ''" :phone="phone" :pay-first="payFirst" :items="menuItems"
       @back="back" @update="b => (bill = b)" @again="onAgain" @closed="onClosed" @add="goOrder" />
 
@@ -331,6 +349,16 @@ function stText(it: { prep_status: string; served_at: string | null; batch_at?: 
             <button class="f" @click="guestsFor.n = Math.min(99, guestsFor.n + 1)">＋</button></div>
         </div>
         <div class="mf"><button class="dd-big ghost" @click="guestsFor.open = false">{{ t('dd.cancel') }}</button><button class="dd-big" style="flex:2" @click="saveGuests">{{ t('dd.save') }}</button></div>
+      </div>
+    </div>
+
+    <!-- release a table that has not ordered -->
+    <div v-if="releaseAsk && bill" class="dd-mask" @click.self="releaseAsk = false">
+      <div class="dd-modal" data-testid="dd-release-ask">
+        <div class="mh"><h3>{{ t('dd.release') }}</h3><button class="x" :aria-label="t('dd.cancel')" @click="releaseAsk = false">✕</button></div>
+        <div class="mb">{{ t('dd.release_ask', { name: bill.table_name }) }}</div>
+        <div class="mf"><button class="dd-big ghost" @click="releaseAsk = false">{{ t('dd.cancel') }}</button>
+          <button class="dd-big" style="flex:2" data-testid="dd-release-ok" :disabled="releasing" @click="release">{{ t('dd.release') }}</button></div>
       </div>
     </div>
 

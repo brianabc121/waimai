@@ -101,7 +101,7 @@ export const bonusRate = (x: { pay: number; bonus: number }) => x.pay > 0 ? Math
 
 extend({
   // the menu and permissions
-  'mk.nav': ['营销', 'Marketing'],
+  'mk.nav': ['市场营销', 'Marketing'],
   'mk.campaigns': ['营销活动', 'Campaigns'],
   'sv.desk': ['会员充值', 'Top up'],
   'rp.p.stored.topup': ['会员充值', 'Top up stored value'],
