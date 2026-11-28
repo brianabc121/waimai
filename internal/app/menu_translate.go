@@ -48,7 +48,14 @@ func sourceHash(s string) string {
 func storeInfoLang(l string) bool { return l == "zh" || l == "en" || l == "zh-Hant" }
 
 // nameOnly reports the texts storeInfoLang holds back.
-func nameOnly(f transField) bool { return f.Entity == "branch" && f.Field == "name" }
+func nameOnly(f transField) bool {
+	return (f.Entity == "branch" || f.Entity == "brand") && f.Field == "name"
+}
+
+// brandItemKey names a brand's own name of an item in the translations: the
+// row has no id of its own, and is written again on every save of the brand's
+// catalog.
+func brandItemKey(brandID, itemID int64) int64 { return brandID<<32 + itemID }
 
 // menuFields lists everything of a store that gets translated.
 func menuFields(ctx context.Context, q Querier, branchID int64) ([]transField, error) {
@@ -73,7 +80,7 @@ func menuFields(ctx context.Context, q Querier, branchID int64) ([]transField, e
 			for i, f := range fields {
 				ent := strings.SplitN(f, ".", 2)
 				tf := transField{Entity: ent[0], ID: id, Field: ent[1], Text: strings.TrimSpace(texts[i]), Owner: owner}
-				if tf.Field == "name" {
+				if i == 0 { // the English kept on the record is of its name
 					tf.En = strings.TrimSpace(en)
 				}
 				if tf.Text != "" {
@@ -91,9 +98,13 @@ func menuFields(ctx context.Context, q Querier, branchID int64) ([]transField, e
 		{`SELECT id, name_en, 'item/' || id, name, description, details FROM menu_items WHERE branch_id=$1 AND NOT archived ORDER BY sort, id`,
 			[]string{"item.name", "item.description", "item.details"}},
 		{`SELECT g.id, g.name_en, 'item/' || i.id, g.name FROM option_groups g JOIN menu_items i ON i.id = g.item_id
-			WHERE i.branch_id=$1 AND NOT i.archived ORDER BY g.sort, g.id`, []string{"group.name"}},
+			WHERE i.branch_id=$1 AND NOT i.archived AND g.topping_template_id IS NULL ORDER BY g.sort, g.id`, []string{"group.name"}},
 		{`SELECT o.id, o.name_en, 'item/' || i.id, o.name FROM options o JOIN option_groups g ON g.id = o.group_id JOIN menu_items i ON i.id = g.item_id
-			WHERE i.branch_id=$1 AND NOT i.archived ORDER BY o.sort, o.id`, []string{"option.name"}},
+			WHERE i.branch_id=$1 AND NOT i.archived AND o.topping_id IS NULL ORDER BY o.sort, o.id`, []string{"option.name"}},
+		// toppings are translated once, on their template, for every item that uses it
+		{`SELECT id, '', 'topping_template/' || id, title FROM topping_templates WHERE branch_id=$1 ORDER BY sort, id`, []string{"topping_template.title"}},
+		{`SELECT o.id, o.name_en, 'topping_template/' || t.id, o.name FROM topping_options o JOIN topping_templates t ON t.id = o.template_id
+			WHERE t.branch_id=$1 ORDER BY t.sort, t.id, o.sort, o.id`, []string{"topping_option.name"}},
 		{`SELECT g.id, g.name_en, 'note_template/' || t.id, g.name FROM note_groups g JOIN note_templates t ON t.id = g.template_id
 			WHERE t.branch_id=$1 ORDER BY t.sort, t.id, g.sort, g.id`, []string{"note_group.name"}},
 		{`SELECT x.id, x.name_en, 'note_template/' || t.id, x.name FROM note_tags x JOIN note_groups g ON g.id = x.group_id JOIN note_templates t ON t.id = g.template_id
@@ -101,6 +112,19 @@ func menuFields(ctx context.Context, q Querier, branchID int64) ([]transField, e
 		{`SELECT id, name_en, 'promotion/' || id, name FROM promotions WHERE branch_id=$1 AND status <> 'ended' ORDER BY id`, []string{"promotion.name"}},
 		// the store's own name and texts (docs/I18N_SIMPLE_DESIGN.md §4.5)
 		{`SELECT id, name_en, 'branch/' || id, name, notice, intro FROM branches WHERE id=$1`, []string{"branch.name", "branch.notice", "branch.intro"}},
+		// the rest of what customers read (§4.8)
+		{`SELECT id, name_en, 'brand/' || id, name, intro FROM brands WHERE branch_id=$1 AND NOT is_main ORDER BY id`, []string{"brand.name", "brand.intro"}},
+		{`SELECT c.id, c.name_en, 'brand_category/' || c.id, c.name FROM brand_categories c JOIN brands b ON b.id = c.brand_id
+			WHERE b.branch_id=$1 ORDER BY b.id, c.sort, c.id`, []string{"brand_category.name"}},
+		{`SELECT (bi.brand_id << 32) + bi.item_id, bi.name_en, 'brand_item/' || ((bi.brand_id << 32) + bi.item_id), bi.name
+			FROM brand_items bi JOIN brands b ON b.id = bi.brand_id WHERE b.branch_id=$1 AND bi.name <> '' ORDER BY b.id, bi.sort`, []string{"brand_item.name"}},
+		{`SELECT id, COALESCE(names->>'en', ''), 'stored_campaign/' || id, name, note FROM stored_campaigns
+			WHERE branch_id=$1 AND (ends_at IS NULL OR ends_at > now()) ORDER BY id`, []string{"stored_campaign.name", "stored_campaign.note"}},
+		{`SELECT t.id, '', 'stored_campaign/' || c.id, t.label FROM stored_tiers t JOIN stored_campaigns c ON c.id = t.campaign_id
+			WHERE c.branch_id=$1 AND NOT t.removed AND (c.ends_at IS NULL OR c.ends_at > now()) ORDER BY c.id, t.sort, t.id`, []string{"stored_tier.label"}},
+		{`SELECT id, name_en, 'coupon_batch/' || id, name FROM coupon_batches WHERE branch_id=$1 AND status <> 'ended' ORDER BY id`, []string{"coupon_batch.name"}},
+		{`SELECT id, '', 'media/' || id, title FROM store_media WHERE branch_id=$1 ORDER BY id`, []string{"media.title"}},
+		{`SELECT id, label_en, 'queue/' || branch_id, label FROM queue_groups WHERE branch_id=$1 AND active ORDER BY sort, id`, []string{"queue_group.label"}},
 	}
 	for _, s := range steps {
 		if err := add(s.sql, s.fields...); err != nil {
@@ -164,8 +188,8 @@ func upsertTranslation(ctx context.Context, q Querier, branchID any, f transFiel
 // screens and tickets print name_en next to the original, and only what the
 // merchant wrote belongs there.
 func syncNameEn(ctx context.Context, q Querier, f transField, lang, text, status string) error {
-	table := nameEnTables[f.Entity]
-	if lang != "en" || f.Field != "name" || table == "" {
+	sql := nameEnSQL[f.Entity+"."+f.Field]
+	if lang != "en" || sql == "" {
 		return nil
 	}
 	if status != "human" {
@@ -174,7 +198,7 @@ func syncNameEn(ctx context.Context, q Querier, f transField, lang, text, status
 	if text == f.En {
 		return nil
 	}
-	_, err := q.Exec(ctx, `UPDATE `+table+` SET name_en=$2 WHERE id=$1`, f.ID, text)
+	_, err := q.Exec(ctx, sql, f.ID, text)
 	return err
 }
 
@@ -386,16 +410,22 @@ func (m *menuLocale) item(it *Item) {
 	it.NameTr = m.text("item", it.ID, "name", it.Name, it.NameEn)
 	if it.BaseName != "" {
 		// a brand's own name for the dish: the store's translations are of its name
-		it.NameTr = m.text("brand_item", it.ID, "name", it.Name, it.NameEn)
+		it.NameTr = m.text("brand_item", it.brandKey, "name", it.Name, it.NameEn)
 	}
 	it.DescriptionTr = m.text("item", it.ID, "description", it.Description, "")
 	it.DetailsTr = m.text("item", it.ID, "details", it.Details, "")
 	for i := range it.Groups {
 		g := &it.Groups[i]
 		g.NameTr = m.text("group", g.ID, "name", g.Name, g.NameEn)
+		if g.ToppingTemplateID != nil { // translated once, on the template
+			g.NameTr = m.text("topping_template", *g.ToppingTemplateID, "title", g.Name, g.NameEn)
+		}
 		for j := range g.Options {
 			o := &g.Options[j]
 			o.NameTr = m.text("option", o.ID, "name", o.Name, o.NameEn)
+			if o.toppingID != nil {
+				o.NameTr = m.text("topping_option", *o.toppingID, "name", o.Name, o.NameEn)
+			}
 		}
 	}
 	for i := range it.Notes {
@@ -416,6 +446,10 @@ func (a *App) LocalizeStorefront(ctx context.Context, sf *Storefront, lang strin
 	m, err := localeFor(ctx, a.DB, sf.Branch, lang)
 	if err != nil || m == nil {
 		return err
+	}
+	for i := range sf.Media {
+		x := &sf.Media[i]
+		x.TitleTr = m.text("media", x.ID, "title", x.Title, "")
 	}
 	for i := range sf.Categories {
 		c := &sf.Categories[i]
@@ -460,7 +494,10 @@ func localizeLines(ctx context.Context, q Querier, b *Branch, lang string, lines
 		m.item(it)
 		l.NameTr = it.NameTr
 		if l.BaseName != "" {
-			l.NameTr = m.text("brand_item", it.ID, "name", l.Name, l.NameEn)
+			l.NameTr = ""
+			if b.brandID != 0 {
+				l.NameTr = m.text("brand_item", brandItemKey(b.brandID, it.ID), "name", l.Name, l.NameEn)
+			}
 		}
 		opts := map[string]string{}
 		groups := map[string]string{}
@@ -578,8 +615,21 @@ type TranslationEdit struct {
 	Text string `json:"text"`
 }
 
-var nameEnTables = map[string]string{"category": "menu_categories", "item": "menu_items", "group": "option_groups",
-	"option": "options", "promotion": "promotions", "branch": "branches", "note_group": "note_groups", "note_tag": "note_tags"}
+// nameEnSQL sets the English kept on a record itself ($1 the id, $2 the text).
+var nameEnSQL = map[string]string{
+	"category.name": `UPDATE menu_categories SET name_en=$2 WHERE id=$1`, "item.name": `UPDATE menu_items SET name_en=$2 WHERE id=$1`,
+	"group.name": `UPDATE option_groups SET name_en=$2 WHERE id=$1`, "option.name": `UPDATE options SET name_en=$2 WHERE id=$1`,
+	"promotion.name": `UPDATE promotions SET name_en=$2 WHERE id=$1`, "branch.name": `UPDATE branches SET name_en=$2 WHERE id=$1`,
+	"note_group.name": `UPDATE note_groups SET name_en=$2 WHERE id=$1`, "note_tag.name": `UPDATE note_tags SET name_en=$2 WHERE id=$1`,
+	"brand.name": `UPDATE brands SET name_en=$2 WHERE id=$1`, "brand_category.name": `UPDATE brand_categories SET name_en=$2 WHERE id=$1`,
+	"brand_item.name":   `UPDATE brand_items SET name_en=$2 WHERE brand_id = $1::bigint >> 32 AND item_id = $1::bigint & 4294967295`,
+	"coupon_batch.name": `UPDATE coupon_batches SET name_en=$2 WHERE id=$1`,
+	"queue_group.label": `UPDATE queue_groups SET label_en=$2 WHERE id=$1`,
+	// the options copied onto the items follow
+	"topping_option.name": `WITH a AS (UPDATE topping_options SET name_en=$2 WHERE id=$1) UPDATE options SET name_en=$2 WHERE topping_id=$1`,
+	"stored_campaign.name": `UPDATE stored_campaigns SET names = CASE WHEN $2::text = '' THEN names - 'en'
+		ELSE jsonb_set(names, '{en}', to_jsonb($2::text)) END WHERE id=$1`,
+}
 
 // SaveTranslation stores the merchant's own translation of one field.
 func (a *App) SaveTranslation(ctx context.Context, branchID int64, in TranslationEdit, actor Actor) error {
@@ -626,8 +676,8 @@ func (a *App) SaveTranslations(ctx context.Context, branchID int64, edits []Tran
 					return err
 				}
 				// the next run fills the English name in again
-				if table := nameEnTables[f.Entity]; in.Lang == "en" && f.Field == "name" && table != "" {
-					if _, err := tx.Exec(ctx, `UPDATE `+table+` SET name_en='' WHERE id=$1`, f.ID); err != nil {
+				if sql := nameEnSQL[f.Entity+"."+f.Field]; in.Lang == "en" && sql != "" {
+					if _, err := tx.Exec(ctx, sql, f.ID, ""); err != nil {
 						return err
 					}
 				}
@@ -685,7 +735,18 @@ func (a *App) Retranslate(ctx context.Context, branchID int64) error {
 // ---- the store's name, notice and introduction ----
 
 // StoreTexts are a store's name, notice and introduction as one customer reads them.
-type StoreTexts struct{ Name, Notice, Intro string }
+// Tagline is a brand's own line on its mall card.
+type StoreTexts struct{ Name, Notice, Intro, Tagline string }
+
+// textsKey is where storeTexts puts a store's texts: under the store's id, or
+// under minus the brand's for a brand that goes by its own name (several
+// brands of one store are listed side by side in the mall).
+func (b *Branch) textsKey() int64 {
+	if b.brandNamed {
+		return -b.brandID
+	}
+	return b.ID
+}
 
 // storeTexts picks the stores' texts for a customer reading lang
 // (docs/I18N_SIMPLE_DESIGN.md §4.5): the customer's language when there is a
@@ -702,8 +763,15 @@ func storeTexts(ctx context.Context, q Querier, lang string, stores []*Branch) (
 	for i, b := range stores {
 		ids[i] = b.ID
 	}
-	rows, err := q.Query(ctx, `SELECT entity_id, field, lang, text FROM content_translations
-		WHERE entity='branch' AND entity_id = ANY($1) AND lang IN ($2, 'en')`, ids, lang)
+	var brands []int64
+	for _, b := range stores {
+		if b.brandNamed {
+			brands = append(brands, b.brandID)
+		}
+	}
+	rows, err := q.Query(ctx, `SELECT entity, entity_id, field, lang, text FROM content_translations
+		WHERE ((entity='branch' AND entity_id = ANY($1)) OR (entity='brand' AND entity_id = ANY($3))) AND lang IN ($2, 'en')`,
+		ids, lang, brands)
 	if err != nil {
 		return nil, err
 	}
@@ -711,11 +779,11 @@ func storeTexts(ctx context.Context, q Querier, lang string, stores []*Branch) (
 	tr := map[string]string{}
 	for rows.Next() {
 		var id int64
-		var field, l, text string
-		if err := rows.Scan(&id, &field, &l, &text); err != nil {
+		var entity, field, l, text string
+		if err := rows.Scan(&entity, &id, &field, &l, &text); err != nil {
 			return nil, err
 		}
-		tr[strconv.FormatInt(id, 10)+"/"+field+"/"+l] = text
+		tr[entity+"/"+strconv.FormatInt(id, 10)+"/"+field+"/"+l] = text
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -731,11 +799,11 @@ func storeTexts(ctx context.Context, q Querier, lang string, stores []*Branch) (
 				continue
 			}
 		}
-		pick := func(field, orig, origEn string) string {
+		pickOf := func(entity string, id int64, field, orig, origEn string) string {
 			if strings.TrimSpace(orig) == "" {
 				return ""
 			}
-			key := strconv.FormatInt(b.ID, 10) + "/" + field + "/"
+			key := entity + "/" + strconv.FormatInt(id, 10) + "/" + field + "/"
 			if s, ok := tr[key+want]; ok {
 				return s
 			}
@@ -750,7 +818,13 @@ func storeTexts(ctx context.Context, q Querier, lang string, stores []*Branch) (
 			}
 			return origEn
 		}
-		out[b.ID] = StoreTexts{Name: pick("name", b.Name, b.NameEn), Notice: pick("notice", b.Notice, ""), Intro: pick("intro", b.Intro, "")}
+		pick := func(field, orig, origEn string) string { return pickOf("branch", b.ID, field, orig, origEn) }
+		x := StoreTexts{Name: pick("name", b.Name, b.NameEn), Notice: pick("notice", b.Notice, ""), Intro: pick("intro", b.Intro, "")}
+		if b.brandNamed {
+			x.Name = pickOf("brand", b.brandID, "name", b.Name, b.NameEn)
+			x.Tagline = pickOf("brand", b.brandID, "intro", b.brandIntro, "")
+		}
+		out[b.textsKey()] = x
 	}
 	return out, nil
 }
@@ -761,7 +835,7 @@ func localizeBranch(ctx context.Context, q Querier, b *Branch, lang string) erro
 	if err != nil {
 		return err
 	}
-	x := t[b.ID]
+	x := t[b.textsKey()]
 	b.NameTr, b.NoticeTr, b.IntroTr = x.Name, x.Notice, x.Intro
 	return nil
 }

@@ -39,11 +39,13 @@ func (c Crop) valid() bool {
 
 // Media is one promotional picture, GIF or video.
 type Media struct {
-	ID        int64   `json:"id"`
-	Kind      string  `json:"kind"` // image, gif or video
-	URL       string  `json:"url"`
-	PosterURL string  `json:"poster_url"` // empty when there is none
-	Title     string  `json:"title"`
+	ID        int64  `json:"id"`
+	Kind      string `json:"kind"` // image, gif or video
+	URL       string `json:"url"`
+	PosterURL string `json:"poster_url"` // empty when there is none
+	Title     string `json:"title"`
+	// TitleTr is the title in the customer's language, when it differs.
+	TitleTr   string  `json:"title_tr,omitempty"`
 	Crop      Crop    `json:"crop"`
 	TrimStart float64 `json:"trim_start"`
 	TrimEnd   float64 `json:"trim_end"`

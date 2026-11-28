@@ -19,7 +19,6 @@ extend({
   'br.code_hint': ['2–8 位字母或数字，全平台唯一；代客单号以它开头', '2–8 letters or digits, unique on the platform; staff order numbers start with it'],
   'br.preview': ['代客单号预览：{no}，同日第二单 {no2}', 'Staff order numbers: {no}, the second that day {no2}'],
   'br.name': ['品牌名', 'Brand name'],
-  'br.name_en': ['英文名', 'English name'],
   'br.color': ['标签颜色', 'Tag colour'],
   'br.color_hint': ['后台订单、后厨、地图上用这个颜色', 'Used on orders, the kitchen screen and maps'],
   'br.kind': ['类型', 'Takes'],

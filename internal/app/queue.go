@@ -1230,11 +1230,13 @@ func (a *App) QueueLog(ctx context.Context, branchID int64, date string) ([]Queu
 
 // QueuePublicGroup is one group on the screen and the guest's page.
 type QueuePublicGroup struct {
-	ID        int64    `json:"id"`
-	Letter    string   `json:"letter"`
-	Preset    string   `json:"preset"`
-	Label     string   `json:"label"`
-	LabelEn   string   `json:"label_en"`
+	ID      int64  `json:"id"`
+	Letter  string `json:"letter"`
+	Preset  string `json:"preset"`
+	Label   string `json:"label"`
+	LabelEn string `json:"label_en"`
+	// LabelTr is the store's own label in the reader's language, when it differs.
+	LabelTr   string   `json:"label_tr,omitempty"`
 	MinPeople int      `json:"min_people"`
 	MaxPeople int      `json:"max_people"`
 	Waiting   int      `json:"waiting"`

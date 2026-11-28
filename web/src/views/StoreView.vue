@@ -414,7 +414,7 @@ async function sendReport() {
         <StoreCoupons :slug="slug" :currency="cur" />
         <router-link v-if="stored?.campaign" class="svbar" :to="offersPath(slug)" data-testid="offers-bar">
           <span class="svtag">{{ t('sv.c.topup') }}</span>
-          <span class="grow">{{ bestTier ? t('sv.c.bar', { pay: money(bestTier.pay, cur), bonus: money(bestTier.bonus, cur) }) : stored.campaign.name }}</span>
+          <span class="grow">{{ bestTier ? t('sv.c.bar', { pay: money(bestTier.pay, cur), bonus: money(bestTier.bonus, cur) }) : stored.campaign.name_tr || stored.campaign.name }}</span>
           <span class="more">{{ t('sv.c.title') }} ›</span></router-link>
         <div class="notice" v-if="store.branch.notice" data-testid="notice">
           <span class="lbl">{{ t('sf.notice') }}</span>

@@ -79,7 +79,7 @@ export interface Storefront { branch: Branch; brand?: BrandRef | null; zones: Zo
   machine_translated?: boolean }
 export interface Crop { x: number; y: number; w: number; h: number }
 // A promotional picture, GIF or video at the top of the store page.
-export interface PromoMedia { id: number; kind: 'image' | 'gif' | 'video'; url: string; poster_url: string; title: string
+export interface PromoMedia { id: number; kind: 'image' | 'gif' | 'video'; url: string; poster_url: string; title: string; title_tr?: string
   crop: Crop; trim_start: number; trim_end: number; active: boolean; size: number; created_at: string }
 export interface ReviewSummary { count: number; average: number; taste: number; packaging: number; delivery: number }
 export interface Review { id: number; display_name: string; rating: number; taste: number; packaging: number; delivery: number | null
@@ -273,7 +273,7 @@ export type CouponKind = 'store_threshold' | 'store_free' | 'store_delivery' | '
 export interface CustomerCoupon {
   id: number; kind: CouponKind; issuer: 'store' | 'platform'; branch_id: number | null
   store_slug: string; store_name: string; store_name_en: string; currency: string
-  name: string; name_en: string; value: number; threshold: number; source: string
+  name: string; name_en: string; name_tr?: string; value: number; threshold: number; source: string
   issued_at: string; expires_at: string; status: 'available' | 'used' | 'expired'; used_at: string | null
   country: string; country_code: string; province: string
 }
@@ -295,7 +295,7 @@ export interface CouponBatch {
   brand_id?: number | null
   stats: { issued: number; used: number; open: number; spent: number }
 }
-export interface ClaimableCoupon { id: number; kind: CouponKind; name: string; name_en: string; value: number; threshold: number; valid_days: number; claimed: boolean; gone: boolean }
+export interface ClaimableCoupon { id: number; kind: CouponKind; name: string; name_en: string; name_tr?: string; value: number; threshold: number; valid_days: number; claimed: boolean; gone: boolean }
 export interface CouponCountry { country_code: string; country: string; currency: string; stores: number; provinces: string[] }
 export interface PlatformCouponSummary { currency: string; month_spent: number; month_orders: number; open_count: number; open_value: number }
 export interface BillDiscount extends OrderDiscount { source: string }

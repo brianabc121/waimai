@@ -8,6 +8,11 @@ import (
 )
 
 type Branch struct {
+	// brandID is the brand the store is shown as (forBrand); brandNamed says
+	// it goes by that brand's own name.
+	brandID              int64
+	brandNamed           bool
+	brandIntro           string
 	ID                   int64  `json:"id"`
 	MerchantID           int64  `json:"merchant_id"`
 	Slug                 string `json:"slug"`
@@ -228,6 +233,8 @@ type Option struct {
 	NameTr string `json:"name_tr,omitempty"`
 	// Code is the topping's code (AC02), for options from a topping template.
 	Code string `json:"code,omitempty"`
+	// toppingID is the template's topping the option was copied from.
+	toppingID *int64
 }
 
 type OptionGroup struct {
@@ -264,7 +271,9 @@ type Item struct {
 	DineInAvailable   bool     `json:"dine_in_available"`
 	Sort              int      `json:"sort"`
 	// BaseName is the store's own name of a dish a brand renamed.
-	BaseName  string        `json:"base_name,omitempty"`
+	BaseName string `json:"base_name,omitempty"`
+	// brandKey names the brand's name of it in the translations (brandItemKey).
+	brandKey  int64
 	StationID *int64        `json:"station_id"`
 	Groups    []OptionGroup `json:"groups"`
 	// NoteTemplateIDs are the flavour note templates the dish shows; Notes
@@ -403,7 +412,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 		return nil, err
 	}
 
-	rows, err = q.Query(ctx, `SELECT o.id, o.group_id, o.name, o.name_en, o.price_delta, o.sold_out, o.code
+	rows, err = q.Query(ctx, `SELECT o.id, o.group_id, o.name, o.name_en, o.price_delta, o.sold_out, o.code, o.topping_id
 		FROM options o JOIN option_groups g ON g.id = o.group_id JOIN menu_items i ON i.id = g.item_id
 		WHERE i.branch_id=$1 AND NOT i.archived ORDER BY o.sort, o.id`, branchID)
 	if err != nil {
@@ -413,7 +422,7 @@ func loadItems(ctx context.Context, q Querier, branchID int64, publishedOnly boo
 	for rows.Next() {
 		var o Option
 		var groupID int64
-		if err := rows.Scan(&o.ID, &groupID, &o.Name, &o.NameEn, &o.PriceDelta, &o.SoldOut, &o.Code); err != nil {
+		if err := rows.Scan(&o.ID, &groupID, &o.Name, &o.NameEn, &o.PriceDelta, &o.SoldOut, &o.Code, &o.toppingID); err != nil {
 			return nil, err
 		}
 		if ref, ok := groups[groupID]; ok {

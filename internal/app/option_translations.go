@@ -129,3 +129,46 @@ func carryOptionTranslations(ctx context.Context, tx pgx.Tx, itemID int64, befor
 	}
 	return nil
 }
+
+// brandCategoryNames lists a brand's own categories, in order.
+func brandCategoryNames(ctx context.Context, tx pgx.Tx, brandID int64) ([]optionNames, error) {
+	rows, err := tx.Query(ctx, `SELECT id, name FROM brand_categories WHERE brand_id=$1 ORDER BY sort, id`, brandID)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (optionNames, error) {
+		var n optionNames
+		return n, r.Scan(&n.id, &n.name)
+	})
+}
+
+// carryBrandTranslations does the same for a brand's catalog, whose
+// categories are written anew on every save: their translations follow them,
+// and those of categories and item names the brand no longer has are dropped.
+func carryBrandTranslations(ctx context.Context, tx pgx.Tx, brandID int64, before []optionNames) error {
+	after, err := brandCategoryNames(ctx, tx, brandID)
+	if err != nil {
+		return err
+	}
+	kept := make([]bool, len(before))
+	for i, j := range pairNames(before, after) {
+		if j < 0 {
+			continue
+		}
+		kept[j] = true
+		if _, err := tx.Exec(ctx, `UPDATE content_translations SET entity_id=$2 WHERE entity='brand_category' AND entity_id=$1`,
+			before[j].id, after[i].id); err != nil {
+			return err
+		}
+	}
+	var gone []int64
+	for j, c := range before {
+		if !kept[j] {
+			gone = append(gone, c.id)
+		}
+	}
+	_, err = tx.Exec(ctx, `DELETE FROM content_translations t WHERE (t.entity='brand_category' AND t.entity_id = ANY($1))
+		OR (t.entity='brand_item' AND t.entity_id >> 32 = $2 AND NOT EXISTS (SELECT 1 FROM brand_items bi
+			WHERE bi.brand_id=$2 AND bi.item_id = t.entity_id & 4294967295 AND bi.name <> ''))`, gone, brandID)
+	return err
+}

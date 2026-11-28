@@ -98,7 +98,7 @@ export function couponStub(c: { kind: string; value: number; threshold: number }
   return [big, c.threshold > 0 ? t('cp.over', { amt: money(c.threshold, currency) }) : t('cp.no_min')]
 }
 
-export const couponName = (c: { name: string; name_en: string; kind: CouponKind }) => pick(c.name, c.name_en) || kindName(c.kind)
+export const couponName = (c: { name: string; name_en: string; name_tr?: string; kind: CouponKind }) => c.name_tr || pick(c.name, c.name_en) || kindName(c.kind)
 // countryName is a country in the reader's language ("PH" → "菲律宾"), else the name the map gave.
 export function countryName(code: string, fallback = ''): string {
   try { return (code && new Intl.DisplayNames([intlTag()], { type: 'region' }).of(code.toUpperCase())) || fallback || code }

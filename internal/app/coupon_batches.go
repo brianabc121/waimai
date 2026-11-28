@@ -370,10 +370,12 @@ func (a *App) SetStoreBatchStatus(ctx context.Context, branchID, id int64, to st
 // ClaimableCoupon is a batch on the store page, with whether this customer
 // may still claim one.
 type ClaimableCoupon struct {
-	ID        int64  `json:"id"`
-	Kind      string `json:"kind"`
-	Name      string `json:"name"`
-	NameEn    string `json:"name_en"`
+	ID     int64  `json:"id"`
+	Kind   string `json:"kind"`
+	Name   string `json:"name"`
+	NameEn string `json:"name_en"`
+	// NameTr is the name in the customer's language, when it differs.
+	NameTr    string `json:"name_tr,omitempty"`
 	Value     int64  `json:"value"`
 	Threshold int64  `json:"threshold"`
 	ValidDays int    `json:"valid_days"`

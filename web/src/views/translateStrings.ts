@@ -14,7 +14,7 @@ extend({
   'mtr.lang_on_hint': ['这种语言已关闭，顾客看英文。点击打开', 'Off: customers get English. Turn on'],
   'mtr.lang_off_hint': ['点击关闭这种语言，顾客改看英文', 'Turn off: customers get English instead'],
   'mtr.k_item': ['商品名', 'Item names'], 'mtr.k_category': ['分类', 'Categories'], 'mtr.k_option': ['规格', 'Options'], 'mtr.k_note': ['口味模板', 'Flavour notes'],
-  'mtr.k_description': ['描述', 'Descriptions'], 'mtr.k_details': ['详情', 'Details'], 'mtr.k_promotion': ['优惠活动', 'Offers'], 'mtr.k_store': ['店铺信息', 'Store details'],
+  'mtr.k_description': ['描述', 'Descriptions'], 'mtr.k_details': ['详情', 'Details'], 'mtr.k_promotion': ['优惠活动', 'Offers'], 'mtr.k_store': ['店铺信息', 'Store details'], 'mtr.k_brand': ['品牌', 'Brands'],
   'mtr.original': ['原文', 'Original'], 'mtr.save': ['保存', 'Save'], 'mtr.revert': ['恢复机器翻译', 'Back to machine translation'],
   'mtr.empty': ['没有内容', 'Nothing here'],
   'mtr.store_name': ['店名', 'Store name'],

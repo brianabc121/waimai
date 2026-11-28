@@ -6,7 +6,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { get, post, put } from '../../api'
 import { t, tIn, loadLocale } from '../../i18n'
 import { LANGS, isLocale } from '../../langs'
-import { currentRole } from '../../session'
+import { currentRole, session } from '../../session'
+import LangsButton from '../LangsButton.vue'
 import { announce, groupName, qErr, sayCall, unlockSound, type QueueDesk, type QueueGroup, type QueueScreen, type QueueSettings } from '../../queue'
 
 const props = defineProps<{ desk: QueueDesk; base: string; manage: boolean }>()
@@ -123,6 +124,7 @@ const screenUrl = computed(() => `${location.host}/screen`)
         <!-- table sizes -->
         <section v-if="set.restaurant" class="ox-panel">
           <div class="ox-panel-h"><h2>{{ t('qu.set.groups') }}</h2><span class="grow"></span>
+            <LangsButton v-if="rows.some(r => r.id && r.label)" small :base="`/merchant/branches/${session.branchId}`" :scope="`queue/${session.branchId}`" :name="t('qu.set.groups')" />
             <button v-if="manage" class="btn small" @click="addGroup">{{ t('qu.set.add_group') }}</button></div>
           <p class="muted small">{{ t('qu.set.groups_d') }}</p>
           <div class="ox-scroll">
