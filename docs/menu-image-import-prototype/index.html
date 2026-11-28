@@ -24,19 +24,19 @@ const CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
 // 一张假的纸质价目表
 const paper = (hl = '') => `<div class="paper"><div class="t">阿明茶饮</div>
 <div class="c">招牌奶茶</div>
-<div class="l"><span>珍珠奶茶</span><i></i><small>中</small><b>95</b><small>大</small><b>110</b></div>
-<div class="l ${hl === 'maybe' ? 'hl' : ''}"><span>黑糖波霸鲜奶</span><i></i><b>130</b></div>
-<div class="l"><span>芋泥啵啵奶茶</span><i></i><b>125</b></div>
-<div class="l"><span>生椰拿铁</span><i></i><b>135</b></div>
+<div class="l"><small>A1</small><span>珍珠奶茶</span><i></i><small>中</small><b>95</b><small>大</small><b>110</b></div>
+<div class="l ${hl === 'maybe' ? 'hl' : ''}"><small>A2</small><span>黑糖波霸鲜奶</span><i></i><b>130</b></div>
+<div class="l"><small>A3</small><span>芋泥啵啵奶茶</span><i></i><b>125</b></div>
+<div class="l"><small>A4</small><span>生椰拿铁</span><i></i><b>135</b></div>
 <div class="c">鲜果茶</div>
-<div class="l ${hl === 'price' ? 'hl' : ''}"><span>冰柠檬茶</span><i></i><b>80</b></div>
-<div class="l"><span>百香果绿茶</span><i></i><b>90</b></div>
-<div class="l"><span>满杯橙橙</span><i></i><b>120</b></div>
-<div class="l h2"><span>季节限定水果茶</span><i></i><b class="hand">时价</b></div>
+<div class="l ${hl === 'price' ? 'hl' : ''}"><small>B1</small><span>冰柠檬茶</span><i></i><b>80</b></div>
+<div class="l"><small>B2</small><span>百香果绿茶</span><i></i><b>90</b></div>
+<div class="l"><small>B3</small><span>满杯橙橙</span><i></i><b>120</b></div>
+<div class="l h2"><small>B4</small><span>季节限定水果茶</span><i></i><b class="hand">时价</b></div>
 <div class="c">小吃</div>
-<div class="l"><span>盐酥鸡</span><i></i><b>150</b></div>
-<div class="l"><span>炸鱿鱼圈</span><i></i><b>160</b></div>
-<div class="l"><span>薯条</span><i></i><b>85</b></div>
+<div class="l"><small>C1</small><span>盐酥鸡</span><i></i><b>150</b></div>
+<div class="l"><small>C2</small><span>炸鱿鱼圈</span><i></i><b>160</b></div>
+<div class="l"><small>C3</small><span>薯条</span><i></i><b>85</b></div>
 <div class="l"><span>加料：珍珠 / 椰果 / 布丁</span><i></i><b>+15</b></div></div>`
 
 const hist = `<div class="card"><div class="row" style="margin-bottom:8px"><h2>导入记录</h2><span class="sp"></span><span class="muted">保留最近 50 次</span></div>
@@ -75,22 +75,22 @@ ${th('IMG_2292.jpg', '<span class="tag fix">看不清</span>', 'bad')}
 <div class="row" style="margin-top:14px"><span class="muted">已识别 2 张，共 33 件商品；1 张识别中，1 张排队，1 张失败</span><span class="sp"></span><button class="btn">取消本次导入</button><button class="btn pri">先确认已识别的 33 件</button></div></div>`)
 
 // 3 确认页（核心）
-const r = (o) => `<tr class="${o.cls || ''}"><td>${cb(o.on)}</td><td><div class="in ${o.nameErr ? 'err' : ''}" style="min-width:150px">${o.name}</div>${o.spec ? `<div class="spec">${o.spec}</div>` : ''}</td>
+const r = (o) => `<tr class="${o.cls || ''}"><td>${cb(o.on)}</td><td><div class="in num" style="width:48px">${o.code || ''}</div></td><td><div class="in ${o.nameErr ? 'err' : ''}" style="min-width:150px">${o.name}</div>${o.spec ? `<div class="spec">${o.spec}</div>` : ''}</td>
 <td><div class="in num ${o.err ? 'err' : ''}" style="width:74px">${o.price}</div></td><td>${tag(o.st)}</td><td>${o.info || ''}</td><td>${o.act ? `<span class="act">${o.act}</span>` : ''}</td></tr>`
-const reviewTable = `<table><tr><th style="width:30px">${cb(true)}</th><th>商品名</th><th>价格 ₱</th><th>状态</th><th>和店里现有商品对比</th><th>怎么处理</th></tr>
-<tr class="grp"><td colspan="6">招牌奶茶 <small>店里已有这个分类</small></td></tr>
-${r({ name: '珍珠奶茶', price: '95', st: 'same', spec: '规格（必选）：中 +0 / 大 +15', info: '<span class="was">店里已有，价格一样 ₱95</span>', act: '跳过', cls: 'off' })}
-${r({ on: 1, name: '黑糖波霸鲜奶', price: '130', st: 'maybe', info: '<span class="was">店里有“<b>黑糖波霸牛奶</b>” ₱125，名字很像</span><br><a>对比</a>', act: '请选择', cls: 'sel' })}
-${r({ on: 1, name: '芋泥啵啵奶茶', price: '125', st: 'new', act: '新增为草稿' })}
-${r({ on: 1, name: '生椰拿铁', price: '135', st: 'new', act: '新增为草稿' })}
-<tr class="grp"><td colspan="6">鲜果茶 <small>新分类，导入时自动新建</small></td></tr>
-${r({ on: 1, name: '冰柠檬茶', price: '80', st: 'price', info: '<span class="was">店里现在 <s>₱75</s> → 图片上 <b>₱80</b>（+5）</span>', act: '更新价格' })}
-${r({ on: 1, name: '百香果绿茶', price: '90', st: 'new', act: '新增为草稿' })}
-${r({ on: 1, name: '满杯橙橙', price: '120', st: 'new', act: '新增为草稿' })}
-${r({ name: '季节限定水果茶', price: '', err: 1, st: 'fix', info: '<span class="was">图片上写的是“时价”，没有数字。填上价格才能导入</span>', act: '跳过' })}
-<tr class="grp"><td colspan="6">小吃 <small>店里已有这个分类</small></td></tr>
-${r({ on: 1, name: '盐酥鸡', price: '150', st: 'new', act: '新增为草稿' })}
-${r({ name: '薯条', price: '85', st: 'maybe', info: '<span class="was">店里有“<b>炸薯条</b>” ₱85，名字很像</span><br><a>对比</a>', act: '当作同一件，跳过', cls: 'off' })}
+const reviewTable = `<table><tr><th style="width:30px">${cb(true)}</th><th>编号</th><th>商品名</th><th>价格 ₱</th><th>状态</th><th>和店里现有商品对比</th><th>怎么处理</th></tr>
+<tr class="grp"><td colspan="7">招牌奶茶 <small>店里已有这个分类</small></td></tr>
+${r({ code: 'A1', name: '珍珠奶茶', price: '95', st: 'same', spec: '规格（必选）：中 +0 / 大 +15', info: '<span class="was">店里已有，价格一样 ₱95</span>', act: '跳过', cls: 'off' })}
+${r({ on: 1, code: 'A2', name: '黑糖波霸鲜奶', price: '130', st: 'maybe', info: '<span class="was">店里有“<b>黑糖波霸牛奶</b>” ₱125，编号也是 <b>A2</b></span><br><a>对比</a>', act: '请选择', cls: 'sel' })}
+${r({ on: 1, code: 'A3', name: '芋泥啵啵奶茶', price: '125', st: 'new', act: '新增为草稿' })}
+${r({ on: 1, code: 'A4', name: '生椰拿铁', price: '135', st: 'new', act: '新增为草稿' })}
+<tr class="grp"><td colspan="7">鲜果茶 <small>新分类，导入时自动新建</small></td></tr>
+${r({ on: 1, code: 'B1', name: '冰柠檬茶', price: '80', st: 'price', info: '<span class="was">店里现在 <s>₱75</s> → 图片上 <b>₱80</b>（+5）</span>', act: '更新价格' })}
+${r({ on: 1, code: 'B2', name: '百香果绿茶', price: '90', st: 'new', act: '新增为草稿' })}
+${r({ on: 1, code: 'B3', name: '满杯橙橙', price: '120', st: 'new', act: '新增为草稿' })}
+${r({ code: 'B4', name: '季节限定水果茶', price: '', err: 1, st: 'fix', info: '<span class="was">图片上写的是“时价”，没有数字。填上价格才能导入</span>', act: '跳过' })}
+<tr class="grp"><td colspan="7">小吃 <small>店里已有这个分类</small></td></tr>
+${r({ on: 1, code: 'C1', name: '盐酥鸡', price: '150', st: 'new', act: '新增为草稿' })}
+${r({ code: 'C3', name: '薯条', price: '85', st: 'maybe', info: '<span class="was">店里有“<b>炸薯条</b>” ₱85，名字很像</span><br><a>对比</a>', act: '当作同一件，跳过', cls: 'off' })}
 </table>`
 const review = (extra = '') => page(`<div class="row" style="margin-bottom:10px"><a class="lnk">← 返回</a><h2 style="font-size:18px">确认识别结果</h2><span class="muted">3 张图片，共认出 46 件商品。认错的地方直接点格子改。</span><span class="sp"></span><button class="btn sm">＋ 手动加一行</button></div>
 <div class="rev"><div class="card view"><div class="pg"><button class="on">第 1 页</button><button>第 2 页</button><button>饮品单</button><span class="sp"></span><button>放大</button><button>旋转</button></div>
@@ -102,14 +102,14 @@ S[3] = () => review()
 
 // 4 可能重复：对比
 S[4] = () => review(`<div class="mask"><div class="dlg"><div class="row"><h2>这是同一件商品吗？</h2><span class="tag maybe">可能重复</span><span class="sp"></span><button class="btn sm">✕</button></div>
-<p class="muted">名字不完全一样，系统不敢自己决定，请你选一下。</p>
-<div class="cmp"><div class="box"><h3>图片上认出来的（第 1 页）</h3><div class="n">黑糖波霸<mark>鲜奶</mark></div><div>₱130　分类：招牌奶茶</div><div class="paper" style="padding:6px 10px;margin-top:8px;border-radius:6px"><div class="l hl"><span>黑糖波霸鲜奶</span><i></i><b>130</b></div></div></div>
+<p class="muted">编号一样，名字差一个字，系统不敢自己决定，请你选一下。</p>
+<div class="cmp"><div class="box"><h3>图片上认出来的（第 1 页）</h3><div class="n">黑糖波霸<mark>鲜奶</mark></div><div>编号 A2　₱130　分类：招牌奶茶</div><div class="paper" style="padding:6px 10px;margin-top:8px;border-radius:6px"><div class="l hl"><small>A2</small><span>黑糖波霸鲜奶</span><i></i><b>130</b></div></div></div>
 <div class="vs">对比</div>
-<div class="box"><h3>店里现有的商品</h3><div class="n">黑糖波霸<mark>牛奶</mark></div><div>₱125　分类：招牌奶茶　<span class="tag done">上架中</span></div><div class="muted" style="margin-top:8px">编号 A12 · 上月卖出 214 件 · 有 2 组规格、1 个加料模板</div></div></div>
+<div class="box"><h3>店里现有的商品</h3><div class="n">黑糖波霸<mark>牛奶</mark></div><div>编号 A2　₱125　分类：招牌奶茶　<span class="tag done">上架中</span></div><div class="muted" style="margin-top:8px">上月卖出 214 件 · 有 2 组规格、1 个加料模板</div></div></div>
 <div class="opts">
-<div class="opt on"><span class="rd"></span><div><b>是同一件，只把价格改成 ₱130</b><div class="muted">商品名、图片、规格、销量都保持不变，只改价格（₱125 → ₱130）。</div></div></div>
+<div class="opt on"><span class="rd"></span><div><b>是同一件，只把价格改成 ₱130</b><div class="muted">商品名、编号、图片、规格、销量都保持不变，只改价格（₱125 → ₱130）。</div></div></div>
 <div class="opt"><span class="rd"></span><div><b>是同一件，什么都不改</b><div class="muted">跳过这一行。</div></div></div>
-<div class="opt"><span class="rd"></span><div><b>不是同一件，新增“黑糖波霸鲜奶”</b><div class="muted">作为一件新商品放进草稿，店里会同时有两件。</div></div></div></div>
+<div class="opt"><span class="rd"></span><div><b>不是同一件，新增“黑糖波霸鲜奶”</b><div class="muted">作为一件新商品放进草稿，店里会同时有两件，编号 A2 会重复，需要你改一个。</div></div></div></div>
 <div class="row" style="margin-top:14px"><span class="muted">还有 1 件可能重复：薯条 / 炸薯条</span><span class="sp"></span><button class="btn">上一件</button><button class="btn pri">确定，看下一件</button></div></div></div>`)
 
 // 5 导入前核对
