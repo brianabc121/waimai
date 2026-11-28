@@ -27,7 +27,8 @@ jobs:
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       # -p 1: the test packages share one database and one job queue
-      - run: go test -count=1 -race -p 1 ./...
+      # the app package alone runs close to go test's default limit of 10 minutes under -race
+      - run: go test -count=1 -race -p 1 -timeout 25m ./...
 
   web:
     runs-on: ubuntu-latest
