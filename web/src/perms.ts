@@ -126,7 +126,7 @@ extend({
   'rp.p.menu.edit': ['修改商品', 'Edit items'],
   'rp.d.menu.edit': ['新增和修改商品、分类、价格、规格，上下架，Excel 导入', 'Items, categories, prices, options, publishing, Excel import'],
   'rp.p.menu.translate': ['商品翻译和店铺文字', 'Translations and store texts'],
-  'rp.d.menu.translate': ['多语言译文、店铺介绍', 'Menu translations and store introduction'],
+  'rp.d.menu.translate': ['多语言译文、店铺介绍', 'Catalog translations and store introduction'],
   'rp.p.store.design': ['模板和宣传物料', 'Templates and promo media'],
   'rp.d.store.design': ['点餐页模板、宣传图片和视频', 'Ordering page templates, promo pictures and videos'],
   'rp.p.promo': ['优惠活动和优惠券', 'Offers and coupons'],

@@ -9,7 +9,7 @@ extend({
   'sf.promo_over': ['满{th}可用', 'Orders over {th}'], 'sf.promo_any': ['无门槛', 'No minimum'], 'sf.promo_hours': ['每天 {from}–{to}', 'Daily {from}–{to}'], 'sf.promo_paused': ['当前时段不可用', 'Not running right now'], 'sf.promo_tip': ['结算时自动使用最划算的一项', 'The best offer is applied at checkout'],
   'sf.promos_n': ['{n} 个优惠', '{n} offers'], 'sf.promos': ['优惠活动', 'Offers'],
   'sf.notice': ['公告：', 'Notice: '],
-  'sf.mt_note': ['商品目录由机器翻译', 'This catalog was machine translated'], 'sf.mt_original': ['正在看商家原文', 'Showing the menu as the store wrote it'],
+  'sf.mt_note': ['商品目录由机器翻译', 'This catalog was machine translated'], 'sf.mt_original': ['正在看商家原文', 'Showing the catalog as the store wrote it'],
   'sf.mt_show_orig': ['查看原文', 'Show original'], 'sf.mt_show_tr': ['看译文', 'Show translation'],
   'sf.search': ['搜索商品', 'Search items'], 'sf.search_none': ['没有找到相关商品', 'No items match'],
   'sf.account': ['我的账号', 'My account'], 'sf.logged_in': ['已登录', 'Logged in as'], 'sf.logout': ['退出登录', 'Log out'],
