@@ -59,18 +59,17 @@ async function place() {
   await page.waitForSelector(tid('mo-done'))
 }
 
-// 1. A new address: nothing known, so "More" is the only line; Google is not asked until it is reached.
+// 1. A new address: nothing of ours matches, so Google is asked by itself once typing has paused.
 const place1 = `Ayala ${run}`
 await newOrder('917' + run.replace(/\D/g, '1').padEnd(7, '1').slice(0, 7))
 const addr = page.locator(tid('mo-address'))
 await addr.click()
 await addr.pressSequentially(place1, { delay: 20 })
 await page.waitForSelector(tid('mo-more'))
-expect(await page.locator(tid('mo-google')).count(), 0, 'Google suggestions before reaching "More"')
-await page.hover(tid('mo-more'))
-await page.waitForSelector(tid('mo-google'))
+expect(await page.locator(tid('mo-google')).count(), 0, 'Google suggestions while still typing')
+await page.waitForSelector(tid('mo-google')) // nobody moved onto "More"
 await shot('ab1-more-google')
-step('"More" loads Google suggestions only once reached')
+step('an address nothing of ours matches gets Google suggestions without anyone asking')
 await page.click(`${tid('mo-google')} >> nth=0`)
 await page.waitForSelector('.okc')
 const line1 = await addr.inputValue()
@@ -105,6 +104,12 @@ expect((await page.locator(`${tid('mo-hint')}[data-kind=book]`).first().innerTex
 await addr.fill('')
 await addr.pressSequentially(run, { delay: 20 })
 await page.waitForFunction(() => document.querySelectorAll('[data-testid=mo-hint][data-kind=book]').length >= 2)
+// The address book has answers, so Google is left alone until "More" is reached.
+await page.waitForTimeout(1200)
+expect(await page.locator(tid('mo-google')).count(), 0, 'Google suggestions while the address book has matches')
+await page.hover(tid('mo-more'))
+await page.waitForSelector(tid('mo-google'))
+await addr.click()
 await page.keyboard.press('ArrowDown')
 await shot('ab2-book-first')
 await page.keyboard.press('Enter')
