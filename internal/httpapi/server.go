@@ -417,6 +417,7 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/config", s.publicConfig)
 	api.GET("/stores/:slug", s.storefront)
 	api.POST("/stores/:slug/locate", s.limit(s.publicWrites), s.locate)
+	api.GET("/address-suggest", s.limit(s.mallLimit), s.addressSuggest)
 	api.POST("/otp/request", s.limit(s.otpLimit), s.otpRequest)
 	api.POST("/otp/verify", s.limit(s.otpLimit), s.otpVerify)
 	api.GET("/customer/session", s.customerSession)

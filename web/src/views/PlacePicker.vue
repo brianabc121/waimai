@@ -7,7 +7,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { termsAt, type DeliveryTerms } from '../addresses'
 import { money, t } from '../i18n'
-import { mapsKey, storeScope, type Place, type Region } from '../maps'
+import { mapsKey, parseLatLng, storeScope, type Place, type Region } from '../maps'
+import { hintPlace, ownAddresses } from '../addressSuggest'
 import type { LatLng, View } from '../geo'
 import MapCanvas from './MapCanvas.vue'
 
@@ -39,6 +40,8 @@ const checking = ref(false), failed = ref(false), note = ref('')
 const q = ref(''), typing = ref(false)
 const list = ref<Place[]>([]), looking = ref(false)
 const chosen = ref<Place | null>(null)
+// more: what is listed is ours, and Google has not been asked for these words yet
+const more = ref(false)
 // A place the customer picked by name: when the map settles on it, it stays chosen.
 let kept: Place | null = props.name ? { label: props.name } : null
 let settleTimer = 0, typeTimer = 0, seq = 0, listSeq = 0
@@ -100,19 +103,35 @@ async function around(p: LatLng) {
   kept = null
 }
 
+// Typed words are looked up among our own addresses first (the address
+// book's public places); Google is asked when none match, or for "more".
 function onType() {
   clearTimeout(typeTimer)
   const text = q.value.trim()
+  more.value = false
   if (text.length < 2) { typing.value = false; if (at.value) void around(at.value); return }
   typing.value = true
   typeTimer = window.setTimeout(async () => {
     const n = ++listSeq
     looking.value = true
+    // typed coordinates are a point, not words to look up
+    const ours = parseLatLng(text) ? [] : (await ownAddresses({ q: text, slug: props.slug, near: at.value })).map(hintPlace).filter(p => p.at)
+    if (n !== listSeq) return
+    if (ours.length) { looking.value = false; list.value = ours; chosen.value = null; more.value = true; return }
     const found = await map.value!.suggest(text).catch(() => [] as Place[])
     if (n !== listSeq) return
     looking.value = false
     list.value = found; chosen.value = null
   }, 300)
+}
+async function loadMore() {
+  const text = q.value.trim(), n = ++listSeq
+  more.value = false; looking.value = true
+  const found = await map.value!.suggest(text).catch(() => [] as Place[])
+  if (n !== listSeq) return
+  looking.value = false
+  const have = new Set(list.value.map(p => p.id || p.label))
+  list.value = [...list.value, ...found.filter(p => !have.has(p.id || p.label))]
 }
 async function pick(p: Place) {
   if (!typing.value) { chosen.value = p; return }
@@ -120,7 +139,7 @@ async function pick(p: Place) {
   const where = p.at ?? await p.locate?.() ?? null
   if (!where) return
   kept = { label: p.label, detail: p.detail }
-  typing.value = false; q.value = ''
+  typing.value = false; q.value = ''; more.value = false
   list.value = []; chosen.value = null
   map.value!.setView({ center: where, zoom: Math.max(17, map.value!.view.zoom) })
 }
@@ -199,13 +218,15 @@ const state = computed(() => checking.value || !terms.value ? 'checking' : terms
       <div class="pp-list" data-testid="pin-list">
         <div v-if="looking && !list.length" class="muted pp-empty">{{ t('pp.looking') }}</div>
         <div v-else-if="typing && !list.length" class="muted pp-empty">{{ t('pp.none') }}</div>
-        <button v-for="(p, i) in list" :key="i" type="button" class="pp-place" :class="{ on: chosen === p }" data-testid="pin-place" @click="pick(p)">
+        <button v-for="(p, i) in list" :key="i" type="button" class="pp-place" :class="{ on: chosen === p }" data-testid="pin-place" :data-own="p.own ? '1' : undefined" @click="pick(p)">
           <span class="grow">
             <span class="n">{{ p.label }}</span>
             <span class="d" v-if="p.detail || p.distance_m">{{ p.detail }}<template v-if="p.distance_m"><template v-if="p.detail"> · </template>{{ t('pp.metres', { n: p.distance_m }) }}</template></span>
           </span>
           <span v-if="chosen === p" class="tick">✓</span>
         </button>
+        <button v-if="typing && more" type="button" class="pp-place pp-more" data-testid="pin-more" @click="loadMore">{{ t('pp.more') }}</button>
+        <div v-if="looking && list.length" class="muted pp-empty">{{ t('pp.looking') }}</div>
       </div>
     </div>
   </div>
@@ -238,4 +259,5 @@ const state = computed(() => checking.value || !terms.value ? 'checking' : terms
 .pp-place .d { display: block; font-size: 13px; color: #7b828c; }
 .pp-place .tick { color: var(--brand); font-size: 18px; font-weight: 700; }
 .pp-place.on { background: var(--brand-soft); }
+.pp-more { color: var(--brand); font-weight: 600; font-size: 14.5px; }
 </style>

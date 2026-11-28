@@ -20,6 +20,7 @@ import { presetList } from './dine/strings'
 import type { Picked } from './PlacePicker.vue'
 import { googleMapsLink, joined, mapsKey, suggestPlaces, type Place } from '../maps'
 import { addrParts, addrText, keepsName } from '../place'
+import { AUTO_WAIT, googleNext, ownAddresses } from '../addressSuggest'
 import AddrText from './AddrText.vue'
 import './manualStrings'
 import './dine/strings'
@@ -374,19 +375,16 @@ function lineInput() {
 }
 async function loadHints() {
   const n = ++hintSeq
-  const r = await get<{ addresses: AddressHint[] }>(`${base}/address-hints?q=${encodeURIComponent(f.line.trim())}&phone=${encodeURIComponent(phoneE164.value)}&${bq()}`)
-    .catch(() => ({ addresses: [] }))
+  const addresses = await ownAddresses({ q: f.line, desk: bid, brand: brandPick.value, phone: phoneE164.value })
   if (n !== hintSeq) return
-  hints.value = r.addresses
+  hints.value = addresses
   // only while the address is still being typed in
   hintsOpen.value = document.activeElement?.getAttribute('data-testid') === 'mo-address'
   clearTimeout(autoTimer)
-  if (hintsOpen.value && !r.addresses.length && mapKey.value && f.lat == null && [...f.line.trim()].length >= AUTO_MIN) {
+  if (hintsOpen.value && mapKey.value && f.lat == null && googleNext(addresses, f.line)) {
     autoTimer = window.setTimeout(() => { if (n === hintSeq && hintsOpen.value) void loadGoogle() }, AUTO_WAIT)
   }
 }
-// Nothing of ours matches: Google is asked by itself after this pause, for at least this many letters.
-const AUTO_WAIT = 400, AUTO_MIN = 3
 // "More" was reached: ask Google once for what is typed now.
 async function loadGoogle() {
   const q = f.line.trim()

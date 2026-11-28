@@ -283,7 +283,7 @@ expect(await cust.locator(tid('picker') + ' svg polygon, ' + tid('picker') + ' s
 // typed searches stay in the store's country, near the store, wherever the map is
 await goTo('40.7624, -73.9738')
 await result('out')
-await cust.fill(tid('pin-search'), 'trump tower')
+await cust.fill(tid('pin-search'), 'zenith tower')
 await cust.locator(`${tid('pin-place')}:has-text("Stub St, PH")`).first().waitFor()
 await cust.locator(tid('pin-place')).first().click()
 await result('in')

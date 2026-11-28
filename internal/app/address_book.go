@@ -112,17 +112,49 @@ func bookMatch(n string) string {
 		OR (length(addr_key(array_to_string(` + n + `::text[], ''))) >= 4 AND addr_key(array_to_string(` + n + `::text[], '')) <% a.line_key))`
 }
 
-// searchBook lists the book's addresses in one region matching q, the closest first.
-func searchBook(ctx context.Context, q Querier, r AddrRegion, text string, limit int) ([]BookAddress, error) {
+// bookScope says which part of the book a search reads: one region (a
+// store's), or the surroundings of a point when no store is known; and
+// whether only what customers may see.
+type bookScope struct {
+	Region *AddrRegion
+	Near   *LatLng
+	Public bool
+}
+
+// publicBook is the part of the book customers are offered: places Google
+// knows by name, and entries the platform wrote or imported itself. A line
+// staff typed by hand for one customer (it may say a house or a unit) stays
+// with staff.
+const publicBook = `(a.place_id <> '' OR a.source IN ('admin', 'import'))`
+
+// nearDeg is how far around a point (in degrees, about 55 km of latitude)
+// the book is read when there is no store to give a region.
+const nearDeg = 0.5
+
+// searchBook lists the book's addresses in scope matching text, the closest match first.
+func searchBook(ctx context.Context, q Querier, sc bookScope, text string, limit int) ([]BookAddress, error) {
 	terms := searchTerms(text)
-	if len(terms) == 0 {
+	if len(terms) == 0 || (sc.Region == nil && sc.Near == nil) {
 		return []BookAddress{}, nil
 	}
+	args := []any{terms, limit}
+	arg := func(v any) string { args = append(args, v); return "$" + strconv.Itoa(len(args)) }
+	where := bookMatch("$1")
+	if sc.Region != nil {
+		where += " AND a.country_code = " + arg(sc.Region.CountryCode) + " AND a.province = " + arg(sc.Region.Province) +
+			" AND a.city = " + arg(sc.Region.City)
+	} else {
+		where += " AND a.lat BETWEEN " + arg(sc.Near[0]-nearDeg) + " AND " + arg(sc.Near[0]+nearDeg) +
+			" AND a.lng BETWEEN " + arg(sc.Near[1]-nearDeg) + " AND " + arg(sc.Near[1]+nearDeg)
+	}
+	if sc.Public {
+		where += " AND " + publicBook
+	}
 	rows, err := q.Query(ctx, `SELECT `+bookCols+` FROM address_book a LEFT JOIN branches b ON b.id = a.branch_id
-		WHERE a.country_code = $1 AND a.province = $2 AND a.city = $3 AND `+bookMatch("$4")+`
-		ORDER BY (a.line_key LIKE addr_key(array_to_string($4::text[], '')) || '%') DESC,
-			similarity(a.line_key, addr_key(array_to_string($4::text[], ''))) DESC, a.uses DESC, a.last_used_at DESC
-		LIMIT $5`, r.CountryCode, r.Province, r.City, terms, limit)
+		WHERE `+where+`
+		ORDER BY (a.line_key LIKE addr_key(array_to_string($1::text[], '')) || '%') DESC,
+			similarity(a.line_key, addr_key(array_to_string($1::text[], ''))) DESC, a.uses DESC, a.last_used_at DESC
+		LIMIT $2`, args...)
 	if err != nil {
 		return nil, err
 	}

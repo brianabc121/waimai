@@ -74,11 +74,26 @@ func (s *Server) saveMember(c *gin.Context) {
 	reply(c, m, err)
 }
 
+// Both address boxes are answered by the one module, app.SuggestAddresses:
+// addressHints for staff at the order desk, addressSuggest for customers.
 func (s *Server) addressHints(c *gin.Context) {
 	if bid, brand, ok := s.brandScope(c, pMemberLookup, queryInt(c, "brand")); ok {
-		hs, err := s.App.AddressHints(c, bid, brand, c.Query("q"), c.Query("phone"))
+		hs, err := s.App.SuggestAddresses(c, app.AddressAsk{Q: c.Query("q"), Staff: true, BranchID: bid, BrandID: brand, Phone: c.Query("phone")})
 		reply(c, gin.H{"addresses": hs}, err)
 	}
+}
+
+// addressSuggest is public: the book's public places for a store (slug), or
+// around a point (lat, lng) where there is no store.
+func (s *Server) addressSuggest(c *gin.Context) {
+	ask := app.AddressAsk{Q: c.Query("q"), Slug: c.Query("slug")}
+	lat, e1 := strconv.ParseFloat(c.Query("lat"), 64)
+	lng, e2 := strconv.ParseFloat(c.Query("lng"), 64)
+	if e1 == nil && e2 == nil {
+		ask.Near = &app.LatLng{lat, lng}
+	}
+	hs, err := s.App.SuggestAddresses(c, ask)
+	reply(c, gin.H{"addresses": hs}, err)
 }
 
 func (s *Server) staffQuote(c *gin.Context) {
