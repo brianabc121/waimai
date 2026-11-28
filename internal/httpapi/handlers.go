@@ -167,6 +167,18 @@ func hideZones(err error) error {
 	return err
 }
 
+// placedOrder answers "did my order go through?" for a request whose answer
+// never arrived.
+func (s *Server) placedOrder(c *gin.Context) {
+	phone, err := s.customerPhone(c)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	out, err := s.App.PlacedOrder(c, c.Param("slug"), phone, c.GetHeader("Idempotency-Key"))
+	reply(c, out, err)
+}
+
 func (s *Server) placeOrder(c *gin.Context) {
 	phone, err := s.customerPhone(c)
 	if err != nil {

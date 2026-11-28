@@ -7,7 +7,8 @@ import LineExtras from './LineExtras.vue'
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { listAddresses, sorted, usable, whoLine, type Address } from '../addresses'
-import { ApiError, get, newKey, post } from '../api'
+import { api, ApiError, get, post } from '../api'
+import { latest, stableKey } from '../retry'
 import { clearLines, linePrice, quoteItems, useCart } from '../cart'
 import { customer, loadCustomer, loginRoute, prettyPhone } from '../customer'
 import { locale, money, pick, t, whenText, mn, sn } from '../i18n'
@@ -86,15 +87,37 @@ function bookChanged(list: Address[]) {
   if (cart.addressId != null && !address.value) { use(list.find(usable) ?? null); void requote() }
 }
 
-// The idempotency key belongs to one confirmed quote. It is kept across a
-// reload so that a retry after a timeout finds the original order.
-let idemKey = ''
-function keyFor(quoteId: string) {
-  const saved = sessionStorage.getItem('order-key')
-  if (saved?.startsWith(quoteId + '|')) return saved.slice(quoteId.length + 1)
-  const k = newKey()
-  sessionStorage.setItem('order-key', quoteId + '|' + k)
-  return k
+// The idempotency key belongs to what is being ordered (the basket and the
+// choices on this page), not to one price quote: asking the price again
+// after a lost answer, or reloading the page, keeps the key, so the server
+// finds the first try instead of making a second order.
+const keys = stableKey(sessionStorage, 'order-key:' + props.slug)
+const orderPrint = () => ({ service: cart.service, zone: cart.zoneId, address: delivery.value ? cart.addressId : null, items: quoteItems(),
+  when: scheduled.value || null, coupons: couponIds.value, name: delivery.value ? '' : cart.name, note: cart.note, credit: useCredit.value })
+// An order request that was never answered may have gone through. Its key
+// is kept until that is known.
+const pendingName = 'order-pending:' + props.slug
+function placed(token: string) {
+  clearLines()
+  keys.done()
+  sessionStorage.removeItem(pendingName)
+  localStorage.setItem('last-order:' + props.slug, token)
+  router.replace(`/o/${token}`)
+}
+// Before the customer orders anything else: did the unanswered request make
+// an order? True when it did (the page goes to that order).
+async function confirmPending(sending = ''): Promise<boolean> {
+  const key = sessionStorage.getItem(pendingName)
+  // the same request again finds its own order
+  if (!key || key === sending) return false
+  try {
+    const r = await api<{ access_token: string }>('GET', `/stores/${props.slug}/orders/placed`, undefined, { 'Idempotency-Key': key })
+    placed(r.access_token)
+    return true
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return false
+    throw e
+  }
 }
 
 function describe(e: unknown): string {
@@ -122,14 +145,23 @@ const coupons = computed(() => quote.value?.coupons ?? [])
 const choices = computed(() => quote.value?.coupon_choices ?? [])
 const couponOff = computed(() => coupons.value.reduce((s, c) => s + c.amount, 0))
 function couponsChosen(ids: number[]) { couponIds.value = ids; showCoupons.value = false; void requote() }
+// Only the answer to the last question counts, and while it is on its way
+// the price on the page is not one to order with.
+const turn = latest()
+const quoting = ref(false)
 async function requote() {
   error.value = ''; short.value = 0
+  const mine = turn.next()
+  quoting.value = false
   if (cart.lines.length === 0) { router.replace(storePath(props.slug)); return }
   // Without an address there is nothing to price a delivery for yet.
   if (delivery.value && !address.value) { quote.value = null; return }
   if (mustSchedule.value && !scheduled.value) { quote.value = null; error.value = slots.value.length ? t('pick_time') : t('closed'); return }
+  quoting.value = true
   try {
-    quote.value = await post<Quote>(`/stores/${props.slug}/quotes`, {
+    // an order whose answer was lost is found before anything is priced again
+    if (await confirmPending()) return
+    const q = await post<Quote>(`/stores/${props.slug}/quotes`, {
       service_type: cart.service,
       zone_id: cart.service === 'delivery' ? cart.zoneId : null,
       // Stores that locate customers on a map decide the area from the address's pin.
@@ -141,14 +173,16 @@ async function requote() {
       // the order keeps the dishes' names in this language
       lang: locale.value,
     })
-    idemKey = keyFor(quote.value.id)
+    if (!mine()) return
+    quote.value = q
   } catch (e) {
+    if (!mine()) return
     quote.value = null
     error.value = describe(e)
     // The offered times move on; fetch fresh ones when the chosen one is gone.
     if (e instanceof ApiError && (e.code === 'SCHEDULE_INVALID' || e.code === 'STORE_CLOSED')) await loadStore()
     if (e instanceof ApiError && e.code === 'ADDRESS_NOT_FOUND') { use(null); await loadAddresses() }
-  }
+  } finally { if (mine()) quoting.value = false }
 }
 
 // Ordering needs an account: without one, log in first and come back here.
@@ -219,22 +253,21 @@ const useCredit = ref(true)
 const credit = computed(() => useCredit.value ? quote.value?.credit ?? 0 : 0)
 const due = computed(() => quote.value ? quote.value.totals.total - credit.value : subtotal.value)
 
-const ready = computed(() => !!quote.value && customer.verified && (delivery.value ? !!address.value : cart.name.trim() !== ''))
+const ready = computed(() => !!quote.value && !quoting.value && customer.verified && (delivery.value ? !!address.value : cart.name.trim() !== ''))
 
 async function submit() {
-  if (!quote.value || busy.value) return
+  if (!quote.value || busy.value || quoting.value) return
   busy.value = true
   error.value = ''; notice.value = ''
+  const idemKey = keys.for(orderPrint())
   try {
+    if (await confirmPending(idemKey)) return
     const r = await post(`/stores/${props.slug}/orders`, {
       // a delivery takes the name and the address from the saved address
       quote_id: quote.value.id, customer_name: delivery.value ? '' : cart.name, note: cart.note,
       use_credit: credit.value > 0, credit_expected: credit.value > 0 ? credit.value : undefined,
     }, { 'Idempotency-Key': idemKey })
-    clearLines()
-    sessionStorage.removeItem('order-key')
-    localStorage.setItem('last-order:' + props.slug, r.access_token)
-    router.replace(`/o/${r.access_token}`)
+    placed(r.access_token)
   } catch (e) {
     if (e instanceof ApiError && (e.code === 'QUOTE_CHANGED' || e.code === 'QUOTE_EXPIRED' || e.code === 'QUOTE_USED' || e.code === 'CREDIT_CHANGED')) {
       // Show the new amount first; the customer confirms again.
@@ -244,8 +277,12 @@ async function submit() {
       customer.verified = false
       toLogin()
     } else {
-      // On a network error the key is kept, so pressing again is a safe retry.
-      error.value = describe(e)
+      // No answer, or the server failed half way: the order may exist. The
+      // key is kept, so pressing again (also after a reload) finds it.
+      if (e instanceof ApiError && (e.code === 'NETWORK' || e.status >= 500)) {
+        sessionStorage.setItem(pendingName, idemKey)
+        error.value = t('submit_failed')
+      } else error.value = describe(e)
     }
   } finally { busy.value = false }
 }

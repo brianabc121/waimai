@@ -516,6 +516,30 @@ type placedRecord struct {
 	OrderID int64 `json:"order_id"`
 }
 
+// PlacedOrder finds the order that a request with this key made, if it got
+// that far: a page whose order request was never answered asks here before
+// it lets the customer order again.
+func (a *App) PlacedOrder(ctx context.Context, slug, phone, idemKey string) (*PlacedOrder, error) {
+	b, err := branchBySlug(ctx, a.DB, slug)
+	if err != nil {
+		return nil, err
+	}
+	var out PlacedOrder
+	var nonce []byte
+	err = a.DB.QueryRow(ctx, `SELECT o.id, o.public_no, o.token_nonce FROM idempotency_records r
+		JOIN orders o ON o.id = (r.response->>'order_id')::bigint
+		WHERE r.scope=$1 AND r.key=$2 AND r.response IS NOT NULL`,
+		fmt.Sprintf("place-order:%d:%s", b.ID, phone), idemKey).Scan(&out.OrderID, &out.PublicNo, &nonce)
+	if isNoRows(err) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	out.AccessToken = a.orderToken(nonce)
+	return &out, nil
+}
+
 // PlaceOrder turns a confirmed quote into an order. phone comes from the
 // verified customer session. The idempotency key is mandatory: a retry with
 // the same key returns the original order.
@@ -540,7 +564,13 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		}
 		scope := fmt.Sprintf("place-order:%d:%s", b.ID, phone)
 		var rec placedRecord
-		replayed, err := idemBegin(ctx, tx, scope, idemKey, hashJSON(in), &rec)
+		// The key stands for what the customer meant to order (the page keeps
+		// it for as long as the basket and the choices stay the same). The
+		// price is asked again after a lost answer, and a balance the first
+		// try spent is no longer offered: neither makes it another order.
+		same := in
+		same.QuoteID, same.UseCredit, same.CreditExpected = "", false, nil
+		replayed, err := idemBegin(ctx, tx, scope, idemKey, hashJSON(same), &rec)
 		if err != nil {
 			return err
 		}

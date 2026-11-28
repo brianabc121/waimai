@@ -1,9 +1,12 @@
 package httpapi_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/brianabc121/waimai/internal/app"
 )
 
 // docs/CODE_REVIEW_FIX_PLAN.md M09: someone who works on some brands sees and
@@ -83,4 +86,104 @@ func TestPromoBrandScopeOverHTTP(t *testing.T) {
 	mgr.want(403, "OWNER_ONLY", "PUT", "/merchant/branches/"+b+"/staff/"+mid+"/brands", map[string]any{"brand_ids": []any{}})
 	mgr.want(200, "", "PATCH", "/merchant/branches/"+b+"/staff/"+mid, map[string]any{"display_name": "M2"})
 	mgr.want(403, "BRAND_FORBIDDEN", "POST", "/merchant/branches/"+b+"/promotions", promo(main))
+}
+
+// M08: a manager's approval is not lost on a request that is refused, and
+// the same request sent again (its answer was lost) finds what it did
+// instead of "the approval was used".
+func TestApprovalSurvivesRefusalAndReplay(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	owner, desk := login(t, f.owner), login(t, f.cashier)
+	owner.want(200, "", "PUT", "/auth/approve-pin", map[string]string{"password": "password1", "pin": "246810"})
+	ownerID := owner.want(200, "", "GET", "/auth/me", nil)["id"]
+	cust := verifiedCustomer(t)
+	id, _ := f.order(t, cust)
+	staff := app.Actor{Type: "staff", ID: 1}
+	o, err := a.Accept(ctx, id, 0, staff)
+	noErr(t, err)
+	for _, it := range o.Items {
+		o, err = a.SetItemStatus(ctx, id, it.ID, "ready", app.Actor{Type: "system"})
+		noErr(t, err)
+	}
+	o, err = a.Pack(ctx, id, 1, o.ManifestVersion, staff)
+	noErr(t, err)
+	o, err = a.AssignRider(ctx, id, f.riderID, staff)
+	noErr(t, err)
+	_, err = a.RiderPickup(ctx, o.Delivery.ID, f.riderID)
+	noErr(t, err)
+	_, err = a.StaffHandoff(ctx, id, staff)
+	noErr(t, err)
+	o, err = a.RiderDeliver(ctx, o.Delivery.ID, f.riderID, o.Totals.Total)
+	noErr(t, err)
+
+	ask := func() string {
+		t.Helper()
+		return desk.want(200, "", "POST", fmt.Sprintf("/merchant/branches/%d/approvals", f.branchID),
+			map[string]any{"approver_id": ownerID, "perm": "wallet.refund", "pin": "246810"})["token"].(string)
+	}
+	url := fmt.Sprintf("/merchant/orders/%d/refunds", id)
+	body := func(amount int) map[string]any {
+		return map[string]any{"lines": []map[string]any{{"item_id": o.Items[0].ID, "qty": 1}}, "reason": "凉了",
+			"to_credit": true, "consent": "in_person", "amount": amount}
+	}
+	desk.want(403, "FORBIDDEN", "POST", url, body(1000))
+	refunds := func() (n int) {
+		t.Helper()
+		noErr(t, a.DB.QueryRow(ctx, `SELECT count(*) FROM order_refunds WHERE order_id=$1`, id).Scan(&n))
+		return n
+	}
+
+	// refused by the action itself (more than the order): the approval is still good
+	token := ask()
+	desk.want(422, "VALIDATION", "POST", url, body(99999999), "Idempotency-Key", uniq("idem"), "X-Approval", token)
+	key := uniq("idem")
+	first := desk.want(200, "", "POST", url, body(1000), "Idempotency-Key", key, "X-Approval", token)
+	// the answer was lost: the same request again is the same refund
+	again := desk.want(200, "", "POST", url, body(1000), "Idempotency-Key", key, "X-Approval", token)
+	if first["quote"].(map[string]any)["refund_id"] != again["quote"].(map[string]any)["refund_id"] || refunds() != 1 {
+		t.Fatalf("replay: %v / %v, %d refunds", first["quote"], again["quote"], refunds())
+	}
+	// the same key with something else is not a replay
+	desk.want(409, "IDEMPOTENCY_CONFLICT", "POST", url, body(500), "Idempotency-Key", key, "X-Approval", token)
+	// and a spent approval pays for nothing new: another key, or no key
+	desk.want(403, "APPROVAL_INVALID", "POST", url, body(500), "Idempotency-Key", uniq("idem"), "X-Approval", token)
+	desk.want(403, "APPROVAL_INVALID", "POST", url, body(500), "X-Approval", token)
+	if refunds() != 1 {
+		t.Fatalf("%d refunds", refunds())
+	}
+}
+
+// H09: the answer to "place order" was lost. Asking the price again and
+// ordering again with the same key (the basket did not change) finds the
+// first order; the page can also ask whether the order went through.
+func TestOrderRetryAfterLostAnswer(t *testing.T) {
+	f := newFixture(t)
+	cust := verifiedCustomer(t)
+	quote := func() any {
+		return cust.want(200, "", "POST", "/stores/"+f.slug+"/quotes", map[string]any{"service_type": "delivery",
+			"zone_id": f.zoneID, "items": []map[string]any{{"item_id": f.itemID, "qty": 1}}})["id"]
+	}
+	key := uniq("key")
+	placed := "/stores/" + f.slug + "/orders/placed"
+	cust.want(404, "NOT_FOUND", "GET", placed, nil, "Idempotency-Key", key)
+	first := cust.want(200, "", "POST", "/stores/"+f.slug+"/orders",
+		map[string]any{"quote_id": quote(), "customer_name": "Ann", "address_line": "1 Main"}, "Idempotency-Key", key)
+	// a new quote for the same basket, the same key: the same order
+	again := cust.want(200, "", "POST", "/stores/"+f.slug+"/orders",
+		map[string]any{"quote_id": quote(), "customer_name": "Ann", "address_line": "1 Main"}, "Idempotency-Key", key)
+	found := cust.want(200, "", "GET", placed, nil, "Idempotency-Key", key)
+	if first["order_id"] != again["order_id"] || found["order_id"] != first["order_id"] || found["access_token"] != first["access_token"] {
+		t.Fatalf("retry: %v / %v / %v", first, again, found)
+	}
+	var n int
+	noErr(t, a.DB.QueryRow(context.Background(), `SELECT count(*) FROM orders WHERE branch_id=$1`, f.branchID).Scan(&n))
+	if n != 1 {
+		t.Fatalf("%d orders", n)
+	}
+	// what the customer typed is part of the request
+	cust.want(409, "IDEMPOTENCY_CONFLICT", "POST", "/stores/"+f.slug+"/orders",
+		map[string]any{"quote_id": quote(), "customer_name": "Bob", "address_line": "1 Main"}, "Idempotency-Key", key)
+	// someone else's key says nothing
+	verifiedCustomer(t).want(404, "NOT_FOUND", "GET", placed, nil, "Idempotency-Key", key)
 }

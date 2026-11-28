@@ -6,7 +6,8 @@
 // "new member" holds the next number for an hour.
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ApiError, get, newKey, post, put } from '../api'
+import { ApiError, get, post, put } from '../api'
+import { stableKey } from '../retry'
 import { has, mn, money, pick, promoLabel, t, whenText } from '../i18n'
 import { can, currentRole, session } from '../session'
 import { dialOf, e164, localDigits, splitPhone } from '../dial'
@@ -584,6 +585,9 @@ async function copyScript(s: string) { await copy(s); flash(t('vo.copied')); scr
 
 // ---------- placing ----------
 const placing = ref(false)
+// Pressing again with nothing changed is the same request: after a lost
+// answer it finds the order the first try made instead of making another.
+const placeKeys = stableKey(), addonKeys = stableKey()
 const done = ref<{ order: Order; token: string; text: string } | null>(null)
 async function place() {
   error.value = ''
@@ -593,7 +597,8 @@ async function place() {
   try {
     const body = { ...orderBody(), expected_total: adjust.value || payChannel.value ? totals.value?.total ?? null : null }
     const r = await post<{ order: Order; member: StoreMember; access_token: string }>(`${base}/staff-orders`, body,
-      { 'Idempotency-Key': newKey(), ...(adjust.value && approval.value ? { 'X-Approval': approval.value } : {}) })
+      { 'Idempotency-Key': placeKeys.for(body), ...(adjust.value && approval.value ? { 'X-Approval': approval.value } : {}) })
+    placeKeys.done()
     if (adjust.value) approval.value = ''
     const text = message(r.order, r.access_token)
     done.value = { order: r.order, token: r.access_token, text }
@@ -605,8 +610,10 @@ const doneSeq = ref(0)
 async function placeAddon() {
   placing.value = true
   try {
+    const body = { items: orderBody().items, round_tags: roundTags.value, expected_total: aq.value?.after.total ?? null }
     const r = await post<{ order: Order; seq: number; access_token: string }>(`/merchant/orders/${appendId}/append`,
-      { items: orderBody().items, round_tags: roundTags.value, expected_total: aq.value?.after.total ?? null }, { 'Idempotency-Key': newKey() })
+      body, { 'Idempotency-Key': addonKeys.for(body) })
+    addonKeys.done()
     const text = addonMessage(r.order, r.seq, r.access_token)
     doneSeq.value = r.seq
     done.value = { order: r.order, token: r.access_token, text }

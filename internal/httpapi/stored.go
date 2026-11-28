@@ -56,12 +56,10 @@ func (s *Server) branchScopeApproving(c *gin.Context, perms, approve []string) (
 		if err != nil {
 			need = perms
 		}
-		by, aerr := s.App.UseApproval(c, tok, bid, currentUser(c).ID, need)
-		if aerr != nil {
+		if aerr := s.useApproval(c, bid, need); aerr != nil {
 			fail(c, aerr)
 			return 0, false
 		}
-		c.Set("approved_by", by)
 		return bid, true
 	}
 	if err != nil {
@@ -204,6 +202,7 @@ func (s *Server) startStaffTopup(c *gin.Context) {
 }
 
 func (s *Server) confirmTopup(c *gin.Context) {
+	replayable(c)
 	bid, ok := s.branchScopeApproving(c, pStoredTopup, pStoredCashout)
 	var in app.TopupConfirm
 	if !ok || !bind(c, &in) {
@@ -257,6 +256,7 @@ func (s *Server) cashoutQuote(c *gin.Context) {
 }
 
 func (s *Server) storedCashout(c *gin.Context) {
+	replayable(c)
 	bid, ok := s.branchScopeApproving(c, pStoredCashout, pStoredCashout)
 	var in app.CashoutInput
 	if !ok || !bind(c, &in) {

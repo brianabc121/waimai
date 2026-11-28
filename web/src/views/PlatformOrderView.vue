@@ -7,7 +7,8 @@
 // the store should get paid. Every amount comes from the server's quote.
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ApiError, get, newKey, post } from '../api'
+import { ApiError, get, post } from '../api'
+import { stableKey } from '../retry'
 import { has, mn, money, t, toMinor, whenText } from '../i18n'
 import { currentRole, session } from '../session'
 import type { Item, OptionGroup, Order, PlatformQuote, QuoteLine, Storefront } from '../types'
@@ -222,6 +223,8 @@ function errText(e: unknown): string {
 
 // ---------- placing ----------
 const placing = ref(false)
+// the same entry sent again (its answer was lost) is the same order
+const placeKeys = stableKey()
 const done = ref<Order | null>(null)
 const dupGone = ref(false)
 async function place() {
@@ -232,8 +235,9 @@ async function place() {
   if (commissionTyped.value && !f.commissionReason.trim()) { error.value = t('po.need_reason'); return }
   placing.value = true
   try {
-    const r = await post<{ order: Order }>(`${base}/platform-orders`, { ...body(), expected_total: totals.value?.total ?? null },
-      { 'Idempotency-Key': newKey() })
+    const sent = { ...body(), expected_total: totals.value?.total ?? null }
+    const r = await post<{ order: Order }>(`${base}/platform-orders`, sent, { 'Idempotency-Key': placeKeys.for(sent) })
+    placeKeys.done()
     done.value = r.order
   } catch (e) {
     error.value = errText(e)

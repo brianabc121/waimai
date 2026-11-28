@@ -95,6 +95,7 @@ func (s *Server) staffQuote(c *gin.Context) {
 }
 
 func (s *Server) staffOrder(c *gin.Context) {
+	replayable(c)
 	bid, ok := branchScope(c, pManual)
 	var in app.StaffOrderInput
 	if !ok || !bind(c, &in) {

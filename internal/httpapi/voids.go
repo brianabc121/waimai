@@ -49,12 +49,10 @@ func (s *Server) voidScope(c *gin.Context) (itemID int64, canMade bool, ok bool)
 		return itemID, true, true
 	}
 	if tok := c.GetHeader("X-Approval"); tok != "" {
-		by, err := s.App.UseApproval(c, tok, bid, currentUser(c).ID, pVoid)
-		if err != nil {
+		if err := s.useApproval(c, bid, pVoid); err != nil {
 			fail(c, err)
 			return 0, false, false
 		}
-		c.Set("approved_by", by)
 		return itemID, true, true
 	}
 	return itemID, false, true
@@ -111,6 +109,9 @@ func (s *Server) refundOrder(c *gin.Context) {
 	} else if in.ToCredit {
 		perms = pWalletRefund
 	}
+	if !in.Dry {
+		replayable(c)
+	}
 	id, ok := s.orderScope(c, perms)
 	if !ok {
 		return
@@ -122,12 +123,10 @@ func (s *Server) refundOrder(c *gin.Context) {
 				fail(c, err)
 				return
 			}
-			by, err := s.App.UseApproval(c, tok, bid, currentUser(c).ID, pWalletRefund)
-			if err != nil {
+			if err := s.useApproval(c, bid, pWalletRefund); err != nil {
 				fail(c, err)
 				return
 			}
-			c.Set("approved_by", by)
 		}
 	}
 	in.IdemKey = c.GetHeader("Idempotency-Key")
