@@ -2,6 +2,8 @@
 // The member list: a store's own members in its back office, or every
 // store's members on the platform (admin). Opens a member's details and
 // order history, and edits their details.
+import { addrText } from '../../place'
+import AddrText from '../AddrText.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ApiError, del, get, put } from '../../api'
 import { has, money, t } from '../../i18n'
@@ -21,12 +23,13 @@ interface Stats { week: number; month: number; quarter: number; orders: number; 
 interface Member {
   id: number; brand_id: number; no: number; status: string; phone: string; name: string; source: string; contact: string
   address_line: string; address_unit: string; address_note: string; lat: number | null; lng: number | null; note: string
+  place_name?: string; place_id?: string
   expires_at: string | null; created_at: string
   branch_id: number; branch_name: string; brand_name: string; brand_code: string; merchant_name: string; currency: string; orders: number; spent: number; last_at: string | null
   stats?: Stats
   address_count: number; addresses?: Address[]
 }
-interface Address { id: number; line: string; unit: string; note: string; lat: number | null; lng: number | null; uses: number; last_used_at: string; current: boolean }
+interface Address { id: number; line: string; place_name?: string; unit: string; note: string; lat: number | null; lng: number | null; uses: number; last_used_at: string; current: boolean }
 interface MemberOrder {
   id: number; public_no: string; created_at: string; channel: string; order_source: string; service_type: string
   acceptance_status: string; fulfillment_status: string; total: number; currency: string; items: string; address_line: string; linked: boolean
@@ -52,7 +55,7 @@ function when(iso: string | null): string {
 const day = (iso: string) => when(iso).slice(0, 10)
 const srcText = (s: string) => s ? (has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s) : '—'
 const minutesLeft = (m: Member) => Math.max(1, Math.ceil((new Date(m.expires_at ?? 0).getTime() - Date.now()) / 60000))
-const address = (m: Member) => [m.address_line, m.address_unit].filter(Boolean).join(' · ')
+const address = (m: Member) => addrText(m)
 const pages = computed(() => Math.max(1, Math.ceil(list.total / SIZE)))
 const pageOrders = computed(() => list.items.reduce((n, m) => n + m.orders, 0))
 const pageSpent = computed(() => {
@@ -151,6 +154,8 @@ async function save() {
       phone: ed.phone, name: ed.name, source: ed.source, contact: ed.contact, address_line: ed.address_line,
       address_unit: ed.address_unit, address_note: ed.address_note, note: ed.note,
       lat: keepPin ? m.lat : null, lng: keepPin ? m.lng : null,
+      // the server drops the place's name once the address no longer starts with it
+      place_name: m.place_name ?? '', place_id: keepPin ? m.place_id ?? '' : '',
     })
     ed.m = null
     if (open.m?.id === m.id) await show(saved)
@@ -267,7 +272,7 @@ async function save() {
           <div v-else class="mb-addrs" data-testid="member-addr-list">
             <div v-for="a in open.m.addresses" :key="a.id" class="mb-addr-item" :class="{ cur: a.current }" data-testid="member-addr-item">
               <div class="row wrap small">
-                <b class="grow">{{ [a.line, a.unit].filter(Boolean).join(' · ') }}</b>
+                <span class="grow"><AddrText :o="{ address_line: a.line, address_unit: a.unit, place_name: a.place_name }" /></span>
                 <span v-if="a.current" class="tag brand">{{ t('sm.a.current') }}</span>
                 <button v-else class="btn small" data-testid="member-address-delete" @click="dropAddress(a)">{{ t('sm.a.delete') }}</button>
               </div>

@@ -1037,6 +1037,7 @@ func (s *Server) kitchenBoard(c *gin.Context) {
 	// The kitchen needs dishes and notes, not the customer's contact details.
 	for _, o := range orders {
 		o.CustomerPhone, o.AddressLine, o.AddressUnit, o.AddressNote, o.Cash = "", "", "", "", nil
+		o.PlaceName, o.PlaceID = "", ""
 	}
 	// The timers turn yellow and red by the store's cooking target.
 	target := 15

@@ -6,14 +6,15 @@
 import { computed, defineAsyncComponent, onMounted, reactive, ref } from 'vue'
 import { ApiError, del, get, post, put } from '../../api'
 import { has, t } from '../../i18n'
-import { googleMapsLink, parseLatLng } from '../../maps'
+import { googleMapsLink, joined, parseLatLng } from '../../maps'
+import AddrText from '../AddrText.vue'
 import type { Picked } from '../PlacePicker.vue'
 
 const PlacePicker = defineAsyncComponent(() => import('../PlacePicker.vue'))
 
 interface Region { country_code: string; country: string; province: string; city: string; count: number }
 interface Addr {
-  id: number; country_code: string; country: string; province: string; city: string; line: string; lat: number; lng: number
+  id: number; country_code: string; country: string; province: string; city: string; line: string; place_name: string; place_id: string; lat: number; lng: number
   source: 'staff' | 'admin' | 'import'; branch_id: number | null; branch_name: string; uses: number
   created_at: string; updated_at: string; last_used_at: string
 }
@@ -86,17 +87,17 @@ const regionText = (a: { country: string; country_code: string; province: string
 const showRegion = computed(() => f.city === '*' || f.cc === '*')
 
 // ---- adding and correcting ----
-const ed = reactive({ open: false, id: 0, country_code: '', country: '', province: '', city: '', line: '', at: '', error: '', saving: false })
+const ed = reactive({ open: false, id: 0, country_code: '', country: '', province: '', city: '', line: '', place_name: '', at: '', error: '', saving: false })
 const picking = ref(false)
 function startNew() {
   const r = f.cc !== '*' && f.province !== '*' && f.city !== '*'
     ? regions.value.find(x => x.country_code === f.cc && x.province === f.province && x.city === f.city) : undefined
   Object.assign(ed, { open: true, id: 0, country_code: r?.country_code ?? '', country: r?.country ?? '', province: r?.province ?? '',
-    city: r?.city ?? '', line: '', at: '', error: '', saving: false })
+    city: r?.city ?? '', line: '', place_name: '', at: '', error: '', saving: false })
 }
 function edit(a: Addr) {
   Object.assign(ed, { open: true, id: a.id, country_code: a.country_code, country: a.country, province: a.province, city: a.city,
-    line: a.line, at: `${a.lat}, ${a.lng}`, error: '', saving: false })
+    line: a.line, place_name: a.place_name, at: `${a.lat}, ${a.lng}`, error: '', saving: false })
 }
 const regionKey = (r: { country_code: string; province: string; city: string }) => [r.country_code, r.province, r.city].join('|')
 function useRegion(k: string) {
@@ -106,7 +107,10 @@ function useRegion(k: string) {
 const edAt = computed(() => parseLatLng(ed.at))
 function picked(p: Picked) {
   ed.at = `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`
-  if (!ed.line.trim()) ed.line = [p.name, p.address].filter(Boolean).join(', ')
+  if (!ed.line.trim()) {
+    ed.line = joined(p.name, p.address)
+    if (p.address && !ed.place_name.trim()) ed.place_name = p.name
+  }
   // a new address takes the region of where it was pinned, unless one was chosen
   if (p.region && !ed.id && !ed.country_code && !ed.province && !ed.city) {
     Object.assign(ed, { country_code: p.region.country_code, country: p.region.country, province: p.region.province, city: p.region.city })
@@ -117,7 +121,7 @@ async function save() {
   const at = edAt.value
   if (!at) { ed.error = t('ab.err.PIN_REQUIRED'); return }
   ed.saving = true
-  const body = { country_code: ed.country_code, country: ed.country, province: ed.province, city: ed.city, line: ed.line, lat: at[0], lng: at[1] }
+  const body = { country_code: ed.country_code, country: ed.country, province: ed.province, city: ed.city, line: ed.line, place_name: ed.place_name, lat: at[0], lng: at[1] }
   try {
     if (ed.id) await put(`/admin/addresses/${ed.id}`, body)
     else await post('/admin/addresses', body)
@@ -185,7 +189,7 @@ async function remove(a: Addr) {
             </tr></thead>
             <tbody>
               <tr v-for="a in list.items" :key="a.id" data-testid="ab-row">
-                <td class="ab-line">{{ a.line }}</td>
+                <td class="ab-line"><AddrText :o="{ address_line: a.line, place_name: a.place_name }" /></td>
                 <td v-if="showRegion" class="small">{{ regionText(a) }}</td>
                 <td class="small mono nowrap">{{ a.lat.toFixed(5) }}, {{ a.lng.toFixed(5) }}</td>
                 <td class="small"><span class="tag" :class="{ info: a.source === 'admin', brand: a.source === 'staff' }">{{ t('ab.src.' + a.source) }}</span>
@@ -193,7 +197,7 @@ async function remove(a: Addr) {
                 <td class="num">{{ a.uses }}</td>
                 <td class="small nowrap">{{ when(a.last_used_at) }}</td>
                 <td class="right nowrap"><span class="row acts">
-                  <a class="btn small" :href="googleMapsLink(a.lat, a.lng)" target="_blank" rel="noopener" data-testid="ab-view">{{ t('ab.view') }}</a>
+                  <a class="btn small" :href="googleMapsLink(a.lat, a.lng, a.place_id)" target="_blank" rel="noopener" data-testid="ab-view">{{ t('ab.view') }}</a>
                   <button class="btn small" data-testid="ab-edit" @click="edit(a)">{{ t('ab.edit') }}</button>
                   <button class="btn small danger" data-testid="ab-delete" @click="remove(a)">{{ t('ab.delete') }}</button></span></td>
               </tr>
@@ -225,7 +229,9 @@ async function remove(a: Addr) {
             <label class="field"><span>{{ t('ab.province') }}</span><input v-model="ed.province" maxlength="120" data-testid="ab-f-province" /></label>
             <label class="field"><span>{{ t('ab.city') }}</span><input v-model="ed.city" maxlength="120" data-testid="ab-f-city" /></label>
           </div>
+          <label class="field"><span>{{ t('ab.place_name') }}</span><input v-model="ed.place_name" maxlength="200" :placeholder="t('ab.place_name_ph')" data-testid="ab-f-place" /></label>
           <label class="field"><span>{{ t('ab.col.line') }} *</span><input v-model="ed.line" maxlength="300" data-testid="ab-f-line" /></label>
+          <div class="small muted" style="margin:-6px 0 10px">{{ t('ab.place_name_hint') }}</div>
           <label class="field"><span>{{ t('ab.latlng') }} *</span>
             <div class="row"><input v-model="ed.at" class="grow" placeholder="14.554729, 121.024445" data-testid="ab-f-at" />
               <button type="button" class="btn" data-testid="ab-f-map" @click="picking = true">{{ t('ab.pick_map') }}</button>

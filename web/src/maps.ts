@@ -9,7 +9,15 @@ import { get } from './api'
 
 // A place offered to the customer. `at` is missing on a typed suggestion until
 // it is chosen: finding it costs a lookup, so `locate` fetches it on demand.
-export interface Place { label: string; detail?: string; at?: LatLng; distance_m?: number; locate?: () => Promise<LatLng | null> }
+//   id    Google's place id, when the place is one Google knows by name
+//   weak  it came from the geocoder because Places is not enabled on the key:
+//         a street address for typed words, with no place name of its own
+//   open  everything known once chosen: the pin and the full street address
+export interface Place {
+  label: string; detail?: string; at?: LatLng; distance_m?: number; id?: string; weak?: boolean
+  locate?: () => Promise<LatLng | null>; open?: () => Promise<Opened | null>
+}
+export interface Opened { at: LatLng; address: string; id: string; types: string[] }
 // A place whose position is known (every search result).
 export interface Spot extends Place { at: LatLng }
 
@@ -140,57 +148,123 @@ export async function placeName(key: string, at: LatLng): Promise<string> {
   } catch { return '' }
 }
 
+// The language addresses are written in: the one riders in the store's country
+// read, whatever language the person typing has their browser in.
+const LOCAL: Record<string, string> = { CN: 'zh-CN', TW: 'zh-TW', HK: 'zh-HK', MO: 'zh-HK', JP: 'ja', KR: 'ko', TH: 'th', VN: 'vi', ID: 'id', MM: 'my', KH: 'km', LA: 'lo' }
+export const addressLanguage = (country?: string) => LOCAL[(country ?? '').toUpperCase()] ?? 'en'
+
+const bare = (s: string) => s.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+// named keeps what was typed as the name of a geocoder's answer when the
+// answer does not say it: "trump tower" comes back as "Makati Ave, Makati",
+// which no rider can find. A typed street address that the answer repeats
+// stands as it is.
+export function named(typed: string, formatted: string): { label: string; detail?: string } {
+  const have = ` ${bare(formatted)} `, words = bare(typed).split(' ').filter(Boolean)
+  if (!words.length || words.every(w => have.includes(` ${w} `))) return { label: formatted }
+  return { label: typed.trim(), detail: formatted }
+}
+// joined is one line for a place: its name, then its street address unless
+// that already starts with the name.
+export function joined(name: string, address: string): string {
+  if (!address) return name
+  return !name || bare(address).startsWith(bare(name)) ? address : `${name}, ${address}`
+}
+
+// predictions turns Google's suggestions into places. A chosen one is read
+// with a Place of its own, not prediction.toPlace(): only that takes the
+// language the address should be written in.
+function predictions(lib: any, suggestions: any[], max: number, lang: string | undefined, chosen: () => void): Place[] {
+  return (suggestions ?? []).filter((s: any) => s.placePrediction).slice(0, max).map((s: any): Place => {
+    const p = s.placePrediction
+    let got: Promise<Opened | null> | null = null
+    const open = () => got ??= (async () => {
+      try {
+        const place = lang && p.placeId ? new lib.Place({ id: p.placeId, requestedLanguage: lang }) : p.toPlace()
+        // location, formattedAddress and types are all "Essentials" fields: one price.
+        await place.fetchFields({ fields: ['location', 'formattedAddress', 'types'] })
+        chosen()
+        if (!place.location) return null
+        return { at: [place.location.lat(), place.location.lng()] as LatLng, address: place.formattedAddress ?? '', id: p.placeId ?? place.id ?? '', types: place.types ?? p.types ?? [] }
+      } catch { return null }
+    })()
+    return {
+      label: p.mainText?.text ?? p.text?.text ?? '', detail: p.secondaryText?.text ?? '', id: p.placeId,
+      open, locate: async () => (await open())?.at ?? null,
+    }
+  })
+}
+// geocoded is the fallback: the geocoder's answers for typed words.
+function geocoded(typed: string, results: any[]): Spot[] {
+  return (results ?? []).slice(0, 5).map((r: any): Spot => ({
+    ...named(typed, r.formatted_address ?? ''), weak: true, id: r.place_id,
+    at: [r.geometry.location.lat(), r.geometry.location.lng()] as LatLng,
+  }))
+}
+
 // suggestPlaces offers places for typed words where there is no map on the
 // page (the order desk's address box). Each one is located only when chosen,
 // as on a map. [] when the platform has no map key or Google answers nothing.
+// weak says the answers are the geocoder's, because Places could not be asked.
 let deskSession: any = null
-export async function suggestPlaces(key: string, q: string, scope: Scope): Promise<Place[]> {
+export async function suggestPlaces(key: string, q: string, scope: Scope): Promise<{ places: Place[]; weak: boolean }> {
   const text = q.trim()
-  if (!key || !text) return []
+  if (!key || !text) return { places: [], weak: false }
   const direct = parseLatLng(text)
-  if (direct) return [{ label: text, at: direct }]
+  if (direct) return { places: [{ label: text, at: direct }], weak: false }
   if (key === 'stub') {
     const base = scope.near ?? [14.5547, 121.0244], tail = scope.country ? `, ${scope.country}` : ''
-    return ['Tower', 'Mall', 'Residences'].map((kind, i): Place => {
-      const where: LatLng = [base[0] + i * 0.0004, base[1] + i * 0.0004]
-      return { label: `${text} ${kind}`, detail: `${i + 1} Stub St${tail}`, locate: async () => where }
-    })
+    return { weak: false, places: ['Tower', 'Mall', 'Residences'].map((kind, i): Place => {
+      const where: LatLng = [base[0] + i * 0.0004, base[1] + i * 0.0004], id = `stub-${kind.toLowerCase()}`
+      const full: Opened = { at: where, address: `${i + 1} Stub St, Brgy. Stub${tail}`, id, types: ['premise'] }
+      return { label: `${text} ${kind}`, detail: `${i + 1} Stub St${tail}`, id, open: async () => full, locate: async () => where }
+    }) }
   }
   try {
     const gm = await loadGoogle(key)
+    const lang = addressLanguage(scope.country)
     try {
       const lib = await gm.importLibrary('places')
       deskSession ??= new lib.AutocompleteSessionToken()
-      const req: any = { input: text, sessionToken: deskSession }
+      const req: any = { input: text, sessionToken: deskSession, language: lang }
       if (scope.near) req.locationBias = { center: { lat: scope.near[0], lng: scope.near[1] }, radius: 50000 }
       if (scope.country) { req.includedRegionCodes = [scope.country.toLowerCase()]; req.region = scope.country.toLowerCase() }
       const { suggestions } = await lib.AutocompleteSuggestion.fetchAutocompleteSuggestions(req)
-      return (suggestions ?? []).filter((s: any) => s.placePrediction).slice(0, 5).map((s: any): Place => {
-        const p = s.placePrediction
-        return {
-          label: p.mainText?.text ?? p.text?.text ?? '', detail: p.secondaryText?.text ?? '',
-          async locate() {
-            try {
-              const place = p.toPlace()
-              await place.fetchFields({ fields: ['location'] })
-              deskSession = null // one billing session ends when a suggestion is chosen
-              return place.location ? [place.location.lat(), place.location.lng()] : null
-            } catch { return null }
-          },
-        }
-      })
+      return { weak: false, places: predictions(lib, suggestions, 5, lang, () => { deskSession = null }) }
     } catch {
       // Places API (New) is not enabled on the key: whole-address search instead.
-      const req: any = { address: text }
+      const req: any = { address: text, language: lang }
       if (scope.country) { req.componentRestrictions = { country: scope.country }; req.region = scope.country.toLowerCase() }
-      const { results } = await new gm.Geocoder().geocode(req)
-      return (results ?? []).slice(0, 5).map((r: any) => ({ label: r.formatted_address, at: [r.geometry.location.lat(), r.geometry.location.lng()] as LatLng }))
+      const { results } = await new gm.Geocoder().geocode(req).catch(() => ({ results: [] }))
+      return { weak: true, places: geocoded(text, results) }
     }
-  } catch { return [] }
+  } catch { return { places: [], weak: false } }
 }
 
-// googleMapsLink opens a point in Google Maps: a plain link, no API call.
-export const googleMapsLink = (lat: number, lng: number) => `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+// checkGoogle tries, with the key the platform has, each Google service the
+// address features need, and says which answer. Used by the settings page.
+export interface GoogleCheck { maps: boolean; geocoding: boolean; places: boolean; error?: string }
+export async function checkGoogle(key: string): Promise<GoogleCheck> {
+  const out: GoogleCheck = { maps: false, geocoding: false, places: false }
+  if (!key || key === 'stub') return { ...out, error: key ? 'stub' : 'none' }
+  let gm: any
+  try { gm = await loadGoogle(key); out.maps = true } catch (e: any) { return { ...out, error: String(e?.message ?? e) } }
+  // ZERO_RESULTS is an answer; REQUEST_DENIED means the service is off for the key.
+  try { await new gm.Geocoder().geocode({ address: 'Manila' }); out.geocoding = true } catch (e: any) { out.geocoding = /ZERO_RESULTS/.test(String(e?.code ?? e?.message ?? e)) }
+  try {
+    const lib = await gm.importLibrary('places')
+    // asked the way the order desk asks, so that a fault in the request shows here too
+    await lib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+      input: 'Manila', sessionToken: new lib.AutocompleteSessionToken(), language: 'en', includedRegionCodes: ['ph'], region: 'ph',
+      locationBias: { center: { lat: 14.5547, lng: 121.0244 }, radius: 50000 } })
+    out.places = true
+  } catch (e: any) { out.error = String(e?.message ?? e).slice(0, 200) }
+  return out
+}
+
+// googleMapsLink opens a point in Google Maps: a plain link, no API call. With
+// a place id it opens that place's own page there, not a bare pin.
+export const googleMapsLink = (lat: number, lng: number, placeId?: string) =>
+  `https://www.google.com/maps/search/?api=1&query=${lat},${lng}` + (placeId ? `&query_place_id=${encodeURIComponent(placeId)}` : '')
 
 export function createMap(key: string, el: HTMLElement, view: View, ev: MapEvents): Promise<MapAdapter> {
   return key === 'stub' ? Promise.resolve(stubMap(el, view, ev)) : googleMap(key, el, view, ev)
@@ -283,14 +357,28 @@ async function googleMap(key: string, el: HTMLElement, view: View, ev: MapEvents
     // The pointer over a Google map is the map's to set, not the page's.
     setCursor(css) { map.setOptions({ draggableCursor: css || null }) },
     lock(on) { map.setOptions({ gestureHandling: on ? 'none' : 'greedy' }) },
+    // A typed search is for a place by name as often as for an address, and
+    // the geocoder answers a name with a bare street: Places first.
     async search(q) {
       const direct = parseLatLng(q)
       if (direct) return [{ label: q.trim(), at: direct }]
       try {
+        const lib = await gm.importLibrary('places')
+        const c = map.getCenter(), near = scope?.near ?? [c.lat(), c.lng()]
+        const req: any = { textQuery: q, fields: ['displayName', 'formattedAddress', 'location'], maxResultCount: 5,
+          locationBias: { center: { lat: near[0], lng: near[1] }, radius: 50000 } }
+        if (scope?.country) req.region = scope.country.toLowerCase()
+        const { places } = await lib.Place.searchByText(req)
+        const found = (places ?? []).filter((p: any) => p.location).map((p: any): Spot => ({
+          label: p.displayName || p.formattedAddress || q, detail: p.displayName ? p.formattedAddress ?? '' : '', id: p.id,
+          at: [p.location.lat(), p.location.lng()] }))
+        if (found.length) return found
+      } catch { /* Places is not enabled, or knows nothing: the geocoder below */ }
+      try {
         const req: any = { address: q, bounds: map.getBounds() }
         if (scope?.country) { req.componentRestrictions = { country: scope.country }; req.region = scope.country.toLowerCase() }
         const { results } = await new gm.Geocoder().geocode(req)
-        return (results ?? []).slice(0, 5).map((r: any) => ({ label: r.formatted_address, at: [r.geometry.location.lat(), r.geometry.location.lng()] as LatLng }))
+        return geocoded(q, results)
       } catch { return [] } // ZERO_RESULTS and friends arrive as rejections
     },
     // Needs "Places API (New)" on the same key. Without it both fall back to
@@ -306,20 +394,7 @@ async function googleMap(key: string, el: HTMLElement, view: View, ev: MapEvents
         // Without this "trump tower" typed in Manila finds the one in New York.
         if (scope?.country) { req.includedRegionCodes = [scope.country.toLowerCase()]; req.region = scope.country.toLowerCase() }
         const { suggestions } = await lib.AutocompleteSuggestion.fetchAutocompleteSuggestions(req)
-        return (suggestions ?? []).filter((s: any) => s.placePrediction).slice(0, 6).map((s: any): Place => {
-          const p = s.placePrediction
-          return {
-            label: p.mainText?.text ?? p.text?.text ?? '', detail: p.secondaryText?.text ?? '',
-            async locate() {
-              try {
-                const place = p.toPlace()
-                await place.fetchFields({ fields: ['location'] })
-                session = null // one billing session ends when a suggestion is chosen
-                return place.location ? [place.location.lat(), place.location.lng()] : null
-              } catch { return null }
-            },
-          }
-        })
+        return predictions(lib, suggestions, 6, undefined, () => { session = null })
       } catch { return (this as MapAdapter).search(q) }
     },
     async nearby(at) {

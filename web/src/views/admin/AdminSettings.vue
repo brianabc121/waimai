@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ApiError, get, post, put } from '../../api'
 import { t } from '../../i18n'
+import { checkGoogle, type GoogleCheck } from '../../maps'
 import { fmtDateTime } from './util'
 
 // Keys of outside services. A secret never comes back from the server: the
@@ -76,6 +77,17 @@ function newPair() {
   void send('web_push', () => post<View>('/admin/settings/vapid'))
 }
 
+// "Check" asks Google, from this browser and with the key now in use, for each
+// service the address features need. Places is the one usually left off, and
+// without it a typed place name comes back as a bare street.
+const gcheck = ref<GoogleCheck | null>(null), checking = ref(false)
+async function runCheck() {
+  checking.value = true; gcheck.value = null
+  const key = await get<{ maps_key: string }>('/config').then(c => c.maps_key || '', () => '')
+  gcheck.value = await checkGoogle(key).catch((e): GoogleCheck => ({ maps: false, geocoding: false, places: false, error: String(e?.message ?? e) }))
+  checking.value = false
+}
+
 function state(g: Group): { on: boolean; text: string } {
   const a = view.value!.active
   if (g === 'maps') return { on: a.maps !== 'off', text: t('ad.set.maps_' + a.maps) + ' · ' + t('ad.set.routes_' + a.routes) }
@@ -128,7 +140,20 @@ function state(g: Group): { on: boolean; text: string } {
             <button v-if="s.source === 'admin' || s.unreadable" class="btn small danger" :disabled="busy" data-testid="clear" @click="clear(s)">{{ t('ad.set.clear') }}</button>
           </div>
         </div>
+        <div v-if="g === 'maps' && gcheck" class="gcheck" data-testid="g-check">
+          <div v-if="gcheck.error === 'none' || gcheck.error === 'stub'" class="small muted">{{ t('ad.set.check_' + gcheck.error) }}</div>
+          <template v-else>
+            <div v-for="k in (['maps', 'geocoding', 'places'] as const)" :key="k" class="gc-row" :data-svc="k" :data-ok="gcheck[k]">
+              <span class="tag" :class="gcheck[k] ? 'ok' : 'bad'">{{ gcheck[k] ? '✓' : '✕' }}</span>
+              <b>{{ t('ad.set.check_' + k) }}</b>
+              <span class="small muted">{{ t('ad.set.check_' + k + (gcheck[k] ? '_ok' : '_bad')) }}</span>
+            </div>
+            <div v-if="gcheck.error" class="small muted mono">{{ gcheck.error }}</div>
+            <div class="small muted">{{ t('ad.set.check_note') }}</div>
+          </template>
+        </div>
         <div class="row" style="justify-content:flex-end;margin-top:12px">
+          <button v-if="g === 'maps'" class="btn" :disabled="checking" data-testid="g-check-run" @click="runCheck">{{ checking ? t('ad.set.checking') : t('ad.set.check') }}</button>
           <button v-if="g === 'web_push'" class="btn" :disabled="busy" data-testid="new-pair" @click="newPair">{{ t('ad.set.new_pair') }}</button>
           <button class="btn primary" :disabled="busy || !dirty(g)" data-testid="save" @click="save(g)">{{ t('save') }}</button>
         </div>
@@ -137,3 +162,8 @@ function state(g: Group): { on: boolean; text: string } {
     </template>
   </div>
 </template>
+
+<style scoped>
+.gcheck { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--edge, #ddd); border-radius: 8px; display: grid; gap: 6px; }
+.gc-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+</style>

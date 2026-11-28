@@ -112,3 +112,88 @@ func TestAddressBook(t *testing.T) {
 		t.Fatal("no audit")
 	}
 }
+
+// A place known by name (docs/ADDRESS_PLACE_DESIGN.md): the name and Google's
+// id travel with the address from the order desk to the order, the member's
+// addresses, the address book and the next order's hints; the line stays the
+// whole address. Money is not touched, which checked() confirms.
+func TestPlaceName(t *testing.T) {
+	s := newStore(t, false)
+	ctx := context.Background()
+	a := testApp
+	city := uniq("Makati")
+	_, err := a.DB.Exec(ctx, `UPDATE branches SET country_code='PH', country='Philippines', province='Metro Manila', city=$2
+		WHERE id=$1`, s.branchID, city)
+	noErr(t, err)
+	lat, lng := 14.5601, 121.0253
+	place := func(phone string, m app.MemberInput) *app.Order {
+		t.Helper()
+		m.Phone, m.Source, m.Lat, m.Lng = phone, "wechat", &lat, &lng
+		p, err := a.PlaceStaffOrder(ctx, s.branchID, s.staff, uniq("k"), app.StaffOrderInput{Member: m, ServiceType: "delivery",
+			ZoneID: &s.zoneID, Items: []app.StaffLine{{ItemID: s.tea, Qty: 1}}})
+		noErr(t, err)
+		checked(t, "staff order to a named place", p.Order.ID)
+		o, err := a.GetOrder(ctx, p.Order.ID)
+		noErr(t, err)
+		return o
+	}
+	name, line := "Trump Tower at Century City", "Trump Tower at Century City, Kalayaan Ave cor. Salamanca St, Makati"
+	o := place("+639170001001", app.MemberInput{AddressLine: line, AddressUnit: "32F", PlaceName: name, PlaceID: "ChIJ-tower"})
+	if o.AddressLine != line || o.PlaceName != name || o.PlaceID != "ChIJ-tower" {
+		t.Fatalf("order: line %q name %q id %q", o.AddressLine, o.PlaceName, o.PlaceID)
+	}
+
+	// The same place chosen from a suggestion worded differently is the same
+	// entry of the book; it keeps the line it was first written with.
+	place("+639170001002", app.MemberInput{AddressLine: "Trump Tower at Century City, Kalayaan Avenue, Poblacion", PlaceName: name, PlaceID: "ChIJ-tower"})
+	l, err := a.ListBook(ctx, app.BookFilter{City: &city})
+	noErr(t, err)
+	if l.Total != 1 || l.Items[0].Line != line || l.Items[0].PlaceName != name || l.Items[0].PlaceID != "ChIJ-tower" || l.Items[0].Uses != 2 {
+		t.Fatalf("book: %+v", l.Items)
+	}
+
+	// The next order is offered it with its name, from the book and as the phone's own.
+	hs, err := a.AddressHints(ctx, s.branchID, 0, "trump", "+639179999999")
+	noErr(t, err)
+	if len(hs) == 0 || hs[0].Kind != "book" || hs[0].PlaceName != name || hs[0].PlaceID != "ChIJ-tower" {
+		t.Fatalf("book hint: %+v", hs)
+	}
+	hs, err = a.AddressHints(ctx, s.branchID, 0, "trump", "+639170001001")
+	noErr(t, err)
+	if len(hs) == 0 || hs[0].Kind != "mine" || hs[0].PlaceName != name || hs[0].Unit != "32F" {
+		t.Fatalf("own hint: %+v", hs)
+	}
+
+	// A line rewritten by hand no longer starts with the name: name and id are dropped.
+	o = place("+639170001003", app.MemberInput{AddressLine: "Gate 2, Kalayaan Ave", PlaceName: name, PlaceID: "ChIJ-tower"})
+	if o.PlaceName != "" || o.PlaceID != "" {
+		t.Fatalf("stale place kept: %q %q", o.PlaceName, o.PlaceID)
+	}
+	// An address typed with no place has none; an older entry of the book takes
+	// the name of the first order that brings one.
+	place("+639170001004", app.MemberInput{AddressLine: "One Ayala, Ayala Ave"})
+	place("+639170001005", app.MemberInput{AddressLine: "One Ayala, Ayala Ave", PlaceName: "One Ayala", PlaceID: "ChIJ-one"})
+	q := "one ayala"
+	l, err = a.ListBook(ctx, app.BookFilter{City: &city, Q: q})
+	noErr(t, err)
+	if l.Total != 1 || l.Items[0].PlaceName != "One Ayala" || l.Items[0].PlaceID != "ChIJ-one" || l.Items[0].Uses != 2 {
+		t.Fatalf("older entry: %+v", l.Items)
+	}
+
+	// The platform names an entry: a name the line does not start with goes in
+	// front of it; taking the name away takes Google's id with it.
+	admin := adminActor(t)
+	e := l.Items[0]
+	in := app.BookInput{AddrRegion: e.AddrRegion, Line: "Ayala Ave cor. Makati Ave", PlaceName: "One Ayala", Lat: e.Lat, Lng: e.Lng}
+	g, err := a.SaveBookAddress(ctx, admin, e.ID, in)
+	noErr(t, err)
+	if g.Line != "One Ayala, Ayala Ave cor. Makati Ave" || g.PlaceName != "One Ayala" || g.PlaceID != "ChIJ-one" {
+		t.Fatalf("named by the platform: %+v", g)
+	}
+	in.PlaceName = ""
+	g, err = a.SaveBookAddress(ctx, admin, e.ID, in)
+	noErr(t, err)
+	if g.PlaceName != "" || g.PlaceID != "" {
+		t.Fatalf("name removed: %+v", g)
+	}
+}
