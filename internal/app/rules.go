@@ -261,5 +261,33 @@ func ruleOf(p *Promotion) []byte {
 	return b
 }
 
+// orderRule is what an order records of the whole-order promotion it took:
+// the terms it is worked out with again when dishes are voided or refunded.
+// The store may change or end the promotion afterwards; an order keeps the
+// one it was placed under (docs/PRICING_CHECK.md D7c).
+type orderRule struct {
+	Kind        string `json:"kind"`
+	Threshold   int64  `json:"threshold"`
+	Value       int64  `json:"value"`
+	MaxDiscount *int64 `json:"max_discount,omitempty"`
+}
+
+// orderRuleOf is the rule an order records of its promotion.
+func orderRuleOf(p *Promotion) []byte {
+	b, _ := json.Marshal(orderRule{Kind: p.Kind, Threshold: p.Threshold, Value: p.Value, MaxDiscount: p.MaxDiscount})
+	return b
+}
+
+// readOrderRule reads a recorded whole-order rule; ok is false for the rows
+// of orders from before rules were recorded.
+func readOrderRule(raw []byte) (orderRule, bool) {
+	var r orderRule
+	if len(raw) == 0 || json.Unmarshal(raw, &r) != nil {
+		return r, false
+	}
+	rule, known := promoRules[r.Kind]
+	return r, known && rule.order != nil
+}
+
 // keyOf is a line key for the engine.
 func keyOf(i int64) string { return strconv.FormatInt(i, 10) }

@@ -448,6 +448,20 @@ func voidPolicy(m *orderMoney, kind string, pick bool) promoPolicy {
 	return promoPolicy{at: m.Created, current: true, pick: pick}
 }
 
+// refundPolicy is how a refund by dish (after the customer has the food, or
+// the table has paid) decides the promotion: always the order's own, never
+// another one. A promotion made or changed after the order must not move
+// what an old order gives back (docs/PRICING_CHECK.md D7c). A table bill
+// checks its promotion's hours at when the table was opened, and keeps its
+// share of it when the store is at fault, as when a dish is voided.
+func refundPolicy(m *orderMoney, service, kind string) promoPolicy {
+	if service == "dine_in" {
+		store := kind == "store"
+		return promoPolicy{at: m.Opened, current: true, floor: store, prorate: store}
+	}
+	return voidPolicy(m, kind, false)
+}
+
 // repriceAfterVoid writes a delivery or pickup order's new amounts after its
 // dishes changed (the voided line is already cancelled). Coupons stay but
 // never take off more than the promotion left of the dishes.
@@ -776,10 +790,7 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		if err != nil {
 			return err
 		}
-		pol := voidPolicy(m, in.ReasonKind, false)
-		if o.ServiceType == "dine_in" {
-			pol = dinePolicy(m, in.ReasonKind == "store")
-		}
+		pol := refundPolicy(m, o.ServiceType, in.ReasonKind)
 		// The dishes refunded before are gone as well: a refund is the
 		// difference between the order without them and the order without
 		// them and these, so that refunding dish by dish gives back what

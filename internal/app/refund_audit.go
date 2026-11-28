@@ -110,10 +110,7 @@ func (a *App) RefundAudit(ctx context.Context, since time.Time) ([]RefundAuditRo
 		if err != nil {
 			return nil, err
 		}
-		pol := voidPolicy(m, c.kind, false)
-		if c.service == "dine_in" {
-			pol = dinePolicy(m, c.kind == "store")
-		}
+		pol := refundPolicy(m, c.service, c.kind)
 		p, _, err := m.reprice(ctx, a.DB, b, m.without(less), pol)
 		if err != nil {
 			return nil, err

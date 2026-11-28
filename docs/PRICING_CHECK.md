@@ -84,6 +84,7 @@ DATABASE_URL='postgres://...' make pricing-check-db DAYS=0   # 全部订单
 | D7 | 退款之和 ≤ 应付（逐单检查）；把菜全部退完、每次都按建议金额退时正好等于应付，不多不少一分：最后一道菜的建议金额是“还没退的全部”，包括包装费、它的税和配送费（样例 S11；`TestPricingCheckChain`、`TestRefundLastDishTakesFees` 验） |
 | D7a | **分次退 = 一次退**：按菜退款的建议金额 = “去掉之前退过的菜的单” − “再去掉这次的菜的单”（都按第 2.1 节重新算），所以同样几道菜分几次退、和一次退，累计一样多（样例 S12、S13；`TestRefundSplitSamples_S12_S13`、`TestRefundSplitEqualsOnce` 验）。2026-11-28 之前每次都拿整张原单来减，带菜品活动会多退、带满减（顾客原因）会少退；老订单用 `pricecheck -refund-audit` 列出来看，不自动更正 |
 | D7b | **只退收到的**：可退的上限 = 实收 − 已退。实收 = 已付的单是应付；没付清的单（骑手少收或没收）是 店铺余额/储值付的 + 骑手收到的现金，不超过应付（样例 S14；`TestRefundOnlyWhatWasReceived` 验）。现金和余额各退多少的比例也按实收算 |
+| D7c | **订单记住下单时的活动条款**：满减、折扣、免配送费这类整单活动，优惠行（`order_discounts.rule`）存下单时的种类、门槛、面额、封顶；之后退菜、退款、加菜重新算时用存下来的条款，不读活动现在的设置。店铺改了活动、结束了活动，旧单不受影响。按菜退款（顾客已收到或已结账）只算订单自己的活动，不换到别的活动，堂食也一样（样例 S15；`TestPricingSampleS15_OrderKeepsItsPromotion`、`TestDineRefundStaysWithItsPromotion`）。2026-11-28 之前的订单没存条款，仍按活动现在的设置算 |
 | D8 | 各道菜服务费之和 = 服务费；各道菜税之和 ≤ 税，没有包装费时相等 |
 | D9 | 各道菜优惠之和 = 各条优惠明细的分摊之和 + 结账打折 |
 | D10 | 平台单（`order_type='platform'`）：服务费、配送费、结账打折、抹零都是 0；优惠明细只有 `platform_merchant_promo`（商家在平台上的活动，店铺出资）和 `platform_promo`（平台出资，税后）两种，不带本店的活动和券（docs/ORDER_TYPES_DESIGN.md 9.1） |
@@ -147,7 +148,7 @@ R 这一组是最重要的：任何一条改金额的路径如果绕开了 `load
 | 7 | 代客下单 | `TestStoreMembersAndStaffOrders`、`TestPricingFixStaffOrderPromotion` |
 | 8 | 加单：活动只升不降、配送费不另收、打折跟着走、抹零清掉、新加的菜能凑第二份 | `TestStaffAddonDelivery`、`TestAddonPromotionOnlyGoesUp`、`TestDishPromotionAddon` |
 | 9 | 退菜：顾客原因按剩下的菜重算门槛；店铺原因活动按比例保留；券封顶到活动减完后的剩余 | `TestVoidDelivery`、`TestVoidDineIn`、`TestPricingFixVoidDiscountLines` |
-| 10 | 按菜退款：带上活动、券、结账打折和抹零；退款进对账；分几次退和一次退一样多；只能退实际收到的（骑手少收、没收的单） | 样例 S8、S11、S12、S13、S14；`TestPricingFixDineRefundPromo`、`TestPricingFixRefundStaffDiscount`、`TestRefundLastDishTakesFees`、`TestRefundSplitSamples_S12_S13`、`TestRefundSplitEqualsOnce`、`TestRefundOnlyWhatWasReceived` |
+| 10 | 按菜退款：带上活动、券、结账打折和抹零；退款进对账；分几次退和一次退一样多；只能退实际收到的（骑手少收、没收的单） | 样例 S8、S11、S12、S13、S14、S15；`TestPricingFixDineRefundPromo`、`TestPricingFixRefundStaffDiscount`、`TestRefundLastDishTakesFees`、`TestRefundSplitSamples_S12_S13`、`TestRefundSplitEqualsOnce`、`TestRefundOnlyWhatWasReceived`、`TestPricingSampleS15_OrderKeepsItsPromotion`、`TestDineRefundStaysWithItsPromotion` |
 | 11 | 商家改了活动规则、服务费率、税率之后，老订单的改单仍按下单（开台）时的快照 | `TestPricingFixServiceChargeDrift`、`TestPricingFixPromoKindDrift`、`TestDishPromotions` |
 | 12 | 一张单走完全程：下单（菜品活动 + 满减 + 店铺券 + 平台券）→ 打 9 折 → 加单 → 店铺原因退菜 → 顾客原因退菜 → 抹零 → 取走 → 逐道退款到全部退完，每一步都验 | `TestPricingCheckChain` |
 | 13 | 金额流水：每种改动都有记录、合计等于应付、不能改删 | `TestMoneyLedgerOverAllOrders` |
@@ -350,6 +351,20 @@ PRICING_REVIEW.md 问题 1 的门店：含税 12%、服务费 5%。鸡 169.00 ×
 - **SV-S5**：充 1000.00 送 200.00，用了 300.00（本金 250.00 + 赠送 50.00），退储值：顾客原因 750.00 − 50.00 = **700.00**，门店原因 **750.00**；剩的赠送 150.00 作废
 - **SV-S6**：充 100.00 送 100.00，用了 180.00（各 90.00），剩各 10.00：顾客原因 max(0, 10.00 − 90.00) = **0.00**（本金 10.00 记扣回），门店原因 **10.00**
 - **SV-S7**（2026-11-27 改，`TestCreditGiveBackSamples`）：订单 200.00 = 退款余额 50.00 + 储值 120.00（本金 100.00 + 赠送 20.00）+ 到付 30.00，退菜后变 110.00：到付减到 0，再把 60.00 按这张单用掉的 170.00 拆：本金 ⌊6000 × 10000 ÷ 17000⌋ = ⌊3529.41⌋ = **35.29**、退款余额 ⌊6000 × 5000 ÷ 17000⌋ = ⌊1764.70⌋ = **17.64**、赠送 6000 − 3529 − 1764 = **7.07**；订单 110.00 = 32.36 + 64.71 + 12.93
+
+### S15 活动改了，旧单退款不变（真库测试 `TestPricingSampleS15_OrderKeepsItsPromotion`，规则 D7c）
+
+门店同 S12（自取，税 12% 另加、服务费 5%、包装费 10.00）。四瓶水每瓶 30.00，活动“满 90 减 15”。
+
+| | 菜 | 优惠 | 服务费 | 包装 | 税 | 应付 |
+|---|---|---|---|---|---|---|
+| 4 瓶，减 15 | 120.00 | −15.00 | 105.00 × 5% = 5.25 | 10.00 | 120.25 × 12% = 14.43 | **134.68** |
+| 3 瓶，减 15 | 90.00 | −15.00 | 3.75 | 10.00 | 88.75 × 12% = 10.65 | **99.40** |
+
+- 顾客原因退一瓶：剩 3 瓶 90.00 仍到下单时的门槛 90，仍减 15：134.68 − 99.40 = **35.28**
+- 下单之后店铺把活动改成“减 5”、把门槛提到 200、把活动结束、或者又建了一个更大的活动，这张单都还是退 **35.28**
+- 改之前：活动改成减 5 后，3 瓶按现在的活动算 = 85.00 + 4.25 + 10.00 + 税 99.25 × 12% = 11.91 = 111.16，只退 134.68 − 111.16 = 23.52，少退 11.76；门槛提到 200 后活动没了，3 瓶 = 90.00 + 4.50 + 10.00 + 税 104.50 × 12% = 12.54 = 117.04，只退 17.64，少退 17.64
+- 堂食（`TestDineRefundStaysWithItsPromotion`）：打 8 折结账的桌单退一瓶水 = 30.00 × 80% = 24.00，加它的 5% 服务费 1.20 = **25.20**；结账后店铺新开了 5 折活动，退款仍是 25.20
 
 ## 5. 改动流程（每个涉及金额的 PR 都要做）
 

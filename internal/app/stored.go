@@ -1052,9 +1052,14 @@ func (a *App) ConfirmTopup(ctx context.Context, branchID, id int64, in TopupConf
 		// the tier's limits again: two counters may confirm two codes at once
 		if tierID != nil {
 			var t StoredTier
-			if err := tx.QueryRow(ctx, `SELECT id, per_customer, first_only, quota,
-					(SELECT count(*) FROM topups x WHERE x.tier_id = t.id AND x.status = 'paid')::int
-				FROM stored_tiers t WHERE id=$1 FOR UPDATE`, *tierID).Scan(&t.ID, &t.PerCustomer, &t.FirstOnly, &t.Quota, &t.Taken); err != nil {
+			// The tier's row is the queue: lock it first, count after. Counted
+			// in the statement that waits for the lock, the paid top-ups would
+			// be those of before the wait, and the last place could go twice.
+			if err := tx.QueryRow(ctx, `SELECT id, per_customer, first_only, quota FROM stored_tiers WHERE id=$1 FOR UPDATE`,
+				*tierID).Scan(&t.ID, &t.PerCustomer, &t.FirstOnly, &t.Quota); err != nil {
+				return err
+			}
+			if err := tx.QueryRow(ctx, `SELECT count(*)::int FROM topups WHERE tier_id=$1 AND status='paid'`, *tierID).Scan(&t.Taken); err != nil {
 				return err
 			}
 			if _, closed, err := tierOpen(ctx, tx, branchID, custID, &t, id); err != nil {
