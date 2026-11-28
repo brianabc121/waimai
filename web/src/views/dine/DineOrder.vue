@@ -20,7 +20,7 @@ import { presetList, sinceText } from './strings'
 
 const props = defineProps<{ bill: Bill; store: Storefront | null; presets: DinePresets | null; top: number[]; phone: boolean
   again: DeskLine | null; sent: { n: number; amt: number } }>()
-const emit = defineEmits<{ back: []; sent: [bill: Bill, round: number]; bill: []; pay: []; move: []; guests: [] }>()
+const emit = defineEmits<{ back: []; sent: [bill: Bill, round: number]; bill: []; pay: []; move: []; guests: []; release: [] }>()
 
 const cur = computed(() => props.store?.branch.currency ?? props.bill.order.currency)
 const m = (v: number) => money(v, cur.value)
@@ -207,6 +207,7 @@ const cartOpen = ref(false)
         <button class="dd-topbtn" @click="emit('move')">{{ t('dd.move') }}</button>
         <button class="dd-topbtn" @click="emit('guests')">{{ t('dd.guests_btn') }}</button>
       </template>
+      <button v-if="!bill.order.items.length" class="dd-topbtn" data-testid="dd-release-top" @click="emit('release')">{{ t('dd.release') }}</button>
       <button v-else class="dd-topbtn" data-testid="dd-to-bill" @click="emit('bill')">{{ m(bill.order.totals.total) }}</button>
     </div>
     <div class="dd-obody">

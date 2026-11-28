@@ -191,3 +191,51 @@ func TestDineMoveRace(t *testing.T) {
 		t.Fatalf("exactly one move should win: %v / %v", errs[0], errs[1])
 	}
 }
+
+// 退桌: a table opened by mistake, or whose guests left before ordering, is
+// freed without a sale; a table that has ordered is refused.
+func TestDineRelease(t *testing.T) {
+	s := newStore(t, false)
+	ctx := context.Background()
+	a := testApp
+	t1, _ := s.table(t, "Q1")
+	t2, _ := s.table(t, "Q2")
+
+	b1, err := a.OpenTable(ctx, t1, 2, nil, s.staff)
+	noErr(t, err)
+	checked(t, "开台", b1.Order.ID)
+	out, err := a.ReleaseTable(ctx, b1.SessionID, s.staff)
+	noErr(t, err)
+	if out.Status != "closed" || out.Order.AcceptanceStatus != "cancelled" || out.Order.Totals.Total != 0 || out.Order.PaymentStatus == "paid" {
+		t.Fatalf("released bill: %+v", out)
+	}
+	checked(t, "退桌", b1.Order.ID)
+	// a second tap changes nothing, and the table opens again for the next guests
+	_, err = a.ReleaseTable(ctx, b1.SessionID, s.staff)
+	noErr(t, err)
+	_, err = a.AddBatch(ctx, b1.SessionID, "staff", uniq("k"), batch(app.QuoteLineInput{ItemID: s.tea, Qty: 1}), s.staff)
+	wantCode(t, err, "TABLE_SESSION_CLOSED")
+	again, err := a.OpenTable(ctx, t1, 2, nil, s.staff)
+	noErr(t, err)
+	if again.SessionID == b1.SessionID {
+		t.Fatal("a new sitting was expected")
+	}
+
+	// a table that has ordered cannot be released, not even after voiding everything
+	b2, err := a.OpenTable(ctx, t2, 2, nil, s.staff)
+	noErr(t, err)
+	b2, err = a.AddBatch(ctx, b2.SessionID, "staff", uniq("k"), batch(app.QuoteLineInput{ItemID: s.tea, Qty: 1}), s.staff)
+	noErr(t, err)
+	checked(t, "点单", b2.Order.ID)
+	_, err = a.ReleaseTable(ctx, b2.SessionID, s.staff)
+	wantCode(t, err, "TABLE_HAS_ORDER")
+	checked(t, "退桌被拒", b2.Order.ID)
+	// a paid table is not "released" either
+	t3, _ := s.table(t, "Q3")
+	paid, err := a.OpenTable(ctx, t3, 1, nil, s.staff)
+	noErr(t, err)
+	_, err = a.CloseTable(ctx, paid.SessionID, app.CloseInput{ExpectedManifest: paid.Order.ManifestVersion}, s.staff)
+	noErr(t, err)
+	_, err = a.ReleaseTable(ctx, paid.SessionID, s.staff)
+	wantCode(t, err, "TABLE_SESSION_CLOSED")
+}

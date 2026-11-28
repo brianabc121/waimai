@@ -508,6 +508,7 @@ func (s *Server) Router() *gin.Engine {
 	s.reconcileRoutes(auth)
 	auth.PATCH("/merchant/table-sessions/:id", s.patchSession)
 	auth.POST("/merchant/table-sessions/:id/move", s.moveTable)
+	auth.POST("/merchant/table-sessions/:id/release", s.releaseTable)
 	auth.GET("/merchant/branches/:bid/dine-desk", s.dineDesk)
 	auth.PUT("/merchant/branches/:bid/dine-desk", s.saveDinePresets)
 	auth.POST("/merchant/bill-items/:id/:action", s.billItem)

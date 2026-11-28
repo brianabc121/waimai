@@ -256,7 +256,8 @@ func loadGroups(ctx context.Context, q Querier, branchID int64, tables []tableRo
 		var n int
 		var med *float64
 		if err := q.QueryRow(ctx, `SELECT count(*), percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM closed_at - opened_at))
-			FROM dining_sessions WHERE branch_id=$1 AND table_id = ANY($2) AND status='closed'
+			FROM dining_sessions s WHERE branch_id=$1 AND table_id = ANY($2) AND status='closed'
+				AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.id = s.order_id AND o.acceptance_status = 'cancelled')
 				AND closed_at > now() - interval '14 days' AND closed_at - opened_at BETWEEN interval '5 minutes' AND interval '6 hours'`,
 			branchID, g.Tables).Scan(&n, &med); err != nil {
 			return nil, err

@@ -401,6 +401,20 @@ func (s *Server) moveTable(c *gin.Context) {
 	c.JSON(200, bill)
 }
 
+// releaseTable frees a table that was opened but never ordered from.
+func (s *Server) releaseTable(c *gin.Context) {
+	id, ok := s.sessionScope(c, pTable)
+	if !ok {
+		return
+	}
+	bill, err := s.App.ReleaseTable(c, id, staffActor(c))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	c.JSON(200, bill)
+}
+
 // dineDesk is what the desk needs besides the tables: the presets and the
 // dishes eaten in most often.
 func (s *Server) dineDesk(c *gin.Context) {
