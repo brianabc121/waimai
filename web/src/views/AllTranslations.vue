@@ -43,14 +43,16 @@ onMounted(load)
 onUnmounted(() => clearTimeout(timer))
 
 // ---- which rows ----
-const kinds = ['item', 'description', 'details', 'category', 'option', 'note', 'promotion', 'store'] as const
+const kinds = ['item', 'description', 'details', 'category', 'option', 'note', 'promotion', 'brand', 'store'] as const
 type Kind = typeof kinds[number]
 const kind = ref<Kind | ''>('')
 const kindOf = (f: Field): Kind => {
   if (f.entity === 'item') return f.field === 'name' ? 'item' : f.field === 'description' ? 'description' : 'details'
-  if (f.entity === 'group' || f.entity === 'option') return 'option'
+  if (['group', 'option', 'topping_template', 'topping_option'].includes(f.entity)) return 'option'
   if (f.entity === 'note_group' || f.entity === 'note_tag') return 'note'
-  if (f.entity === 'category' || f.entity === 'promotion') return f.entity
+  if (f.entity === 'category') return 'category'
+  if (['promotion', 'stored_campaign', 'stored_tier', 'coupon_batch'].includes(f.entity)) return 'promotion'
+  if (f.entity.startsWith('brand')) return 'brand'
   return 'store'
 }
 const byKey = computed(() => {

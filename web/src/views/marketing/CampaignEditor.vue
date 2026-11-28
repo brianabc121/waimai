@@ -4,6 +4,7 @@
 // a quota. A tier taken off stays for the top-ups that used it.
 import { computed, reactive, ref } from 'vue'
 import { currencySymbol, t, toMajor, toMinor } from '../../i18n'
+import LangsButton from '../LangsButton.vue'
 import { brandsHere, multiBrand } from '../../brands'
 import { saveCampaign, storedErr, type StoredCampaign } from '../../stored'
 
@@ -58,11 +59,11 @@ async function save() {
 <template>
   <div class="ce-mask" @click.self="emit('close')">
     <form class="ce" data-testid="campaign-editor" @submit.prevent="save">
-      <div class="ce-h"><h2>{{ t(c ? 'sv.e.edit' : 'sv.e.new') }}</h2><button type="button" class="x" :aria-label="t('close')" @click="emit('close')">✕</button></div>
+      <div class="ce-h"><h2>{{ t(c ? 'sv.e.edit' : 'sv.e.new') }}</h2><span style="flex:1"></span>
+        <LangsButton :base="`/merchant/branches/${branchId}`" :scope="c ? `stored_campaign/${c.id}` : null" :name="f.name" /><button type="button" class="x" :aria-label="t('close')" @click="emit('close')">✕</button></div>
       <div class="ce-b">
         <div class="ce-g2">
           <label class="field"><span>{{ t('sv.e.name') }}</span><input v-model="f.name" maxlength="60" required data-testid="ce-name" /></label>
-          <label class="field"><span>{{ t('sv.e.name_en') }}</span><input v-model="f.name_en" maxlength="60" /></label>
           <label class="field"><span>{{ t('sv.e.starts') }}</span><input v-model="f.starts" type="date" /></label>
           <label class="field"><span>{{ t('sv.e.ends') }}</span><input v-model="f.ends" type="date" /></label>
         </div>

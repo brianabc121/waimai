@@ -114,6 +114,18 @@ func (s *Server) storeCoupons(c *gin.Context) {
 		cid = cu.ID
 	}
 	list, err := s.App.StoreCoupons(c, c.Param("slug"), cid)
+	if err == nil {
+		ids := make([]int64, len(list))
+		for i, x := range list {
+			ids[i] = x.ID
+		}
+		var tr map[int64]string
+		if tr, err = s.App.Texts(c, reqLang(c), "coupon_batch", "name", ids); err == nil {
+			for i := range list {
+				list[i].NameTr = tr[list[i].ID]
+			}
+		}
+	}
 	reply(c, gin.H{"coupons": list}, err)
 }
 

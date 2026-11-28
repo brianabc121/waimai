@@ -96,6 +96,7 @@ e2e:
 	$(E2E_NODE) e2e/currency.cjs
 	$(E2E_NODE) e2e/i18n.cjs
 	$(E2E_NODE) e2e/menutranslate.cjs
+	$(E2E_NODE) e2e/langsmore.cjs
 	$(E2E_NODE) e2e/i18nadmin.cjs
 	$(E2E_NODE) e2e/zawgyi.cjs
 	$(E2E_NODE) e2e/longtext.cjs

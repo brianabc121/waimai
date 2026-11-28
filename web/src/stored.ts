@@ -7,13 +7,15 @@ import type { CreditCodeSent } from './credit'
 
 export interface StoredTier {
   id: number; pay: number; bonus: number; coupon_kind: '' | 'store_free' | 'store_threshold'; coupon_value: number; coupon_min: number
-  coupon_days: number; coupon_qty: number; label: string; per_customer: number | null; first_only: boolean; quota: number | null
+  coupon_days: number; coupon_qty: number; label: string; label_tr?: string; per_customer: number | null; first_only: boolean; quota: number | null
   taken: number; mine?: number; closed?: '' | 'first_only' | 'per_customer' | 'quota'
 }
 export interface StoredCampaign {
   id: number; name: string; name_en: string; starts_at: string | null; ends_at: string | null; status: 'active' | 'paused'
   state: 'running' | 'upcoming' | 'ended' | 'paused'; custom_ok: boolean; custom_min: number; brand_ids: number[]; note: string
   tiers: StoredTier[]; count: number; paid: number; given: number
+  // in the customer's language, when the server sent them
+  name_tr?: string; note_tr?: string
 }
 export interface StoredOverview {
   currency: string; enabled: boolean; cap: number; terms_at: string | null; approve_over: number; principal: number; bonus: number
@@ -155,7 +157,7 @@ extend({
   'sv.revoke_what': ['撤销充值', 'undoing a top-up'],
   // the campaign editor
   'sv.e.new': ['新建充值送活动', 'New top-up offer'], 'sv.e.edit': ['编辑充值送活动', 'Edit top-up offer'],
-  'sv.e.name': ['活动名称', 'Name'], 'sv.e.name_en': ['英文名称（可不填）', 'English name (optional)'],
+  'sv.e.name': ['活动名称', 'Name'],
   'sv.e.starts': ['开始', 'Starts'], 'sv.e.ends': ['结束（不填就是长期）', 'Ends (empty: no end)'],
   'sv.e.tiers': ['充值档位', 'Tiers'], 'sv.e.pay': ['充值金额', 'Pay'], 'sv.e.bonus': ['赠送金额', 'Bonus'],
   'sv.e.coupon': ['送券', 'Coupons'], 'sv.e.coupon_none': ['不送券', 'None'], 'sv.e.coupon_free': ['无门槛券', 'Any order'],

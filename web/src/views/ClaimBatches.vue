@@ -6,6 +6,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { get, post, put } from '../api'
 import { couponTitle } from '../coupons'
 import { money, t, toMajor, toMinor } from '../i18n'
+import LangsButton from './LangsButton.vue'
 import { session } from '../session'
 import type { CouponBatch, CouponKind } from '../types'
 
@@ -67,6 +68,7 @@ const sample = computed(() => ({ kind: f.kind, value: toMinor(f.value), threshol
       <label class="field"><span>{{ t('cb.per') }}</span><input v-model="f.per_customer" type="number" min="1" /></label>
       <div class="small muted full">{{ t('cr.preview') }}：{{ couponTitle(sample, props.currency) }}</div>
       <div class="row full" style="gap:8px"><button class="btn primary" :disabled="busy" data-testid="claim-save">{{ t('save') }}</button>
+        <LangsButton v-if="f.name" :base="`/merchant/branches/${bid}`" :scope="f.id ? `coupon_batch/${f.id}` : null" :name="f.name" />
         <button type="button" class="btn" @click="editing = false">{{ t('cancel') }}</button></div>
     </form>
     <div v-if="!list.length && !editing" class="muted small">{{ t('cb.none') }}</div>

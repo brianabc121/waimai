@@ -38,7 +38,7 @@ func (s *Server) queueRoutes(api, auth *gin.RouterGroup) {
 	auth.POST("/merchant/branches/:bid/queue/pause", s.withBranch(pQueue, s.pauseQueue))
 	auth.GET("/merchant/branches/:bid/queue/settings", s.withBranch(pQueue, s.queueSettings))
 	auth.PUT("/merchant/branches/:bid/queue/settings", s.withBranch(pQueueManage, s.saveQueueSettings))
-	auth.PUT("/merchant/branches/:bid/queue/groups", s.withBranch(pQueueManage, s.saveQueueGroups))
+	auth.PUT("/merchant/branches/:bid/queue/groups", s.menuChanged, s.withBranch(pQueueManage, s.saveQueueGroups))
 	auth.GET("/merchant/branches/:bid/queue/screens", s.withBranch(pQueueManage, s.queueScreens))
 	auth.POST("/merchant/branches/:bid/queue/screens", s.withBranch(pQueueManage, s.createScreen))
 	auth.PUT("/merchant/branches/:bid/queue/screens/:id", s.withBranch(pQueueManage, s.updateScreen))
@@ -52,6 +52,18 @@ func (s *Server) queueRoutes(api, auth *gin.RouterGroup) {
 
 func (s *Server) publicQueue(c *gin.Context) {
 	q, err := s.App.PublicQueue(c, c.Param("slug"))
+	if err == nil {
+		ids := make([]int64, len(q.Groups))
+		for i, g := range q.Groups {
+			ids[i] = g.ID
+		}
+		var tr map[int64]string
+		if tr, err = s.App.Texts(c, reqLang(c), "queue_group", "label", ids); err == nil {
+			for i := range q.Groups {
+				q.Groups[i].LabelTr = tr[q.Groups[i].ID]
+			}
+		}
+	}
 	if err != nil {
 		fail(c, err)
 		return
@@ -83,6 +95,12 @@ func (s *Server) takeTicketGuest(c *gin.Context) {
 
 func (s *Server) guestTicket(c *gin.Context) {
 	t, err := s.App.TicketByToken(c, c.Param("token"))
+	if err == nil { // the store's own name of the group, in the guest's language
+		var tr map[int64]string
+		if tr, err = s.App.Texts(c, reqLang(c), "queue_group", "label", []int64{t.Group.ID}); err == nil {
+			t.Group.LabelTr = tr[t.Group.ID]
+		}
+	}
 	if err != nil {
 		fail(c, err)
 		return
