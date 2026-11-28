@@ -9,7 +9,9 @@ import { both, extend, money, pick, t, toMajor, toMinor } from '../i18n'
 import { can, session } from '../session'
 import { CONTACT_FIELDS } from '../addresses'
 import type { Branch, Station, Zone } from '../types'
-import StoreTextsCard from './StoreTextsCard.vue'
+import LangsButton from './LangsButton.vue'
+import LangsCard from './LangsCard.vue'
+import './langsStrings'
 import PaySettingsCard from './checkout/PaySettingsCard.vue'
 import OrderNumberingCard from './OrderNumberingCard.vue'
 import PlatformsCard from './PlatformsCard.vue'
@@ -20,7 +22,7 @@ const zones = ref<Zone[]>([])
 const stations = ref<Station[]>([])
 const error = ref('')
 const saved = ref(false)
-const texts = ref<InstanceType<typeof StoreTextsCard> | null>(null)
+const texts = ref<InstanceType<typeof LangsCard> | null>(null)
 
 const s = reactive({ name: '', name_en: '', address: '', phone: '', tax: 12, tax_inclusive: true, service: 0, packaging: 0,
   min_order: 0, accept_timeout_minutes: 10, addon_confirm_minutes: 5, cook_target_minutes: 15, delivery_enabled: true, pickup_enabled: true, paused: false, open_time: '00:00', close_time: '00:00', notify_sms: true, scheduling_enabled: false, prep_minutes: 30,
@@ -82,8 +84,8 @@ const saveSettings = () => run(() => put(`/merchant/branches/${bid}/settings`, {
   scheduling_enabled: s.scheduling_enabled, prep_minutes: s.prep_minutes,
   kitchen_slow_minutes: s.kitchen_slow_minutes, detour_percent: s.detour_percent, detour_meters: Math.round(s.detour_km * 1000),
   notice: s.notice, intro: s.intro, baskets_enabled: s.baskets_enabled, contact_fields: s.contact_fields })).then(ok => {
-  // the other languages are filled in a few seconds after the save
-  if (ok) { texts.value?.load(); setTimeout(() => texts.value?.load(), 5000) }
+  // the other languages follow a few seconds after the save
+  if (ok) void texts.value?.load()
   return ok
 })
 
@@ -106,7 +108,7 @@ const sections = computed(() => [
   { id: 'set-pay', label: t('ox.set.pay'), on: can('settings') },
   { id: 'set-numbers', label: t('ot.set.title'), on: can('settings') },
   { id: 'set-platforms', label: t('pf.set.title'), on: can('settings') },
-  { id: 'set-texts', label: t('ox.set.texts'), on: can('menu.translate') },
+  { id: 'set-texts', label: t('lg.set.title'), on: can('menu.translate') },
   { id: 'set-mall', label: t('mls.title'), on: !!listing.value && can('mall') },
   { id: 'set-zones', label: t('zones'), on: can('delivery.map') },
   { id: 'set-stations', label: t('stations'), on: can('settings') },
@@ -140,11 +142,11 @@ function jump(id: string) { at.value = id; document.getElementById(id)?.scrollIn
     </section>
 
     <form v-if="can('settings')" id="set-store" class="ox-panel" @submit.prevent="saveSettings">
-      <div class="ox-panel-h"><h2>{{ t('store_settings') }}</h2><span class="grow"></span><button class="btn primary">{{ t('save') }}</button></div>
+      <div class="ox-panel-h"><h2>{{ t('store_settings') }}</h2><span class="grow"></span>
+        <LangsButton :base="`/merchant/branches/${bid}`" :scope="`branch/${bid}`" :name="s.name" /><button class="btn primary">{{ t('save') }}</button></div>
       <h3>{{ t('ox.set.basic') }}</h3>
       <div class="grid2">
-        <label class="field"><span>{{ t('name_zh') }}</span><input v-model="s.name" required /></label>
-        <label class="field"><span>{{ t('name_en') }}</span><input v-model="s.name_en" /></label>
+        <label class="field"><span>{{ t('mtr.store_name') }}</span><input v-model="s.name" name="store_name" required /></label>
         <label class="field"><span>{{ t('address') }}</span><input v-model="s.address" /></label>
         <label class="field"><span>{{ t('phone') }}</span><input v-model="s.phone" /></label>
         <label class="field"><span>{{ t('open_time') }}</span><input type="time" v-model="s.open_time" required /></label>
@@ -194,7 +196,7 @@ function jump(id: string) { at.value = id; document.getElementById(id)?.scrollIn
     <div v-if="can('settings')" id="set-numbers"><OrderNumberingCard :branch="branch" @saved="b => branch = b" /></div>
     <div v-if="can('settings')" id="set-platforms"><PlatformsCard :branch-id="bid" /></div>
 
-    <div v-if="can('menu.translate')" id="set-texts"><StoreTextsCard ref="texts" :base="`/merchant/branches/${bid}`" @en-name="v => s.name_en = v" /></div>
+    <div v-if="can('menu.translate')" id="set-texts"><LangsCard ref="texts" :base="`/merchant/branches/${bid}`" /></div>
 
     <form v-if="listing && can('mall')" id="set-mall" class="ox-panel stack" data-testid="mall-listing" @submit.prevent="saveListing">
       <h2>{{ t('mls.title') }}</h2>
@@ -239,8 +241,7 @@ function jump(id: string) { at.value = id; document.getElementById(id)?.scrollIn
         </tr></tbody>
       </table>
       <form class="row wrap" @submit.prevent="saveStation">
-        <input v-model="st.name" :placeholder="t('name_zh')" required style="flex:1 1 140px" />
-        <input v-model="st.name_en" :placeholder="t('name_en')" style="flex:1 1 140px" />
+        <input v-model="st.name" :placeholder="t('lg.name')" required style="flex:1 1 140px" />
         <label class="check" style="margin:0"><input type="checkbox" v-model="st.active" />{{ t('enabled') }}</label>
         <button class="btn primary">{{ st.id ? t('save') : t('new_station') }}</button>
         <button v-if="st.id" type="button" class="btn" @click="editStation(null)">{{ t('cancel') }}</button>

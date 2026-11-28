@@ -51,15 +51,11 @@ func (s *Server) translationRoutes(auth, admin *gin.RouterGroup) {
 	auth.PUT("/merchant/branches/:bid/translations", s.withBranch(pTranslate, s.saveTranslation))
 	auth.PUT("/merchant/branches/:bid/menu-langs", s.withBranch(pTranslate, s.saveMenuLangs))
 	auth.POST("/merchant/branches/:bid/translations/retranslate", s.withBranch(pTranslate, s.retranslate))
-	auth.GET("/merchant/branches/:bid/store-texts", s.withBranch(pTranslate, s.storeTexts))
-	auth.PUT("/merchant/branches/:bid/store-texts", s.withBranch(pTranslate, s.saveStoreText))
 	// the platform, for any store
 	admin.GET("/branches/:bid/translations", s.withAnyBranch(s.getTranslations))
 	admin.PUT("/branches/:bid/translations", s.withAnyBranch(s.saveTranslation))
 	admin.PUT("/branches/:bid/menu-langs", s.withAnyBranch(s.saveMenuLangs))
 	admin.POST("/branches/:bid/translations/retranslate", s.withAnyBranch(s.retranslate))
-	admin.GET("/branches/:bid/store-texts", s.withAnyBranch(s.storeTexts))
-	admin.PUT("/branches/:bid/store-texts", s.withAnyBranch(s.saveStoreText))
 }
 
 func (s *Server) withBranch(roles []string, h func(*gin.Context, int64)) gin.HandlerFunc {
@@ -79,7 +75,8 @@ func (s *Server) withAnyBranch(h func(*gin.Context, int64)) gin.HandlerFunc {
 }
 
 func (s *Server) getTranslations(c *gin.Context, bid int64) {
-	v, err := s.App.MenuTranslations(c, bid)
+	// ?scope=item/12 is one record's language window, "none" only the settings
+	v, err := s.App.MenuTranslations(c, bid, c.Query("scope"))
 	if err != nil {
 		fail(c, err)
 		return
@@ -88,11 +85,18 @@ func (s *Server) getTranslations(c *gin.Context, bid int64) {
 }
 
 func (s *Server) saveTranslation(c *gin.Context, bid int64) {
-	var in app.TranslationEdit
+	// one translation, or everything changed in a language window ("edits")
+	var in struct {
+		app.TranslationEdit
+		Edits []app.TranslationEdit `json:"edits"`
+	}
 	if !bind(c, &in) {
 		return
 	}
-	if err := s.App.SaveTranslation(c, bid, in, staffActor(c)); err != nil {
+	if in.Edits == nil {
+		in.Edits = []app.TranslationEdit{in.TranslationEdit}
+	}
+	if err := s.App.SaveTranslations(c, bid, in.Edits, staffActor(c)); err != nil {
 		fail(c, err)
 		return
 	}
@@ -125,26 +129,4 @@ func (s *Server) retranslate(c *gin.Context, bid int64) {
 func idValue(s string) (int64, bool) {
 	n, err := strconv.ParseInt(s, 10, 64)
 	return n, err == nil && n > 0
-}
-
-func (s *Server) storeTexts(c *gin.Context, bid int64) {
-	v, err := s.App.StoreTexts(c, bid)
-	if err != nil {
-		fail(c, err)
-		return
-	}
-	c.JSON(200, v)
-}
-
-func (s *Server) saveStoreText(c *gin.Context, bid int64) {
-	var in app.TranslationEdit
-	if !bind(c, &in) {
-		return
-	}
-	in.Entity, in.EntityID = "branch", bid
-	if err := s.App.SaveTranslation(c, bid, in, staffActor(c)); err != nil {
-		fail(c, err)
-		return
-	}
-	s.storeTexts(c, bid)
 }

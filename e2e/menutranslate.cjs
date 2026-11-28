@@ -1,6 +1,6 @@
 // Menu translation in a real browser (docs/I18N_DESIGN.md §6): the platform
 // switches on a translation service, the merchant's menu is translated in the
-// background, the merchant checks and corrects it on the "languages" page, a
+// background, the merchant corrects one item in the window behind its "Languages" button, a
 // Thai customer sees the Thai menu with "show original", and the order keeps
 // the dish's name in Thai while the kitchen sees the original.
 // The test service ("stub") marks the text instead of translating it, so no
@@ -53,39 +53,63 @@ try {
 const own = watch(await (await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: 'zh-CN', ignoreHTTPSErrors: insecure })).newPage())
 await signIn(own, 'owner2')
 await own.goto(BASE + '/merchant/menu')
-await own.waitForSelector(tid('open-langs'))
+const btn = scope => own.locator(`[data-testid=langs-btn][data-scope="${scope}"]`).first()
+await btn('item/11').waitFor()
+const API = BASE + '/api/v1/merchant/branches/2'
+const H = { headers: { 'X-Requested-With': 'waimai-web' } }
+const view = async scope => (await own.request.get(`${API}/translations?scope=${scope}`)).json()
+const tr = (v, entity, field, lang) => v.translations.find(x => x.entity === entity && x.field === field && x.lang === lang)
 // start over from an earlier run: hand the Thai name back to the service
-const reset = await own.request.put(BASE + '/api/v1/merchant/branches/2/translations', { headers: { 'X-Requested-With': 'waimai-web' }, data: { entity: 'item', entity_id: 11, field: 'name', lang: 'th', text: '' } })
+const reset = await own.request.put(API + '/translations', { ...H, data: { entity: 'item', entity_id: 11, field: 'name', lang: 'th', text: '' } })
 expect(reset.ok(), 'resetting the Thai name: ' + reset.status())
 // any save asks for a translation; this one changes nothing
-const r = await own.request.put(BASE + '/api/v1/merchant/branches/2/menu-langs', { headers: { 'X-Requested-With': 'waimai-web' }, data: { menu_lang: 'zh', menu_langs_off: [] } })
+const r = await own.request.put(API + '/menu-langs', { ...H, data: { menu_lang: 'zh', menu_langs_off: [] } })
 expect(r.ok(), 'saving the menu language: ' + r.status())
-await own.click(tid('open-langs'))
-await own.waitForSelector(tid('tr-dialog'))
-const cell = (id, field, lang) => own.locator(tid(`tr-cell-item-${id}-${field}-${lang}`))
-await cell(11, 'name', 'th').filter({ hasText: '[th] 盐酥鸡' }).waitFor({ timeout: 60000 })
-expect((await cell(11, 'name', 'zh-Hant').textContent()).includes('鹽酥雞'), 'Traditional Chinese is converted, not translated')
-expect((await cell(11, 'name', 'en').textContent()).includes('Popcorn Chicken'), 'the English the merchant typed is kept')
-await own.screenshot({ path: `${SHOTS}/tr-01-merchant-grid.png` })
-step('the menu is translated in the background and listed by language on the merchant\'s page')
+for (let i = 0; i < 120; i++) {
+  if (tr(await view('item/11'), 'item', 'name', 'th')?.text === '[th] 盐酥鸡') break
+  await own.waitForTimeout(500)
+}
+// nothing of the other languages shows until the button is clicked
+expect(!(await own.locator(tid('langs-sheet')).count()), 'no translations on the page itself')
+await btn('item/11').click()
+await own.waitForSelector(tid('langs-sheet'))
+const text = field => own.locator(`${tid('langs-row-item-11-' + field)} ${tid('langs-text')}`)
+await own.click(tid('langs-tab-th'))
+await own.waitForFunction(() => document.querySelector('[data-testid=langs-row-item-11-name] [data-testid=langs-text]')?.value === '[th] 盐酥鸡', null, { timeout: 60000 })
+await own.click(tid('langs-tab-zh-Hant'))
+expect((await text('name').inputValue()).includes('鹽酥雞'), 'Traditional Chinese is converted, not translated')
+await own.click(tid('langs-tab-en'))
+expect((await text('name').inputValue()).includes('Popcorn Chicken'), 'the English the merchant typed is kept')
+expect(await own.locator(`${tid('langs-row-item-11-name')} ${tid('langs-mine')}`).count(), 'and marked as the merchant\'s')
+await own.waitForSelector(tid('langs-row-item-11-description'))
+await own.screenshot({ path: `${SHOTS}/tr-01-merchant-window.png` })
+step('the item is translated in the background; its languages show only in the window behind the button')
 
 // the merchant corrects the Thai name
-await cell(11, 'name', 'th').click()
-await own.fill(tid('tr-text'), 'ไก่ป๊อป')
-await own.click(tid('tr-save'))
-await cell(11, 'name', 'th').filter({ hasText: 'ไก่ป๊อป' }).waitFor()
-expect((await cell(11, 'name', 'th').textContent()).includes('商家已改'), 'a corrected translation is marked as the merchant\'s')
-// the option groups are listed too
-await own.click(tid('tr-kind-option'))
-await own.locator(tid('tr-cell-group-') + ', [data-testid^=tr-cell-group-]').first().waitFor()
-await own.click(tid('tr-close'))
-// one dish at a time
-await own.click(tid('item-more-11'))
-await own.click(tid('item-langs-11'))
-await own.waitForSelector(tid('tr-row-item-11-description'))
-await own.screenshot({ path: `${SHOTS}/tr-02-merchant-dish.png` })
-await own.click(tid('tr-close'))
-step('the merchant corrects a translation, and sees one dish\'s languages from its row')
+await own.click(tid('langs-tab-th'))
+await text('name').fill('ไก่ป๊อป')
+await own.click(tid('langs-save'))
+await own.locator(`${tid('langs-row-item-11-name')} ${tid('langs-mine')}`).waitFor()
+expect(tr(await view('item/11'), 'item', 'name', 'th')?.status === 'human', 'a corrected translation is the merchant\'s')
+await own.screenshot({ path: `${SHOTS}/tr-02-merchant-corrected.png` })
+await own.click(tid('langs-close'))
+expect(!(await own.locator(tid('langs-failed')).count()), 'no red dot while the service works')
+step('the merchant corrects one translation in the window')
+
+// the whole table is behind the settings card, and finds a text by its translation
+await own.goto(BASE + '/merchant/settings')
+await own.waitForSelector(tid('langs-card'))
+await own.locator(tid('langs-status')).waitFor()
+await own.locator(tid('langs-card')).scrollIntoViewIfNeeded()
+await own.screenshot({ path: `${SHOTS}/tr-04-settings-card.png` })
+await own.click(tid('langs-all'))
+await own.waitForSelector(tid('all-langs'))
+await own.fill(tid('all-langs-q'), 'ไก่ป๊อป')
+await own.locator(tid('all-langs-row-item-11-name')).waitFor()
+expect(await own.locator('[data-testid^=all-langs-row-]').count() === 1, 'the search by a translation finds that one item')
+await own.screenshot({ path: `${SHOTS}/tr-05-all-translations.png` })
+await own.click(tid('all-langs-close'))
+step('the settings card shows the state, and "all translations" finds an item by its Thai name')
 
 // ---- a Thai customer ----
 const th = watch(await (await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'th-TH', ignoreHTTPSErrors: insecure, geolocation: { latitude: 14.5547, longitude: 121.0244 }, permissions: ['geolocation'] })).newPage())
@@ -129,26 +153,26 @@ await th.goto(BASE + '/'); await th.waitForSelector(tid('mall-search'))
 await th.locator(`text=${cat.name_tr}`).filter({ visible: true }).first().waitFor()
 step('the mall categories are shown in Thai')
 
-// store details: Traditional Chinese is filled in and waits for the owner to confirm
-const H = { headers: { 'X-Requested-With': 'waimai-web' } }
-await own.request.put(BASE + '/api/v1/merchant/branches/2/store-texts', { ...H, data: { field: 'name', lang: 'zh-Hant', text: '' } })
-for (let i = 0; i < 40; i++) { // converted again in the background
-  const v = await (await own.request.get(BASE + '/api/v1/merchant/branches/2/store-texts')).json()
-  if (v.translations.some(x => x.field === 'name' && x.lang === 'zh-Hant')) break
+// store details: the name goes into English and Traditional Chinese by itself,
+// the other languages read English until the owner writes one
+let st = null
+for (let i = 0; i < 60; i++) {
+  st = await view('branch/2')
+  if (tr(st, 'branch', 'name', 'zh-Hant')) break
   await own.waitForTimeout(500)
 }
+expect(tr(st, 'branch', 'name', 'zh-Hant'), 'the store name is put into Traditional Chinese')
+expect(!tr(st, 'branch', 'name', 'th'), 'the store name is not put into Thai')
 await own.goto(BASE + '/merchant/settings')
-const card = own.locator(tid('store-text-name-zh-Hant'))
-await card.waitFor()
-await own.waitForFunction(() => document.querySelector('[data-testid=store-text-name-zh-Hant] textarea')?.value)
-await card.locator(tid('store-text-confirm')).click()
-await card.locator('.tag.ok').waitFor()
-const st = await (await own.request.get(BASE + '/api/v1/merchant/branches/2/store-texts')).json()
-expect(st.translations.some(x => x.field === 'name' && x.lang === 'zh-Hant' && x.status === 'human'), 'the confirmed name is the owner\'s')
-expect(!st.translations.some(x => x.lang === 'th'), 'store details are not put into Thai')
-await card.scrollIntoViewIfNeeded(); await own.screenshot({ path: `${SHOTS}/tr-05-store-texts.png` })
-step('the owner confirms the Traditional Chinese store name in the settings')
-const en = st.translations.find(x => x.field === 'name' && x.lang === 'en')
+await btn('branch/2').click()
+await own.waitForSelector(tid('langs-sheet'))
+await own.click(tid('langs-tab-th'))
+const nameTh = own.locator(`${tid('langs-row-branch-2-name')} ${tid('langs-text')}`)
+expect(await nameTh.inputValue() === '', 'the Thai name is left for the owner')
+await own.screenshot({ path: `${SHOTS}/tr-06-store-window.png` })
+await own.click(tid('langs-close'))
+step('the store name has its own window; Thai is empty until the owner writes it')
+const en = tr(st, 'branch', 'name', 'en')
 if (en) {
   await th.goto(BASE + '/s/bgc'); await th.waitForSelector('.item')
   await th.locator(`text=${en.text}`).first().waitFor()

@@ -69,7 +69,7 @@ extend({
   'mz.ov_banner_order': ['和“{names}”有重叠，按列表顺序，排在前面的覆盖后面的。', 'Overlaps "{names}". The area higher in the list wins.'],
   'mz.rechoose': ['改选', 'Change'], 'mz.overlap_n': ['{n} 个区域，{area}', '{n} areas, {area}'], 'mz.overlap': ['重叠', 'Overlap'],
   // form
-  'mz.new_zone': ['新区域', 'New area'], 'mz.unsaved': ['未保存', 'Unsaved'], 'mz.name': ['名称', 'Name'], 'mz.name_en': ['英文名', 'English name'],
+  'mz.new_zone': ['新区域', 'New area'], 'mz.unsaved': ['未保存', 'Unsaved'], 'mz.name': ['名称', 'Name'],
   'mz.fee_f': ['配送费（{c}）', 'Fee ({c})'], 'mz.min_f': ['起送金额（{c}）', 'Minimum order ({c})'], 'mz.eta_f': ['预计送达（分钟）', 'Estimated minutes'],
   'mz.color': ['颜色', 'Colour'], 'mz.enable': ['启用这个区域', 'Enable this area'],
   'mz.hint_edit': ['拖动圆点调整边界 · 拖动边中间的小圆点加一个点 · 右键（或长按）圆点删除', 'Drag a corner to reshape · drag a small dot to add a corner · right-click (or long-press) a corner to remove it'],

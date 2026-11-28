@@ -25,8 +25,11 @@ type transField struct {
 	ID     int64  `json:"entity_id"`
 	Field  string `json:"field"` // name, description, details
 	Text   string `json:"text"`
-	// En is the English name the merchant typed on the form, if any.
+	// En is the English name kept on the record itself (name_en), if any.
 	En string `json:"-"`
+	// Owner is the record whose language window shows this text: an option
+	// belongs to its item, a flavour tag to its template.
+	Owner string `json:"owner"`
 }
 
 func (f transField) key(lang string) string {
@@ -38,10 +41,14 @@ func sourceHash(s string) string {
 	return hex.EncodeToString(h[:])
 }
 
-// storeInfoLang: the store's name, notice and introduction are kept in
-// Simplified Chinese, English and Traditional Chinese only; the merchant
-// confirms them, since a wrong store name does harm.
+// storeInfoLang: a store's or brand's name goes into Simplified Chinese,
+// English and Traditional Chinese on its own; a name is a sign, and a machine
+// making up eleven of them does harm. The merchant may write any other
+// language by hand (docs/I18N_SIMPLE_DESIGN.md §4.5).
 func storeInfoLang(l string) bool { return l == "zh" || l == "en" || l == "zh-Hant" }
+
+// nameOnly reports the texts storeInfoLang holds back.
+func nameOnly(f transField) bool { return f.Entity == "branch" && f.Field == "name" }
 
 // menuFields lists everything of a store that gets translated.
 func menuFields(ctx context.Context, q Querier, branchID int64) ([]transField, error) {
@@ -54,9 +61,9 @@ func menuFields(ctx context.Context, q Querier, branchID int64) ([]transField, e
 		defer rows.Close()
 		for rows.Next() {
 			var id int64
-			var en string
+			var en, owner string
 			texts := make([]string, len(fields))
-			dst := []any{&id, &en}
+			dst := []any{&id, &en, &owner}
 			for i := range texts {
 				dst = append(dst, &texts[i])
 			}
@@ -65,7 +72,7 @@ func menuFields(ctx context.Context, q Querier, branchID int64) ([]transField, e
 			}
 			for i, f := range fields {
 				ent := strings.SplitN(f, ".", 2)
-				tf := transField{Entity: ent[0], ID: id, Field: ent[1], Text: strings.TrimSpace(texts[i])}
+				tf := transField{Entity: ent[0], ID: id, Field: ent[1], Text: strings.TrimSpace(texts[i]), Owner: owner}
 				if tf.Field == "name" {
 					tf.En = strings.TrimSpace(en)
 				}
@@ -80,20 +87,20 @@ func menuFields(ctx context.Context, q Querier, branchID int64) ([]transField, e
 		sql    string
 		fields []string
 	}{
-		{`SELECT id, name_en, name FROM menu_categories WHERE branch_id=$1 AND NOT archived ORDER BY sort, id`, []string{"category.name"}},
-		{`SELECT id, name_en, name, description, details FROM menu_items WHERE branch_id=$1 AND NOT archived ORDER BY sort, id`,
+		{`SELECT id, name_en, 'category/' || id, name FROM menu_categories WHERE branch_id=$1 AND NOT archived ORDER BY sort, id`, []string{"category.name"}},
+		{`SELECT id, name_en, 'item/' || id, name, description, details FROM menu_items WHERE branch_id=$1 AND NOT archived ORDER BY sort, id`,
 			[]string{"item.name", "item.description", "item.details"}},
-		{`SELECT g.id, g.name_en, g.name FROM option_groups g JOIN menu_items i ON i.id = g.item_id
+		{`SELECT g.id, g.name_en, 'item/' || i.id, g.name FROM option_groups g JOIN menu_items i ON i.id = g.item_id
 			WHERE i.branch_id=$1 AND NOT i.archived ORDER BY g.sort, g.id`, []string{"group.name"}},
-		{`SELECT o.id, o.name_en, o.name FROM options o JOIN option_groups g ON g.id = o.group_id JOIN menu_items i ON i.id = g.item_id
+		{`SELECT o.id, o.name_en, 'item/' || i.id, o.name FROM options o JOIN option_groups g ON g.id = o.group_id JOIN menu_items i ON i.id = g.item_id
 			WHERE i.branch_id=$1 AND NOT i.archived ORDER BY o.sort, o.id`, []string{"option.name"}},
-		{`SELECT g.id, g.name_en, g.name FROM note_groups g JOIN note_templates t ON t.id = g.template_id
+		{`SELECT g.id, g.name_en, 'note_template/' || t.id, g.name FROM note_groups g JOIN note_templates t ON t.id = g.template_id
 			WHERE t.branch_id=$1 ORDER BY t.sort, t.id, g.sort, g.id`, []string{"note_group.name"}},
-		{`SELECT x.id, x.name_en, x.name FROM note_tags x JOIN note_groups g ON g.id = x.group_id JOIN note_templates t ON t.id = g.template_id
+		{`SELECT x.id, x.name_en, 'note_template/' || t.id, x.name FROM note_tags x JOIN note_groups g ON g.id = x.group_id JOIN note_templates t ON t.id = g.template_id
 			WHERE t.branch_id=$1 ORDER BY t.sort, t.id, g.sort, g.id, x.sort, x.id`, []string{"note_tag.name"}},
-		{`SELECT id, name_en, name FROM promotions WHERE branch_id=$1 AND status <> 'ended' ORDER BY id`, []string{"promotion.name"}},
-		// the store's own name and texts, in three languages only (docs/I18N_DESIGN.md §7)
-		{`SELECT id, name_en, name, notice, intro FROM branches WHERE id=$1`, []string{"branch.name", "branch.notice", "branch.intro"}},
+		{`SELECT id, name_en, 'promotion/' || id, name FROM promotions WHERE branch_id=$1 AND status <> 'ended' ORDER BY id`, []string{"promotion.name"}},
+		// the store's own name and texts (docs/I18N_SIMPLE_DESIGN.md §4.5)
+		{`SELECT id, name_en, 'branch/' || id, name, notice, intro FROM branches WHERE id=$1`, []string{"branch.name", "branch.notice", "branch.intro"}},
 	}
 	for _, s := range steps {
 		if err := add(s.sql, s.fields...); err != nil {
@@ -113,11 +120,14 @@ type Translation struct {
 	Status    string    `json:"status"` // machine, converted, human, stale
 	Provider  string    `json:"provider"`
 	UpdatedAt time.Time `json:"updated_at"`
-	hash      string
+	// Prev is the merchant's own translation of an earlier wording, replaced
+	// when the original changed; the language window offers it back.
+	Prev string `json:"prev,omitempty"`
+	hash string
 }
 
 func loadTranslations(ctx context.Context, q Querier, branchID int64, langs []string) (map[string]Translation, error) {
-	rows, err := q.Query(ctx, `SELECT entity, entity_id, field, lang, text, status, provider, updated_at, source_hash
+	rows, err := q.Query(ctx, `SELECT entity, entity_id, field, lang, text, status, provider, updated_at, source_hash, prev_text
 		FROM content_translations WHERE branch_id=$1 AND (COALESCE(cardinality($2::text[]), 0) = 0 OR lang = ANY($2))`, branchID, langs)
 	if err != nil {
 		return nil, err
@@ -126,7 +136,7 @@ func loadTranslations(ctx context.Context, q Querier, branchID int64, langs []st
 	out := map[string]Translation{}
 	for rows.Next() {
 		var t Translation
-		if err := rows.Scan(&t.Entity, &t.EntityID, &t.Field, &t.Lang, &t.Text, &t.Status, &t.Provider, &t.UpdatedAt, &t.hash); err != nil {
+		if err := rows.Scan(&t.Entity, &t.EntityID, &t.Field, &t.Lang, &t.Text, &t.Status, &t.Provider, &t.UpdatedAt, &t.hash, &t.Prev); err != nil {
 			return nil, err
 		}
 		out[transField{Entity: t.Entity, ID: t.EntityID, Field: t.Field}.key(t.Lang)] = t
@@ -134,14 +144,37 @@ func loadTranslations(ctx context.Context, q Querier, branchID int64, langs []st
 	return out, rows.Err()
 }
 
-func upsertTranslation(ctx context.Context, q Querier, branchID any, f transField, lang, text, status, provider string,
+// upsertTranslation stores one translation. prev is the merchant's own earlier
+// translation it replaces, "" for none.
+func upsertTranslation(ctx context.Context, q Querier, branchID any, f transField, lang, text, status, provider, prev string,
 	by *int64) error {
-	_, err := q.Exec(ctx, `INSERT INTO content_translations (entity, entity_id, field, lang, branch_id, text, status,
-			source_hash, provider, updated_by, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now())
+	if _, err := q.Exec(ctx, `INSERT INTO content_translations (entity, entity_id, field, lang, branch_id, text, status,
+			source_hash, provider, updated_by, updated_at, prev_text)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11)
 		ON CONFLICT (entity, entity_id, field, lang) DO UPDATE SET text=$6, status=$7, source_hash=$8, provider=$9,
-			updated_by=$10, updated_at=now()`,
-		f.Entity, f.ID, f.Field, lang, branchID, text, status, sourceHash(f.Text), provider, by)
+			updated_by=$10, updated_at=now(), prev_text=$11`,
+		f.Entity, f.ID, f.Field, lang, branchID, text, status, sourceHash(f.Text), provider, by, prev); err != nil {
+		return err
+	}
+	return syncNameEn(ctx, q, f, lang, text, status)
+}
+
+// syncNameEn keeps a record's name_en equal to the merchant's own English
+// name, and empty when the English is the translation service's: kitchen
+// screens and tickets print name_en next to the original, and only what the
+// merchant wrote belongs there.
+func syncNameEn(ctx context.Context, q Querier, f transField, lang, text, status string) error {
+	table := nameEnTables[f.Entity]
+	if lang != "en" || f.Field != "name" || table == "" {
+		return nil
+	}
+	if status != "human" {
+		text = ""
+	}
+	if text == f.En {
+		return nil
+	}
+	_, err := q.Exec(ctx, `UPDATE `+table+` SET name_en=$2 WHERE id=$1`, f.ID, text)
 	return err
 }
 
@@ -187,8 +220,8 @@ func (a *App) TranslateMenu(ctx context.Context, branchID int64, force bool) err
 		return err
 	}
 	skip := func(f transField, l string) bool {
-		return l == menuLang || (l != "en" && slices.Contains(off, l) && f.Entity != "branch") ||
-			(f.Entity == "branch" && !storeInfoLang(l))
+		return l == menuLang || (l != "en" && slices.Contains(off, l) && !nameOnly(f)) ||
+			(nameOnly(f) && !storeInfoLang(l))
 	}
 	return a.translateDone(ctx, branchID, a.syncTranslations(ctx, branchID, menuLang, fields, have, skip, force))
 }
@@ -198,6 +231,7 @@ func (a *App) TranslateMenu(ctx context.Context, branchID int64, force bool) err
 func (a *App) syncTranslations(ctx context.Context, owner any, from string, fields []transField,
 	have map[string]Translation, skip func(transField, string) bool, force bool) error {
 	todo := map[string][]transField{}
+	hints := map[string]string{} // key -> the merchant's own translation of the earlier wording
 	for _, f := range fields {
 		h := sourceHash(f.Text)
 		for _, l := range Langs {
@@ -205,38 +239,42 @@ func (a *App) syncTranslations(ctx context.Context, owner any, from string, fiel
 				continue
 			}
 			t, ok := have[f.key(l)]
-			// The English typed on the form is the writer's own.
-			if l == "en" && f.En != "" {
+			// An English name put on the record outside the language window (an
+			// import, the platform's forms) is the writer's own.
+			// The platform's own texts always take the English typed on its forms.
+			if l == "en" && f.En != "" && (owner == nil || !ok || t.Text != f.En) {
 				if !ok || t.Text != f.En || t.hash != h || t.Status != "human" {
-					if err := upsertTranslation(ctx, a.DB, owner, f, "en", f.En, "human", "", nil); err != nil {
+					if err := upsertTranslation(ctx, a.DB, owner, f, "en", f.En, "human", "", "", nil); err != nil {
 						return err
 					}
 				}
 				continue
 			}
+			hint := ""
 			if ok {
-				switch {
-				case t.Status == "stale":
-					continue
-				case t.Status == "human":
-					if t.hash != h {
-						if _, err := a.DB.Exec(ctx, `UPDATE content_translations SET status='stale'
-							WHERE entity=$1 AND entity_id=$2 AND field=$3 AND lang=$4`, f.Entity, f.ID, f.Field, l); err != nil {
-							return err
-						}
+				if t.hash == h && !(force && t.Status == "machine") {
+					if err := syncNameEn(ctx, a.DB, f, l, t.Text, t.Status); err != nil {
+						return err
 					}
 					continue
-				case t.hash == h && !(force && t.Status == "machine"):
-					continue
+				}
+				// The original changed: translate again, the merchant's own
+				// translation too, and keep theirs to offer back (§4.4).
+				hint = t.Prev
+				if t.Status == "human" || t.Status == "stale" {
+					hint = t.Text
 				}
 			}
 			if (l == "zh-Hant" && from == "zh") || (l == "zh" && from == "zh-Hant") {
 				if s := convertChinese(f.Text, l); s != "" {
-					if err := upsertTranslation(ctx, a.DB, owner, f, l, s, "converted", "opencc", nil); err != nil {
+					if err := upsertTranslation(ctx, a.DB, owner, f, l, s, "converted", "opencc", hint, nil); err != nil {
 						return err
 					}
 				}
 				continue
+			}
+			if hint != "" {
+				hints[f.key(l)] = hint
 			}
 			todo[l] = append(todo[l], f)
 		}
@@ -250,15 +288,25 @@ func (a *App) syncTranslations(ctx context.Context, owner any, from string, fiel
 		for start := 0; start < len(list); start += translateBatch {
 			part := list[start:min(start+translateBatch, len(list))]
 			texts := make([]string, len(part))
+			earlier := make([]string, len(part))
+			hinted := false
 			for i, f := range part {
 				texts[i] = f.Text
+				earlier[i] = hints[f.key(l)]
+				hinted = hinted || earlier[i] != ""
 			}
-			out, err := tr.Translate(ctx, from, l, texts)
+			var out []string
+			var err error
+			if ht, ok := tr.(HintTranslator); ok && hinted {
+				out, err = ht.TranslateWithHints(ctx, from, l, texts, earlier)
+			} else {
+				out, err = tr.Translate(ctx, from, l, texts)
+			}
 			if err != nil {
 				return err
 			}
 			for i, f := range part {
-				if err := upsertTranslation(ctx, a.DB, owner, f, l, out[i], "machine", tr.Name(), nil); err != nil {
+				if err := upsertTranslation(ctx, a.DB, owner, f, l, out[i], "machine", tr.Name(), earlier[i], nil); err != nil {
 					return err
 				}
 			}
@@ -442,24 +490,33 @@ func localizeLines(ctx context.Context, q Querier, b *Branch, lang string, lines
 
 // ---- the merchant's view ----
 
-// MenuTranslations is the menu page's language card and checking grid.
+// MenuTranslations is what the language window, the settings card and the
+// page of all translations show.
 type MenuTranslations struct {
-	MenuLang     string        `json:"menu_lang"`
-	MenuLangsOff []string      `json:"menu_langs_off"`
-	Provider     string        `json:"provider"` // "" when no service is set up
-	Pending      bool          `json:"pending"`  // a translation run is waiting or running
-	Error        string        `json:"error"`
-	ErrorAt      *time.Time    `json:"error_at"`
+	MenuLang     string     `json:"menu_lang"`
+	MenuLangsOff []string   `json:"menu_langs_off"`
+	Provider     string     `json:"provider"` // "" when no service is set up
+	Pending      bool       `json:"pending"`  // a translation run is waiting or running
+	Error        string     `json:"error"`
+	ErrorAt      *time.Time `json:"error_at"`
+	// DefaultLang is the language the window opens on: the one this store's
+	// customers ordered in most over the last 30 days, English without orders.
+	DefaultLang  string        `json:"default_lang"`
+	UpdatedAt    *time.Time    `json:"updated_at"` // the newest translation
 	Fields       []transField  `json:"fields"`
 	Translations []Translation `json:"translations"`
 }
 
-func (a *App) MenuTranslations(ctx context.Context, branchID int64) (*MenuTranslations, error) {
-	out := &MenuTranslations{Translations: []Translation{}}
+// MenuTranslations lists a store's texts and their translations. scope narrows
+// it to one record's language window ("item/12", "branch/3"); "" is everything
+// and "none" only the settings.
+func (a *App) MenuTranslations(ctx context.Context, branchID int64, scope string) (*MenuTranslations, error) {
+	out := &MenuTranslations{Fields: []transField{}, Translations: []Translation{}}
 	if err := a.DB.QueryRow(ctx, `SELECT menu_lang, menu_langs_off, translate_error, translate_error_at,
-			EXISTS (SELECT 1 FROM jobs WHERE kind='translate_menu' AND status='pending' AND (payload->>'branch_id')::bigint = branches.id)
+			EXISTS (SELECT 1 FROM jobs WHERE kind='translate_menu' AND status='pending' AND (payload->>'branch_id')::bigint = branches.id),
+			(SELECT max(updated_at) FROM content_translations WHERE branch_id = branches.id)
 		FROM branches WHERE id=$1 AND deleted_at IS NULL`, branchID).
-		Scan(&out.MenuLang, &out.MenuLangsOff, &out.Error, &out.ErrorAt, &out.Pending); err != nil {
+		Scan(&out.MenuLang, &out.MenuLangsOff, &out.Error, &out.ErrorAt, &out.Pending, &out.UpdatedAt); err != nil {
 		if isNoRows(err) {
 			return nil, ErrNotFound
 		}
@@ -468,19 +525,41 @@ func (a *App) MenuTranslations(ctx context.Context, branchID int64) (*MenuTransl
 	if tr := a.translator(); tr != nil {
 		out.Provider = tr.Name()
 	}
-	var err error
-	if out.Fields, err = menuFields(ctx, a.DB, branchID); err != nil {
+	out.DefaultLang = "en"
+	var top string
+	err := a.DB.QueryRow(ctx, `SELECT customer_lang FROM orders WHERE branch_id=$1 AND created_at > now() - interval '30 days'
+		AND customer_lang <> '' AND customer_lang <> $2 AND customer_lang <> ALL($3)
+		GROUP BY customer_lang ORDER BY count(*) DESC, customer_lang LIMIT 1`, branchID, out.MenuLang, out.MenuLangsOff).Scan(&top)
+	if err != nil && !isNoRows(err) {
 		return nil, err
 	}
-	if out.Fields == nil {
-		out.Fields = []transField{}
+	if IsLang(top) {
+		out.DefaultLang = top
+	} else if out.MenuLang == "en" {
+		out.DefaultLang = "zh"
+	}
+	if scope == "none" {
+		return out, nil
+	}
+	fields, err := menuFields(ctx, a.DB, branchID)
+	if err != nil {
+		return nil, err
+	}
+	shown := map[string]bool{}
+	for _, f := range fields {
+		if scope == "" || f.Owner == scope {
+			out.Fields = append(out.Fields, f)
+			shown[f.key("")] = true
+		}
 	}
 	have, err := loadTranslations(ctx, a.DB, branchID, nil)
 	if err != nil {
 		return nil, err
 	}
 	for _, t := range have {
-		out.Translations = append(out.Translations, t)
+		if shown[transField{Entity: t.Entity, ID: t.EntityID, Field: t.Field}.key("")] {
+			out.Translations = append(out.Translations, t)
+		}
 	}
 	slices.SortFunc(out.Translations, func(x, y Translation) int {
 		return strings.Compare(transField{Entity: x.Entity, ID: x.EntityID, Field: x.Field}.key(x.Lang),
@@ -497,8 +576,6 @@ type TranslationEdit struct {
 	Lang     string `json:"lang"`
 	// Text is the merchant's translation; "" hands it back to the service.
 	Text string `json:"text"`
-	// Keep confirms a translation whose original changed, as it is.
-	Keep bool `json:"keep"`
 }
 
 var nameEnTables = map[string]string{"category": "menu_categories", "item": "menu_items", "group": "option_groups",
@@ -506,51 +583,57 @@ var nameEnTables = map[string]string{"category": "menu_categories", "item": "men
 
 // SaveTranslation stores the merchant's own translation of one field.
 func (a *App) SaveTranslation(ctx context.Context, branchID int64, in TranslationEdit, actor Actor) error {
-	in.Text = strings.TrimSpace(in.Text)
-	if !IsLang(in.Lang) || (in.Entity == "branch" && !storeInfoLang(in.Lang)) {
-		return ErrValidation("unknown language")
+	return a.SaveTranslations(ctx, branchID, []TranslationEdit{in}, actor)
+}
+
+// SaveTranslations stores what the merchant changed in a language window: all
+// of it or none.
+func (a *App) SaveTranslations(ctx context.Context, branchID int64, edits []TranslationEdit, actor Actor) error {
+	if len(edits) == 0 {
+		return nil
 	}
-	if len(in.Text) > 4000 {
-		return ErrValidation("translation is too long")
+	if len(edits) > 500 {
+		return ErrValidation("too many translations at once")
 	}
 	fields, err := menuFields(ctx, a.DB, branchID)
 	if err != nil {
 		return err
 	}
-	var f *transField
+	byKey := map[string]*transField{}
 	for i := range fields {
-		if fields[i].Entity == in.Entity && fields[i].ID == in.EntityID && fields[i].Field == in.Field {
-			f = &fields[i]
-		}
-	}
-	if f == nil {
-		return ErrNotFound
+		byKey[fields[i].key("")] = &fields[i]
 	}
 	var by *int64
 	if actor.ID != 0 {
 		by = &actor.ID
 	}
 	err = a.inTx(ctx, func(tx pgx.Tx) error {
-		switch {
-		case in.Keep:
-			if _, err := tx.Exec(ctx, `UPDATE content_translations SET status='human', source_hash=$5, updated_by=$6, updated_at=now()
-				WHERE entity=$1 AND entity_id=$2 AND field=$3 AND lang=$4`, f.Entity, f.ID, f.Field, in.Lang,
-				sourceHash(f.Text), by); err != nil {
-				return err
+		for _, in := range edits {
+			in.Text = strings.TrimSpace(in.Text)
+			if !IsLang(in.Lang) {
+				return ErrValidation("unknown language")
 			}
-		case in.Text == "":
-			if _, err := tx.Exec(ctx, `DELETE FROM content_translations WHERE entity=$1 AND entity_id=$2 AND field=$3 AND lang=$4`,
-				f.Entity, f.ID, f.Field, in.Lang); err != nil {
-				return err
+			if len(in.Text) > 4000 {
+				return ErrValidation("translation is too long")
 			}
-		default:
-			if err := upsertTranslation(ctx, tx, branchID, *f, in.Lang, in.Text, "human", "", by); err != nil {
-				return err
+			f := byKey[transField{Entity: in.Entity, ID: in.EntityID, Field: in.Field}.key("")]
+			if f == nil {
+				return ErrNotFound
 			}
-		}
-		// The English name stays on the menu tables, where staff screens read it.
-		if in.Lang == "en" && f.Field == "name" && !in.Keep {
-			if _, err := tx.Exec(ctx, `UPDATE `+nameEnTables[f.Entity]+` SET name_en=$2 WHERE id=$1`, f.ID, in.Text); err != nil {
+			if in.Text == "" {
+				if _, err := tx.Exec(ctx, `DELETE FROM content_translations WHERE entity=$1 AND entity_id=$2 AND field=$3 AND lang=$4`,
+					f.Entity, f.ID, f.Field, in.Lang); err != nil {
+					return err
+				}
+				// the next run fills the English name in again
+				if table := nameEnTables[f.Entity]; in.Lang == "en" && f.Field == "name" && table != "" {
+					if _, err := tx.Exec(ctx, `UPDATE `+table+` SET name_en='' WHERE id=$1`, f.ID); err != nil {
+						return err
+					}
+				}
+				continue
+			}
+			if err := upsertTranslation(ctx, tx, branchID, *f, in.Lang, in.Text, "human", "", "", by); err != nil {
 				return err
 			}
 		}
@@ -604,10 +687,12 @@ func (a *App) Retranslate(ctx context.Context, branchID int64) error {
 // StoreTexts are a store's name, notice and introduction as one customer reads them.
 type StoreTexts struct{ Name, Notice, Intro string }
 
-// storeTexts picks the stores' texts for a customer reading lang (docs/I18N_DESIGN.md
-// §7): Simplified Chinese, English and Traditional Chinese readers get their own
-// version; readers of the language the store writes in get the original; everyone
-// else English, then the original. "" leaves a field as it is.
+// storeTexts picks the stores' texts for a customer reading lang
+// (docs/I18N_SIMPLE_DESIGN.md §4.5): the customer's language when there is a
+// translation (the notice and introduction go into every language, the name
+// into three unless the merchant wrote more), then English, then the original.
+// Readers of the language the store writes in get the original, and a language
+// the store turned off reads English. "" leaves a field as it is.
 func storeTexts(ctx context.Context, q Querier, lang string, stores []*Branch) (map[int64]StoreTexts, error) {
 	out := map[int64]StoreTexts{}
 	if len(stores) == 0 || !IsLang(lang) {
@@ -617,12 +702,8 @@ func storeTexts(ctx context.Context, q Querier, lang string, stores []*Branch) (
 	for i, b := range stores {
 		ids[i] = b.ID
 	}
-	want := lang
-	if !storeInfoLang(lang) {
-		want = "en"
-	}
 	rows, err := q.Query(ctx, `SELECT entity_id, field, lang, text FROM content_translations
-		WHERE entity='branch' AND entity_id = ANY($1) AND lang IN ($2, 'en')`, ids, want)
+		WHERE entity='branch' AND entity_id = ANY($1) AND lang IN ($2, 'en')`, ids, lang)
 	if err != nil {
 		return nil, err
 	}
@@ -642,6 +723,13 @@ func storeTexts(ctx context.Context, q Querier, lang string, stores []*Branch) (
 	for _, b := range stores {
 		if lang == b.MenuLang {
 			continue
+		}
+		want := lang
+		if slices.Contains(b.MenuLangsOff, lang) {
+			want = "en"
+			if b.MenuLang == "en" {
+				continue
+			}
 		}
 		pick := func(field, orig, origEn string) string {
 			if strings.TrimSpace(orig) == "" {
@@ -708,41 +796,6 @@ func storeNames(ctx context.Context, q Querier, lang string, ids []int64) (map[i
 	for id, x := range t {
 		if x.Name != "" {
 			out[id] = x.Name
-		}
-	}
-	return out, nil
-}
-
-// StoreTextsView is the store's name, notice and introduction in the three
-// languages, for the settings page.
-type StoreTextsView struct {
-	MenuLang     string        `json:"menu_lang"`
-	Fields       []transField  `json:"fields"`
-	Translations []Translation `json:"translations"`
-	// Pending counts the texts the system filled in that the merchant has not confirmed.
-	Pending int `json:"pending"`
-}
-
-func (a *App) StoreTexts(ctx context.Context, branchID int64) (*StoreTextsView, error) {
-	all, err := a.MenuTranslations(ctx, branchID)
-	if err != nil {
-		return nil, err
-	}
-	out := &StoreTextsView{MenuLang: all.MenuLang, Fields: []transField{}, Translations: []Translation{}}
-	has := map[string]bool{}
-	for _, f := range all.Fields {
-		if f.Entity == "branch" {
-			out.Fields = append(out.Fields, f)
-			has[f.Field] = true
-		}
-	}
-	for _, t := range all.Translations {
-		if t.Entity != "branch" || !storeInfoLang(t.Lang) || !has[t.Field] || t.Lang == all.MenuLang {
-			continue
-		}
-		out.Translations = append(out.Translations, t)
-		if t.Status != "human" {
-			out.Pending++
 		}
 	}
 	return out, nil
