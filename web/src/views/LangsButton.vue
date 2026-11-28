@@ -21,7 +21,8 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 const open = ref(false)
-const show = computed(() => props.always || can('menu.translate'))
+// the platform's own pages (their address starts with /admin/) show it whatever the role
+const show = computed(() => props.always || props.base.startsWith('/admin/') || can('menu.translate'))
 const status = computed(() => langStatus(props.base))
 </script>
 

@@ -132,6 +132,7 @@ for (const [name, price] of [['猪肉白菜饺', '168'], ['三鲜饺', '188']]) 
   await admin.click('[data-testid=new-item]')
   const f = admin.locator('[data-testid=item-form]')
   await f.locator('input').nth(0).fill(name)
+  await f.locator('[data-testid=langs-btn]').waitFor() // the platform has the same Languages button
   await f.locator('input[type=number]').first().fill(price)
   await f.locator('[data-testid=item-published]').check()
   await f.locator('.sheet-foot .btn.primary').click()
