@@ -71,6 +71,23 @@ if (!A || !B || !P) throw new Error('needs two free hall tables and a free priva
 await shot(pad, 'dd01-tables')
 step('the 堂食 switch opens the table map, with the hall, rooms and terrace as tabs')
 
+// 退桌: a table opened by mistake has not ordered, so it can be released
+await pad.click(tid(`dd-table-${B}`))
+await pad.waitForSelector(tid('dd-open'))
+await pad.click(tid('dd-open-order'))
+await pad.waitForSelector(tid('dd-round'))
+await pad.click(tid('dd-back'))
+await pad.locator(`${tid(`dd-table-${B}`)}:not(.free)`).waitFor()
+await pad.click(tid(`dd-table-${B}`))
+await pad.waitForSelector(tid('dd-release'))
+await shot(pad, 'dd01b-release')
+await pad.click(tid('dd-release'))
+await pad.waitForSelector(tid('dd-release-ask'))
+await shot(pad, 'dd01c-release-ask')
+await pad.click(tid('dd-release-ok'))
+await pad.locator(`${tid(`dd-table-${B}`)}.free`).waitFor()
+step(`table ${B} was opened, never ordered, and released: it is free again`)
+
 // open 01 for 3 guests with a table note
 await pad.click(tid(`dd-table-${A}`))
 await pad.waitForSelector(tid('dd-open'))
@@ -105,6 +122,7 @@ step('round 1 sent (beef noodles with spice and a note, two braised pork rice, a
 await pad.click(tid(`dd-table-${A}`))
 await pad.locator(`${tid('dd-side')} .dd-mini`).first().waitFor()
 await shot(pad, 'dd05-side')
+if (await pad.locator(tid('dd-release')).count()) throw new Error('a table that has ordered offers 退桌')
 await pad.click(tid('dd-bill'))
 await pad.waitForSelector(tid('dd-bill-list'))
 const beefRow = pad.locator(`${tid('dd-bill-item')}:has-text("牛肉面")`).first()

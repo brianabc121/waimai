@@ -18,7 +18,6 @@ import PayPicker from './checkout/PayPicker.vue'
 import { payText, pctText } from '../checkout'
 import { contactApps, contactName, contactPhone } from '../addresses'
 import './work/strings'
-import './translateStrings'
 import '../orders'
 import TotalsTable from './TotalsTable.vue'
 import PlatformBlock from './PlatformBlock.vue'
@@ -43,11 +42,6 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 // "message the customer" shows only where chat is set up
 const chatOn = ref(false)
 void chatEnabled().then(v => { chatOn.value = v })
-
-// store name, notice or introduction in another language the merchant has not
-// confirmed yet (only managers can see it; the others get nothing)
-const textsPending = ref(0)
-void get<{ pending: number }>(`/merchant/branches/${session.branchId}/store-texts`).then(v => { textsPending.value = v.pending }, () => {})
 
 const bid = session.branchId!
 
@@ -292,8 +286,6 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
         <router-link v-if="can('order.manual')" class="btn primary small" to="/merchant/order/delivery" data-testid="manual-order-new">{{ t('pos.new_delivery') }}</router-link>
       </div>
     </div>
-    <div v-if="textsPending" class="banner warn" style="margin-bottom:12px" data-testid="store-texts-banner">{{ t('mtr.store_banner', { n: textsPending }) }}
-      <router-link to="/merchant/settings">{{ t('mtr.store_go') }}</router-link></div>
     <div v-if="!online" class="banner warn" style="margin-bottom:12px">{{ t('offline') }}</div>
     <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
     <div v-else-if="approvedBy" class="banner ok" style="margin-bottom:12px" data-testid="approved-by">{{ approvedBy }}</div>

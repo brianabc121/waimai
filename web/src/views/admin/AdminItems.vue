@@ -7,7 +7,7 @@ import type { Category, Item, Station } from '../../types'
 import type { BranchPlatform } from '../../platforms'
 import ItemForm from '../ItemForm.vue'
 import MenuImportDialog from '../MenuImportDialog.vue'
-import MenuTranslations from '../MenuTranslations.vue'
+import AllTranslations from '../AllTranslations.vue'
 import NoteTemplates from '../NoteTemplates.vue'
 import '../translateStrings'
 import Pager from './Pager.vue'
@@ -92,9 +92,9 @@ const notes = reactive<{ open: boolean; cats: Category[] }>({ open: false, cats:
 async function openNotes() {
   try { notes.cats = (await get(`${base(branchId.value)}/menu`)).categories; notes.open = true } catch (e) { error.value = (e as Error).message }
 }
-const langs = reactive<{ open: boolean; cats: Category[] }>({ open: false, cats: [] })
-async function openLangs() {
-  try { langs.cats = (await get(`${base(branchId.value)}/menu`)).categories; langs.open = true } catch (e) { error.value = (e as Error).message }
+const langs = reactive({ open: false })
+function openLangs() {
+  langs.open = true
 }
 
 // ---- categories of the selected store ----
@@ -133,7 +133,7 @@ function removeCat(c: Category) { if (confirm(t('ad.cat_delete_confirm', { name:
       </div>
       <span class="grow"></span>
       <button class="btn" :disabled="!store" data-testid="open-import" :title="store ? '' : t('ad.pick_store')" @click="importing = true">{{ t('import_excel') }}</button>
-      <button class="btn" :disabled="!store" data-testid="open-langs" :title="store ? t('mtr.open_hint') : t('ad.pick_store')" @click="openLangs">{{ t('mtr.open') }}</button>
+      <button class="btn" :disabled="!store" data-testid="open-langs" :title="store ? '' : t('ad.pick_store')" @click="openLangs">{{ t('mtr.title') }}</button>
       <button class="btn" :disabled="!store" data-testid="open-notes" @click="openNotes">{{ t('nt.tab_templates') }}</button>
       <button class="btn" :disabled="!store" data-testid="manage-cats" @click="openCats">{{ t('ad.manage_cats') }}</button>
       <button class="btn primary" :disabled="!store" data-testid="new-item" @click="edit(null)">＋ {{ t('new_item') }}</button>
@@ -183,7 +183,7 @@ function removeCat(c: Category) { if (confirm(t('ad.cat_delete_confirm', { name:
     </Pager>
     <p class="small muted">{{ t('ad.items_foot') }} {{ t('ad.excel_hint') }}</p>
 
-    <MenuTranslations v-if="langs.open && store" :base="base(store.id)" :cats="langs.cats" @close="langs.open = false" />
+    <AllTranslations v-if="langs.open && store" :base="base(store.id)" @close="langs.open = false" />
     <MenuImportDialog v-if="importing && store" :base="base(store.id)" :cur="store.currency"
       :title="t('import_excel') + ' · ' + store.merchant_name + ' · ' + store.name" @imported="load" @close="importing = false" />
 

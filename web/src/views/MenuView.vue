@@ -6,13 +6,14 @@
 // templates (ToppingTemplates.vue).
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { get, patch, post, put } from '../api'
-import { both, mn, money, t } from '../i18n'
+import { mn, money, t } from '../i18n'
 import { can, currentRole, session } from '../session'
 import type { Category, Item, Station } from '../types'
 import type { BranchPlatform } from '../platforms'
 import ItemForm from './ItemForm.vue'
 import MenuImportDialog from './MenuImportDialog.vue'
-import MenuTranslations from './MenuTranslations.vue'
+import LangsButton from './LangsButton.vue'
+import './langsStrings'
 import './translateStrings'
 import '../notes'
 import NoteTemplates from './NoteTemplates.vue'
@@ -26,7 +27,6 @@ const bid = session.branchId!
 const base = `/merchant/branches/${bid}`
 const cur = currentRole()?.currency ?? 'PHP'
 const manager = computed(() => can('menu.edit'))
-const translator = computed(() => can('menu.translate'))
 const soldOut = computed(() => can('menu.soldout', 'menu.edit', 'kitchen'))
 const cats = ref<Category[]>([])
 const loaded = ref(false)
@@ -69,31 +69,20 @@ function setStock(it: Item) {
 function archive(it: Item) { if (confirm(`${t('archive')}: ${it.name}?`)) void quick(it, { archived: true }) }
 
 async function newCategory() {
-  const name = prompt(t('name_zh'))
+  const name = prompt(t('lg.name'))
   if (!name?.trim()) return
-  const en = prompt(t('name_en')) ?? ''
-  await run(() => post(`${base}/categories`, { name, name_en: en, sort: cats.value.length }))
+  await run(() => post(`${base}/categories`, { name, name_en: '', sort: cats.value.length }))
 }
 async function renameCategory(c: Category) {
-  const name = prompt(t('name_zh'), c.name)
+  const name = prompt(t('lg.name'), c.name)
   if (!name?.trim()) return
-  const en = prompt(t('name_en'), c.name_en) ?? c.name_en
-  await run(() => put(`${base}/categories/${c.id}`, { name, name_en: en, sort: c.sort }))
+  await run(() => put(`${base}/categories/${c.id}`, { name, name_en: c.name_en, sort: c.sort }))
 }
 
 // A required category: every delivery or pickup order must contain something from it.
 const setRequired = (c: Category) => run(() => put(`${base}/categories/${c.id}`,
   { name: c.name, name_en: c.name_en, sort: c.sort, required: !c.required }))
 
-// ---- the menu in other languages (MenuTranslations.vue) ----
-const langs = reactive<{ open: boolean; item: Item | null }>({ open: false, item: null })
-const showLangs = (it: Item | null) => Object.assign(langs, { open: true, item: it })
-const trFailed = ref(false)
-async function checkTranslations() {
-  trFailed.value = !!(await get<{ error: string }>(`${base}/translations`).catch(() => ({ error: '' }))).error
-}
-onMounted(() => { if (translator.value) void checkTranslations() })
-function closeLangs() { langs.open = false; void checkTranslations() }
 
 // ---- Excel import (MenuImportDialog.vue) ----
 const importing = ref(false)
@@ -241,8 +230,7 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
     <div class="page mx-page">
       <div class="mx-head">
         <div><h1>{{ t('mx.title') }}</h1><p class="mx-sub">{{ t('mx.sub') }}</p></div>
-        <div class="mx-acts" v-if="manager || translator">
-          <button v-if="translator" class="btn" :title="t('mtr.open_hint')" data-testid="open-langs" @click="showLangs(null)">{{ t('mtr.open') }}</button>
+        <div class="mx-acts" v-if="manager">
           <template v-if="manager">
             <button class="btn" data-testid="open-import" @click="importing = true">{{ t('import_excel') }}</button>
             <button class="btn" @click="newCategory">{{ t('new_category') }}</button>
@@ -256,8 +244,6 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
         <button :class="{ on: tab === 'toppings' }" data-testid="tab-toppings" @click="setTab('toppings')">{{ t('tp.tab') }}</button>
       </div>
       <div v-if="error" class="banner bad">{{ error }}</div>
-      <div v-if="trFailed && translator" class="banner bad row between" data-testid="tr-failed-banner">{{ t('mtr.failed', { at: '' }) }}
-        <button class="btn small" @click="showLangs(null)">{{ t('mtr.open') }}</button></div>
 
       <NoteTemplates v-if="tab === 'notes'" :base="base" :cats="cats" :can-edit="manager" @changed="load(); loadTpls()" />
       <ToppingTemplates v-else-if="tab === 'toppings'" :base="base" :cats="cats" :can-edit="manager" :cur="cur" @changed="load(); loadToppings()" />
@@ -332,9 +318,10 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
             <tbody v-for="x in pageCats" :key="x.c.id" class="mx-grp" :data-cat="x.c.name">
               <tr class="mx-gh" :class="{ over: over === 'g' + x.c.id }" @dragover.prevent="over = 'g' + x.c.id" @dragleave="over = ''" @drop.prevent="dropOnCat(x.c)">
                 <td colspan="9"><div class="mx-gh-in">
-                  <h2>{{ both(x.c.name, x.c.name_en) }} <span class="cnt">({{ x.total }})</span>
+                  <h2>{{ x.c.name }} <span class="cnt">({{ x.total }})</span>
                     <span v-if="x.c.required" class="tag brand" :title="t('cat_required_hint')" data-testid="cat-required">{{ t('cat_required') }}</span></h2>
                   <span class="grow"></span>
+                  <LangsButton small :base="base" :scope="`category/${x.c.id}`" :name="x.c.name" />
                   <template v-if="manager">
                     <button class="btn small" :title="t('cat_required_hint')" data-testid="toggle-required" @click="setRequired(x.c)">{{ x.c.required ? t('cat_required_off') : t('cat_required_on') }}</button>
                     <button class="btn small" @click="edit(null, x.c.id)">＋ {{ t('new_item') }}</button>
@@ -365,7 +352,7 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
                 <td class="c-ops"><div class="mx-ops">
                   <button v-if="manager" class="op red" @click="edit(it)">{{ t('edit') }}</button>
                   <button v-if="soldOut" class="op" @click="quick(it, { sold_out: !it.sold_out })">{{ it.sold_out ? t('restore') : t('mx.sold_out') }}</button>
-                  <button v-if="translator && !manager" class="op" :data-testid="'item-langs-' + it.id" @click="showLangs(it)">{{ t('mtr.open') }}</button>
+                  <LangsButton small :base="base" :scope="`item/${it.id}`" :name="it.name" />
                   <button v-if="manager || soldOut" class="op dots" :aria-label="t('mx.more')" :data-testid="'item-more-' + it.id" @click.stop="openMenu('item', it.id, $event)"><MxIcon name="dots" /></button>
                 </div></td>
               </tr>
@@ -377,8 +364,9 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
           <div v-else class="mx-gridwrap">
             <div v-if="manager" class="mx-gridall"><label class="check"><input type="checkbox" :checked="allPicked" @change="togglePage" /> {{ t('mx.all') }}</label></div>
             <template v-for="x in pageCats" :key="x.c.id">
-              <div class="mx-gh-in mx-ggh"><h2>{{ both(x.c.name, x.c.name_en) }} <span class="cnt">({{ x.total }})</span>
+              <div class="mx-gh-in mx-ggh"><h2>{{ x.c.name }} <span class="cnt">({{ x.total }})</span>
                   <span v-if="x.c.required" class="tag brand">{{ t('cat_required') }}</span></h2><span class="grow"></span>
+                <LangsButton small :base="base" :scope="`category/${x.c.id}`" :name="x.c.name" />
                 <button v-if="manager" class="btn small" @click="edit(null, x.c.id)">＋ {{ t('new_item') }}</button></div>
               <div class="mx-grid">
                 <div v-for="it in x.items" :key="it.id" class="mx-card" :class="{ off: !it.published || it.sold_out, picked: picked.has(it.id) }" :data-testid="'item-card-' + it.id">
@@ -393,7 +381,7 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
                     <div class="mx-ops">
                       <button v-if="manager" class="op red" @click="edit(it)">{{ t('edit') }}</button>
                       <button v-if="soldOut" class="op" @click="quick(it, { sold_out: !it.sold_out })">{{ it.sold_out ? t('restore') : t('mx.sold_out') }}</button>
-                      <button v-if="translator && !manager" class="op" @click="showLangs(it)">{{ t('mtr.open') }}</button>
+                      <LangsButton small :base="base" :scope="`item/${it.id}`" :name="it.name" />
                       <button v-if="manager || soldOut" class="op dots" :aria-label="t('mx.more')" @click.stop="openMenu('item', it.id, $event)"><MxIcon name="dots" /></button>
                     </div>
                   </div>
@@ -426,7 +414,6 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
       <button v-if="soldOut" @click="act(() => setStock(menuItem!))">{{ t('mx.stock_set') }}</button>
       <template v-if="manager">
         <button @click="act(() => quick(menuItem!, { published: !menuItem!.published }))">{{ menuItem.published ? t('unpublish') : t('publish') }}</button>
-        <button :data-testid="'item-langs-' + menuItem.id" @click="act(() => showLangs(menuItem))">{{ t('mtr.open') }}</button>
         <button :disabled="filtering" data-act="up" @click="act(() => step(menuItem!, -1))">{{ t('mx.move_up') }}</button>
         <button :disabled="filtering" data-act="down" @click="act(() => step(menuItem!, 1))">{{ t('mx.move_down') }}</button>
         <button class="bad" @click="act(() => archive(menuItem!))">{{ t('archive') }}</button>
@@ -441,7 +428,6 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
     </div>
 
     <MenuImportDialog v-if="importing" :base="base" :cur="cur" @imported="load" @close="importing = false" />
-    <MenuTranslations v-if="langs.open" :base="base" :cats="cats" :item="langs.item" @close="closeLangs" />
     <ItemForm v-if="form.open" :item="form.item" :category-id="form.categoryId" :cats="cats" :stations="stations" :cur="cur"
       :platforms="platforms" :base="base" @saved="saved" @close="form.open = false" @manage-notes="form.open = false; setTab('notes')" @manage-toppings="form.open = false; setTab('toppings')" />
   </div>
@@ -513,7 +499,7 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
 .mx-row.picked td { background: #fdf1ec; }
 .mx-row.off .c-img img { filter: grayscale(.6); opacity: .7; }
 .c-h { width: 22px; padding-inline: 4px 0 !important; } .c-ck { width: 34px; } .c-img { width: 84px; }
-.c-price { width: 100px; } .c-stock { width: 110px; } .c-stn { width: 110px; } .c-st { width: 110px; } .c-ops { width: 180px; }
+.c-price { width: 100px; } .c-stock { width: 110px; } .c-stn { width: 110px; } .c-st { width: 110px; } .c-ops { width: 250px; }
 .pfline { font-size: 11.5px; color: var(--muted); font-weight: 400; white-space: nowrap; } .pfline i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-inline-end: 4px; } .pfline.own { color: var(--ink, #222); }
 .mx-handle { cursor: grab; color: #a8927f; user-select: none; display: inline-flex; }
 .mx-handle.dis { cursor: not-allowed; opacity: .35; }
@@ -529,7 +515,8 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
 .pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 11px; font-size: 13px; font-weight: 700; white-space: nowrap; margin: 1px 4px 1px 0; }
 .pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .pill.on { background: #e6f2e2; color: #2f7a2a; } .pill.draft { background: #efe9e1; color: #7b6657; } .pill.sold { background: #fbe3df; color: #b42318; }
-.mx-ops { display: flex; align-items: center; justify-content: flex-end; }
+.mx-ops { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; row-gap: 4px; }
+.mx-ops .langs-btn { margin-inline: 6px 2px; }
 .mx-ops .op { border: 0; background: none; font: inherit; font-weight: 600; color: #6f5a4b; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
 .mx-ops .op + .op { border-inline-start: 1px solid var(--line); }
 .mx-ops .op.red { color: var(--brand); }
@@ -569,7 +556,10 @@ const stockText = (it: Item) => it.stock_qty === null ? t('mx.unlimited') : it.s
 .mx-main { container-type: inline-size; }
 @container (max-width: 980px) {
   .c-stn { display: none; }
-  .c-ops { width: 150px; }
+  .c-ops { width: 200px; }
+  /* the globe alone where the row is short of room */
+  .mx-row .mx-ops :deep(.langs-btn span) { display: none; }
+  .mx-row .mx-ops :deep(.langs-btn) { padding: 3px 6px; }
 }
 @container (max-width: 720px) {
   .mx-tools select { flex: 1 1 140px; width: auto; }

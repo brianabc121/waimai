@@ -165,7 +165,6 @@ for (const [x, y] of [[-200, 115], [0, 115], [0, 250], [-200, 250]]) await click
 await click(-200, 115)
 await mode('edit')
 await page.fill(tid('zone-name'), '地图测试区')
-await page.fill(tid('zone-name-en'), 'Map test')
 await page.fill(tid('zone-fee'), '59')
 await page.fill(tid('zone-min'), '300')
 await page.click(tid('save-zone'))

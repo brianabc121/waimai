@@ -868,9 +868,6 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
           <div class="sec"><span class="k">{{ t('vo.address') }} <i v-if="service === 'delivery'" class="req">*</i></span>
             <div class="btnrow rel">
               <button class="btn blue" :disabled="service === 'pickup'" data-testid="mo-map" @click="picking = true">{{ t('vo.open_map') }}</button>
-              <a class="btn blue" :class="{ off: service === 'pickup' || f.lat == null }" data-testid="mo-view" target="_blank" rel="noopener"
-                :href="viewLink(f.lat, f.lng, f.placeId) || undefined" :title="f.lat == null ? t('vo.view_none') : t('vo.view_hint')"
-                @click="f.lat == null && $event.preventDefault()">{{ t('vo.view') }}</a>
               <button class="btn blue" :class="{ on: feeOverride != null }" :disabled="service === 'pickup'" data-testid="mo-fee" @click="adjustFee">{{ t('vo.fee_adjust') }}</button>
               <button class="btn blue" :class="{ on: service === 'pickup' }" data-testid="mo-pickup"
                 @click="service = service === 'pickup' ? 'delivery' : 'pickup'">{{ service === 'pickup' ? t('vo.delivery') : t('vo.pickup') }}</button>
@@ -903,8 +900,13 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
             </div>
             <div class="sec rel"><span class="k kt"></span>
               <div class="grow stack0">
-                <textarea v-model="f.line" class="inp ta" rows="2" data-testid="mo-address" maxlength="300" :placeholder="t('vo.addr_ph')"
-                  @input="lineInput" @focus="loadHints" @blur="closeHints" @keydown="addrKey"></textarea>
+                <div class="addrbox">
+                  <textarea v-model="f.line" class="inp ta" rows="2" data-testid="mo-address" maxlength="300" :placeholder="t('vo.addr_ph')"
+                    @input="lineInput" @focus="loadHints" @blur="closeHints" @keydown="addrKey"></textarea>
+                  <a class="btn blue addrview" :class="{ off: f.lat == null }" data-testid="mo-view" target="_blank" rel="noopener"
+                    :href="viewLink(f.lat, f.lng, f.placeId) || undefined" :title="f.lat == null ? t('vo.view_none') : t('vo.view_hint')"
+                    @mousedown.prevent @click="f.lat == null && $event.preventDefault()">{{ t('vo.view') }}</a>
+                </div>
                 <div v-if="f.placeName" class="placetag" data-testid="mo-place-name"><span class="tag">{{ t('vo.place_tag') }}</span><b>{{ f.placeName }}</b>
                   <span v-if="placeStreet" class="muted small">{{ placeStreet }}</span></div>
                 <input v-model="f.unit" class="inp" :class="{ ask: askUnit }" maxlength="100" :placeholder="t('vo.unit_ph')" data-testid="mo-unit" />
@@ -1166,7 +1168,11 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 .drop .grp { padding: 4px 12px; background: var(--row); font-size: 11.5px; color: var(--muted); font-weight: 700; }
 .drop .it.more { color: var(--brand-dark); font-weight: 700; border-top: 1px dashed var(--edge); }
 .drop .it .look { font-size: 12px; white-space: nowrap; }
-.btnrow a.btn.off { opacity: .45; cursor: not-allowed; }
+a.btn.off { opacity: .45; cursor: not-allowed; }
+/* "View" sits inside the address box, at its end, so it is one tap from the address */
+.addrbox { position: relative; display: flex; }
+.addrbox .ta { flex: 1; min-width: 0; padding-inline-end: 84px; }
+.addrbox .addrview { position: absolute; inset-inline-end: 8px; top: 8px; white-space: nowrap; text-decoration: none; }
 .drop .it .gplace { display: flex; flex-direction: column; min-width: 0; }
 .placetag { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 13.5px; }
 .inp.ask { border-color: #d59a00; background: #fff4d6; }

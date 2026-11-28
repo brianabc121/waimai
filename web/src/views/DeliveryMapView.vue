@@ -547,7 +547,6 @@ async function fbSave() {
       </table>
       <form v-if="!readOnly" class="row wrap" @submit.prevent="fbSave">
         <input v-model="fz.name" :placeholder="t('mz.name')" required style="flex:1 1 140px" />
-        <input v-model="fz.name_en" :placeholder="t('mz.name_en')" style="flex:1 1 140px" />
         <input type="number" min="0" step="0.01" v-model.number="fz.fee" :title="t('mz.fee')" style="flex:0 1 100px" />
         <input type="number" min="0" step="0.01" v-model.number="fz.min_order" :title="t('mz.min')" style="flex:0 1 100px" />
         <label class="check" style="margin:0"><input type="checkbox" v-model="fz.active" />{{ t('mz.on') }}</label>
@@ -809,8 +808,7 @@ async function fbSave() {
       <!-- zone form -->
       <template v-else-if="mode === 'edit'">
         <section><div class="row between"><h2>{{ ed.id ? ed.name : t('mz.new_zone') }}</h2><span v-if="fresh" class="tag warn">{{ t('mz.unsaved') }}</span></div>
-          <div class="two"><label class="field"><span>{{ t('mz.name') }}</span><input v-model="ed.name" data-testid="zone-name" /></label>
-            <label class="field"><span>{{ t('mz.name_en') }}</span><input v-model="ed.name_en" data-testid="zone-name-en" /></label></div>
+          <label class="field"><span>{{ t('mz.name') }}</span><input v-model="ed.name" data-testid="zone-name" /></label>
           <div class="two"><label class="field"><span>{{ t('mz.fee_f', { c: cur }) }}</span><input type="number" min="0" step="0.01" v-model.number="ed.fee" data-testid="zone-fee" /></label>
             <label class="field"><span>{{ t('mz.min_f', { c: cur }) }}</span><input type="number" min="0" step="0.01" v-model.number="ed.min_order" data-testid="zone-min" /></label></div>
           <div class="two"><label class="field"><span>{{ t('mz.eta_f') }}</span><input type="number" min="1" max="600" v-model="ed.eta" data-testid="zone-eta" /></label>

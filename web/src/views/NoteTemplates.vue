@@ -13,7 +13,7 @@ import '../menuPage'
 import MxIcon from './MxIcon.vue'
 import type { Category, NoteTemplate } from '../types'
 import NotePicker from './NotePicker.vue'
-import MenuTranslations from './MenuTranslations.vue'
+import LangsButton from './LangsButton.vue'
 import './translateStrings'
 
 const props = defineProps<{ base: string; cats: Category[]; canEdit: boolean }>()
@@ -33,7 +33,6 @@ const form = reactive<Form>({ id: 0, name: '', icon: '', groups: [] })
 const dirty = ref(false)
 const busy = ref(false)
 // the template's group names and tags in the customers' languages
-const langsOpen = ref(false)
 
 async function load(keep = sel.value) {
   try {
@@ -206,7 +205,7 @@ async function saveApply() {
         <div class="nt-eh">
           <h2>{{ form.id ? t('mx.nt_edit') : t('mx.nt_new_title') }}</h2>
           <span class="grow"></span>
-          <button v-if="canEdit && current" type="button" class="btn small" data-testid="nt-langs" :title="t('mtr.open_hint')" @click="langsOpen = true">{{ t('mtr.open') }}</button>
+          <LangsButton :base="base" :scope="current ? `note_template/${current.id}` : null" :name="form.name" :readonly="!canEdit" />
           <span v-if="form.id && !dirty" class="nt-saved" data-testid="nt-saved">✓ {{ t('mx.saved') }}</span>
           <span v-else-if="canEdit" class="nt-dirty">{{ t('mx.unsaved') }}</span>
         </div>
@@ -309,7 +308,6 @@ async function saveApply() {
       </div>
     </div>
 
-    <MenuTranslations v-if="langsOpen && current" :base="base" :cats="cats" :tpl="current" :readonly="!canEdit" @close="langsOpen = false" />
 
     <!-- apply to dishes -->
     <div v-if="apply.open && current" class="sheet-mask" @click.self="apply.open = false">

@@ -252,6 +252,10 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 		} else if err != nil {
 			return err
 		}
+		optionsBefore, err := itemOptionNames(ctx, tx, id)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `DELETE FROM option_groups WHERE item_id=$1 AND topping_template_id IS NULL`, id); err != nil {
 			return err
 		}
@@ -282,6 +286,9 @@ func (a *App) SaveItem(ctx context.Context, branchID, id int64, in ItemInput) (i
 					return err
 				}
 			}
+		}
+		if err := carryOptionTranslations(ctx, tx, id, optionsBefore); err != nil {
+			return err
 		}
 		if err := syncItemToppings(ctx, tx, id); err != nil {
 			return err

@@ -12,6 +12,8 @@ import '../toppings'
 import ImageUpload from './ImageUpload.vue'
 import PhotoList from './PhotoList.vue'
 import './manualStrings'
+import LangsButton from './LangsButton.vue'
+import './langsStrings'
 
 const props = defineProps<{ item: Item | null; categoryId?: number; cats: { id: number; name: string }[]; stations: Station[]; cur: string; base: string; platforms?: BranchPlatform[] }>()
 const emit = defineEmits<{ saved: []; close: []; 'manage-notes': []; 'manage-toppings': [] }>()
@@ -119,12 +121,12 @@ async function save() {
 <template>
   <div class="sheet-mask" @click.self="emit('close')">
     <form class="sheet center" data-testid="item-form" @submit.prevent="save">
-      <div class="sheet-head"><h2>{{ f.id ? t('edit') : t('new_item') }}</h2></div>
+      <div class="sheet-head row between"><h2>{{ f.id ? t('edit') : t('new_item') }}</h2>
+        <LangsButton :base="base" :scope="f.id ? `item/${f.id}` : null" :name="f.name" /></div>
       <div class="sheet-body">
         <div v-if="error" class="banner bad" style="margin-bottom:12px">{{ error }}</div>
         <div class="grid2">
-          <label class="field"><span>{{ t('name_zh') }}</span><input v-model="f.name" required /></label>
-          <label class="field"><span>{{ t('name_en') }}</span><input v-model="f.name_en" /></label>
+          <label class="field"><span>{{ t('lg.item_name') }}</span><input v-model="f.name" name="item_name" required /></label>
           <label class="field"><span>{{ t('category') }}</span><select v-model="f.category_id">
             <option v-for="c in cats" :key="c.id" :value="c.id">{{ c.name }}</option></select></label>
           <label class="field"><span>{{ t('price') }} ({{ cur }})</span><input type="number" min="0" step="0.01" v-model.number="f.price" required /></label>
@@ -200,14 +202,12 @@ async function save() {
         <h3 style="margin:14px 0 8px">{{ t('option_groups') }}</h3>
         <div v-for="(g, gi) in f.groups" :key="gi" class="card stack" style="margin-bottom:10px;background:#fafafa">
           <div class="grid2">
-            <label class="field"><span>{{ t('name_zh') }}</span><input v-model="g.name" required /></label>
-            <label class="field"><span>{{ t('name_en') }}</span><input v-model="g.name_en" /></label>
+            <label class="field" style="grid-column:1 / -1"><span>{{ t('lg.name') }}</span><input v-model="g.name" required /></label>
             <label class="field"><span>{{ t('min_sel') }}</span><input type="number" min="0" v-model.number="g.min_select" /></label>
             <label class="field"><span>{{ t('max_sel') }}</span><input type="number" min="1" v-model.number="g.max_select" /></label>
           </div>
           <div v-for="(o, oi) in g.options" :key="oi" class="row">
-            <input v-model="o.name" :placeholder="t('name_zh')" required />
-            <input v-model="o.name_en" :placeholder="t('name_en')" />
+            <input v-model="o.name" :placeholder="t('lg.name')" required style="flex:1 1 0" />
             <input type="number" min="0" step="0.01" v-model.number="o.extra" :placeholder="t('extra')" style="width:90px" />
             <button type="button" class="btn small danger" @click="g.options.splice(oi, 1)">×</button>
           </div>

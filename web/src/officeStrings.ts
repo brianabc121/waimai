@@ -73,7 +73,6 @@ extend({
   'ox.set.timing': ['接单和出餐', 'Accepting and cooking'],
   'ox.set.switches': ['服务开关', 'Services'],
   'ox.set.pay': ['付款方式', 'Payments'],
-  'ox.set.texts': ['店铺多语言', 'Store texts'],
   // rider cash (核款)
   'ox.cs.sub': ['骑手代收的现金，交回店里后在这里核款', 'Cash riders collected; check it in here when they hand it back'],
   'ox.cs.all': ['全部记录', 'All'],
