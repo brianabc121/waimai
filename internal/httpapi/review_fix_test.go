@@ -230,3 +230,47 @@ func TestSettleShortOverHTTP(t *testing.T) {
 		t.Fatalf("order: %v", got["payment_status"])
 	}
 }
+
+// M15: a sign-out that the database refused is reported, and the session
+// keeps working: the page must not tell the person they are out.
+func TestLogoutThatFailsIsNotALogout(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	staff := login(t, f.cashier)
+	cust := verifiedCustomer(t)
+	// the database refuses to forget sessions for a moment
+	for _, q := range []string{
+		`CREATE OR REPLACE FUNCTION test_no_delete() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'disk trouble'; END $$`,
+		`CREATE TRIGGER test_no_delete BEFORE DELETE ON sessions FOR EACH ROW EXECUTE FUNCTION test_no_delete()`,
+		`CREATE TRIGGER test_no_delete BEFORE DELETE ON customer_sessions FOR EACH ROW EXECUTE FUNCTION test_no_delete()`,
+	} {
+		_, err := a.DB.Exec(ctx, q)
+		noErr(t, err)
+	}
+	restored := false
+	restore := func() {
+		if restored {
+			return
+		}
+		restored = true
+		for _, q := range []string{`DROP TRIGGER IF EXISTS test_no_delete ON sessions`,
+			`DROP TRIGGER IF EXISTS test_no_delete ON customer_sessions`, `DROP FUNCTION IF EXISTS test_no_delete()`} {
+			if _, err := a.DB.Exec(ctx, q); err != nil {
+				t.Errorf("%s: %v", q, err)
+			}
+		}
+	}
+	t.Cleanup(restore)
+	staff.want(500, "INTERNAL", "POST", "/auth/logout", nil)
+	staff.want(200, "", "GET", "/auth/me", nil) // still signed in, and the cookie was kept
+	cust.want(500, "INTERNAL", "POST", "/customer/logout", nil)
+	cust.want(200, "", "GET", "/customer/addresses", nil)
+
+	restore()
+	staff.want(200, "", "POST", "/auth/logout", nil)
+	staff.want(401, "UNAUTHENTICATED", "GET", "/auth/me", nil)
+	cust.want(200, "", "POST", "/customer/logout", nil)
+	cust.want(403, "PHONE_NOT_VERIFIED", "GET", "/customer/addresses", nil)
+	// signing out again with a session that is already gone is fine
+	staff.want(200, "", "POST", "/auth/logout", nil)
+}

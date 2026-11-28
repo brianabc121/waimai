@@ -43,6 +43,7 @@ type Worker struct {
 	startedAt   time.Time
 	lastCleanup time.Time
 	lastTrips   time.Time
+	lastDomains time.Time
 }
 
 // NewWorker prepares a worker loop. embedded says that it runs inside the api process.
@@ -96,6 +97,15 @@ func truncate(s string, n int) string {
 
 // Tick runs every task that is due once and then reports the heartbeat.
 func (w *Worker) Tick(ctx context.Context) {
+	w.tickSlow(ctx)
+	w.tickOrders(ctx)
+}
+
+// tickOrders is the fast loop: the order timers (accept timeout, add-on
+// timeout, releasing scheduled orders) and the heartbeat. Nothing in it calls
+// an outside service, so a slow translation or text message cannot hold back
+// an order that is due.
+func (w *Worker) tickOrders(ctx context.Context) {
 	start := time.Now()
 	a := w.app
 	w.runTask(ctx, "expire_pending", func(ctx context.Context) (int, error) {
@@ -107,16 +117,9 @@ func (w *Worker) Tick(ctx context.Context) {
 	})
 	w.runTask(ctx, "expire_addons", a.ExpireAddons)
 	w.runTask(ctx, "release_scheduled", a.ReleaseScheduled)
-	w.runTask(ctx, "jobs", a.runJobs)
 	if time.Since(w.lastTrips) > tripInterval {
 		w.runTask(ctx, "rider_trips", a.AdvanceTrips)
-		w.runTask(ctx, "check_domains", a.CheckDomains)
 		w.lastTrips = time.Now()
-	}
-	if time.Since(w.lastCleanup) > cleanupInterval {
-		w.runTask(ctx, "cleanup", func(ctx context.Context) (int, error) { return 0, a.Cleanup(ctx) })
-		w.runTask(ctx, "wallet_check", a.WalletCheckDue)
-		w.lastCleanup = time.Now()
 	}
 	if ctx.Err() != nil {
 		return
@@ -126,6 +129,22 @@ func (w *Worker) Tick(ctx context.Context) {
 		ON CONFLICT (instance) DO UPDATE SET last_beat_at=now(), last_loop_ms=$5`,
 		w.instance, w.hostname, w.embedded, w.startedAt, int(time.Since(start).Milliseconds())); err != nil {
 		w.logf("worker: heartbeat: %v", err)
+	}
+}
+
+// tickSlow is the other loop: the job queue (texts, pushes, imports,
+// translations) and the housekeeping that may take a while.
+func (w *Worker) tickSlow(ctx context.Context) {
+	a := w.app
+	w.runTask(ctx, "jobs", a.runJobs)
+	if time.Since(w.lastDomains) > tripInterval {
+		w.runTask(ctx, "check_domains", a.CheckDomains)
+		w.lastDomains = time.Now()
+	}
+	if time.Since(w.lastCleanup) > cleanupInterval {
+		w.runTask(ctx, "cleanup", func(ctx context.Context) (int, error) { return 0, a.Cleanup(ctx) })
+		w.runTask(ctx, "wallet_check", a.WalletCheckDue)
+		w.lastCleanup = time.Now()
 	}
 }
 
@@ -139,14 +158,25 @@ func (w *Worker) Stop() {
 	}
 }
 
-// RunWorker loops until ctx is cancelled.
+// RunWorker loops until ctx is cancelled: the order timers and the heartbeat
+// in one loop, the job queue and housekeeping in another.
 func (a *App) RunWorker(ctx context.Context, logf func(string, ...any), embedded bool) {
 	w := a.NewWorker(logf, embedded)
 	defer w.Stop()
+	slow := make(chan struct{})
+	go func() {
+		defer close(slow)
+		loop(ctx, w.tickSlow)
+	}()
+	loop(ctx, w.tickOrders)
+	<-slow
+}
+
+func loop(ctx context.Context, turn func(context.Context)) {
 	tick := time.NewTicker(workerTick)
 	defer tick.Stop()
 	for {
-		w.Tick(ctx)
+		turn(ctx)
 		select {
 		case <-ctx.Done():
 			return

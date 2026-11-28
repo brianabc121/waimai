@@ -49,3 +49,32 @@ test('a late answer is told from the current one', async () => {
   await Promise.all([ask('old', 30), ask('new', 5)])
   assert.equal(shown, 'new')
 })
+
+test('one failed read does not hold back the other', async () => {
+  const { parts } = await import('../src/retry.ts')
+  const r = await parts({ board: () => Promise.reject(new Error('502')), stations: () => Promise.resolve([1, 2]) })
+  assert.deepEqual(r.values.stations, [1, 2])
+  assert.equal(r.values.board, undefined)
+  assert.equal(r.errors.board.message, '502')
+  assert.equal(r.errors.stations, undefined)
+})
+
+test('a screen that never loaded, or loaded long ago, says so', async () => {
+  const { screenState } = await import('../src/retry.ts')
+  const t0 = 1_000_000
+  assert.equal(screenState(null, false, t0, 90000), 'ok') // first read still running
+  assert.equal(screenState(null, true, t0, 90000), 'never') // empty is not "no orders"
+  assert.equal(screenState(t0, false, t0 + 30000, 90000), 'ok')
+  assert.equal(screenState(t0, true, t0 + 30000, 90000), 'failing')
+  assert.equal(screenState(t0, true, t0 + 91000, 90000), 'stale') // old tickets are marked
+  assert.equal(screenState(t0, false, t0 + 91000, 90000), 'stale')
+})
+
+test('signing out only counts when the server knows', async () => {
+  const { signOut } = await import('../src/retry.ts')
+  const err = (status, code) => Object.assign(new Error(code), { status, code })
+  assert.equal(await signOut(() => Promise.resolve({ ok: true })), true) // normal
+  assert.equal(await signOut(() => Promise.reject(err(401, 'UNAUTHENTICATED'))), true) // already expired
+  assert.equal(await signOut(() => Promise.reject(err(0, 'NETWORK'))), false) // no network
+  assert.equal(await signOut(() => Promise.reject(err(500, 'INTERNAL'))), false) // database error
+})

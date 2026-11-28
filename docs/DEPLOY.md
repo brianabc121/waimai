@@ -199,7 +199,7 @@ APP_DB_PASSWORD=应用角色密码
 DATABASE_URL=postgres://waimai_app:应用角色密码@postgres:5432/waimai?sslmode=disable
 ```
 
-`migrate` 用 `MIGRATE_DATABASE_URL`（表的所有者）跑迁移，并给 `waimai_app` 设上密码、允许登录；`api`、`worker` 用 `DATABASE_URL`。用了托管数据库并且有 `DIRECT_DATABASE_URL` 时，它也换成 `waimai_app`，`MIGRATE_DATABASE_URL` 填所有者的直连地址。托管数据库不允许建角色时迁移会跳过这一步：请在数据库控制台手动建一个叫 `waimai_app` 的用户，再重跑 `docker compose up -d migrate`。没改的话系统照样能用（触发器也会拦），但平台后台“余额账本”页会一直显示安全警告。
+`migrate` 用 `MIGRATE_DATABASE_URL`（表的所有者）跑迁移，并给 `waimai_app` 设上密码、允许登录；`api`、`worker` 用 `DATABASE_URL`。用了托管数据库并且有 `DIRECT_DATABASE_URL` 时，它也换成 `waimai_app`，`MIGRATE_DATABASE_URL` 填所有者的直连地址。托管数据库不允许建角色时迁移会跳过这一步：请在数据库控制台手动建一个叫 `waimai_app` 的用户（密码和 `APP_DB_PASSWORD` 一样），再重跑 `docker compose up -d migrate`。`migrate` 每次跑完都会把这个角色该有的权限重新授一遍，所以后补的角色也能用；日志里看到 `waimai_app: rights granted` 就是授好了。如果控制台不让程序改密码，日志会提示，照提示在控制台把密码设成一样的即可。没改的话系统照样能用（触发器也会拦），但平台后台“余额账本”页会一直显示安全警告。
 
 *2）自动检查和告警*。后台任务每小时检查新记的账、每天检查全部账本，每家店过了当地午夜关一次账（日终试算）。结果在平台后台左侧“余额账本”，有问题显示红色数字。想在手机上收到提醒，在 `.env` 设 `WALLET_ALERT_WEBHOOK` 为企业微信/钉钉/Slack/Telegram 机器人的地址，出问题会推一条（6 小时内不重复）。收到后照 docs/BALANCE_CHECK.md 第 7 节处理。
 

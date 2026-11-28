@@ -123,8 +123,14 @@ func (s *Server) saveCustomerLang(c *gin.Context) {
 }
 
 func (s *Server) customerLogout(c *gin.Context) {
+	// A sign-out that did not reach the database is not a sign-out: the
+	// cookie stays and the page is told, so that nobody walks away from a
+	// shared device believing they are out (CODE_REVIEW_FIX_PLAN M15).
 	if token, err := c.Cookie(customerCookie); err == nil && token != "" {
-		_ = s.App.CustomerLogout(c, token)
+		if err := s.App.CustomerLogout(c, token); err != nil {
+			fail(c, err)
+			return
+		}
 	}
 	s.setCookie(c, customerCookie, "", -1)
 	c.JSON(200, gin.H{"ok": true})
@@ -421,7 +427,10 @@ func (s *Server) adminLogin(c *gin.Context) {
 
 func (s *Server) adminLogout(c *gin.Context) {
 	if token, _ := c.Cookie(adminCookie); token != "" {
-		_ = s.App.Logout(c, token)
+		if err := s.App.Logout(c, token); err != nil {
+			fail(c, err)
+			return
+		}
 	}
 	s.setCookie(c, adminCookie, "", -1)
 	c.JSON(200, gin.H{"ok": true})
@@ -465,7 +474,10 @@ func (s *Server) tokenLogin(c *gin.Context) {
 
 func (s *Server) logout(c *gin.Context) {
 	if token := sessionToken(c); token != "" {
-		_ = s.App.Logout(c, token)
+		if err := s.App.Logout(c, token); err != nil {
+			fail(c, err)
+			return
+		}
 	}
 	s.setCookie(c, staffCookie, "", -1)
 	c.JSON(200, gin.H{"ok": true})

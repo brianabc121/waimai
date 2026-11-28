@@ -1,6 +1,8 @@
 import { reactive } from 'vue'
 import { ApiError, apiScope, get, post } from './api'
 import type { BranchRole, Entry, User } from './types'
+import { signOut } from './retry'
+import { t } from './i18n'
 
 // A platform administrator can open one store's back office read-only. The
 // store is remembered here and shown to the staff screens as if it were a role.
@@ -122,12 +124,18 @@ export async function switchEntry(entry: 'office' | 'work', password = '') {
   pickBranch()
 }
 
-export async function logout() {
-  if (apiScope.admin) await post('/admin/auth/logout').catch(() => {})
-  else await post('/auth/logout').catch(() => {})
+// logout answers whether the person is signed out. When the request was
+// lost or the server failed, the session still works: nothing is forgotten
+// here, the person is told, and can try again (CODE_REVIEW_FIX_PLAN M15).
+export async function logout(): Promise<boolean> {
+  if (!(await signOut(() => post(apiScope.admin ? '/admin/auth/logout' : '/auth/logout')))) {
+    window.alert(t('logout_failed'))
+    return false
+  }
   localStorage.removeItem(VIEW_KEY)
   localStorage.removeItem(USER_KEY)
   session.user = null
+  return true
 }
 
 // Where a sign-in lands: the workbench, the one store's back office, or the

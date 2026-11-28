@@ -13,7 +13,47 @@ import (
 const (
 	jobLease       = 60 * time.Second
 	jobMaxAttempts = 5
+	// A long job (a menu translation can take minutes) renews its lease this
+	// often, so that no other worker takes it for abandoned and runs it again.
+	jobRenew = 20 * time.Second
+	// One turn of the job loop stops after this many jobs or this long and
+	// lets the next turn carry on, so that the turn's outcome gets recorded.
+	jobBatch     = 50
+	jobBatchTime = 30 * time.Second
 )
+
+func (a *App) jobLease() time.Duration {
+	if a.JobLease > 0 {
+		return a.JobLease
+	}
+	return jobLease
+}
+
+// keepLease renews a job's lease until stop is called. A renewal that finds
+// the lease gone (another worker has the job) cancels the job's context.
+func (a *App) keepLease(ctx context.Context, j *claimedJob, every time.Duration) (context.Context, func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		t := time.NewTicker(every)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+			}
+			tag, err := a.DB.Exec(ctx, `UPDATE jobs SET locked_until = now() + make_interval(secs => $3)
+				WHERE id=$1 AND lease_token::text=$2 AND status='pending'`, j.ID, j.Token, a.jobLease().Seconds())
+			if err == nil && tag.RowsAffected() == 0 {
+				cancel()
+				return
+			}
+		}
+	}()
+	return ctx, func() { cancel(); <-done }
+}
 
 type smsJob struct {
 	Phone   string `json:"phone"`
@@ -67,9 +107,9 @@ func (a *App) notifyCustomer(ctx context.Context, tx pgx.Tx, orderID int64, even
 	if names, err := storeNames(ctx, tx, lang, []int64{branchID}); err == nil && names[branchID] != "" {
 		store = names[branchID]
 	}
-	msg := a.sysText(ctx, lang, "sys.sms.order", "store", store, "no", publicNo, "status", a.sysText(ctx, lang, key))
+	msg := a.sysTextIn(ctx, tx, lang, "sys.sms.order", "store", store, "no", publicNo, "status", a.sysTextIn(ctx, tx, lang, key))
 	if event == "ready_for_pickup" {
-		msg += " " + a.sysText(ctx, lang, "sys.sms.pickup", "code", pickupCode)
+		msg += " " + a.sysTextIn(ctx, tx, lang, "sys.sms.pickup", "code", pickupCode)
 	}
 	if a.PublicBaseURL != "" {
 		msg += " " + strings.TrimRight(a.PublicBaseURL, "/") + "/o/" + a.orderToken(nonce)
@@ -94,7 +134,7 @@ func (a *App) claimJob(ctx context.Context) (*claimedJob, error) {
 		locked_until = now() + make_interval(secs => $1)
 		WHERE id = (SELECT id FROM jobs WHERE status='pending' AND run_at <= now()
 			AND (locked_until IS NULL OR locked_until < now()) ORDER BY run_at LIMIT 1 FOR UPDATE SKIP LOCKED)
-		RETURNING id, kind, payload, attempts, lease_token::text`, jobLease.Seconds()).
+		RETURNING id, kind, payload, attempts, lease_token::text`, a.jobLease().Seconds()).
 		Scan(&j.ID, &j.Kind, &j.Payload, &j.Attempts, &j.Token)
 	if isNoRows(err) {
 		return nil, nil
@@ -160,14 +200,19 @@ func (a *App) runJob(ctx context.Context, j *claimedJob) error {
 // RunJobs processes due jobs until none are left. External calls happen
 // outside any database transaction.
 func (a *App) RunJobs(ctx context.Context) error {
-	_, err := a.runJobs(ctx)
-	return err
+	for {
+		n, err := a.runJobs(ctx)
+		if err != nil || n == 0 {
+			return err
+		}
+	}
 }
 
 // runJobs is RunJobs that also reports how many jobs it ran.
 func (a *App) runJobs(ctx context.Context) (int, error) {
 	n := 0
-	for ctx.Err() == nil {
+	start := time.Now()
+	for ctx.Err() == nil && n < jobBatch && time.Since(start) < jobBatchTime {
 		j, err := a.claimJob(ctx)
 		if err != nil {
 			return n, err
@@ -176,7 +221,13 @@ func (a *App) runJobs(ctx context.Context) (int, error) {
 			return n, nil
 		}
 		n++
-		runErr := a.runJob(ctx, j)
+		renew := a.JobRenewEvery
+		if renew == 0 {
+			renew = jobRenew
+		}
+		jctx, stop := a.keepLease(ctx, j, renew)
+		runErr := a.runJob(jctx, j)
+		stop()
 		switch {
 		case runErr == nil:
 			_, err = a.DB.Exec(ctx, `UPDATE jobs SET status='done', finished_at=now(), locked_until=NULL, last_error=''

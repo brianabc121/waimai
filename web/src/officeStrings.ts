@@ -33,6 +33,10 @@ extend({
   'ox.tb.tip': ['点空桌开台点菜，点用餐中的桌看账单；“桌码”里可打印二维码、绑定平板。', 'Tap a free table to seat guests, a busy one to see its bill; “Table code” prints the QR code and pairs tablets.'],
   // kitchen
   'ox.kt.sub': ['按工位做菜、打包出餐、堂食上菜', 'Cook by station, pack and hand over, serve to the tables'],
+  'kt.never': ['订单没取到，不是没有单。请检查网络后重试', 'Could not load the orders. This does not mean there are none: check the network and retry'],
+  'kt.stale': ['下面是 {t} 的旧内容，可能有新单没显示', 'Showing what was loaded at {t}; new orders may be missing'],
+  'kt.failing': ['刚才刷新失败，正在重试', 'The last refresh failed, trying again'],
+  'kt.retry': ['重试', 'Retry'],
   'ox.kt.stations': ['制作台', 'Stations'],
   'ox.kt.tip': ['只看自己的工位；菜可以改到别的工位。', 'Show your own station; a dish can be moved to another one.'],
   // messages

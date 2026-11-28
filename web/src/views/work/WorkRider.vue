@@ -18,7 +18,7 @@ import { shrink } from '../../photo'
 import { duty, flush, loadDuty, openAppSettings, setDuty, track } from './duty'
 import { native } from './native'
 import { askNotifications } from './push'
-import { enqueue, overlay, queue, send } from './offline'
+import { enqueue, overlay, queue, send, useQueue } from './offline'
 
 const props = defineProps<{ tab: 'tasks' | 'done'; active: boolean }>()
 const emit = defineEmits<{ count: [n: number] }>()
@@ -29,6 +29,8 @@ const router = useRouter()
 // when the app is opened without signal.
 const CACHE = `work-tasks-${session.user?.id}`
 const cached = (): Order[] => { try { return JSON.parse(localStorage.getItem(CACHE) || '[]') } catch { return [] } }
+// the unsent steps of THIS account, never the last person's
+useQueue(session.user?.id ?? 0)
 const fetched = ref<Order[]>(cached())
 // Steps taken offline are shown as done while they wait to be sent.
 const tasks = computed(() => overlay(fetched.value))

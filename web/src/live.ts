@@ -7,6 +7,8 @@ import { apiScope } from './api'
 export function useLive(url: () => string | null, refresh: () => Promise<void> | void) {
   const online = ref(true)
   const lastSync = ref<Date | null>(null)
+  // what the latest read failed with; empty after a good one
+  const error = ref('')
   let es: EventSource | null = null
   let timer: number | undefined
   let running = false
@@ -19,7 +21,11 @@ export function useLive(url: () => string | null, refresh: () => Promise<void> |
     try {
       await refresh()
       lastSync.value = new Date()
-    } catch { /* keep the last confirmed snapshot on screen */ }
+      error.value = ''
+    } catch (e) {
+      // keep the last confirmed snapshot on screen, and let the screen say that it is old
+      error.value = (e as Error)?.message || 'error'
+    }
     running = false
     if (again) { again = false; void run() }
   }
@@ -66,5 +72,5 @@ export function useLive(url: () => string | null, refresh: () => Promise<void> |
     window.clearTimeout(timer)
     document.removeEventListener('visibilitychange', onVisible)
   })
-  return { online, lastSync, refreshNow: run, reconnect }
+  return { online, lastSync, error, refreshNow: run, reconnect }
 }

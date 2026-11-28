@@ -43,3 +43,39 @@ export function latest() {
   let seq = 0
   return { next(): () => boolean { const n = ++seq; return () => n === seq } }
 }
+
+// parts runs several reads on their own: one that fails does not hold back
+// what the others brought. The caller shows what arrived and reports what
+// did not (docs/CODE_REVIEW_FIX_PLAN.md M12).
+export async function parts<T extends Record<string, () => Promise<unknown>>>(loaders: T):
+  Promise<{ values: { [K in keyof T]?: Awaited<ReturnType<T[K]>> }; errors: { [K in keyof T]?: Error } }> {
+  const names = Object.keys(loaders) as (keyof T)[]
+  const done = await Promise.allSettled(names.map(n => loaders[n]()))
+  const values: Record<string, unknown> = {}, errors: Record<string, Error> = {}
+  done.forEach((r, i) => {
+    const n = names[i] as string
+    if (r.status === 'fulfilled') values[n] = r.value
+    else errors[n] = r.reason instanceof Error ? r.reason : new Error(String(r.reason))
+  })
+  return { values, errors } as never
+}
+
+// screenState says what a live screen should tell its reader: 'never' when
+// nothing was ever read (an empty screen is NOT "no orders"), 'stale' when
+// the last good read is older than limit, 'failing' when the latest read
+// failed but the data is still recent, 'ok' otherwise.
+export function screenState(lastOK: number | null, failed: boolean, now: number, limit: number): 'ok' | 'failing' | 'stale' | 'never' {
+  if (lastOK === null) return failed ? 'never' : 'ok' // the first read is still on its way
+  if (now - lastOK > limit) return 'stale'
+  return failed ? 'failing' : 'ok'
+}
+
+// signOut sends the sign-out and says whether the person is really out: yes
+// when the server confirmed it, or said the session was already gone (401);
+// no when the request was lost or the server failed, because then the
+// session still works and the device must not pretend otherwise (M15).
+export async function signOut(send: () => Promise<unknown>): Promise<boolean> {
+  try { await send(); return true } catch (e) {
+    return (e as { status?: number })?.status === 401
+  }
+}

@@ -14,6 +14,7 @@ import MyShifts from './work/MyShifts.vue'
 import { disablePush, enablePush, forgetPush, push, setupWorkbench } from './work/push'
 import { native, platform } from './work/native'
 import { openAppSettings } from './work/duty'
+import { dropQueue } from './work/offline'
 import './work/strings'
 
 const router = useRouter()
@@ -35,10 +36,13 @@ const postName = (p: Post) => p.kind === 'station' ? pick(p.station_name ?? '', 
 const storePosts = computed(() => posts.value.filter(p => p.kind !== 'rider').map(postName).join('、'))
 const office = computed(() => ['owner', 'manager', 'cashier'].includes(role.value?.role ?? ''))
 async function out() {
+  if (!(await logout())) return
   await forgetPush()
-  await logout()
   // What this person left on the phone is not the next person's business.
-  for (const k of Object.keys(localStorage)) if (/^work-(ops|points|tasks)/.test(k)) localStorage.removeItem(k)
+  // Unsent delivery steps stay under their own account (opqueue.ts) and are
+  // neither shown to nor sent by whoever signs in next.
+  dropQueue()
+  for (const k of Object.keys(localStorage)) if (/^work-(points|tasks)/.test(k)) localStorage.removeItem(k)
   session.loaded = true; router.replace('/login')
 }
 onMounted(setupWorkbench)

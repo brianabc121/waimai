@@ -124,6 +124,7 @@ const dict: Record<string, [string, string]> = {
   cancel_order: ['取消订单', 'Cancel order'], cancel_confirm: ['确定取消这张订单？', 'Cancel this order?'],
   contact_store: ['联系门店', 'Call the store'], rider: ['骑手', 'Rider'], unpaid: ['未付款', 'Unpaid'], paid: ['已付款', 'Paid'],
   offline: ['连接已断开，显示的内容可能不是最新', 'Connection lost. This may be out of date.'],
+  logout_failed: ['没有退出成功：网络不通或服务器出错，你现在仍是登录状态。请再试一次', 'Sign-out did not go through (network or server problem). You are still signed in: please try again'],
   synced: ['同步于', 'Synced'], loading: ['加载中…', 'Loading…'], not_found: ['没有找到', 'Not found'], retry: ['重试', 'Retry'],
   // display status
   's.pending_acceptance': ['等待商家接单', 'Waiting for the store to accept'], 's.preparing': ['备餐中', 'Preparing'],
