@@ -13,6 +13,8 @@ extend({
   'ab.sort.recent': ['最近使用', 'Recently used'], 'ab.sort.uses': ['使用次数', 'Most used'], 'ab.sort.new': ['最新加入', 'Newest'], 'ab.sort.line': ['按地址', 'By address'],
   'ab.search': ['搜索', 'Search'], 'ab.new': ['新增地址', 'New address'], 'ab.edit_title': ['修改地址', 'Edit address'],
   'ab.count': ['共 {n} 个地址', '{n} addresses'], 'ab.empty': ['这里还没有地址', 'No addresses here'],
+  'ab.place_name': ['地点名', 'Place name'], 'ab.place_name_ph': ['大楼、小区、商场的名字（选填）', 'Name of the tower, compound or mall (optional)'],
+  'ab.place_name_hint': ['填了地点名，详细地址会以它开头；骑手和订单上先显示地点名，再显示街道。', 'With a place name the address starts with it; riders and orders show the name first, the street after.'],
   'ab.col.line': ['详细地址', 'Address'], 'ab.col.region': ['国家 / 省份 / 地区', 'Country / province / city'], 'ab.col.pin': ['经纬度', 'Position'],
   'ab.col.source': ['来源', 'Source'], 'ab.col.uses': ['使用次数', 'Uses'], 'ab.col.last': ['最近使用', 'Last used'],
   'ab.view': ['查看', 'View'], 'ab.edit': ['修改', 'Edit'], 'ab.delete': ['删除', 'Delete'],

@@ -33,7 +33,10 @@ func branchRegion(b *Branch) AddrRegion {
 type BookAddress struct {
 	ID int64 `json:"id"`
 	AddrRegion
-	Line       string    `json:"line"`
+	Line string `json:"line"`
+	// PlaceName: the leading part of Line that names the place; PlaceID: Google's id of it.
+	PlaceName  string    `json:"place_name"`
+	PlaceID    string    `json:"place_id"`
 	Lat        float64   `json:"lat"`
 	Lng        float64   `json:"lng"`
 	Source     string    `json:"source"`
@@ -47,12 +50,12 @@ type BookAddress struct {
 }
 
 const bookCols = `a.id, a.country_code, a.country, a.province, a.city, a.line, a.lat, a.lng, a.source, a.branch_id,
-	COALESCE(b.name, ''), a.uses, a.created_at, a.updated_at, a.last_used_at, a.line_key`
+	COALESCE(b.name, ''), a.uses, a.created_at, a.updated_at, a.last_used_at, a.line_key, a.place_name, a.place_id`
 
 func scanBook(row interface{ Scan(...any) error }) (*BookAddress, error) {
 	x := &BookAddress{}
 	err := row.Scan(&x.ID, &x.CountryCode, &x.Country, &x.Province, &x.City, &x.Line, &x.Lat, &x.Lng, &x.Source,
-		&x.BranchID, &x.BranchName, &x.Uses, &x.CreatedAt, &x.UpdatedAt, &x.LastUsedAt, &x.key)
+		&x.BranchID, &x.BranchName, &x.Uses, &x.CreatedAt, &x.UpdatedAt, &x.LastUsedAt, &x.key, &x.PlaceName, &x.PlaceID)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	}
@@ -61,15 +64,35 @@ func scanBook(row interface{ Scan(...any) error }) (*BookAddress, error) {
 
 // rememberAddress puts an address staff delivered to into the book, or counts
 // one more use of the one already there. Without a pin there is nothing to keep.
-func rememberAddress(ctx context.Context, q Querier, b *Branch, line string, lat, lng *float64) error {
+//
+// A place Google knows (placeID) is one entry in its region however its line
+// is written: "Trump Tower, Kalayaan Ave" and "Trump Tower at Century City,
+// Kalayaan Ave cor. Salamanca St" chosen from two suggestions are one place.
+// An entry written before places were kept takes the name and id of the
+// first order that brings them.
+func rememberAddress(ctx context.Context, q Querier, b *Branch, line, placeName, placeID string, lat, lng *float64) error {
 	if lat == nil || lng == nil || strings.TrimSpace(line) == "" {
 		return nil
 	}
 	r := branchRegion(b)
-	_, err := q.Exec(ctx, `INSERT INTO address_book (country_code, country, province, city, line, lat, lng, source, branch_id)
-		SELECT $1, $2, $3, $4, left(addr_line($5), 300), $6, $7, 'staff', $8 WHERE addr_key($5) <> ''
-		ON CONFLICT (country_code, province, city, line_key) DO UPDATE SET uses = address_book.uses + 1, last_used_at = now()`,
-		r.CountryCode, r.Country, r.Province, r.City, line, *lat, *lng, b.ID)
+	if placeID != "" {
+		tag, err := q.Exec(ctx, `UPDATE address_book SET uses = uses + 1, last_used_at = now()
+			WHERE id = (SELECT id FROM address_book WHERE country_code=$1 AND province=$2 AND city=$3 AND place_id=$4
+				ORDER BY id LIMIT 1)`, r.CountryCode, r.Province, r.City, placeID)
+		if err != nil {
+			return wrap("remember place", err)
+		}
+		if tag.RowsAffected() > 0 {
+			return nil
+		}
+	}
+	_, err := q.Exec(ctx, `INSERT INTO address_book (country_code, country, province, city, line, lat, lng, source, branch_id,
+			place_name, place_id)
+		SELECT $1, $2, $3, $4, left(addr_line($5), 300), $6, $7, 'staff', $8, $9, $10 WHERE addr_key($5) <> ''
+		ON CONFLICT (country_code, province, city, line_key) DO UPDATE SET uses = address_book.uses + 1, last_used_at = now(),
+			place_name = CASE WHEN address_book.place_name = '' THEN EXCLUDED.place_name ELSE address_book.place_name END,
+			place_id = CASE WHEN address_book.place_id = '' THEN EXCLUDED.place_id ELSE address_book.place_id END`,
+		r.CountryCode, r.Country, r.Province, r.City, line, *lat, *lng, b.ID, placeName, placeID)
 	return wrap("remember address", err)
 }
 
@@ -218,13 +241,22 @@ func (a *App) ListBook(ctx context.Context, f BookFilter) (*BookList, error) {
 // BookInput is an address put in or corrected on the platform's page.
 type BookInput struct {
 	AddrRegion
-	Line string  `json:"line"`
-	Lat  float64 `json:"lat"`
-	Lng  float64 `json:"lng"`
+	Line string `json:"line"`
+	// PlaceName names the place the address is (a tower, a mall). The line
+	// always starts with it: a name the line does not start with is put in front.
+	PlaceName string  `json:"place_name"`
+	Lat       float64 `json:"lat"`
+	Lng       float64 `json:"lng"`
 }
 
 func (in *BookInput) clean() error {
-	in.Line = strings.TrimSpace(in.Line)
+	in.Line, in.PlaceName = strings.TrimSpace(in.Line), strings.TrimSpace(in.PlaceName)
+	if len([]rune(in.PlaceName)) > 200 {
+		return ErrValidation("text too long")
+	}
+	if in.PlaceName != "" && in.Line != "" && !leadsWith(in.Line, in.PlaceName) {
+		in.Line = in.PlaceName + ", " + in.Line
+	}
 	in.CountryCode = strings.ToUpper(strings.TrimSpace(in.CountryCode))
 	in.Country, in.Province, in.City = strings.TrimSpace(in.Country), strings.TrimSpace(in.Province), strings.TrimSpace(in.City)
 	if in.Line == "" || len([]rune(in.Line)) > 300 {
@@ -254,14 +286,16 @@ func (a *App) SaveBookAddress(ctx context.Context, actor AdminActor, id int64, i
 	err := a.inTx(ctx, func(tx pgx.Tx) error {
 		var err error
 		if id == 0 {
-			err = tx.QueryRow(ctx, `INSERT INTO address_book (country_code, country, province, city, line, lat, lng, source, uses)
-				VALUES ($1,$2,$3,$4,left(addr_line($5), 300),$6,$7,'admin',0) RETURNING id`,
-				in.CountryCode, in.Country, in.Province, in.City, in.Line, in.Lat, in.Lng).Scan(&id)
+			err = tx.QueryRow(ctx, `INSERT INTO address_book (country_code, country, province, city, line, lat, lng, source, uses, place_name)
+				VALUES ($1,$2,$3,$4,left(addr_line($5), 300),$6,$7,'admin',0,$8) RETURNING id`,
+				in.CountryCode, in.Country, in.Province, in.City, in.Line, in.Lat, in.Lng, in.PlaceName).Scan(&id)
 		} else {
 			var tag interface{ RowsAffected() int64 }
 			tag, err = tx.Exec(ctx, `UPDATE address_book SET country_code=$2, country=$3, province=$4, city=$5,
-				line=left(addr_line($6), 300), lat=$7, lng=$8, updated_at=now() WHERE id=$1`,
-				id, in.CountryCode, in.Country, in.Province, in.City, in.Line, in.Lat, in.Lng)
+				line=left(addr_line($6), 300), lat=$7, lng=$8, updated_at=now(), place_name=$9,
+				-- Google's id belongs to the place the entry was: gone with its name, or when the pin moved
+				place_id=CASE WHEN $9 = '' OR lat <> $7 OR lng <> $8 THEN '' ELSE place_id END WHERE id=$1`,
+				id, in.CountryCode, in.Country, in.Province, in.City, in.Line, in.Lat, in.Lng, in.PlaceName)
 			if err == nil && tag.RowsAffected() == 0 {
 				return ErrNotFound
 			}

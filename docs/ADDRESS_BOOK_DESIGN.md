@@ -72,3 +72,7 @@ brian 的要求：平台后台新增地址管理页，按国家 / 省份 / 地�
 - Go：`TestAddressBook`（去重、错字、地区限定、后台增改删）、`TestAddressBookOverHTTP`（权限和接口）。
 - 浏览器：`e2e/addressbook.cjs`（API 用 `GOOGLE_MAPS_API_KEY=stub` 启动）。
 - 没验证：真实谷歌密钥下的推荐效果（只在模拟地图上测过）。
+
+## 10. 地点名（2026-11-28 补充）
+
+地址库的每条地址可以带“地点名”和谷歌地点 ID，同一地区同一个谷歌地点只有一条。详见 `docs/ADDRESS_PLACE_DESIGN.md` 第 8 节。

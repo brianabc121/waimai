@@ -81,7 +81,7 @@ func scanMemberRow(row interface{ Scan(...any) error }) (*MemberRow, error) {
 	m := &Member{}
 	r := &MemberRow{Member: m}
 	err := row.Scan(&m.ID, &m.BrandID, &m.No, &m.Status, &m.Phone, &m.Name, &m.Source, &m.Contact, &m.AddressLine,
-		&m.AddressUnit, &m.AddressNote, &m.Lat, &m.Lng, &m.Note, &m.ExpiresAt, &m.CreatedAt,
+		&m.AddressUnit, &m.AddressNote, &m.Lat, &m.Lng, &m.Note, &m.ExpiresAt, &m.CreatedAt, &m.PlaceName, &m.PlaceID,
 		&r.BranchID, &r.BranchName, &r.BrandName, &r.BrandCode, &r.MerchantName, &r.Currency, &r.Orders, &r.Spent, &r.LastAt, &r.AddressCount)
 	if isNoRows(err) {
 		return nil, ErrNotFound
@@ -314,6 +314,9 @@ type MemberAddress struct {
 	LastUsedAt time.Time `json:"last_used_at"`
 	// Current: the address now on the member (the one used last).
 	Current bool `json:"current"`
+	// PlaceName: the leading part of Line that names the place; PlaceID: Google's id of it.
+	PlaceName string `json:"place_name"`
+	PlaceID   string `json:"place_id"`
 }
 
 // keepMemberAddress saves the member's address in their address book unless
@@ -327,26 +330,29 @@ func keepMemberAddress(ctx context.Context, q Querier, m *Member, used bool) err
 	if used {
 		uses = 1
 	}
-	_, err := q.Exec(ctx, `INSERT INTO store_member_addresses (member_id, address_line, address_unit, address_note, lat, lng, uses)
-		VALUES ($1, btrim($2), btrim($3), $4, $5, $6, $7)
+	_, err := q.Exec(ctx, `INSERT INTO store_member_addresses (member_id, address_line, address_unit, address_note, lat, lng, uses,
+			place_name, place_id)
+		VALUES ($1, btrim($2), btrim($3), $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (member_id, lower(btrim(address_line)), lower(btrim(address_unit))) DO UPDATE SET
 			address_note = CASE WHEN EXCLUDED.address_note <> '' THEN EXCLUDED.address_note ELSE store_member_addresses.address_note END,
 			lat = COALESCE(EXCLUDED.lat, store_member_addresses.lat), lng = COALESCE(EXCLUDED.lng, store_member_addresses.lng),
+			place_name = CASE WHEN EXCLUDED.place_name <> '' THEN EXCLUDED.place_name ELSE store_member_addresses.place_name END,
+			place_id = CASE WHEN EXCLUDED.place_id <> '' THEN EXCLUDED.place_id ELSE store_member_addresses.place_id END,
 			uses = store_member_addresses.uses + EXCLUDED.uses, last_used_at = now()`,
-		m.ID, m.AddressLine, m.AddressUnit, m.AddressNote, m.Lat, m.Lng, uses)
+		m.ID, m.AddressLine, m.AddressUnit, m.AddressNote, m.Lat, m.Lng, uses, m.PlaceName, m.PlaceID)
 	return err
 }
 
 func memberAddresses(ctx context.Context, q Querier, m *Member) ([]MemberAddress, error) {
 	rows, err := q.Query(ctx, `SELECT id, address_line, address_unit, address_note, lat, lng, uses, last_used_at,
-			lower(btrim(address_line)) = lower(btrim($2)) AND lower(btrim(address_unit)) = lower(btrim($3))
+			lower(btrim(address_line)) = lower(btrim($2)) AND lower(btrim(address_unit)) = lower(btrim($3)), place_name, place_id
 		FROM store_member_addresses WHERE member_id=$1 ORDER BY last_used_at DESC, id DESC`, m.ID, m.AddressLine, m.AddressUnit)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (MemberAddress, error) {
 		var a MemberAddress
-		err := r.Scan(&a.ID, &a.Line, &a.Unit, &a.Note, &a.Lat, &a.Lng, &a.Uses, &a.LastUsedAt, &a.Current)
+		err := r.Scan(&a.ID, &a.Line, &a.Unit, &a.Note, &a.Lat, &a.Lng, &a.Uses, &a.LastUsedAt, &a.Current, &a.PlaceName, &a.PlaceID)
 		return a, err
 	})
 }

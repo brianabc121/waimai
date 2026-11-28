@@ -18,6 +18,8 @@ import { addonErr, addonNo, batchSource, batchTitle, itemsByBatch } from '../add
 import { presetList } from './dine/strings'
 import type { Picked } from './PlacePicker.vue'
 import { googleMapsLink, joined, mapsKey, suggestPlaces, type Place } from '../maps'
+import { addrParts, addrText, keepsName } from '../place'
+import AddrText from './AddrText.vue'
 import './manualStrings'
 import './dine/strings'
 import NotePicker from './NotePicker.vue'
@@ -239,8 +241,10 @@ function specAdd() {
 // ---------- the member ----------
 const f = reactive({ no: 0, status: '' as '' | 'temp' | 'active', expires: null as string | null, phone: '', name: '', source: '',
   contact: '', line: '', unit: '', addrNote: '', lat: null as number | null, lng: null as number | null, note: '',
-  // Google's id of the place the pin was taken from: "View" opens that place. Gone once the address is retyped.
-  placeId: '' })
+  // The place the address is, when it is one known by name: the leading part of the line, and Google's id of it
+  // ("View" opens that place). The id goes with the pin once the address is retyped; the name stays while the
+  // line still starts with it.
+  placeName: '', placeId: '' })
 const stats = ref<StoreMember['stats'] | null>(null)
 const memberQ = ref(''), memberHits = ref<StoreMember[]>([]), memberAt = ref(0), memberOpen = ref(false)
 const memberMsg = ref<'' | 'found' | 'not_found'>('')
@@ -267,7 +271,7 @@ function memberKey(e: KeyboardEvent) {
 function fill(x: StoreMember) {
   const sp = splitPhone(x.phone)
   Object.assign(f, { no: x.no, status: x.status, expires: x.expires_at, name: x.name, source: x.source, contact: x.contact,
-    line: x.address_line, unit: x.address_unit, addrNote: x.address_note, lat: x.lat, lng: x.lng, note: x.note, placeId: '',
+    line: x.address_line, unit: x.address_unit, addrNote: x.address_note, lat: x.lat, lng: x.lng, note: x.note, placeName: x.place_name ?? '', placeId: x.place_id ?? '',
     phone: sp && sp.dial === dial.value ? sp.local : x.phone })
   stats.value = x.stats ?? null
   showNo(x.no)
@@ -303,7 +307,7 @@ async function newMember() {
   } catch (e) { error.value = errText(e) }
 }
 function clearMember() {
-  Object.assign(f, { no: 0, status: '', expires: null, phone: '', name: '', source: '', contact: '', line: '', unit: '', addrNote: '', lat: null, lng: null, note: '', placeId: '' })
+  Object.assign(f, { no: 0, status: '', expires: null, phone: '', name: '', source: '', contact: '', line: '', unit: '', addrNote: '', lat: null, lng: null, note: '', placeName: '', placeId: '' })
   stats.value = null; memberQ.value = ''; memberMsg.value = ''
 }
 const now = ref(Date.now())
@@ -314,6 +318,7 @@ const minutesLeft = computed(() => f.expires ? Math.max(0, Math.ceil((new Date(f
 const phoneE164 = computed(() => f.phone.trim().startsWith('+') ? '+' + f.phone.replace(/\D/g, '') : f.phone.trim() ? e164(dial.value, f.phone) : '')
 const memberBody = () => ({ no: f.no, phone: phoneE164.value, name: f.name, source: f.source, contact: f.contact,
   address_line: service.value === 'delivery' || f.line ? f.line : '', address_unit: f.unit, address_note: f.addrNote,
+  place_name: f.placeName, place_id: f.placeId,
   lat: f.lat, lng: f.lng, note: f.note })
 const saved = ref(false)
 async function saveMember() {
@@ -358,6 +363,7 @@ const hintAt = ref(-1)
 function lineInput() {
   // a typed address is no longer where the pin is
   f.lat = f.lng = null; f.placeId = ''
+  if (!keepsName(f.line, f.placeName)) f.placeName = ''
   gq.list = []; gq.asked = ''; gq.weak = false; hintAt.value = -1
   clearTimeout(hintTimer)
   hintTimer = window.setTimeout(loadHints, 250)
@@ -383,7 +389,8 @@ async function loadGoogle() {
   gq.list = r.places; gq.weak = r.weak; gq.loading = false
 }
 function useHint(h: AddressHint) {
-  Object.assign(f, { line: h.line, unit: h.unit || f.unit, addrNote: h.note || f.addrNote, lat: h.lat, lng: h.lng, placeId: '' })
+  Object.assign(f, { line: h.line, unit: h.unit || f.unit, addrNote: h.note || f.addrNote, lat: h.lat, lng: h.lng,
+    placeName: h.place_name ?? '', placeId: h.place_id ?? '' })
   hintsOpen.value = false
 }
 async function useGoogle(p: Place) {
@@ -396,6 +403,8 @@ async function useGoogle(p: Place) {
   f.line = joined(p.label, full?.address || p.detail || '').slice(0, 300)
   f.lat = at ? at[0] : null; f.lng = at ? at[1] : null
   f.placeId = at ? full?.id || p.id || '' : ''
+  // a suggestion with a second line is a place by name; a bare street address is not
+  f.placeName = (full?.address || p.detail) && keepsName(f.line, p.label) ? p.label : ''
   gq.list = []; gq.asked = ''; gq.weak = false
 }
 function pickRow(r: Row) {
@@ -419,13 +428,22 @@ function addrKey(e: KeyboardEvent) {
     if (r) pickRow(r)
   } else if (e.key === 'Escape') hintsOpen.value = false
 }
+// A place known by name is nearly always a building or a compound: the rider
+// needs the tower, floor and unit. Staff are reminded, never stopped: some
+// customers do meet the rider in the lobby.
+const askUnit = computed(() => service.value === 'delivery' && !!f.placeName && !f.unit.trim())
+const placeStreet = computed(() => addrParts({ address_line: f.line, place_name: f.placeName }).street)
+const hintParts = (h: AddressHint) => addrParts({ address_line: h.line, place_name: h.place_name })
 const viewLink = (lat: number | null, lng: number | null, placeId = '') => lat != null && lng != null ? googleMapsLink(lat, lng, placeId) : ''
 const later = (fn: () => void) => setTimeout(fn, 150)
 const closeHints = () => later(() => (hintsOpen.value = false))
 const origin = location.origin
 function picked(p: Picked) {
   f.lat = p.lat; f.lng = p.lng; f.placeId = ''
-  if (!f.line.trim()) f.line = joined(p.name, p.address)
+  if (!f.line.trim()) {
+    f.line = joined(p.name, p.address)
+    f.placeName = p.address && keepsName(f.line, p.name) ? p.name : ''
+  }
   picking.value = false
 }
 function adjustFee() {
@@ -571,10 +589,10 @@ function message(o?: Order, token?: string): string {
   }
   if (o) {
     if (o.service_type === 'pickup') out.push(t('vo.msg.pickup', { s: o.pickup_code }))
-    else out.push(t('vo.msg.addr', { s: [o.address_line, o.address_unit].filter(Boolean).join('，') }))
+    else out.push(t('vo.msg.addr', { s: addrText(o, '，') }))
     if (o.scheduled_for) out.push(t('vo.msg.when', { s: whenText(o.scheduled_for, o.timezone) }))
     if (token) out.push(t('vo.msg.link', { s: `${location.origin}/o/${token}` }))
-  } else if (service.value === 'delivery' && f.line) out.push(t('vo.msg.addr', { s: [f.line, f.unit].filter(Boolean).join('，') }))
+  } else if (service.value === 'delivery' && f.line) out.push(t('vo.msg.addr', { s: addrText({ address_line: f.line, address_unit: f.unit, place_name: f.placeName }, '，') }))
   return out.join('\n')
 }
 async function copyDraft() { await copy(message()); flash(t('vo.copied')) }
@@ -764,7 +782,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
           <div v-if="target" class="cust">
             <span>{{ t('vo.f.name') }}</span><span>{{ target.customer_name || '—' }}</span>
             <span>{{ t('vo.f.phone') }}</span><span>{{ target.contact_phone || target.customer_phone || '—' }}</span>
-            <span>{{ t('vo.f.address') }}</span><span>{{ target.service_type === 'pickup' ? t('vo.pickup') + ' · ' + target.pickup_code : [target.address_line, target.address_unit].filter(Boolean).join(' · ') }}</span>
+            <span>{{ t('vo.f.address') }}</span><span>{{ target.service_type === 'pickup' ? t('vo.pickup') + ' · ' + target.pickup_code : addrText(target) }}</span>
           </div>
           <div v-else class="cust">
             <span>{{ t('vo.f.member') }}</span><span>{{ f.no ? pad(f.no) : '—' }}<template v-if="f.status === 'temp'">（{{ t('vo.temp') }}）</template></span>
@@ -785,7 +803,7 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
               <div class="row between"><b>{{ target?.public_no }} · {{ target ? t(target.service_type) : '' }}</b>
                 <span v-if="target?.member_no" class="muted">#{{ pad(target.member_no) }}</span></div>
               <div>{{ target?.customer_name }} · {{ target?.contact_phone || target?.customer_phone }}</div>
-              <div v-if="target?.service_type === 'delivery'">{{ [target.address_line, target.address_unit].filter(Boolean).join('，') }}</div>
+              <div v-if="target?.service_type === 'delivery'"><AddrText :o="target" /></div>
               <div v-if="target?.service_type === 'delivery'" class="small">{{ t('vo.delivery_fee') }}: {{ t('ao.m.fee_same', { s: target.totals.delivery_fee ? m(target.totals.delivery_fee) : t('vo.free') }) }}</div>
               <div class="muted small">{{ t('ao.m.ro') }}</div>
             </div>
@@ -873,7 +891,10 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
               <div class="grow stack0">
                 <textarea v-model="f.line" class="inp ta" rows="2" data-testid="mo-address" maxlength="300" :placeholder="t('vo.addr_ph')"
                   @input="lineInput" @focus="loadHints" @blur="closeHints" @keydown="addrKey"></textarea>
-                <input v-model="f.unit" class="inp" maxlength="100" :placeholder="t('vo.unit_ph')" />
+                <div v-if="f.placeName" class="placetag" data-testid="mo-place-name"><span class="tag">{{ t('vo.place_tag') }}</span><b>{{ f.placeName }}</b>
+                  <span v-if="placeStreet" class="muted small">{{ placeStreet }}</span></div>
+                <input v-model="f.unit" class="inp" :class="{ ask: askUnit }" maxlength="100" :placeholder="t('vo.unit_ph')" data-testid="mo-unit" />
+                <div v-if="askUnit" class="small askc" data-testid="mo-unit-ask">{{ t('vo.unit_ask') }}</div>
                 <div class="small" :class="f.lat != null ? 'okc' : 'muted'">{{ f.lat != null ? '📍 ' + t('vo.pinned') : t('vo.not_pinned') }}</div>
               </div>
               <div v-if="hintsOpen && rows.length" class="drop" style="left:80px;right:0;top:64px" data-testid="mo-hints">
@@ -881,9 +902,11 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
                   <div v-if="r.k !== 'more' && r.head" class="grp">{{ r.head }}</div>
                   <div v-if="r.k === 'hint'" class="it" :class="{ on: i === hintAt }" :data-kind="r.h.kind" data-testid="mo-hint"
                     @mousedown.prevent="pickRow(r)" @mouseenter="hover(i)">
-                    <span class="grow">{{ r.h.line }}<span v-if="r.h.unit" class="muted">，{{ r.h.unit }}</span></span>
+                    <span v-if="r.h.place_name" class="grow gplace"><span><b>{{ hintParts(r.h).name }}</b><span v-if="r.h.unit" class="muted">，{{ r.h.unit }}</span></span>
+                      <span v-if="hintParts(r.h).street" class="muted small">{{ hintParts(r.h).street }}</span></span>
+                    <span v-else class="grow">{{ r.h.line }}<span v-if="r.h.unit" class="muted">，{{ r.h.unit }}</span></span>
                     <span v-if="r.h.zone_name" class="tag bad">{{ r.h.zone_name }}</span>
-                    <a v-if="r.h.lat != null" class="look" :href="viewLink(r.h.lat, r.h.lng)" target="_blank" rel="noopener"
+                    <a v-if="r.h.lat != null" class="look" :href="viewLink(r.h.lat, r.h.lng, r.h.place_id)" target="_blank" rel="noopener"
                       @mousedown.stop @click.stop>{{ t('vo.view_short') }}</a>
                   </div>
                   <div v-else-if="r.k === 'more'" class="it more" :class="{ on: i === hintAt }" data-testid="mo-more"
@@ -1131,6 +1154,9 @@ const srcText = (s: string) => has(`vo.src.${s}`) ? t(`vo.src.${s}`) : s
 .drop .it .look { font-size: 12px; white-space: nowrap; }
 .btnrow a.btn.off { opacity: .45; cursor: not-allowed; }
 .drop .it .gplace { display: flex; flex-direction: column; min-width: 0; }
+.placetag { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 13.5px; }
+.inp.ask { border-color: #d59a00; background: #fff4d6; }
+.askc { color: #7a5200; }
 .drop .weak { padding: 6px 12px; font-size: 12px; color: #7a5200; background: #fff4d6; border-bottom: 1px solid var(--row); }
 .drop .hint { padding: 6px 12px; font-size: 12px; color: var(--muted); background: var(--paper); }
 .pick .inp { background: #fff; border-color: var(--brand); font-weight: 700; font-size: 15px; }

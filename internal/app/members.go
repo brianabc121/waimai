@@ -30,21 +30,24 @@ type Member struct {
 	ID int64 `json:"id"`
 	// BrandID is the brand the member belongs to: members are kept per brand
 	// (docs/MULTI_BRAND_DESIGN.md §8).
-	BrandID     int64      `json:"brand_id"`
-	No          int        `json:"no"`
-	Status      string     `json:"status"`
-	Phone       string     `json:"phone"`
-	Name        string     `json:"name"`
-	Source      string     `json:"source"`
-	Contact     string     `json:"contact"`
-	AddressLine string     `json:"address_line"`
-	AddressUnit string     `json:"address_unit"`
-	AddressNote string     `json:"address_note"`
-	Lat         *float64   `json:"lat"`
-	Lng         *float64   `json:"lng"`
-	Note        string     `json:"note"`
-	ExpiresAt   *time.Time `json:"expires_at"`
-	CreatedAt   time.Time  `json:"created_at"`
+	BrandID     int64  `json:"brand_id"`
+	No          int    `json:"no"`
+	Status      string `json:"status"`
+	Phone       string `json:"phone"`
+	Name        string `json:"name"`
+	Source      string `json:"source"`
+	Contact     string `json:"contact"`
+	AddressLine string `json:"address_line"`
+	AddressUnit string `json:"address_unit"`
+	AddressNote string `json:"address_note"`
+	// PlaceName: the leading part of AddressLine that names the place; PlaceID: Google's id of it.
+	PlaceName string     `json:"place_name"`
+	PlaceID   string     `json:"place_id"`
+	Lat       *float64   `json:"lat"`
+	Lng       *float64   `json:"lng"`
+	Note      string     `json:"note"`
+	ExpiresAt *time.Time `json:"expires_at"`
+	CreatedAt time.Time  `json:"created_at"`
 	// Stats is only filled in when one member is looked up.
 	Stats *MemberStats `json:"stats,omitempty"`
 }
@@ -72,18 +75,20 @@ type MemberInput struct {
 	AddressLine string   `json:"address_line"`
 	AddressUnit string   `json:"address_unit"`
 	AddressNote string   `json:"address_note"`
+	PlaceName   string   `json:"place_name"`
+	PlaceID     string   `json:"place_id"`
 	Lat         *float64 `json:"lat"`
 	Lng         *float64 `json:"lng"`
 	Note        string   `json:"note"`
 }
 
 const memberCols = `id, brand_id, member_no, status, phone, name, source, contact, address_line, address_unit, address_note,
-	lat, lng, note, expires_at, created_at`
+	lat, lng, note, expires_at, created_at, place_name, place_id`
 
 func scanMember(row interface{ Scan(...any) error }) (*Member, error) {
 	m := &Member{}
 	err := row.Scan(&m.ID, &m.BrandID, &m.No, &m.Status, &m.Phone, &m.Name, &m.Source, &m.Contact, &m.AddressLine,
-		&m.AddressUnit, &m.AddressNote, &m.Lat, &m.Lng, &m.Note, &m.ExpiresAt, &m.CreatedAt)
+		&m.AddressUnit, &m.AddressNote, &m.Lat, &m.Lng, &m.Note, &m.ExpiresAt, &m.CreatedAt, &m.PlaceName, &m.PlaceID)
 	if isNoRows(err) {
 		return nil, ErrNotFound
 	}
@@ -123,7 +128,9 @@ func (in *MemberInput) clean(delivery bool) error {
 		len([]rune(in.AddressUnit)) > 100 || len([]rune(in.AddressNote)) > 300 || len([]rune(in.Note)) > 300 {
 		return ErrValidation("text too long")
 	}
-	return nil
+	var err error
+	in.PlaceName, in.PlaceID, err = cleanPlace(in.AddressLine, in.PlaceName, in.PlaceID)
+	return err
 }
 
 // recycleMembers removes temporary members nobody filled in within the hour,
@@ -299,15 +306,15 @@ func upsertMember(ctx context.Context, tx pgx.Tx, branchID, brandID, staffID int
 		}
 	}
 	m, err := scanMember(tx.QueryRow(ctx, `INSERT INTO store_members (branch_id, member_no, status, phone, name, source,
-			contact, address_line, address_unit, address_note, lat, lng, note, created_by, brand_id)
-		VALUES ($1,$2,'active',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13, 0),$14)
+			contact, address_line, address_unit, address_note, lat, lng, note, created_by, brand_id, place_name, place_id)
+		VALUES ($1,$2,'active',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13, 0),$14,$15,$16)
 		ON CONFLICT (brand_id, member_no) DO UPDATE SET status='active', expires_at=NULL, phone=EXCLUDED.phone,
 			name=EXCLUDED.name, source=EXCLUDED.source, contact=EXCLUDED.contact,
 			address_line=EXCLUDED.address_line, address_unit=EXCLUDED.address_unit,
 			address_note=EXCLUDED.address_note, lat=EXCLUDED.lat, lng=EXCLUDED.lng, note=EXCLUDED.note,
-			updated_at=now()
+			place_name=EXCLUDED.place_name, place_id=EXCLUDED.place_id, updated_at=now()
 		RETURNING `+memberCols, branchID, in.No, in.Phone, in.Name, in.Source, in.Contact, in.AddressLine,
-		in.AddressUnit, in.AddressNote, in.Lat, in.Lng, in.Note, staffID, brandID))
+		in.AddressUnit, in.AddressNote, in.Lat, in.Lng, in.Note, staffID, brandID, in.PlaceName, in.PlaceID))
 	if err != nil {
 		return nil, err
 	}
@@ -326,6 +333,9 @@ type AddressHint struct {
 	Note string   `json:"note"`
 	Lat  *float64 `json:"lat"`
 	Lng  *float64 `json:"lng"`
+	// PlaceName: the leading part of Line that names the place; PlaceID: Google's id of it.
+	PlaceName string `json:"place_name"`
+	PlaceID   string `json:"place_id"`
 	// Kind: "mine" (this phone number), "book" (the address book) or "store".
 	Kind string `json:"kind"`
 	// Mine: this phone number used it before (Kind "mine").
@@ -357,18 +367,19 @@ func (a *App) AddressHints(ctx context.Context, branchID, brandID int64, q, phon
 	if err != nil {
 		return nil, err
 	}
-	rows, err := a.DB.Query(ctx, `SELECT line, unit, note, lat, lng, mine, addr_key(line) FROM (
-			SELECT DISTINCT ON (addr_key(line)) line, unit, note, lat, lng, mine, at FROM (
+	rows, err := a.DB.Query(ctx, `SELECT line, unit, note, lat, lng, mine, addr_key(line), pname, pid FROM (
+			SELECT DISTINCT ON (addr_key(line)) line, unit, note, lat, lng, mine, at, pname, pid FROM (
 				SELECT address_line AS line, address_unit AS unit, address_note AS note, dest_lat AS lat, dest_lng AS lng,
-					($3 <> '' AND customer_phone = $3 AND brand_id = $4) AS mine, created_at AS at
+					($3 <> '' AND customer_phone = $3 AND brand_id = $4) AS mine, created_at AS at, place_name AS pname, place_id AS pid
 				FROM orders WHERE branch_id=$1 AND service_type='delivery' AND address_line <> ''
 					AND ($2 = '' OR address_line ILIKE '%' || $2 || '%' OR addr_key(address_line) LIKE '%' || addr_key($2) || '%')
 				UNION ALL
-				SELECT address_line, address_unit, address_note, lat, lng, ($3 <> '' AND phone = $3), updated_at
+				SELECT address_line, address_unit, address_note, lat, lng, ($3 <> '' AND phone = $3), updated_at, place_name, place_id
 				FROM store_members WHERE brand_id=$4 AND address_line <> '' AND `+liveMember+`
 					AND ($2 = '' OR address_line ILIKE '%' || $2 || '%' OR addr_key(address_line) LIKE '%' || addr_key($2) || '%')
 				UNION ALL
-				SELECT a.address_line, a.address_unit, a.address_note, a.lat, a.lng, ($3 <> '' AND m.phone = $3), a.last_used_at
+				SELECT a.address_line, a.address_unit, a.address_note, a.lat, a.lng, ($3 <> '' AND m.phone = $3), a.last_used_at,
+					a.place_name, a.place_id
 				FROM store_member_addresses a JOIN store_members m ON m.id = a.member_id
 				WHERE m.brand_id=$4 AND `+liveMember+` AND ($2 = '' OR a.address_line ILIKE '%' || $2 || '%'
 					OR addr_key(a.address_line) LIKE '%' || addr_key($2) || '%')
@@ -384,7 +395,7 @@ func (a *App) AddressHints(ctx context.Context, branchID, brandID int64, q, phon
 	for rows.Next() {
 		var h AddressHint
 		var key string
-		if err := rows.Scan(&h.Line, &h.Unit, &h.Note, &h.Lat, &h.Lng, &h.Mine, &key); err != nil {
+		if err := rows.Scan(&h.Line, &h.Unit, &h.Note, &h.Lat, &h.Lng, &h.Mine, &key, &h.PlaceName, &h.PlaceID); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -417,7 +428,7 @@ func (a *App) AddressHints(ctx context.Context, branchID, brandID int64, q, phon
 			}
 			seen[x.key] = true
 			lat, lng := x.Lat, x.Lng
-			out = append(out, AddressHint{Line: x.Line, Lat: &lat, Lng: &lng, Kind: "book"})
+			out = append(out, AddressHint{Line: x.Line, Lat: &lat, Lng: &lng, Kind: "book", PlaceName: x.PlaceName, PlaceID: x.PlaceID})
 		}
 	}
 	for i, h := range store {
@@ -677,11 +688,12 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 			whatsapp = m.Contact
 		}
 		addrLine, addrUnit, addrNote := m.AddressLine, m.AddressUnit, m.AddressNote
+		placeName, placeID := m.PlaceName, m.PlaceID
 		var lat, lng *float64
 		if cur.ServiceType == "delivery" {
 			lat, lng = m.Lat, m.Lng
 		} else {
-			addrLine, addrUnit, addrNote = "", "", ""
+			addrLine, addrUnit, addrNote, placeName, placeID = "", "", "", "", ""
 		}
 		if err := moneyEvent(ctx, tx, "placed", 0, actor); err != nil {
 			return err
@@ -693,18 +705,19 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 			service_charge, tax_amount, tax_inclusive, tax_rate_bp, discount, total, payment_method, accept_deadline,
 			promotion_id, promotion_name, promotion_name_en, scheduled_for, release_at, dest_lat, dest_lng,
 			zone_distance_m, contact_phone, contact_wechat, contact_line, contact_whatsapp,
-			member_id, order_source, placed_by, staff_note, brand_id, brand_name)
+			member_id, order_source, placed_by, staff_note, brand_id, brand_name, place_name, place_id)
 			VALUES ($1,$2,$3,$4,$5,$6,'staff',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
 				now() + make_interval(mins => $27), NULLIF($28, 0), $29, $30,
 				$31::timestamptz, $31::timestamptz - make_interval(mins => $32), $33, $34, $35, $36, $37, $38, $39,
-				$40, $41, NULLIF($42, 0), $43, $44, $45)
+				$40, $41, NULLIF($42, 0), $43, $44, $45, $46, $47)
 			RETURNING id`,
 			b.MerchantID, b.ID, publicNo, pickupCode, hashToken(token), nonce, cur.ServiceType, m.Name, phone,
 			cur.ZoneID, cur.ZoneName, addrLine, addrUnit, addrNote, strings.TrimSpace(in.Note), b.Currency,
 			t.Subtotal, t.PackagingFee, t.DeliveryFee, t.ServiceCharge, t.TaxAmount, t.TaxInclusive, t.TaxRateBP,
 			t.Discount, t.Total, payMethod, b.AcceptTimeoutMinutes, t.PromotionID, t.PromotionName,
 			t.PromotionNameEn, cur.ScheduledFor, b.PrepMinutes, lat, lng, cur.ZoneDistanceM,
-			phone, wechat, line, whatsapp, m.ID, m.Source, actor.ID, strings.TrimSpace(in.StaffNote), brand.ID, brand.Name).Scan(&orderID)
+			phone, wechat, line, whatsapp, m.ID, m.Source, actor.ID, strings.TrimSpace(in.StaffNote), brand.ID, brand.Name,
+			placeName, placeID).Scan(&orderID)
 		if err != nil {
 			return wrap("insert order", err)
 		}
@@ -721,7 +734,7 @@ func (a *App) PlaceStaffOrder(ctx context.Context, branchID int64, actor Actor, 
 				return err
 			}
 			// A new address with a pin goes into the platform's address book.
-			if err := rememberAddress(ctx, tx, b, m.AddressLine, lat, lng); err != nil {
+			if err := rememberAddress(ctx, tx, b, m.AddressLine, m.PlaceName, m.PlaceID, lat, lng); err != nil {
 				return err
 			}
 		}
