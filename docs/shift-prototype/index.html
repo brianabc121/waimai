@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>班次 · 原型</title>
+<link rel="stylesheet" href="proto.css">
+</head>
+<body>
+<div id="app"></div>
+<script>
+// 原型：index.html?s=1…9。店名、人名、订单、金额都是示意数据。
+const s = new URLSearchParams(location.search).get('s') || '1'
+const MNAV = ['订单', '点单', '消息', '客户管理', '桌台', '后厨', '商品', '店铺装修', '市场营销', '财务', '配送管理', '员工', '设置']
+const nav = (on) => `<aside class="side"><div class="shop">一品湘 · Makati<small><b>店主</b> owner5</small></div>${MNAV.map(x => `<div class="${x === on ? 'on' : ''}">${x}</div>`).join('')}</aside>`
+const page = (on, h1, sub, tabs, body, extra = '') => `<div class="ox">${nav(on)}<main>
+<div class="ph"><div><h1>${h1}</h1><p>${sub}</p></div></div>
+<div class="tabs">${tabs.map(t => `<button class="${t[1] ? 'on' : ''}">${t[0]}${t[2] ? '<span class="new">新</span>' : ''}</button>`).join('')}</div>${body}${extra}</main></div>`
+const P = (n) => '₱' + n.toLocaleString('en-US')
+const SH = { 1: '早班', 2: '中班', 3: '晚班', 0: '班次外' }
+const sh = (k) => `<span class="sh s${k}">${SH[k]}</span>`
+const SETTABS = (on) => ['店铺信息', '营业时间', '付款方式', '订单编号', '班次'].map(x => [x, x === on, x === '班次'])
+const FINTABS = (on) => ['核款', '账单', '对账', '班次报表'].map(x => [x, x === on, x === '班次报表'])
+
+const timeline = (parts) => `<div class="tl">${parts.map(p => `<div class="${p[0] === 'gap' ? 'gap' : 's' + p[0]}" style="flex:${p[1]}">${p[2]}</div>`).join('')}</div>
+<div class="tlx">${parts.map(p => `<span>${p[3]}</span>`).join('')}<span>${parts[parts.length - 1][4]}</span></div>`
+
+const S = {}
+
+// 1 设置 → 班次：默认关闭
+S[1] = () => page('设置', '设置', '店铺信息、营业时间、付款方式、订单编号和班次', SETTABS('班次'), `
+<div class="card"><div class="row"><div><h2>班次</h2><p class="muted" style="font-size:13px;margin-top:4px">把一天分成几个班（早班、中班、晚班……）。开启后，订单、收款和员工考勤都会标上班次，财务里可以按班次看销售。</p></div><span class="sp"></span><span class="tag off">未开启</span><span class="sw"></span></div></div>
+<div class="card"><h2>开启后会多出什么</h2>
+<table style="margin-top:8px"><tr><th>位置</th><th>变化</th></tr>
+<tr><td>财务 → 班次报表</td><td>每个班的单数、销售额、各付款方式收款、退款、优惠、当班员工</td></tr>
+<tr><td>订单列表</td><td>每张单多一个班次标记，可以按班次筛选</td></tr>
+<tr><td>员工 → 考勤、工作汇总</td><td>每条上班记录标上班次，可以按班次筛选</td></tr>
+<tr><td>交班点钞（可选）</td><td>每个班结束时点一次钱箱，系统算出应有多少、差多少</td></tr></table>
+<p class="note" style="margin-top:12px">不开启，系统和现在完全一样。开启、关闭、改时间都不会改动任何订单的金额。</p></div>`)
+
+// 2 设置 → 班次：开启，三班
+const editor = (rows, tl, preset, foot) => `
+<div class="card"><div class="row"><div><h2>班次</h2><p class="muted" style="font-size:13px;margin-top:4px">开启后，订单、收款和员工考勤都会标上班次，财务里可以按班次看销售。</p></div><span class="sp"></span><span class="tag on">已开启</span><span class="sw on"></span></div></div>
+<div class="card"><div class="row"><h2>班次时间</h2><span class="sp"></span><span class="muted">时间按门店时区（Asia/Manila）</span></div>
+<div class="presets">${[['两班', '09:00–21:00 / 21:00–次日 09:00'], ['三班', '08:00–17:00 / 17:00–00:00 / 00:00–08:00'], ['自定义', '最多 6 个班']].map((p, i) => `<div class="preset ${i === preset ? 'on' : ''}"><b>${p[0]}</b><span class="muted">${p[1]}</span></div>`).join('')}</div>
+${tl}
+<div style="margin-top:10px">${rows.map((r, i) => `<div class="shrow s${r[0]}"><span class="muted">${i + 1}</span><span class="in"><span class="dot"></span>${r[1]}</span><span class="in num">${r[2]}</span><span class="muted">至</span><span class="in num ${r[5] ? 'err' : ''}">${r[3]}</span><span class="muted">${r[4]}</span><a class="lnk">删除</a></div>`).join('')}</div>
+<div class="row" style="margin-top:12px"><button class="btn sm">＋ 加一个班</button><span class="muted">第 1 个班的开始时间就是“班次日”的开始：从 ${rows[0][2]} 到第二天 ${rows[0][2]} 算同一天。</span></div>
+${foot}</div>`
+S[2] = () => page('设置', '设置', '店铺信息、营业时间、付款方式、订单编号和班次', SETTABS('班次'), editor(
+  [[1, '早班', '08:00', '17:00', '共 9 小时'], [2, '中班', '17:00', '00:00', '共 7 小时 · 到次日 00:00'], [3, '晚班', '00:00', '08:00', '共 8 小时 · 次日']],
+  timeline([[1, 9, '早班', '08:00'], [2, 7, '中班', '17:00'], [3, 8, '晚班', '次日 00:00', '次日 08:00']]), 1,
+  `<div class="row" style="margin-top:14px"><span class="tag on">✓ 24 小时都有班，没有重叠</span><span class="sp"></span><button class="btn">取消</button><button class="btn pri">保存</button></div>`))
+
+// 3 改时间：有空档的提示和生效时间
+S[3] = () => page('设置', '设置', '店铺信息、营业时间、付款方式、订单编号和班次', SETTABS('班次'), editor(
+  [[1, '早班', '09:00', '21:00', '共 12 小时'], [3, '晚班', '21:00', '06:00', '共 9 小时 · 到次日 06:00', 0]],
+  timeline([[1, 12, '早班', '09:00'], [3, 9, '晚班', '21:00'], ['gap', 3, '班次外', '次日 06:00', '次日 09:00']]), 2,
+  `<p class="note" style="margin-top:12px">06:00–09:00 没有安排班次。这段时间的订单和收款会记在“班次外”，报表里单独一行，合计不会少。</p>`),
+`<div class="mask"><div class="dlg" style="width:560px"><h2>保存班次时间？</h2>
+<p style="color:#6b5a4e;margin:6px 0 12px">新时间从 <b>明天（11-29）09:00</b> 开始的班次日生效。</p>
+<div class="kv"><span>今天和以前的订单、报表</span><b>不变，仍按原来的班次</b></div>
+<div class="kv"><span>现在正在进行的中班</span><b>按原时间到 00:00 结束</b></div>
+<div class="kv"><span>11-29 08:00–09:00（新旧交接的一小时）</span><b>记在“班次外”</b></div>
+<div class="row" style="margin-top:16px"><span class="sp"></span><button class="btn">再想想</button><button class="btn pri">保存，明天生效</button></div></div></div>`)
+
+// 4 财务 → 班次报表：一天
+const D = {
+  1: { n: 46, sale: 18400, cash: 6100, online: 9700, stored: 1450, plat: 900, refund: 0, disc: 1240, staff: 6, time: '08:00–17:00' },
+  2: { n: 71, sale: 33650, cash: 12300, online: 16900, stored: 2400, plat: 2100, refund: 320, disc: 2880, staff: 8, time: '17:00–00:00' },
+  3: { n: 12, sale: 4300, cash: 1900, online: 2100, stored: 0, plat: 500, refund: 0, disc: 150, staff: 2, time: '00:00–08:00（次日）' },
+}
+const sum = (f) => f(D[1]) + f(D[2]) + f(D[3])
+const got = (d) => d.cash + d.online + d.stored + d.plat
+const filt = (seg, extra = '') => `<div class="filt"><div class="seg"><span class="${seg === 0 ? 'on' : ''}">按天</span><span class="${seg === 1 ? 'on' : ''}">按时间段</span></div>${extra}<span class="in">品牌：全店 ▾</span><span class="sp"></span><button class="btn">导出 Excel</button></div>`
+const rowOf = (label, f, cls = '', fmt = P) => `<tr class="${cls}"><td>${label}</td>${[1, 2, 3].map(k => `<td class="r num">${fmt(f(D[k]))}</td>`).join('')}<td class="r num"><b>${fmt(sum(f))}</b></td></tr>`
+S[4] = () => page('财务', '财务', '核款、账单、对账和班次报表', FINTABS('班次报表'), `
+${filt(0, '<span class="in num">◀　2026-11-27（周五）　▶</span><span class="muted">班次日：11-27 08:00 至 11-28 08:00</span>')}
+<div class="kpis">${[1, 2, 3].map(k => `<div class="kpi s${k}"><div class="t"><span>${SH[k]}</span><small class="num">${D[k].time}</small></div><div class="v num">${P(D[k].sale)}</div><div class="m num">${D[k].n} 单 · 客单价 ${P(Math.round(D[k].sale / D[k].n))} · 当班 ${D[k].staff} 人</div><div class="bar"><i style="width:${(D[k].sale / sum(d => d.sale) * 100).toFixed(1)}%"></i></div></div>`).join('')}
+<div class="kpi s0"><div class="t"><span>全天合计</span><small>3 个班</small></div><div class="v num">${P(sum(d => d.sale))}</div><div class="m num">${sum(d => d.n)} 单 · 客单价 ${P(Math.round(sum(d => d.sale) / sum(d => d.n)))}</div><div class="bar"><i style="width:100%"></i></div></div></div>
+<div class="card"><table><tr><th></th>${[1, 2, 3].map(k => `<th class="r"><span class="dot s${k}"></span>${SH[k]}</th>`).join('')}<th class="r">全天合计</th></tr>
+<tr class="grp"><td colspan="5" style="background:#f6eedf;font-weight:700">销售（按下单时间）</td></tr>
+${rowOf('订单数', d => d.n, '', x => x + ' 单')}${rowOf('销售额', d => d.sale)}${rowOf('优惠合计', d => d.disc)}
+<tr class="grp"><td colspan="5" style="background:#f6eedf;font-weight:700">收款（按收到钱的时间）</td></tr>
+${rowOf('现金', d => d.cash, 'sub')}${rowOf('在线支付', d => d.online, 'sub')}${rowOf('储值余额', d => d.stored, 'sub')}${rowOf('外卖平台', d => d.plat, 'sub')}${rowOf('收款合计', got)}
+${rowOf('退款', d => d.refund, '', x => x ? '−' + P(x) : P(0))}
+${rowOf('净收款', d => got(d) - d.refund, 'tot')}
+<tr><td>交班点钞</td><td class="r"><span class="tag on">已点 · 相符</span></td><td class="r"><span class="tag warn">已点 · 少 ₱50</span></td><td class="r"><span class="tag off">还没点</span></td><td></td></tr>
+<tr><td></td><td class="r"><a>看明细</a></td><td class="r"><a>看明细</a></td><td class="r"><a>看明细</a></td><td></td></tr></table>
+<p class="muted" style="margin-top:10px">销售按下单时间算，收款按收到钱的时间算，所以同一个班的两个数可以不一样（例如 16:50 下单、17:10 结账的堂食单，销售算早班，收款算中班）。各班相加等于全天合计。</p></div>`)
+
+// 5 一个班的明细
+S[5] = () => page('财务', '财务', '核款、账单、对账和班次报表', FINTABS('班次报表'), `
+<div class="filt"><a class="lnk">‹ 返回 11-27</a>${sh(2)}<b class="num">2026-11-27 17:00 至 11-28 00:00</b><span class="in">品牌：全店 ▾</span><span class="sp"></span><button class="btn">导出 Excel</button><button class="btn line">交班点钞</button></div>
+<div class="two">
+<div class="card"><h2>销售 <span class="muted">按下单时间</span></h2>
+<div class="kv" style="margin-top:6px"><span>订单数</span><b class="num">71 单</b></div><div class="kv"><span>销售额</span><b class="num">${P(33650)}</b></div><div class="kv"><span>客单价</span><b class="num">${P(474)}</b></div><div class="kv"><span>优惠合计</span><b class="num">${P(2880)}</b></div>
+<table style="margin-top:10px"><tr><th>订单类型</th><th class="r">单数</th><th class="r">销售额</th></tr>
+${[['堂食', 28, 15200], ['代客下单', 15, 6900], ['商城', 14, 5750], ['网店', 6, 3700], ['外卖平台', 8, 2100]].map(r => `<tr><td>${r[0]}</td><td class="r num">${r[1]}</td><td class="r num">${P(r[2])}</td></tr>`).join('')}
+<tr class="tot"><td>合计</td><td class="r num">71</td><td class="r num">${P(33650)}</td></tr></table></div>
+<div class="card"><h2>收款 <span class="muted">按收到钱的时间</span></h2>
+<table style="margin-top:6px"><tr><th>付款方式</th><th class="r">笔数</th><th class="r">金额</th></tr>
+${[['现金', 27, 12300], ['在线支付 · GCash', 24, 11200], ['在线支付 · Maya', 11, 5700], ['储值余额', 5, 2400], ['外卖平台（平台结算）', 8, 2100]].map(r => `<tr><td>${r[0]}</td><td class="r num">${r[1]}</td><td class="r num">${P(r[2])}</td></tr>`).join('')}
+<tr class="tot"><td>收款合计</td><td class="r num">75</td><td class="r num">${P(33700)}</td></tr>
+<tr><td>退款（1 笔，退回 GCash）</td><td></td><td class="r num">−${P(320)}</td></tr>
+<tr class="tot"><td>净收款</td><td></td><td class="r num">${P(33380)}</td></tr></table>
+<div class="row" style="margin-top:12px"><div><div class="muted">钱箱应有现金</div><div class="big num">${P(12300)}</div></div><div><div class="muted">实点</div><div class="big num">${P(12250)}</div></div><div><div class="muted">差额</div><div class="big num" style="color:#b3261e">−${P(50)}</div></div><span class="sp"></span><span class="muted">阿May 00:06 点钞<br>备注：找零找多了</span></div></div>
+</div>
+<div class="card" style="margin-top:14px"><div class="row"><h2>当班员工</h2><span class="muted">按考勤：这个班里上过班的人</span><span class="sp"></span><a>去考勤页看</a></div>
+<table style="margin-top:6px"><tr><th>员工</th><th>岗位</th><th>上班</th><th>下班</th><th class="r">下单</th><th class="r">收银</th><th class="r">做好商品</th><th class="r">送达</th></tr>
+${[['陈经理', '经理', '16:52', '00:10', '4 单', '6 笔', '', ''], ['小林', '接单员', '16:55', '00:05', '26 单', '31 笔', '', ''], ['阿May', '接单员', '17:01', '00:08', '17 单', '22 笔', '', ''], ['老周', '后厨', '16:40', '23:50', '', '', '98 件', ''], ['阿强', '后厨', '16:58', '00:02', '', '', '87 件', ''], ['Jun', '后厨', '17:30', '23:30', '', '', '64 件', ''], ['Mark', '骑手', '16:45', '23:40', '', '', '', '11 单'], ['Rey', '骑手', '17:10', '00:15', '', '', '', '9 单']].map(r => `<tr><td><b>${r[0]}</b></td><td>${r[1]}</td>${r.slice(2, 4).map(x => `<td class="num">${x}</td>`).join('')}${r.slice(4).map(x => `<td class="r num">${x || '<span class="muted">—</span>'}</td>`).join('')}</tr>`).join('')}</table>
+<p class="muted" style="margin-top:8px">顾客自己在手机上下的单没有下单员工，所以“下单”相加不等于这个班的订单数。</p></div>`)
+
+// 6 交班点钞
+S[6] = () => S[5]().replace('</main>', `<div class="mask"><div class="dlg" style="width:520px"><h2>交班点钞 · ${sh(2)} <span class="muted num">11-27 17:00–00:00</span></h2>
+<p style="color:#6b5a4e;margin:6px 0 12px">把钱箱里这个班收的现金点一遍，填实际金额。</p>
+<div class="kv"><span>店里收的现金</span><b class="num">${P(10650)}</b></div>
+<div class="kv"><span>骑手交回的现金</span><b class="num">${P(1650)}</b></div>
+<div class="kv"><span>现金退款</span><b class="num">${P(0)}</b></div>
+<div class="kv"><span><b>钱箱应有</b></span><b class="num">${P(12300)}</b></div>
+<div class="row" style="margin-top:12px"><span style="width:90px">实点金额</span><span class="in num" style="flex:1;font-size:18px;font-weight:700">₱ 12,250</span></div>
+<div class="row" style="margin-top:8px"><span style="width:90px">差额</span><b class="num" style="color:#b3261e">少 ${P(50)}</b></div>
+<div class="row" style="margin-top:8px"><span style="width:90px">备注</span><span class="in" style="flex:1">找零找多了</span></div>
+<p class="note" style="margin-top:12px">点钞只是记录，不会改动任何订单和余额。保存后可以由店主或经理更正，更正会留记录。</p>
+<div class="row" style="margin-top:14px"><span class="sp"></span><button class="btn">取消</button><button class="btn pri">保存</button></div></div></div></main>`)
+
+// 7 按时间段：各班对比
+const R = { 1: [1214, 486200], 2: [1902, 901500], 3: [331, 118900] }
+const RT = [3447, 1506600]
+const days = [['11-27 周五', [46, 18400], [71, 33650], [12, 4300]], ['11-26 周四', [44, 17300], [68, 31900], [10, 3650]], ['11-25 周三', [41, 16050], [75, 35400], [14, 5100]]]
+const chart = () => { // 27 天的堆叠柱，示意
+  const seed = [18, 17, 19, 22, 24, 21, 16, 17, 18, 18, 21, 25, 23, 16, 17, 18, 19, 22, 26, 22, 17, 16, 18, 19, 16, 17, 18]
+  const w = 1100 / 27
+  return `<svg viewBox="0 0 1100 180" style="width:100%;height:180px">${seed.map((v, i) => { const a = v * 1.7, b = v * 3.2 * (1 + (i % 7 > 3 ? .15 : 0)), c = v * .45, x = i * w + 6; return `<rect x="${x}" y="${160 - a}" width="${w - 12}" height="${a}" fill="#d98a1f"/><rect x="${x}" y="${160 - a - b}" width="${w - 12}" height="${b}" fill="#a02c20"/><rect x="${x}" y="${160 - a - b - c}" width="${w - 12}" height="${c}" fill="#3b47b5"/><text x="${x + (w - 12) / 2}" y="176" font-size="10" fill="#8a7b6f" text-anchor="middle">${i + 1}</text>` }).join('')}</svg>`
+}
+S[7] = () => page('财务', '财务', '核款、账单、对账和班次报表', FINTABS('班次报表'), `
+${filt(1, '<span class="in num">2026-11-01 至 2026-11-27</span><span class="chip">本周</span><span class="chip on">本月</span><span class="chip">上月</span>')}
+<div class="kpis">${[1, 2, 3].map(k => `<div class="kpi s${k}"><div class="t"><span>${SH[k]}</span><small class="num">占 ${(R[k][1] / RT[1] * 100).toFixed(1)}%</small></div><div class="v num">${P(R[k][1])}</div><div class="m num">${R[k][0].toLocaleString()} 单 · 平均每天 ${P(Math.round(R[k][1] / 27))}</div><div class="bar"><i style="width:${(R[k][1] / RT[1] * 100).toFixed(1)}%"></i></div></div>`).join('')}
+<div class="kpi s0"><div class="t"><span>合计</span><small>27 天</small></div><div class="v num">${P(RT[1])}</div><div class="m num">${RT[0].toLocaleString()} 单 · 平均每天 ${P(Math.round(RT[1] / 27))}</div><div class="bar"><i style="width:100%"></i></div></div></div>
+<div class="card"><div class="row"><h2>每天各班销售额</h2><span class="sp"></span>${[1, 2, 3].map(k => `<span class="muted"><span class="dot s${k}"></span>${SH[k]}</span>`).join('')}</div>${chart()}</div>
+<div class="card"><table><tr><th>班次日</th>${[1, 2, 3].map(k => `<th class="r"><span class="dot s${k}"></span>${SH[k]} 单数</th><th class="r">销售额</th>`).join('')}<th class="r">全天单数</th><th class="r">全天销售额</th><th></th></tr>
+${days.map(d => `<tr><td class="num">${d[0]}</td>${d.slice(1).map(x => `<td class="r num">${x[0]}</td><td class="r num">${P(x[1])}</td>`).join('')}<td class="r num"><b>${d[1][0] + d[2][0] + d[3][0]}</b></td><td class="r num"><b>${P(d[1][1] + d[2][1] + d[3][1])}</b></td><td class="r"><a>看这天</a></td></tr>`).join('')}
+<tr><td class="muted" colspan="9">… 还有 24 天</td></tr>
+<tr class="tot"><td>合计</td>${[1, 2, 3].map(k => `<td class="r num">${R[k][0].toLocaleString()}</td><td class="r num">${P(R[k][1])}</td>`).join('')}<td class="r num">${RT[0].toLocaleString()}</td><td class="r num">${P(RT[1])}</td><td></td></tr></table></div>`)
+
+// 8 订单列表和考勤里的班次
+S[8] = () => `<div class="ox">${nav('订单')}<main>
+<div class="ph"><div><h1>订单</h1><p>订单列表多一个班次标记和筛选</p></div></div>
+<div class="filt"><span class="in num">2026-11-27</span><span class="chip">全部班次</span><span class="chip">早班 <b>46</b></span><span class="chip on">中班 <b>71</b></span><span class="chip">晚班 <b>12</b></span><span class="in">类型：全部 ▾</span><span class="in">状态：全部 ▾</span></div>
+<div class="card"><table><tr><th>单号</th><th>下单时间</th><th>班次</th><th>类型</th><th>下单人</th><th class="r">金额</th><th>付款</th><th>状态</th></tr>
+${[['DineIn-38', '17:02', 2, '堂食 · A3 桌', '小林', 1280, '现金 · 18:10', '已完成'], ['YPX000123', '17:05', 2, '代客 · 外卖', '阿May', 560, 'GCash · 17:06', '已完成'], ['Hippo-21', '17:11', 2, '商城 · 外卖', '顾客', 430, '货到付现 · 17:58', '已完成'], ['DineIn-39', '17:20', 2, '堂食 · B1 桌', '小林', 2150, 'Maya · 19:02', '已完成'], ['Grab GF-482', '17:26', 2, '平台 · Grab', '阿May', 380, '平台结算', '已完成'], ['DineIn-52', '23:41', 2, '堂食 · A1 桌', '陈经理', 940, '现金 · 00:20 <span class="sh s3">晚班收款</span>', '已完成']].map(r => `<tr><td><b>${r[0]}</b></td><td class="num">${r[1]}</td><td>${sh(r[2])}</td><td>${r[3]}</td><td>${r[4]}</td><td class="r num">${P(r[5])}</td><td class="num">${r[6]}</td><td><span class="tag on">${r[7]}</span></td></tr>`).join('')}</table></div>
+<div class="ph" style="margin-top:22px"><div><h1 style="font-size:20px">员工 → 考勤</h1><p>每条上班记录多一个班次，一条记录跨了两个班时两个都标</p></div></div>
+<div class="card"><table><tr><th>员工</th><th>岗位</th><th>上班</th><th>下班</th><th>时长</th><th>班次</th><th>各班时长</th></tr>
+${[['小林', '接单员', '11-27 16:55', '11-28 00:05', '7 小时 10 分', [2], '中班 7 小时'], ['老周', '后厨', '11-27 07:50', '11-27 23:50', '16 小时', [1, 2], '早班 9 小时 · 中班 6 小时 50 分'], ['Rey', '骑手', '11-27 17:10', '11-28 00:15', '7 小时 5 分', [2], '中班 6 小时 50 分'], ['阿Ben', '接单员', '11-27 23:55', '11-28 08:03', '8 小时 8 分', [3], '晚班 8 小时']].map(r => `<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td class="num">${r[2]}</td><td class="num">${r[3]}</td><td class="num">${r[4]}</td><td>${r[5].map(sh).join(' ')}</td><td class="muted num">${r[6]}</td></tr>`).join('')}</table></div></main></div>`
+
+// 9 手机
+S[9] = () => `<div class="phones">
+<div class="phone"><div class="top">‹　班次报表<span class="sp" style="flex:1"></span><span class="muted num">11-27 ▾</span></div><div class="body">
+${[1, 2, 3].map(k => `<div class="kpi s${k}"><div class="t"><span>${SH[k]}</span><small class="num">${D[k].time}</small></div><div class="v num">${P(D[k].sale)}</div><div class="m num">${D[k].n} 单 · 收款 ${P(got(D[k]))} · 当班 ${D[k].staff} 人</div><div class="bar"><i style="width:${(D[k].sale / 56350 * 100).toFixed(1)}%"></i></div></div>`).join('')}
+<div class="kpi s0"><div class="t"><span>全天合计</span><small class="num">11-27 08:00 至 11-28 08:00</small></div><div class="v num">${P(56350)}</div><div class="m num">129 单 · 净收款 ${P(56030)}</div></div></div></div>
+<div class="phone"><div class="top">‹　${sh(2)}　<span class="num" style="font-weight:400;font-size:13px">11-27 17:00–00:00</span></div><div class="body">
+<div class="card"><b>收款</b>${[['现金', 12300], ['在线支付', 16900], ['储值余额', 2400], ['外卖平台', 2100]].map(r => `<div class="kv"><span>${r[0]}</span><b class="num">${P(r[1])}</b></div>`).join('')}<div class="kv"><span>退款</span><b class="num neg">−${P(320)}</b></div><div class="kv"><span><b>净收款</b></span><b class="num">${P(33380)}</b></div></div>
+<div class="card"><div class="row"><b>交班点钞</b><span class="sp"></span><span class="tag warn">少 ₱50</span></div><div class="kv"><span>钱箱应有</span><b class="num">${P(12300)}</b></div><div class="kv"><span>实点</span><b class="num">${P(12250)}</b></div></div>
+<div class="card"><b>当班 8 人</b><div class="kv"><span>小林 · 接单员</span><span class="num">下单 26 · 收银 31</span></div><div class="kv"><span>阿May · 接单员</span><span class="num">下单 17 · 收银 22</span></div><div class="kv"><span>老周 · 后厨</span><span class="num">做好 98 件</span></div><div class="kv"><span class="muted">还有 5 人</span><a class="lnk">全部</a></div></div>
+</div></div></div>`
+
+document.getElementById('app').innerHTML = (S[s] || S[1])()
+</script>
+</body>
+</html>
