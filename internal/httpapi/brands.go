@@ -111,6 +111,44 @@ func (s *Server) mayUseBrand(c *gin.Context, bid, brand int64) bool {
 	return true
 }
 
+// mayUseBrands answers 403 unless the person works on every one of the
+// brands; none is the store's main brand. A promotion or a coupon batch is
+// changed only by someone who works on all the brands it is for
+// (docs/MULTI_BRAND_DESIGN.md §13, docs/CODE_REVIEW_FIX_PLAN.md M09).
+func (s *Server) mayUseBrands(c *gin.Context, bid int64, brands []int64) bool {
+	if currentUser(c).AllBrands(bid) {
+		return true
+	}
+	if len(brands) == 0 {
+		brands = []int64{0}
+	}
+	for _, b := range brands {
+		if !s.mayUseBrand(c, bid, b) {
+			return false
+		}
+	}
+	return true
+}
+
+// seesBrands says, without answering, whether any of the brands is one the
+// person works on; none is the main brand.
+func (s *Server) seesBrands(c *gin.Context, bid int64, brands []int64) bool {
+	u := currentUser(c)
+	if u.AllBrands(bid) {
+		return true
+	}
+	if len(brands) == 0 {
+		main, err := s.App.MainBrandID(c, bid)
+		return err == nil && u.MayUseBrand(bid, main)
+	}
+	for _, b := range brands {
+		if u.MayUseBrand(bid, b) {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Server) listBrands(c *gin.Context) {
 	if bid, ok := branchScope(c, pAny); ok {
 		bs, err := s.App.ListBrands(c, bid)
@@ -148,7 +186,10 @@ func (s *Server) suggestBrandCode(c *gin.Context) {
 // setStaffBrands limits the brands a member of staff works on; an empty
 // brand_ids (or null) means every brand.
 func (s *Server) setStaffBrands(c *gin.Context) {
-	bid, id, ok := staffScope(c, pStaffManage)
+	// Only the owner decides who works on which brand: a manager limited to
+	// one brand could otherwise lift the limit, their own included
+	// (docs/CODE_REVIEW_FIX_PLAN.md H03).
+	bid, id, ok := staffScope(c, pOwner)
 	var in struct {
 		BrandIDs []int64 `json:"brand_ids"`
 	}

@@ -83,7 +83,8 @@ const formStations = computed(() => {
   return [...stations.value.map(s => ({ id: s.id, name: pick(s.name, s.name_en) })), ...held.map(p => ({ id: p.station_id!, name: postName(p) }))]
 })
 // Brands they work on (docs/MULTI_BRAND_DESIGN.md §10); none ticked = all.
-const showBrands = computed(() => multiBrand() && f.role !== 'owner' && !self.value)
+// Only the owner sets them (docs/CODE_REVIEW_FIX_PLAN.md H03); nobody sets their own.
+const showBrands = computed(() => multiBrand() && isOwner() && f.role !== 'owner' && !self.value)
 const toggleBrand = (id: number) => { const i = f.brands.indexOf(id); i < 0 ? f.brands.push(id) : f.brands.splice(i, 1) }
 const brandNames = (m: StaffMember) => m.brand_ids ? brandsHere().filter(b => m.brand_ids!.includes(b.id)).map(b => b.name).join('、') : ''
 const toggleStation = (id: number) => { const i = f.stations.indexOf(id); i < 0 ? f.stations.push(id) : f.stations.splice(i, 1) }
@@ -114,9 +115,10 @@ function save() {
     let id = f.id
     if (id) await patch(`/merchant/branches/${bid}/staff/${id}`, body)
     else id = (await post<{ id: number }>(`/merchant/branches/${bid}/staff`, { ...body, role: f.role, password: f.password })).id
+    // the brands are only sent when the form showed them: a form without them must not lift a limit
+    if (!showBrands.value) return
     const was = staff.value.find(m => m.id === id)?.brand_ids ?? []
-    const now = showBrands.value ? f.brands : []
-    if ([...was].sort().join() !== [...now].sort().join()) await put(`/merchant/branches/${bid}/staff/${id}/brands`, { brand_ids: now })
+    if ([...was].sort().join() !== [...f.brands].sort().join()) await put(`/merchant/branches/${bid}/staff/${id}/brands`, { brand_ids: f.brands })
   })
 }
 const setActive = (id: number, on: boolean) => act(() => patch(`/merchant/branches/${bid}/staff/${id}`, { active: on }))

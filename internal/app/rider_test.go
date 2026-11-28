@@ -301,7 +301,7 @@ func TestWebPushSender(t *testing.T) {
 	sub, _ := json.Marshal(map[string]any{"endpoint": srv.URL + "/push/abc", "keys": map[string]string{
 		"p256dh": base64.RawURLEncoding.EncodeToString(key.PublicKey().Bytes()),
 		"auth":   base64.RawURLEncoding.EncodeToString(secret)}})
-	w := app.WebPush{PublicKey: public, PrivateKey: private, Subject: "mailto:ops@example.com"}
+	w := app.WebPush{PublicKey: public, PrivateKey: private, Subject: "mailto:ops@example.com", Client: srv.Client(), AnyHost: true}
 	d := app.Device{Platform: "web", Token: string(sub)}
 	noErr(t, w.Send(context.Background(), d, app.PushMessage{Title: "新配送单", Body: "A012"}))
 	if len(gotAuth) < 20 || gotEncoding != "aes128gcm" || gotBody == 0 {
@@ -317,6 +317,13 @@ func TestWebPushSender(t *testing.T) {
 	}
 	if err := w.Send(context.Background(), app.Device{Token: "{}"}, app.PushMessage{}); !errors.Is(err, app.ErrPushGone) {
 		t.Fatalf("an unusable subscription: %v", err)
+	}
+	// docs/CODE_REVIEW_FIX_PLAN.md H05: without the test's leave, an address that is
+	// not a push service's is dropped and nothing is sent to it
+	strict := app.WebPush{PublicKey: public, PrivateKey: private, Subject: "mailto:ops@example.com"}
+	gotAuth = ""
+	if err := strict.Send(context.Background(), d, app.PushMessage{Title: "x"}); !errors.Is(err, app.ErrPushGone) || gotAuth != "" {
+		t.Fatalf("a subscription inside the network: %v, reached %v", err, gotAuth != "")
 	}
 }
 

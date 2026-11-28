@@ -132,8 +132,12 @@ const (
 func need(perms ...string) []string { return perms }
 
 var (
-	pAny          = need(needAny)
-	pOrderView    = need(app.PermOrderView)
+	pAny       = need(needAny)
+	pOrderView = need(app.PermOrderView)
+	// pOrderRead is who may read one whole order: whoever lists, follows,
+	// handles or enters orders at the desk, or runs the tables.
+	pOrderRead = need(app.PermOrderView, app.PermOrderProgress, app.PermOrderHandle, app.PermOrderCancel,
+		app.PermOrderAftersale, app.PermOrderManual, app.PermOrderPlatform, app.PermTableUse)
 	pProgress     = need(app.PermOrderProgress)
 	pHandle       = need(app.PermOrderHandle)
 	pCancel       = need(app.PermOrderCancel)

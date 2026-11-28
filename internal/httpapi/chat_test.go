@@ -484,7 +484,9 @@ func TestChatAlerts(t *testing.T) {
 	}
 
 	// the desk: the owner's browser asked for reminders, the kitchen's does not count
-	sub := func(name string) string { return `{"endpoint":"https://push.example/` + name + `","keys":{}}` }
+	sub := func(name string) string {
+		return `{"endpoint":"https://fcm.googleapis.com/fcm/send/` + name + `","keys":{}}`
+	}
 	owner.want(200, "", "POST", "/rider/devices", map[string]any{"platform": "web", "token": sub("owner"), "app_version": "web"})
 	kitchen.want(200, "", "POST", "/rider/devices", map[string]any{"platform": "web", "token": sub("kitchen"), "app_version": "web"})
 	if why := say(t, cIM, bIM, "hello", 0); why != "" {

@@ -325,10 +325,35 @@ func TestTenantIsolationAndRoles(t *testing.T) {
 	if ko["customer_phone"] != "" || ko["address_line"] != "" {
 		t.Fatalf("kitchen board leaks contact details: %v", ko)
 	}
+	// docs/CODE_REVIEW_FIX_PLAN.md H02: nor how else to reach them, where they are or what they paid
+	leaks := func(step string, ko map[string]any) {
+		t.Helper()
+		for _, k := range []string{"customer_phone", "contact_phone", "contact_wechat", "contact_whatsapp", "address_line", "address_unit", "address_note"} {
+			if ko[k] != "" {
+				t.Fatalf("%s leaks %s: %v", step, k, ko[k])
+			}
+		}
+		if ko["dest_lat"] != nil || ko["dest_lng"] != nil || ko["cash"] != nil || ko["totals"].(map[string]any)["total"].(float64) != 0 {
+			t.Fatalf("%s leaks the pin or the money: %v", step, ko)
+		}
+		if len(ko["items"].([]any)) == 0 {
+			t.Fatalf("%s lost the dishes", step)
+		}
+	}
+	leaks("the board", ko)
+	// the whole order is for the desk: not for a station, not for a rider it is not assigned to
+	kitchen.want(403, "FORBIDDEN", "GET", "/merchant/orders/"+oid, nil)
+	rider.want(403, "FORBIDDEN", "GET", "/merchant/orders/"+oid, nil)
+	owner2.want(404, "NOT_FOUND", "GET", "/merchant/orders/"+oid, nil)
+	if full := cashier.want(200, "", "GET", "/merchant/orders/"+oid, nil); full["customer_phone"] == "" || full["totals"].(map[string]any)["total"].(float64) == 0 {
+		t.Fatalf("the desk's order lost its details: %v", full)
+	}
 	owner2.want(404, "NOT_FOUND", "POST", "/kitchen/items/"+itemID+"/ready", nil)
 	o = kitchen.want(200, "", "POST", "/kitchen/items/"+itemID+"/ready", nil)
+	leaks("marking a dish ready", o)
 	o = kitchen.want(200, "", "POST", "/kitchen/orders/"+oid+"/pack",
 		map[string]any{"bags": 1, "manifest_version": o["manifest_version"]})
+	leaks("packing", o)
 
 	// rider sees nothing until assigned
 	tasks := rider.want(200, "", "GET", "/rider/tasks", nil)
