@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>多语言简化 · 原型</title>
+<link rel="stylesheet" href="proto.css">
+</head>
+<body>
+<div id="app"></div>
+<script>
+// 可点开的原型：index.html?s=1…7。数据都是示意，译文没有经过母语者核对。
+const s = new URLSearchParams(location.search).get('s') || '1'
+const G = '<svg class="g" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18"/></svg>'
+const ml = (extra = '') => `<button class="ml ${extra}">${G}多语言</button>`
+const nav = (on) => `<aside class="side"><div class="shop">马卡蒂小馆<small><b>店主</b> 店长 owner1</small></div>
+${['订单', '点单', '消息', '客户管理', '桌台', '后厨', '商品', '店铺装修', '营销活动', '优惠', '财务', '配送管理', '员工', '设置'].map(x => `<div class="${x === on ? 'on' : ''}">${x}</div>`).join('')}</aside>`
+const page = (on, title, sub, body) => `<div class="ox">${nav(on)}<main><div class="ph"><div><h1>${title}</h1><p>${sub}</p></div></div>${body}</main></div>`
+const fld = (label, val, cls = '') => `<label class="f ${cls}"><span>${label}</span><div class="in">${val}</div></label>`
+const area = (label, val) => `<label class="f"><span>${label}</span><div class="in ta">${val}</div></label>`
+
+const LANGS = [['en', 'English'], ['zh-Hant', '繁體中文'], ['th', 'ไทย'], ['vi', 'Tiếng Việt'], ['ja', '日本語'], ['fr', 'Français'], ['es', 'Español'], ['ru', 'Русский'], ['ar', 'العربية'], ['my', 'မြန်မာ'], ['km', 'ខ្មែរ']]
+const langTabs = (on) => `<div class="lt">${LANGS.map(([c, n]) => `<button class="${c === on ? 'on' : ''}">${n}</button>`).join('')}</div>`
+// 一行：原文 | 译文
+const row = (label, src, tr, st = '', big = false) => `<div class="tr"><div class="tl">${label}</div>
+<div class="src ${big ? 'big' : ''}">${src}</div><div class="in ${big ? 'ta' : ''} ${st === 'me' ? 'mine' : ''}">${tr}</div>
+<div class="ts">${st === 'me' ? '<i class="me">你改的</i><a>恢复自动翻译</a>' : '<i>自动翻译</i>'}</div></div>`
+const sheet = (title, sub, lang, rows, foot = true) => `<div class="sheet"><div class="sh"><div><h2>${G}多语言 · ${title}</h2><p>${sub}</p></div><button class="x">✕</button></div>
+${langTabs(lang)}<div class="trh"><span></span><span>你填的原文（简体中文）</span><span>${LANGS.find(l => l[0] === lang)[1]} 译文，点一下就能改</span><span></span></div>
+<div class="trs">${rows}</div>${foot ? '<div class="sf"><span class="muted">不改也不用管：原文一改，译文几秒内自动跟着更新。</span><button class="btn">关闭</button><button class="btn pri">保存修改</button></div>' : ''}</div>`
+
+const itemFormAfter = `<div class="dlg"><div class="dh"><h2>编辑商品</h2><div class="dr">${ml()}<button class="x">✕</button></div></div>
+<div class="g2">${fld('商品名', '红烧牛肉面')}${fld('编号', 'A12')}</div>
+<div class="g2">${fld('价格 (PHP)', '268')}${fld('分类', '面食')}</div>
+${area('描述', '慢炖四小时的牛腱，手工拉面，微辣')}
+<h3>规格</h3><div class="g2">${fld('规格组', '份量')}${fld('选项', '小份 · 大份 +40')}</div>
+<div class="g2">${fld('规格组', '辣度')}${fld('选项', '不辣 · 微辣 · 中辣')}</div>
+<div class="df"><button class="btn">取消</button><button class="btn pri">保存</button></div></div>`
+const itemFormBefore = `<div class="dlg old"><div class="dh"><h2>编辑商品</h2><div class="dr"><button class="x">✕</button></div></div>
+<div class="g2">${fld('中文名', '红烧牛肉面')}${fld('英文名', 'Braised Beef Noodle Soup', 'hl')}</div>
+<div class="g2">${fld('价格 (PHP)', '268')}${fld('分类', '面食')}</div>
+${area('描述', '慢炖四小时的牛腱，手工拉面，微辣')}
+<h3>规格</h3><div class="g2">${fld('规格组', '份量')}${fld('规格组英文名', 'Size', 'hl')}</div>
+<div class="g3">${fld('选项', '小份')}${fld('英文名', 'Small', 'hl')}${fld('选项', '大份 +40')}${fld('英文名', 'Large', 'hl')}</div>
+<div class="g2">${fld('规格组', '辣度')}${fld('规格组英文名', 'Spice level', 'hl')}</div>
+<div class="g3">${fld('选项', '不辣')}${fld('英文名', 'Not spicy', 'hl')}${fld('选项', '微辣')}${fld('英文名', 'Mild', 'hl')}</div>
+<div class="df"><button class="btn">取消</button><button class="btn pri">保存</button></div></div>`
+
+const itemRows = (l) => ({
+  th: row('商品名', '红烧牛肉面', 'ก๋วยเตี๋ยวเนื้อตุ๋นน้ำแดง', 'me') + row('描述', '慢炖四小时的牛腱，手工拉面，微辣', 'เนื้อน่องลายตุ๋นสี่ชั่วโมง เส้นดึงมือ เผ็ดน้อย', '', true) +
+    row('规格组', '份量', 'ขนาด') + row('选项', '小份', 'เล็ก') + row('选项', '大份', 'ใหญ่') + row('规格组', '辣度', 'ระดับความเผ็ด') + row('选项', '微辣', 'เผ็ดน้อย'),
+  en: row('商品名', '红烧牛肉面', 'Braised Beef Noodle Soup', 'me') + row('描述', '慢炖四小时的牛腱，手工拉面，微辣', 'Beef shank braised for four hours, hand-pulled noodles, mildly spicy', '', true) +
+    row('规格组', '份量', 'Size') + row('选项', '小份', 'Small') + row('选项', '大份', 'Large'),
+}[l])
+
+const screens = {
+  // ① 改前 / 改后
+  1: () => `<div class="cmp"><div><div class="cap bad">现在：每个名字旁边都有一格英文，规格越多格子越多</div>${itemFormBefore}</div>
+<div><div class="cap ok">改后：只填一种语言，右上角一个“多语言”按钮，平时不用点</div>${itemFormAfter}</div></div>`,
+  // ② 点开“多语言”
+  2: () => page('商品', '商品管理', '商品、分类、规格', `<div class="dim"></div>${sheet('红烧牛肉面', '这件商品的所有文字。发现哪种语言翻得不对，切到那种语言改掉就行。', 'th', itemRows('th'))}`),
+  // ③ 店铺设置
+  3: () => page('设置', '设置', '门店资料、费用、接单出餐、付款方式和商城展示', `<div class="set"><div class="sn"><b>设置项</b>${['顾客点单链接', '门店设置', '付款方式', '多语言', '商城展示', '配送区', '后厨工作台'].map((x, i) => `<div class="${i === 1 ? 'on' : ''}">${x}</div>`).join('')}</div>
+<div class="sc"><div class="card"><div class="ch"><h2>门店设置</h2><div class="dr">${ml()}<button class="btn pri">保存</button></div></div>
+<h3>基本信息</h3><div class="g2">${fld('店名', '马卡蒂小馆')}${fld('电话', '+63 2 8123 4567')}</div>
+${fld('地址', '123 Ayala Ave, Makati')}
+${area('店铺公告', '春节期间 1 月 28 日至 30 日休息，31 日起照常营业')}
+${area('店铺简介', '开在马卡蒂十年的川味小馆，招牌红烧牛肉面和手工水饺')}</div>
+<div class="card"><div class="ch"><h2>多语言</h2></div>
+<div class="g2">${fld('我填写内容用的语言', '简体中文 ▾')}${fld('翻译状态', '<span class="okdot"></span>全部已翻译 · 上次更新 2 分钟前')}</div>
+<div class="f"><span>顾客能看到的语言（默认全开，关掉的语言顾客看英文）</span><div class="chips">${LANGS.map(([c, n], i) => `<i class="${i === 8 || i === 10 ? 'off' : ''}">${n}</i>`).join('')}</div></div>
+<div class="lnk"><a>查看全部译文 ›</a><span class="muted">一张表看完整份商品目录，可以搜索译文。平时用不到。</span></div></div></div></div>`),
+  // ④ 充值活动
+  4: () => page('营销活动', '营销活动', '充值送、领券活动', `<div class="dim"></div><div class="two"><div class="dlg"><div class="dh"><h2>编辑充值活动</h2><div class="dr">${ml('on')}<button class="x">✕</button></div></div>
+<div class="g2">${fld('活动名称', '新春充值送')}${fld('开始', '2027-01-20')}</div>
+<h3>充值档位</h3><div class="g3">${fld('充', '1000')}${fld('送', '100')}${fld('角标', '')}${fld('充', '2000')}${fld('送', '300')}${fld('角标', '最划算')}</div>
+${area('活动说明（顾客看得到）', '赠送金额只能在本店使用，不能提现')}
+<div class="df"><button class="btn">取消</button><button class="btn pri">保存</button></div></div>
+${sheet('新春充值送', '活动名称、角标、活动说明。', 'en', row('活动名称', '新春充值送', 'Lunar New Year Top-up Bonus') + row('角标', '最划算', 'Best value') + row('活动说明', '赠送金额只能在本店使用，不能提现', 'Bonus credit can only be used at this store and cannot be withdrawn', '', true))}</div>`),
+  // ⑤ 按钮在各处的位置
+  5: () => `<div class="grid">${[
+    ['商品 · 列表每行的操作', `<div class="li"><b>红烧牛肉面</b><span>₱268</span><em>编辑</em><em>下架</em>${ml('sm')}</div><div class="li"><b>手工水饺</b><span>₱180</span><em>编辑</em><em>下架</em>${ml('sm')}</div>`],
+    ['分类 · 分类名旁边', `<div class="li"><b>面食</b><span>12 件</span><em>改名</em>${ml('sm')}</div><div class="li"><b>饮品</b><span>8 件</span><em>改名</em>${ml('sm')}</div>`],
+    ['口味模板、加料模板 · 模板标题栏', `<div class="mh"><b>奶茶加料</b>${ml('sm')}</div><div class="li"><b>珍珠</b><span>+₱15</span></div><div class="li"><b>椰果</b><span>+₱15</span></div>`],
+    ['优惠活动 · 编辑窗口标题栏', `<div class="mh"><b>编辑优惠活动</b>${ml('sm')}</div>${fld('活动名称', '午市满 500 减 50')}`],
+    ['领券活动 · 编辑窗口标题栏', `<div class="mh"><b>编辑领券活动</b>${ml('sm')}</div>${fld('名称（可不填）', '新客见面礼')}`],
+    ['品牌 · 编辑窗口标题栏', `<div class="mh"><b>编辑品牌</b>${ml('sm')}</div>${fld('品牌名', '阿姨奶茶')}${fld('一句话简介', '现煮黑糖珍珠')}`],
+    ['宣传物料 · 每张图的操作', `<div class="li"><div class="thumb"></div><b>新品上市</b><em>裁剪</em>${ml('sm')}</div>`],
+    ['排队叫号 · 桌型设置标题栏', `<div class="mh"><b>桌型</b>${ml('sm')}</div><div class="li"><b>A 小桌</b><span>1–2 人</span></div><div class="li"><b>B 包间</b><span>6–10 人</span></div>`],
+  ].map(([t, b]) => `<div class="mini"><div class="mt">${t}</div><div class="mb">${b}</div></div>`).join('')}</div>`,
+  // ⑥ 手机
+  6: () => `<div class="phone">${sheet('红烧牛肉面', '发现哪种语言不对，切过去改掉就行。', 'en', itemRows('en'))}</div>`,
+  // ⑦ 全部译文
+  7: () => page('设置', '全部译文', '整份商品目录和店铺文字的译文。平时不用看，找某一句译文时用。', `<div class="card all"><div class="bar"><div class="in sr">🔍 lung slice</div><div class="in sel">ไทย / English ▾</div><div class="in sel">全部内容 ▾</div><span class="muted">找到 1 条</span></div>
+<table><thead><tr><th>位置</th><th>原文</th><th>English</th><th>ไทย</th><th></th></tr></thead><tbody>
+<tr><td>商品 · 凉菜</td><td>夫妻肺片</td><td><mark>Husband and Wife Lung Slice</mark><small>自动翻译</small></td><td>เนื้อและเครื่องในวัวยำหมาล่า<small>自动翻译</small></td><td><button class="btn pri sm">改译文</button></td></tr>
+</tbody></table><div class="hint">顾客说哪句话翻得怪，把那句话贴进搜索框，直接找到是哪件商品，点“改译文”。</div></div>`),
+}
+document.getElementById('app').innerHTML = screens[s]()
+document.body.className = 's' + s
+</script>
+</body>
+</html>
