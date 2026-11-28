@@ -132,6 +132,8 @@ export interface DeliveryTask {
 export interface Cash {
   id: number; order_id: number; public_no: string; rider_name: string; amount_due: number; amount_collected: number
   reconcile_status: string; amount_returned: number | null; note: string; created_at: string
+  // what the rider did not collect of an order still unpaid; how it was settled
+  short?: number; late_cash?: number; waived?: number
 }
 export interface Order {
   id: number; branch_id: number; public_no: string; pickup_code: string; service_type: 'delivery' | 'pickup' | 'dine_in'

@@ -92,6 +92,12 @@ type CashCollection struct {
 	ReconciledAt    *time.Time `json:"reconciled_at"`
 	Note            string     `json:"note"`
 	CreatedAt       time.Time  `json:"created_at"`
+	// Short is what the rider did not collect of an order that is still
+	// unpaid: the store says whether it got the rest or lets it go.
+	Short int64 `json:"short"`
+	// LateCash and Waived are how a short order was settled.
+	LateCash int64 `json:"late_cash"`
+	Waived   int64 `json:"waived"`
 }
 
 // Order is the full staff-facing view. Customer and rider views are trimmed
@@ -308,6 +314,10 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		return nil, err
 	}
 	o.Due = max(0, t.Total-o.CreditPaid)
+	// paid in advance, then dishes were added: only the difference is owed
+	if o.PaymentStatus == "unpaid" && o.AmountReceived != nil {
+		o.Due = max(0, o.Due-*o.AmountReceived)
+	}
 	o.DisplayStatus = DisplayStatus(o.AcceptanceStatus, o.FulfillmentStatus)
 	// An accepted scheduled order that the kitchen has not started on yet.
 	if o.DisplayStatus == "preparing" && o.ReleaseAt != nil && o.ReleaseAt.After(time.Now()) {
@@ -520,6 +530,30 @@ type placedRecord struct {
 	OrderID int64 `json:"order_id"`
 }
 
+// PlacedOrder finds the order that a request with this key made, if it got
+// that far: a page whose order request was never answered asks here before
+// it lets the customer order again.
+func (a *App) PlacedOrder(ctx context.Context, slug, phone, idemKey string) (*PlacedOrder, error) {
+	b, err := branchBySlug(ctx, a.DB, slug)
+	if err != nil {
+		return nil, err
+	}
+	var out PlacedOrder
+	var nonce []byte
+	err = a.DB.QueryRow(ctx, `SELECT o.id, o.public_no, o.token_nonce FROM idempotency_records r
+		JOIN orders o ON o.id = (r.response->>'order_id')::bigint
+		WHERE r.scope=$1 AND r.key=$2 AND r.response IS NOT NULL`,
+		fmt.Sprintf("place-order:%d:%s", b.ID, phone), idemKey).Scan(&out.OrderID, &out.PublicNo, &nonce)
+	if isNoRows(err) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	out.AccessToken = a.orderToken(nonce)
+	return &out, nil
+}
+
 // PlaceOrder turns a confirmed quote into an order. phone comes from the
 // verified customer session. The idempotency key is mandatory: a retry with
 // the same key returns the original order.
@@ -544,7 +578,13 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		}
 		scope := fmt.Sprintf("place-order:%d:%s", b.ID, phone)
 		var rec placedRecord
-		replayed, err := idemBegin(ctx, tx, scope, idemKey, hashJSON(in), &rec)
+		// The key stands for what the customer meant to order (the page keeps
+		// it for as long as the basket and the choices stay the same). The
+		// price is asked again after a lost answer, and a balance the first
+		// try spent is no longer offered: neither makes it another order.
+		same := in
+		same.QuoteID, same.UseCredit, same.CreditExpected = "", false, nil
+		replayed, err := idemBegin(ctx, tx, scope, idemKey, hashJSON(same), &rec)
 		if err != nil {
 			return err
 		}

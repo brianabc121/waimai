@@ -7,7 +7,8 @@ import { storePath } from '../site'
 import '../checkout'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ApiError, get, newKey, post } from '../api'
+import { ApiError, get, post } from '../api'
+import { stableKey } from '../retry'
 import { clearLines, quoteItems, useCart } from '../cart'
 import { money, mn, pick, t } from '../i18n'
 import { addonErr } from '../addon'
@@ -46,11 +47,15 @@ const delivery = computed(() => order.value?.service_type === 'delivery')
 const waits = computed(() => order.value?.acceptance_status === 'accepted')
 const confirmMins = computed(() => order.value?.addon?.confirm_minutes ?? 5)
 
+// the same dishes sent again (the answer was lost) are added once
+const sendKeys = stableKey()
 async function send() {
   if (!quote.value || busy.value) return
   busy.value = true; error.value = ''
   try {
-    await post<Order>(`/customer/orders/${props.token}/append`, { items: quoteItems(), expected_total: quote.value.after.total }, { 'Idempotency-Key': newKey() })
+    const body = { items: quoteItems(), expected_total: quote.value.after.total }
+    await post<Order>(`/customer/orders/${props.token}/append`, body, { 'Idempotency-Key': sendKeys.for(body) })
+    sendKeys.done()
     if (cart) clearLines()
     router.replace(`/o/${props.token}`)
   } catch (e) {

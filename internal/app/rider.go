@@ -195,7 +195,7 @@ func (a *App) RegisterDevice(ctx context.Context, userID int64, platform, token,
 		var sub struct {
 			Endpoint string `json:"endpoint"`
 		}
-		if json.Unmarshal([]byte(token), &sub) != nil || !strings.HasPrefix(sub.Endpoint, "http") {
+		if json.Unmarshal([]byte(token), &sub) != nil || !pushEndpointOK(sub.Endpoint) {
 			return nil, ErrValidation("invalid push subscription")
 		}
 	}

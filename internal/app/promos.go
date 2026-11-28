@@ -360,6 +360,17 @@ func (a *App) SavePromotion(ctx context.Context, branchID, id int64, in Promotio
 
 // SetPromotionStatus publishes, pauses, resumes or ends a promotion.
 // draft -> active; active <-> paused; anything -> ended (final).
+// PromotionBrands is the brands a promotion applies to, for checking that
+// the person changing it works on all of them.
+func (a *App) PromotionBrands(ctx context.Context, branchID, id int64) ([]int64, error) {
+	var ids []int64
+	err := a.DB.QueryRow(ctx, `SELECT brand_ids FROM promotions WHERE id=$1 AND branch_id=$2`, id, branchID).Scan(&ids)
+	if isNoRows(err) {
+		return nil, ErrNotFound
+	}
+	return ids, err
+}
+
 func (a *App) SetPromotionStatus(ctx context.Context, branchID, id int64, to string, actor Actor) error {
 	return a.inTx(ctx, func(tx pgx.Tx) error {
 		var from string

@@ -448,6 +448,20 @@ func voidPolicy(m *orderMoney, kind string, pick bool) promoPolicy {
 	return promoPolicy{at: m.Created, current: true, pick: pick}
 }
 
+// refundPolicy is how a refund by dish (after the customer has the food, or
+// the table has paid) decides the promotion: always the order's own, never
+// another one. A promotion made or changed after the order must not move
+// what an old order gives back (docs/PRICING_CHECK.md D7c). A table bill
+// checks its promotion's hours at when the table was opened, and keeps its
+// share of it when the store is at fault, as when a dish is voided.
+func refundPolicy(m *orderMoney, service, kind string) promoPolicy {
+	if service == "dine_in" {
+		store := kind == "store"
+		return promoPolicy{at: m.Opened, current: true, floor: store, prorate: store}
+	}
+	return voidPolicy(m, kind, false)
+}
+
 // repriceAfterVoid writes a delivery or pickup order's new amounts after its
 // dishes changed (the voided line is already cancelled). Coupons stay but
 // never take off more than the promotion left of the dishes.
@@ -776,10 +790,7 @@ func (a *App) Refund(ctx context.Context, orderID int64, in RefundInput, actor A
 		if err != nil {
 			return err
 		}
-		pol := voidPolicy(m, in.ReasonKind, false)
-		if o.ServiceType == "dine_in" {
-			pol = dinePolicy(m, in.ReasonKind == "store")
-		}
+		pol := refundPolicy(m, o.ServiceType, in.ReasonKind)
 		// The dishes refunded before are gone as well: a refund is the
 		// difference between the order without them and the order without
 		// them and these, so that refunding dish by dish gives back what
@@ -1177,14 +1188,20 @@ func refundPayType(method string) string {
 	return "other"
 }
 
+// receivedSQL is the money order o actually took in: all of it once it is
+// paid, less what the store decided not to collect; before that what a
+// store balance paid, what was paid in advance and what the rider collected
+// at the door, never more than the order's amount.
+const receivedSQL = `(CASE WHEN o.payment_status = 'paid' THEN o.total - o.short_waived
+	ELSE LEAST(o.total, o.credit_paid + COALESCE(o.amount_received, 0) + COALESCE((SELECT c.amount_collected
+		FROM cash_collections c WHERE c.order_id = o.id), 0)) END)`
+
 // orderReceived is the money an order actually took in: all of it once it
 // is paid, and before that what a store balance paid and what the rider
 // collected at the door, never more than the order's amount.
 func orderReceived(ctx context.Context, q Querier, orderID int64) (int64, error) {
 	var got int64
-	err := q.QueryRow(ctx, `SELECT CASE WHEN o.payment_status = 'paid' THEN o.total
-		ELSE LEAST(o.total, o.credit_paid + COALESCE((SELECT c.amount_collected FROM cash_collections c
-			WHERE c.order_id = o.id), 0)) END FROM orders o WHERE o.id=$1`, orderID).Scan(&got)
+	err := q.QueryRow(ctx, `SELECT `+receivedSQL+` FROM orders o WHERE o.id=$1`, orderID).Scan(&got)
 	return got, err
 }
 

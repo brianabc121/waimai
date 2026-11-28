@@ -247,9 +247,14 @@ func (a *App) handoff(ctx context.Context, tx pgx.Tx, o *lockedOrder, actor Acto
 		}
 		// Paid at the counter in cash unless recorded otherwise (prepaid, or
 		// corrected on the order page afterwards).
+		// An order paid in advance that dishes were added to: the difference
+		// is taken at the counter, in cash (docs/PRICING_CHECK.md P1).
 		if _, err := tx.Exec(ctx, `UPDATE orders SET fulfillment_status='picked_up', payment_status='paid',
 			pay_type = CASE WHEN pay_type <> '' THEN pay_type WHEN credit_paid = total AND total > 0 THEN 'credit' ELSE 'cash' END,
-			amount_received = COALESCE(amount_received, total - credit_paid),
+			topup_cash = CASE WHEN payment_status = 'unpaid' AND amount_received IS NOT NULL
+				THEN GREATEST(0, total - credit_paid - amount_received) ELSE topup_cash END,
+			amount_received = CASE WHEN payment_status = 'unpaid' THEN total - credit_paid
+				ELSE COALESCE(amount_received, total - credit_paid) END,
 			handed_off_at=now(), completed_at=now(), version=version+1, updated_at=now() WHERE id=$1`, o.ID); err != nil {
 			return err
 		}
@@ -594,9 +599,12 @@ func (a *App) RiderDeliverPaid(ctx context.Context, taskID, riderID, collected i
 		}
 		paid := o.Payment
 		// what a store balance paid is not collected at the door
-		var due, fromCredit int64
-		if err := tx.QueryRow(ctx, `SELECT total - credit_paid, credit_paid FROM orders WHERE id=$1`, o.ID).
-			Scan(&due, &fromCredit); err != nil {
+		// nor is what was paid in advance, when dishes were added after
+		// (prepaid > 0 only then, see prepaidDue)
+		var due, fromCredit, prepaid int64
+		if err := tx.QueryRow(ctx, `SELECT total - credit_paid - CASE WHEN payment_status = 'unpaid' THEN COALESCE(amount_received, 0) ELSE 0 END,
+			credit_paid, CASE WHEN payment_status = 'unpaid' THEN COALESCE(amount_received, 0) ELSE 0 END
+			FROM orders WHERE id=$1`, o.ID).Scan(&due, &fromCredit, &prepaid); err != nil {
 			return err
 		}
 		if o.Payment == "unpaid" && due == 0 && fromCredit > 0 {
@@ -609,7 +617,13 @@ func (a *App) RiderDeliverPaid(ctx context.Context, taskID, riderID, collected i
 			if err != nil {
 				return err
 			}
-			if _, err := tx.Exec(ctx, `UPDATE orders SET pay_type='online', pay_channel_id=$2, pay_method=$3,
+			if prepaid > 0 {
+				// the difference came the way the rest did: the order keeps
+				// the method it was paid with in advance
+				if _, err := tx.Exec(ctx, `UPDATE orders SET amount_received=total - credit_paid WHERE id=$1`, o.ID); err != nil {
+					return err
+				}
+			} else if _, err := tx.Exec(ctx, `UPDATE orders SET pay_type='online', pay_channel_id=$2, pay_method=$3,
 				amount_received=total - credit_paid WHERE id=$1`, o.ID, ch, name); err != nil {
 				return err
 			}
@@ -627,6 +641,13 @@ func (a *App) RiderDeliverPaid(ctx context.Context, taskID, riderID, collected i
 			// cash is counted
 			if collected >= due {
 				paid = "paid"
+				// the difference of an order paid in advance came in cash
+				if prepaid > 0 {
+					if _, err := tx.Exec(ctx, `UPDATE orders SET topup_cash=$2, amount_received=total - credit_paid WHERE id=$1`,
+						o.ID, due); err != nil {
+						return err
+					}
+				}
 			}
 		}
 		if _, err := tx.Exec(ctx, `UPDATE orders SET fulfillment_status='delivered', payment_status=$2,
@@ -684,7 +705,9 @@ func (a *App) RiderFail(ctx context.Context, taskID, riderID int64, reason strin
 
 func queryCash(ctx context.Context, q Querier, where string, args ...any) ([]*CashCollection, error) {
 	rows, err := q.Query(ctx, `SELECT c.id, c.order_id, o.public_no, c.rider_id, u.display_name, c.amount_due,
-		c.amount_collected, c.reconcile_status, c.amount_returned, c.reconciled_at, c.note, c.created_at
+		c.amount_collected, c.reconcile_status, c.amount_returned, c.reconciled_at, c.note, c.created_at,
+		CASE WHEN o.payment_status = 'unpaid' AND o.fulfillment_status = 'delivered'
+			THEN GREATEST(0, c.amount_due - c.amount_collected) ELSE 0 END, o.late_cash, o.short_waived
 		FROM cash_collections c JOIN users u ON u.id = c.rider_id JOIN orders o ON o.id = c.order_id
 		WHERE `+where, args...)
 	if err != nil {
@@ -695,7 +718,8 @@ func queryCash(ctx context.Context, q Querier, where string, args ...any) ([]*Ca
 	for rows.Next() {
 		c := &CashCollection{}
 		if err := rows.Scan(&c.ID, &c.OrderID, &c.PublicNo, &c.RiderID, &c.RiderName, &c.AmountDue,
-			&c.AmountCollected, &c.ReconcileStatus, &c.AmountReturned, &c.ReconciledAt, &c.Note, &c.CreatedAt); err != nil {
+			&c.AmountCollected, &c.ReconcileStatus, &c.AmountReturned, &c.ReconciledAt, &c.Note, &c.CreatedAt,
+			&c.Short, &c.LateCash, &c.Waived); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -747,6 +771,71 @@ func (a *App) Reconcile(ctx context.Context, id, amountReturned int64, note stri
 			return err
 		}
 		return notify(ctx, tx, Event{BranchID: branchID, OrderID: orderID})
+	})
+	if err != nil {
+		return nil, err
+	}
+	out, err := queryCash(ctx, a.DB, `c.id=$1`, id)
+	if err != nil || len(out) == 0 {
+		return nil, wrap("load cash", err)
+	}
+	return out[0], nil
+}
+
+// SettleShort closes an order the rider collected too little for
+// (docs/PRICING_CHECK.md P2): "collected" says the store got the rest in
+// cash afterwards, "waived" that it lets the rest go. Either way the order
+// is paid from now on, and counts in the takings of today.
+func (a *App) SettleShort(ctx context.Context, id int64, action, note string, actor Actor) (*CashCollection, error) {
+	if action != "collected" && action != "waived" {
+		return nil, ErrValidation("action is collected or waived")
+	}
+	note = strings.TrimSpace(note)
+	if len([]rune(note)) > 200 {
+		return nil, ErrValidation("note is too long")
+	}
+	if action == "waived" && note == "" {
+		return nil, ErrValidation("say why the rest is not collected")
+	}
+	err := a.inTx(ctx, func(tx pgx.Tx) error {
+		var orderID int64
+		if err := tx.QueryRow(ctx, `SELECT order_id FROM cash_collections WHERE id=$1`, id).Scan(&orderID); err != nil {
+			if isNoRows(err) {
+				return ErrNotFound
+			}
+			return err
+		}
+		o, err := lockOrder(ctx, tx, orderID)
+		if err != nil {
+			return err
+		}
+		var due, collected int64
+		if err := tx.QueryRow(ctx, `SELECT amount_due, amount_collected FROM cash_collections WHERE id=$1 FOR UPDATE`,
+			id).Scan(&due, &collected); err != nil {
+			return err
+		}
+		short := due - collected
+		if o.Payment != "unpaid" || o.Fulfillment != "delivered" || short <= 0 {
+			return ErrInvalidState("this order is not short of money")
+		}
+		// late: cash taken at the store now; waived: never received. The
+		// cash part of an order paid in advance is what the rider took plus
+		// what the store takes now.
+		late, waived, cash := short, int64(0), due
+		if action == "waived" {
+			late, waived, cash = 0, short, collected
+		}
+		if _, err := tx.Exec(ctx, `UPDATE orders SET late_cash=$2, short_waived=$3, payment_status='paid',
+			topup_cash = CASE WHEN amount_received IS NOT NULL THEN $4 ELSE topup_cash END,
+			amount_received = total - credit_paid - $3, version=version+1, updated_at=now() WHERE id=$1`,
+			o.ID, late, waived, cash); err != nil {
+			return err
+		}
+		if err := audit(ctx, tx, o.BranchID, o.ID, actor, "cash.short_"+action,
+			map[string]any{"amount_due": due, "amount_collected": collected, "short": short, "note": note}); err != nil {
+			return err
+		}
+		return notify(ctx, tx, Event{BranchID: o.BranchID, OrderID: o.ID})
 	})
 	if err != nil {
 		return nil, err

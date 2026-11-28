@@ -168,15 +168,54 @@ func (a *App) Approve(ctx context.Context, requester *User, branchID, approverID
 	return out, nil
 }
 
+// ApprovalReplayOnly is set on the request's context when its approval was
+// already spent on this very request (same Idempotency-Key): the request may
+// only find its earlier result, it may not do anything new.
+const ApprovalReplayOnly = "approval_replay_only"
+
+// ApprovalUse is an approval spent on a request.
+type ApprovalUse struct {
+	By     int64
+	UsedAt time.Time
+	// Replay: the approval was spent before, on a request with this same
+	// Idempotency-Key.
+	Replay bool
+}
+
 // UseApproval spends an approval on the action at hand: it must be for this
-// person, this store and one of the permissions the action needs.
-func (a *App) UseApproval(ctx context.Context, token string, branchID, requesterID int64, perms []string) (int64, error) {
-	var by int64
-	err := a.DB.QueryRow(ctx, `UPDATE approvals SET used_at=now() WHERE token_hash=$1 AND branch_id=$2 AND requester_id=$3
-		AND perm = ANY($4) AND used_at IS NULL AND expires_at > now() RETURNING approver_id`,
-		hashToken(token), branchID, requesterID, perms).Scan(&by)
-	if isNoRows(err) {
-		return 0, Err(http.StatusForbidden, "APPROVAL_INVALID", "the approval was used or has expired; ask again")
+// person, this store and one of the permissions the action needs. idemKey is
+// the request's Idempotency-Key, if it has one: the same request sent again
+// (its answer was lost) is let through to find its earlier result.
+func (a *App) UseApproval(ctx context.Context, token string, branchID, requesterID int64, perms []string, idemKey string) (*ApprovalUse, error) {
+	var u ApprovalUse
+	err := a.DB.QueryRow(ctx, `UPDATE approvals SET used_at=now(), used_key=$5 WHERE token_hash=$1 AND branch_id=$2 AND requester_id=$3
+		AND perm = ANY($4) AND used_at IS NULL AND expires_at > now() RETURNING approver_id, used_at`,
+		hashToken(token), branchID, requesterID, perms, idemKey).Scan(&u.By, &u.UsedAt)
+	if isNoRows(err) && idemKey != "" {
+		err = a.DB.QueryRow(ctx, `SELECT approver_id, used_at FROM approvals WHERE token_hash=$1 AND branch_id=$2 AND requester_id=$3
+			AND perm = ANY($4) AND used_at IS NOT NULL AND used_key=$5`,
+			hashToken(token), branchID, requesterID, perms, idemKey).Scan(&u.By, &u.UsedAt)
+		u.Replay = err == nil
 	}
-	return by, err
+	if isNoRows(err) {
+		return nil, Err(http.StatusForbidden, "APPROVAL_INVALID", "the approval was used or has expired; ask again")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+// RestoreApproval gives back an approval whose action was refused: nothing
+// was done with it, so it is still good for the time it has left.
+func (a *App) RestoreApproval(ctx context.Context, token string, u *ApprovalUse) error {
+	_, err := a.DB.Exec(ctx, `UPDATE approvals SET used_at=NULL, used_key='' WHERE token_hash=$1 AND used_at=$2`,
+		hashToken(token), u.UsedAt)
+	return err
+}
+
+// approvalReplayOnly says whether this request may only replay.
+func approvalReplayOnly(ctx context.Context) bool {
+	v, _ := ctx.Value(ApprovalReplayOnly).(bool)
+	return v
 }

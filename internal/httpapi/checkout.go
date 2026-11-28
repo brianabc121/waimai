@@ -82,12 +82,10 @@ func (s *Server) savePaySettings(c *gin.Context, bid int64) {
 func (s *Server) discountOK(c *gin.Context, bid int64) bool {
 	err := permError(c, bid, []string{app.PermCheckoutDiscount})
 	if err == errForbidden && c.GetHeader("X-Approval") != "" {
-		by, aerr := s.App.UseApproval(c, c.GetHeader("X-Approval"), bid, currentUser(c).ID, []string{app.PermCheckoutDiscount})
-		if aerr != nil {
+		if aerr := s.useApproval(c, bid, []string{app.PermCheckoutDiscount}); aerr != nil {
 			fail(c, aerr)
 			return false
 		}
-		c.Set("approved_by", by)
 		return true
 	}
 	if err != nil {

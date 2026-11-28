@@ -173,6 +173,21 @@ func TestPricingCheckSamples(t *testing.T) {
 		{"S13 店铺原因退两瓶后：满减留 5.00", Input{Lines: []Line{{Key: "water", Amount: 3000}}, Fees: pickup, Adjustments: []Adjustment{
 			{Kind: "promotion", Stage: StageOrder, Amount: 500}}},
 			want{goods: 500, svc: 125, tax: 435, total: 4060, disc: []int64{500}, svcs: []int64{125}, taxs: []int64{315}}},
+		// S15 (docs/CODE_REVIEW_FIX_PLAN.md M01): four waters, 15.00 off for spending 90.00.
+		// 120.00 − 15.00 = 105.00, service 5.25, packaging 10.00, tax 120.25 × 12% = 14.43.
+		// After one is returned the order is S13's three waters with the same 15.00 off: 99.40.
+		{"S15 自取四瓶水，满 90 减 15", Input{Lines: []Line{{Key: "water", Amount: 12000}}, Fees: pickup, Adjustments: []Adjustment{
+			{Kind: "promotion", Stage: StageOrder, Amount: 1500}}},
+			want{goods: 1500, svc: 525, tax: 1443, total: 13468, disc: []int64{1500}, svcs: []int64{525}, taxs: []int64{1323}}},
+		{"S15 退一瓶后：三瓶，仍按下单时的满 90 减 15", Input{Lines: []Line{{Key: "water", Amount: 9000}}, Fees: pickup, Adjustments: []Adjustment{
+			{Kind: "promotion", Stage: StageOrder, Amount: 1500}}},
+			want{goods: 1500, svc: 375, tax: 1065, total: 9940, disc: []int64{1500}, svcs: []int64{375}, taxs: []int64{945}}},
+		// S16 (docs/CODE_REVIEW_FIX_PLAN.md M02): a tea delivered (161.34, sample S11 C) gets a water added.
+		// 99.00, service 4.95, packaging 10.00, tax 113.95 × 12% = 13.67, delivery 69.00 untaxed: 196.62.
+		// Each dish's tax: tea (69.00 + 3.45) × 12% = 8.69, water (30.00 + 1.50) × 12% = 3.78; packaging's 1.20.
+		{"S16 外卖茶加一瓶水", Input{Lines: []Line{{Key: "tea", Amount: 6900}, {Key: "water", Amount: 3000}},
+			Fees: Fees{TaxRateBP: 1200, ServiceChargeBP: 500, Packaging: 1000, Delivery: 6900}},
+			want{svc: 495, tax: 1367, total: 19662, disc: []int64{0, 0}, svcs: []int64{345, 150}, taxs: []int64{869, 378}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

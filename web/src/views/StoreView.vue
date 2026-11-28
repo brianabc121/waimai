@@ -28,6 +28,7 @@ import { isFavorite, loadProfile, rememberStore, setFavorite } from './me/me'
 import '../orders'
 import '../media'
 import { chatEnabled } from '../chat'
+import { shareUrl } from '../share'
 
 // The "contact store" entry shows only where chat is set up.
 const chatOn = ref(false)
@@ -271,7 +272,9 @@ const showPromos = ref(false)
 const toast = ref('')
 async function share() {
   // on its own page the store shares that page, never the mall
-  const url = ownSite() ? location.origin + '/' : location.href
+  // The page's own address without its query: ?append= carries the link to
+  // an order, which must never leave with a shared store (docs/CODE_REVIEW_FIX_PLAN.md H04).
+  const url = ownSite() ? location.origin + '/' : shareUrl(location.origin, location.pathname)
   const data = { title: name.value, url }
   try {
     if (navigator.share) { await navigator.share(data); return }

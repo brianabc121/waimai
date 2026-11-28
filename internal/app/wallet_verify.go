@@ -93,16 +93,13 @@ func (a *App) RequestCreditCode(ctx context.Context, orderID int64, phone, purpo
 			return Err(http.StatusTooManyRequests, "OTP_DAILY_LIMIT", "too many codes for this order today")
 		}
 		if purpose == "spend" {
-			var cust int64
-			err := tx.QueryRow(ctx, `SELECT id FROM customers WHERE phone=$1`, phone).Scan(&cust)
-			if err == nil {
-				err = tx.QueryRow(ctx, `SELECT COALESCE((SELECT balance FROM wallet_accounts WHERE kind='store_credit'
-					AND branch_id=$1 AND customer_id=$2 AND currency=$3 AND NOT frozen), 0)`, oc.BranchID, cust, oc.Currency).
-					Scan(&out.Balance)
-			} else if !isNoRows(err) {
+			// what the order can be paid with: the refund balance and the
+			// stored value, as spending counts them (storeCreditOf)
+			bal, err := storeCreditOf(ctx, tx, oc.BranchID, phone, oc.Currency)
+			if err != nil {
 				return err
 			}
-			if out.Balance <= 0 {
+			if out.Balance = bal; out.Balance <= 0 {
 				return Err(http.StatusConflict, "CREDIT_NONE", "this customer has no balance at the store")
 			}
 		}

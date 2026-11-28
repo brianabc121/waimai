@@ -265,6 +265,21 @@ func (a *App) ListStoreBatches(ctx context.Context, branchID int64) ([]BatchRow,
 	return listBatches(ctx, a.DB, `branch_id=$1 AND source='claim'`, branchID)
 }
 
+// StoreBatchBrand is the brand a store's claimable batch belongs to (0 = the
+// main brand, for batches from before brands).
+func (a *App) StoreBatchBrand(ctx context.Context, branchID, id int64) (int64, error) {
+	var brand *int64
+	err := a.DB.QueryRow(ctx, `SELECT brand_id FROM coupon_batches WHERE id=$1 AND branch_id=$2 AND source='claim'`,
+		id, branchID).Scan(&brand)
+	if isNoRows(err) {
+		return 0, ErrNotFound
+	}
+	if brand == nil {
+		return 0, err
+	}
+	return *brand, err
+}
+
 func (a *App) SaveStoreBatch(ctx context.Context, branchID, id int64, in CouponBatchInput, actor Actor) (int64, error) {
 	if err := in.validate(false); err != nil {
 		return 0, err

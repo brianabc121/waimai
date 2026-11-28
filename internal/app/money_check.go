@@ -123,6 +123,28 @@ func (a *App) CheckOrderMoney(ctx context.Context, orderID int64) ([]string, err
 	if badRate > 0 {
 		fail("D14 commission of another platform")
 	}
+	// P1–P3 money that reached the order after its first payment
+	// (docs/PRICING_CHECK.md §2.2a): the cash part of an order paid another
+	// way, the cash taken later and what was let go are parts of what was
+	// due in money; only a paid order has them; what was let go was never
+	// received, so it is never given back.
+	var topUp, late, waived, credit int64
+	var pay string
+	if err := a.DB.QueryRow(ctx, `SELECT topup_cash, late_cash, short_waived, credit_paid, payment_status FROM orders WHERE id=$1`,
+		orderID).Scan(&topUp, &late, &waived, &credit, &pay); err != nil {
+		return nil, err
+	}
+	if topUp+late+waived > 0 {
+		if pay != "paid" {
+			fail("P1 order is %s with top-up %d, late cash %d, let go %d", pay, topUp, late, waived)
+		}
+		if due := o.total - credit; topUp > due || late > due || waived > due || late > 0 && waived > 0 {
+			fail("P2 top-up %d, late cash %d, let go %d of %d due in money", topUp, late, waived, o.total-credit)
+		}
+		if o.refunded > o.total-waived {
+			fail("P2 refunded %d of %d received (%d let go)", o.refunded, o.total-waived, waived)
+		}
+	}
 	// D7 never more given back than was paid
 	if o.refunded > o.total {
 		fail("D7 refunded %d of %d", o.refunded, o.total)

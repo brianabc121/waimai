@@ -497,6 +497,12 @@ func creditRefundLimits(ctx context.Context, tx pgx.Tx, branchID, amount int64, 
 	if err != nil || owner {
 		return err
 	}
+	// One person's refunds into balances at a store go one at a time: the
+	// second waits here and then counts the first in today's total.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`,
+		fmt.Sprintf("credit-refund-day:%d:%d", branchID, actor.ID)); err != nil {
+		return err
+	}
 	var over, daily, today int64
 	if err := tx.QueryRow(ctx, `SELECT b.credit_approve_over, b.credit_daily_limit,
 		COALESCE((SELECT sum(r.to_credit - (r.amount - r.cash_part)) FROM order_refunds r

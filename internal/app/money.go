@@ -120,6 +120,9 @@ func loadMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, erro
 		return nil, err
 	}
 	havePromoRow := false
+	// held is the promotion's terms as the order recorded them
+	var held *orderRule
+	var heldName, heldNameEn string
 	var others int64
 	for rows.Next() {
 		var c orderCoupon
@@ -141,6 +144,9 @@ func loadMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, erro
 		if c.Kind == "promotion" {
 			havePromoRow = true
 			m.PromoAmount += c.Amount
+			if r, ok := readOrderRule(rule); ok {
+				held, heldName, heldNameEn = &r, c.Name, c.NameEn
+			}
 			continue
 		}
 		if c.Kind == KindPlatformMerchantPromo {
@@ -167,10 +173,19 @@ func loadMoney(ctx context.Context, q Querier, orderID int64) (*orderMoney, erro
 		if err != nil {
 			return nil, err
 		}
+		if len(ps) == 0 && held != nil {
+			// the promotion itself is gone: the order still has its terms
+			ps = []Promotion{{ID: *promoID, Name: heldName, NameEn: heldNameEn, Status: "ended"}}
+		}
 		if len(ps) == 1 {
 			m.Promo = &ps[0]
 			if promoKind != "" {
 				m.Promo.Kind = promoKind
+			}
+			// The order keeps the terms it was placed under: what the store
+			// changed on the promotion since is for new orders (D7c).
+			if held != nil {
+				m.Promo.Kind, m.Promo.Threshold, m.Promo.Value, m.Promo.MaxDiscount = held.Kind, held.Threshold, held.Value, held.MaxDiscount
 			}
 			// it applied to the order's brand when the order took it, and an
 			// order keeps what it took
@@ -592,7 +607,25 @@ func saveMoney(ctx context.Context, tx pgx.Tx, b *Branch, orderID int64, p *pric
 	}
 	// what was paid from a store balance stays within the new amount
 	// (docs/REFUND_BALANCE_DESIGN.md §5.4)
-	return settleTenders(ctx, tx, orderID)
+	if err := settleTenders(ctx, tx, orderID); err != nil {
+		return err
+	}
+	return prepaidDue(ctx, tx, orderID)
+}
+
+// prepaidDue keeps "paid" true for an order that was paid before it left the
+// store (a staff order marked as paid): when dishes are added and it now
+// costs more than was received, the difference is owed and the order is
+// unpaid again until the rider (or the counter, for a pickup) collects it
+// (docs/PRICING_CHECK.md P1). Taking the added dishes off again makes it
+// paid as before. amount_received keeps what was paid in advance.
+func prepaidDue(ctx context.Context, tx pgx.Tx, orderID int64) error {
+	_, err := tx.Exec(ctx, `UPDATE orders SET payment_status = CASE WHEN total - credit_paid > amount_received THEN 'unpaid' ELSE 'paid' END
+		WHERE id=$1 AND amount_received IS NOT NULL AND order_type <> 'platform' AND service_type <> 'dine_in'
+			AND acceptance_status IN ('pending', 'accepted')
+			AND fulfillment_status IN ('none', 'awaiting_handoff', 'awaiting_pickup')
+			AND payment_status <> CASE WHEN total - credit_paid > amount_received THEN 'unpaid' ELSE 'paid' END`, orderID)
+	return err
 }
 
 // saveDiscountRows replaces the order's discount rows: one for the
@@ -612,9 +645,9 @@ func saveDiscountRows(ctx context.Context, tx pgx.Tx, branchID, orderID int64, p
 		}
 	} else if p.Promo != nil && t.PromotionDiscount > 0 {
 		if _, err := tx.Exec(ctx, `INSERT INTO order_discounts (order_id, branch_id, kind, funded_by, name, name_en,
-			amount, promotion_id, per_line, brand_ids, created_at) VALUES ($1,$2,'promotion','store',$3,$4,$5,$6,$7,$8,
+			amount, promotion_id, per_line, brand_ids, rule, created_at) VALUES ($1,$2,'promotion','store',$3,$4,$5,$6,$7,$8,$9,
 			(SELECT created_at FROM orders WHERE id=$1))`, orderID, branchID, t.PromotionName,
-			t.PromotionNameEn, t.PromotionDiscount, p.Promo.ID, perLine(p.promoShare, p.ids), p.Promo.BrandIDs); err != nil {
+			t.PromotionNameEn, t.PromotionDiscount, p.Promo.ID, perLine(p.promoShare, p.ids), p.Promo.BrandIDs, orderRuleOf(p.Promo)); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE promotion_redemptions SET amount=$2 WHERE order_id=$1 AND status='applied'`,

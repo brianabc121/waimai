@@ -49,6 +49,9 @@ func TestBrandsOverHTTP(t *testing.T) {
 	if fmt.Sprint(m["brand_id"]) != bid {
 		t.Fatalf("member brand: %v", m)
 	}
+	// docs/CODE_REVIEW_FIX_PLAN.md H03: only the owner sets who works on which brand; nobody lifts their own limit
+	desk.want(403, "OWNER_ONLY", "PUT", "/merchant/branches/"+b+"/staff/"+deskID+"/brands", map[string]any{"brand_ids": []any{}})
+	desk.want(403, "BRAND_FORBIDDEN", "GET", "/merchant/branches/"+b+"/member-list", nil)
 	// Back to every brand.
 	owner.want(200, "", "PUT", "/merchant/branches/"+b+"/staff/"+deskID+"/brands", map[string]any{"brand_ids": []any{}})
 	desk.want(200, "", "GET", "/merchant/branches/"+b+"/member-list", nil)

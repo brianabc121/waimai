@@ -3,6 +3,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -109,6 +110,46 @@ func currentUser(c *gin.Context) *app.User {
 	return user
 }
 
+// replayable marks a request whose action is idempotent by its
+// Idempotency-Key: sent again with an approval that it already spent, it is
+// let through to find its earlier result (the action itself refuses to do
+// anything new, see app.ApprovalReplayOnly).
+func replayable(c *gin.Context) { c.Set("approval_replayable", true) }
+
+// useApproval spends the request's X-Approval on one of perms and notes who
+// approved. An approval spent on a request that is then refused (4xx) is
+// given back by approvalBack.
+func (s *Server) useApproval(c *gin.Context, bid int64, perms []string) error {
+	key := ""
+	if c.GetBool("approval_replayable") {
+		key = c.GetHeader("Idempotency-Key")
+	}
+	u, err := s.App.UseApproval(c, c.GetHeader("X-Approval"), bid, currentUser(c).ID, perms, key)
+	if err != nil {
+		return err
+	}
+	if u.Replay {
+		c.Set(app.ApprovalReplayOnly, true)
+	} else {
+		c.Set("approval_spent", u)
+	}
+	c.Set("approved_by", u.By)
+	return nil
+}
+
+// approvalBack gives an approval back when the request it was spent on was
+// refused: a failed check must not cost the manager's code.
+func (s *Server) approvalBack(c *gin.Context) {
+	c.Next()
+	v, ok := c.Get("approval_spent")
+	if !ok || c.Writer.Status() < 400 || c.Writer.Status() >= 500 {
+		return
+	}
+	if err := s.App.RestoreApproval(context.WithoutCancel(c.Request.Context()), c.GetHeader("X-Approval"), v.(*app.ApprovalUse)); err != nil {
+		log.Printf("restore approval: %v", err)
+	}
+}
+
 func staffActor(c *gin.Context) app.Actor {
 	a := app.Actor{Type: "staff", ID: currentUser(c).ID, ApprovedBy: c.GetInt64("approved_by")}
 	// The workbench and the kitchen screen say which of them is asking.
@@ -132,8 +173,12 @@ const (
 func need(perms ...string) []string { return perms }
 
 var (
-	pAny          = need(needAny)
-	pOrderView    = need(app.PermOrderView)
+	pAny       = need(needAny)
+	pOrderView = need(app.PermOrderView)
+	// pOrderRead is who may read one whole order: whoever lists, follows,
+	// handles or enters orders at the desk, or runs the tables.
+	pOrderRead = need(app.PermOrderView, app.PermOrderProgress, app.PermOrderHandle, app.PermOrderCancel,
+		app.PermOrderAftersale, app.PermOrderManual, app.PermOrderPlatform, app.PermTableUse)
 	pProgress     = need(app.PermOrderProgress)
 	pHandle       = need(app.PermOrderHandle)
 	pCancel       = need(app.PermOrderCancel)
@@ -248,12 +293,10 @@ func (s *Server) orderScope(c *gin.Context, roles []string) (int64, bool) {
 	// What the role may not do, a manager may approve for this one time
 	// (docs/STAFF_ACCESS_DESIGN.md §7).
 	if err == errForbidden && c.GetHeader("X-Approval") != "" {
-		by, aerr := s.App.UseApproval(c, c.GetHeader("X-Approval"), bid, currentUser(c).ID, roles)
-		if aerr != nil {
+		if aerr := s.useApproval(c, bid, roles); aerr != nil {
 			fail(c, aerr)
 			return 0, false
 		}
-		c.Set("approved_by", by)
 		return id, true
 	}
 	if err != nil {
@@ -353,7 +396,7 @@ func (s *Server) Router() *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.ContextWithFallback = true // lets handlers pass *gin.Context as the request context
-	r.Use(gin.Recovery(), requestID, s.metrics)
+	r.Use(gin.Recovery(), requestID, s.metrics, s.approvalBack)
 	_ = r.SetTrustedProxies([]string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"})
 
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
@@ -388,6 +431,7 @@ func (s *Server) Router() *gin.Engine {
 	api.DELETE("/customer/addresses/:id/photo", s.limit(s.publicWrites), s.deleteAddressPhoto)
 	api.POST("/stores/:slug/quotes", s.limit(s.publicWrites), s.createQuote)
 	api.POST("/stores/:slug/orders", s.limit(s.publicWrites), s.placeOrder)
+	api.GET("/stores/:slug/orders/placed", s.placedOrder)
 	api.GET("/customer/orders", s.customerOrders)
 	api.GET("/customer/orders/:token", s.customerOrder)
 	api.GET("/customer/orders/:token/reorder", s.customerReorder)
@@ -531,6 +575,7 @@ func (s *Server) Router() *gin.Engine {
 	auth.GET("/merchant/branches/:bid/trips/:id", s.tripDetail)
 	auth.GET("/merchant/branches/:bid/cash-collections", s.listCash)
 	auth.POST("/merchant/cash-collections/:id/reconcile", s.reconcile)
+	auth.POST("/merchant/cash-collections/:id/settle-short", s.settleShort)
 
 	// kitchen and packing
 	auth.GET("/kitchen/branches/:bid/board", s.kitchenBoard)

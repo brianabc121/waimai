@@ -11,6 +11,7 @@ import Pager from './Pager.vue'
 import { fmtDate, fmtDateTime } from './util'
 import { monitor } from './monitor'
 import '../../brands'
+import { latest } from '../../retry'
 
 extend({
   'as.search': ['搜索顾客、门店、商户、手机号、消息内容', 'Search customer, store, merchant, phone or message text'],
@@ -33,8 +34,12 @@ const SIZE = 30
 const route = useRoute(), router = useRouter()
 const ask = reactive({ q: '', who: '', unread: false, open: false, page: 1 })
 const list = ref<{ chats: SupportRow[]; total: number; unread: number; open: number } | null>(null), enabled = ref(true)
-const error = ref(''), detail = ref<SupportDetail | null>(null)
+const error = ref(''), loaded = ref<SupportDetail | null>(null)
 const party = computed(() => /^[cb]_\d+$/.test(String(route.query.party ?? '')) ? String(route.query.party) : '')
+// What is on screen is the conversation picked in the list, or nothing: a
+// late answer for the one picked before is never shown, replied to or closed.
+const detail = computed(() => loaded.value?.party === party.value ? loaded.value : null)
+const turn = latest()
 const me = computed(() => ({ uid: session.user!.id, name: session.user!.display_name || session.user!.username }))
 
 async function load() {
@@ -43,7 +48,7 @@ async function load() {
     list.value = r.list; enabled.value = r.enabled
     // keep the "read" mark of the open conversation current
     const row = r.list.chats.find(c => c.party === party.value)
-    if (row && detail.value) detail.value.peer_read_at = row.peer_read_at
+    if (row && loaded.value?.party === row.party) loaded.value.peer_read_at = row.peer_read_at
   } catch (e) { error.value = (e as Error).message }
 }
 let typing = 0
@@ -51,9 +56,13 @@ watch(() => ask.q, () => { clearTimeout(typing); typing = window.setTimeout(() =
 watch(() => [ask.who, ask.unread, ask.open], () => { ask.page = 1; void load() })
 
 async function open(p: string) {
-  detail.value = null
+  const mine = turn.next()
+  loaded.value = null
   if (!p) return
-  try { detail.value = await adminSupportChat(p) } catch (e) { error.value = (e as { code?: string }).code === 'NOT_FOUND' ? t('not_found') : (e as Error).message }
+  try {
+    const d = await adminSupportChat(p)
+    if (mine()) loaded.value = d
+  } catch (e) { if (mine()) error.value = (e as { code?: string }).code === 'NOT_FOUND' ? t('not_found') : (e as Error).message }
 }
 watch(party, p => void open(p), { immediate: true })
 
@@ -64,13 +73,18 @@ async function seen() {
   void load()
 }
 async function activity() {
-  if (detail.value) detail.value = await adminSupportChat(detail.value.party).catch(() => detail.value)
+  const d = detail.value
+  if (d) {
+    const mine = turn.next()
+    const fresh = await adminSupportChat(d.party).catch(() => null)
+    if (fresh && mine()) loaded.value = fresh
+  }
   void load()
 }
 async function resolve() {
   const d = detail.value
   if (!d) return
-  await adminSupportResolve(d.party, !d.resolved_at).then(() => open(d.party).then(load), e => { error.value = e.message })
+  await adminSupportResolve(d.party, !d.resolved_at).then(() => (party.value === d.party ? open(d.party) : Promise.resolve()).then(load), e => { error.value = e.message })
 }
 
 let stop = () => {}, timer = 0

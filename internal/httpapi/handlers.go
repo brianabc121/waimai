@@ -167,6 +167,18 @@ func hideZones(err error) error {
 	return err
 }
 
+// placedOrder answers "did my order go through?" for a request whose answer
+// never arrived.
+func (s *Server) placedOrder(c *gin.Context) {
+	phone, err := s.customerPhone(c)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	out, err := s.App.PlacedOrder(c, c.Param("slug"), phone, c.GetHeader("Idempotency-Key"))
+	reply(c, out, err)
+}
+
 func (s *Server) placeOrder(c *gin.Context) {
 	phone, err := s.customerPhone(c)
 	if err != nil {
@@ -495,8 +507,12 @@ func (s *Server) listRiders(c *gin.Context) {
 	c.JSON(200, gin.H{"riders": riders, "store": store})
 }
 
+// getOrder is the whole order, contact details and money included: for the
+// desk's people, not for everyone with a role in the store. A station, the
+// packing counter and a rider have their own, smaller, views
+// (docs/CODE_REVIEW_FIX_PLAN.md H02).
 func (s *Server) getOrder(c *gin.Context) {
-	id, ok := s.orderScope(c, pAny)
+	id, ok := s.orderScope(c, pOrderRead)
 	if !ok {
 		return
 	}
@@ -528,7 +544,36 @@ func (s *Server) orderCmd(c *gin.Context, roles []string, fn func(id int64, in o
 		fail(c, err)
 		return
 	}
-	c.JSON(200, o)
+	c.JSON(200, forKitchen(c, o.BranchID, o))
+}
+
+// kitchenView leaves on an order what a station and the packing counter
+// work with: the dishes, the notes, the table or the number, who carries
+// it. Who the customer is, where they live and what was paid are taken off.
+func kitchenView(o *app.Order) *app.Order {
+	o.CustomerPhone, o.ContactPhone, o.ContactTitle = "", "", ""
+	o.ContactWechat, o.ContactTelegram, o.ContactLine, o.ContactWhatsapp = "", "", "", ""
+	o.AddressLine, o.AddressUnit, o.AddressNote, o.AddressPhoto = "", "", "", false
+	o.PlaceName, o.PlaceID = "", ""
+	o.DestLat, o.DestLng, o.ZoneDistanceM = nil, nil, nil
+	o.Cash, o.Aftersale, o.MemberNo = nil, nil, nil
+	o.Totals = app.Totals{}
+	o.AmountReceived, o.PaymentNote, o.PayMethod, o.PayType, o.PayChannelID = nil, "", "", "", 0
+	o.CreditPaid, o.StoredPrincipalPaid, o.StoredBonusPaid, o.Due = 0, 0, 0, 0
+	o.PayCheck, o.PayCheckNote, o.AdjReason, o.AdjBy, o.AdjApprovedBy, o.AdjAt = "", "", "", "", "", nil
+	o.Discounts, o.Refunds = nil, nil
+	o.Platform = nil
+	return o
+}
+
+// forKitchen answers an action a station or the packing counter may take
+// with the kitchen's view of the order, unless the person may read orders
+// at the desk anyway.
+func forKitchen(c *gin.Context, bid int64, o *app.Order) *app.Order {
+	if o == nil || permError(c, bid, pOrderRead) == nil {
+		return o
+	}
+	return kitchenView(o)
 }
 
 func (s *Server) acceptOrder(c *gin.Context) {
@@ -994,6 +1039,32 @@ func (s *Server) listCash(c *gin.Context) {
 	c.JSON(200, gin.H{"collections": cash})
 }
 
+// settleShort closes an order the rider collected too little for: the store
+// got the rest, or lets it go.
+func (s *Server) settleShort(c *gin.Context) {
+	id, ok := idParam(c, "id")
+	if !ok {
+		return
+	}
+	bid, err := s.App.CashBranch(c, id)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	if !allowed(c, bid, pCash) {
+		return
+	}
+	var in struct {
+		Action string `json:"action"`
+		Note   string `json:"note"`
+	}
+	if !bind(c, &in) {
+		return
+	}
+	out, err := s.App.SettleShort(c, id, in.Action, in.Note, staffActor(c))
+	reply(c, out, err)
+}
+
 func (s *Server) reconcile(c *gin.Context) {
 	id, ok := idParam(c, "id")
 	if !ok {
@@ -1036,8 +1107,7 @@ func (s *Server) kitchenBoard(c *gin.Context) {
 	}
 	// The kitchen needs dishes and notes, not the customer's contact details.
 	for _, o := range orders {
-		o.CustomerPhone, o.AddressLine, o.AddressUnit, o.AddressNote, o.Cash = "", "", "", "", nil
-		o.PlaceName, o.PlaceID = "", ""
+		kitchenView(o)
 	}
 	// The timers turn yellow and red by the store's cooking target.
 	target := 15
@@ -1077,7 +1147,7 @@ func (s *Server) itemAction(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	c.JSON(200, o)
+	c.JSON(200, forKitchen(c, bid, o))
 }
 
 func (s *Server) packOrder(c *gin.Context) {
@@ -1097,7 +1167,7 @@ func (s *Server) packOrder(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	c.JSON(200, o)
+	c.JSON(200, forKitchen(c, o.BranchID, o))
 }
 
 // ---- rider ----
@@ -1252,7 +1322,14 @@ func (s *Server) listPromotions(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"promotions": ps})
+	// someone who works on some brands sees those brands' promotions
+	mine := ps[:0]
+	for _, p := range ps {
+		if s.seesBrands(c, bid, p.BrandIDs) {
+			mine = append(mine, p)
+		}
+	}
+	c.JSON(200, gin.H{"promotions": mine})
 }
 
 func (s *Server) savePromotion(c *gin.Context) {
@@ -1268,12 +1345,30 @@ func (s *Server) savePromotion(c *gin.Context) {
 	if !bind(c, &in) {
 		return
 	}
+	// the brands it was for and the brands it will be for
+	if !s.promotionMine(c, bid, id) || !s.mayUseBrands(c, bid, in.BrandIDs) {
+		return
+	}
 	id, err := s.App.SavePromotion(c, bid, id, in, staffActor(c))
 	if err != nil {
 		fail(c, err)
 		return
 	}
 	c.JSON(200, gin.H{"id": id})
+}
+
+// promotionMine checks that the person works on every brand of an existing
+// promotion (id 0: a new one, nothing to check).
+func (s *Server) promotionMine(c *gin.Context, bid, id int64) bool {
+	if id == 0 || currentUser(c).AllBrands(bid) {
+		return true
+	}
+	brands, err := s.App.PromotionBrands(c, bid, id)
+	if err != nil {
+		fail(c, err)
+		return false
+	}
+	return s.mayUseBrands(c, bid, brands)
 }
 
 func (s *Server) setPromotionStatus(c *gin.Context) {
@@ -1289,6 +1384,9 @@ func (s *Server) setPromotionStatus(c *gin.Context) {
 		Status string `json:"status"`
 	}
 	if !bind(c, &in) {
+		return
+	}
+	if !s.promotionMine(c, bid, id) {
 		return
 	}
 	if err := s.App.SetPromotionStatus(c, bid, id, in.Status, staffActor(c)); err != nil {

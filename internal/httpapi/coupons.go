@@ -39,7 +39,17 @@ func (s *Server) listStoreBatches(c *gin.Context) {
 		return
 	}
 	list, err := s.App.ListStoreBatches(c, bid)
-	reply(c, gin.H{"batches": list}, err)
+	mine := list[:0]
+	for _, b := range list {
+		var brand []int64
+		if b.BrandID != nil {
+			brand = []int64{*b.BrandID}
+		}
+		if s.seesBrands(c, bid, brand) {
+			mine = append(mine, b)
+		}
+	}
+	reply(c, gin.H{"batches": mine}, err)
 }
 
 func (s *Server) saveStoreBatch(c *gin.Context) {
@@ -55,8 +65,24 @@ func (s *Server) saveStoreBatch(c *gin.Context) {
 	if !bind(c, &in) {
 		return
 	}
+	if !s.batchMine(c, bid, id) || !s.mayUseBrand(c, bid, in.BrandID) {
+		return
+	}
 	id, err := s.App.SaveStoreBatch(c, bid, id, in, staffActor(c))
 	reply(c, gin.H{"id": id}, err)
+}
+
+// batchMine checks that the person works on the brand of an existing batch.
+func (s *Server) batchMine(c *gin.Context, bid, id int64) bool {
+	if id == 0 || currentUser(c).AllBrands(bid) {
+		return true
+	}
+	brand, err := s.App.StoreBatchBrand(c, bid, id)
+	if err != nil {
+		fail(c, err)
+		return false
+	}
+	return s.mayUseBrand(c, bid, brand)
 }
 
 func (s *Server) setStoreBatchStatus(c *gin.Context) {
@@ -72,6 +98,9 @@ func (s *Server) setStoreBatchStatus(c *gin.Context) {
 		Status string `json:"status"`
 	}
 	if !bind(c, &in) {
+		return
+	}
+	if !s.batchMine(c, bid, id) {
 		return
 	}
 	err := s.App.SetStoreBatchStatus(c, bid, id, in.Status, staffActor(c))

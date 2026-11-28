@@ -33,8 +33,7 @@ type RefundAuditRow struct {
 func (a *App) RefundAudit(ctx context.Context, since time.Time) ([]RefundAuditRow, error) {
 	rows, err := a.DB.Query(ctx, `SELECT o.id, o.branch_id, o.public_no, o.currency, o.total, o.discount, o.service_type,
 			count(r.id), sum(r.amount), (array_agg(r.reason_kind ORDER BY r.id DESC))[1],
-			CASE WHEN o.payment_status = 'paid' THEN o.total ELSE LEAST(o.total, o.credit_paid + COALESCE(
-				(SELECT c.amount_collected FROM cash_collections c WHERE c.order_id = o.id), 0)) END
+			`+receivedSQL+`
 		FROM orders o JOIN order_refunds r ON r.order_id = o.id
 		WHERE o.created_at >= $1 GROUP BY o.id ORDER BY o.id`, since)
 	if err != nil {
@@ -110,10 +109,7 @@ func (a *App) RefundAudit(ctx context.Context, since time.Time) ([]RefundAuditRo
 		if err != nil {
 			return nil, err
 		}
-		pol := voidPolicy(m, c.kind, false)
-		if c.service == "dine_in" {
-			pol = dinePolicy(m, c.kind == "store")
-		}
+		pol := refundPolicy(m, c.service, c.kind)
 		p, _, err := m.reprice(ctx, a.DB, b, m.without(less), pol)
 		if err != nil {
 			return nil, err

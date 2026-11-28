@@ -210,7 +210,13 @@ func notify(ctx context.Context, q Querier, ev Event) error {
 // request it unmarshals the stored response into out and returns replayed=true.
 // A concurrent holder of the same key blocks this insert until it commits.
 func idemBegin(ctx context.Context, tx pgx.Tx, scope, key string, reqHash []byte, out any) (bool, error) {
+	// An approval that was spent on this request before only finds what the
+	// request did then; it does not pay for doing it again.
+	spent := Err(http.StatusForbidden, "APPROVAL_INVALID", "the approval was used or has expired; ask again")
 	if key == "" {
+		if approvalReplayOnly(ctx) {
+			return false, spent
+		}
 		return false, nil
 	}
 	tag, err := tx.Exec(ctx, `INSERT INTO idempotency_records (scope, key, request_hash)
@@ -219,6 +225,9 @@ func idemBegin(ctx context.Context, tx pgx.Tx, scope, key string, reqHash []byte
 		return false, err
 	}
 	if tag.RowsAffected() == 1 {
+		if approvalReplayOnly(ctx) {
+			return false, spent
+		}
 		return false, nil
 	}
 	var storedHash []byte

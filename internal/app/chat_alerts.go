@@ -42,7 +42,7 @@ func (a *App) AddCustomerDevice(ctx context.Context, customerID int64, token str
 	var sub struct {
 		Endpoint string `json:"endpoint"`
 	}
-	if token == "" || len(token) > 4096 || json.Unmarshal([]byte(token), &sub) != nil || !strings.HasPrefix(sub.Endpoint, "https://") {
+	if token == "" || len(token) > 4096 || json.Unmarshal([]byte(token), &sub) != nil || !pushEndpointOK(sub.Endpoint) {
 		return 0, ErrValidation("invalid push subscription")
 	}
 	var id int64
