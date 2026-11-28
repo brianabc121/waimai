@@ -144,7 +144,7 @@ func kitchenXLSX(c *gin.Context, r *app.KitchenReport, dishes []app.KitchenDish)
 	}
 	via := map[string]string{"work": w("手机工作台", "own workbench"), "board": board, "": w("后台或来源不明", "back office or unknown")}
 	kind := map[string]string{"delivery": w("外卖", "delivery"), "pickup": w("自取", "pickup"), "dine_in": w("堂食", "dine-in")}
-	rows := [][]any{{w("做好时间", "Ready at"), w("算谁的", "Counts for"), w("点的账号", "Marked by"), w("菜", "Dish"), w("规格", "Options"), w("备注", "Note"),
+	rows := [][]any{{w("做好时间", "Ready at"), w("算谁的", "Counts for"), w("点的账号", "Marked by"), w("商品", "Item"), w("规格", "Options"), w("备注", "Note"),
 		w("份数", "Qty"), w("工作台", "Station"), w("订单", "Order"), w("类型", "Type"), w("桌号", "Table"), w("开始做的人", "Started by"),
 		w("用时（秒）", "Seconds"), w("超时", "Slow"), w("在哪点的", "Marked on"), w("撤回次数", "Taken back"), w("订单后来取消", "Order cancelled later")}}
 	yes := func(b bool) any {

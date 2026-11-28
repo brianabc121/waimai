@@ -4,8 +4,8 @@ import { extend } from '../../i18n'
 extend({
   'ad.i18n.nav': ['语言适配', 'Languages'],
   'ad.i18n.lang': ['核对语言', 'Language'],
-  'ad.i18n.hint': ['列出顾客端、商家端和员工端的所有界面文字。点译文直接改，保存后立即生效，不用重新发版（其他人最多一分钟内看到）。商家的菜单译文由商家自己管，不在这里。',
-    'Every text of the customer, merchant and staff screens. Click a translation to correct it; it takes effect at once, without a new release (others see it within a minute). Merchants manage their own menu translations.'],
+  'ad.i18n.hint': ['列出顾客端、商家端和员工端的所有界面文字。点译文直接改，保存后立即生效，不用重新发版（其他人最多一分钟内看到）。商家的商品译文由商家自己管，不在这里。',
+    'Every text of the customer, merchant and staff screens. Click a translation to correct it; it takes effect at once, without a new release (others see it within a minute). Merchants manage their own catalog translations.'],
   'ad.i18n.fill': ['机器补齐缺失', 'Fill in missing'], 'ad.i18n.export': ['导出 Excel', 'Export Excel'], 'ad.i18n.import': ['导入 Excel', 'Import Excel'],
   'ad.i18n.f_all': ['全部', 'All'], 'ad.i18n.f_human': ['人工已校对', 'Checked'], 'ad.i18n.f_machine': ['机器补齐待校对', 'Machine, to check'],
   'ad.i18n.f_missing': ['缺失', 'Missing'], 'ad.i18n.f_long': ['可能显示不下', 'May not fit'],

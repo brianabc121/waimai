@@ -174,22 +174,22 @@ func templateCols(currency string) []templateCol {
 	}
 	return []templateCol{
 		{"分类", 12, true, false, "必填。没有的分类会自动新建。"},
-		{"菜名", 18, true, false, "必填。同一分类里菜名相同的菜品会被更新，不会重复新建。"},
+		{"商品名", 18, true, false, "必填。同一分类里商品名相同的商品会被更新，不会重复新建。"},
 		{price, 11, true, false, "必填。填数字，例如 169 或 219.5，单位是店铺的货币。"},
 		{"英文名", 18, false, false, "选填。"},
-		{"描述", 24, false, false, "选填，最多 300 字。显示在菜名下面。"},
+		{"描述", 24, false, false, "选填，最多 300 字。显示在商品名下面。"},
 		{"规格", 30, false, false, "选填。一行一组：组名：选项1，选项2+加价。组名后可加 [可选] [多选] [选1-3]，不加就是必选一项。更新时填“无”清空规格。"},
 		{"主图链接", 30, false, false, "选填。图片网址（https:// 开头）。更新时填“无”清空。"},
 		{"更多图片链接", 30, false, false, "选填，最多 8 张。每行一个网址，或用逗号隔开。"},
-		{"商品详情", 30, false, false, "选填，最多 2000 字。菜品详情页里的长介绍。"},
-		{"上架", 8, false, true, "是 / 否。新菜品不填就是草稿（不上架），老菜品不填保持不变。"},
-		{"堂食", 8, false, true, "是 / 否。不填：新菜品为“是”，老菜品不变。"},
-		{"外卖", 8, false, true, "是 / 否。不填：新菜品为“是”，老菜品不变。"},
-		{"自取", 8, false, true, "是 / 否。不填：新菜品为“是”，老菜品不变。"},
+		{"商品详情", 30, false, false, "选填，最多 2000 字。商品详情页里的长介绍。"},
+		{"上架", 8, false, true, "是 / 否。新商品不填就是草稿（不上架），老商品不填保持不变。"},
+		{"堂食", 8, false, true, "是 / 否。不填：新商品为“是”，老商品不变。"},
+		{"外卖", 8, false, true, "是 / 否。不填：新商品为“是”，老商品不变。"},
+		{"自取", 8, false, true, "是 / 否。不填：新商品为“是”，老商品不变。"},
 		{"需要制作", 10, false, true, "是 / 否。瓶装饮料这类不用后厨做的填“否”。"},
 		{"工作台", 12, false, false, "选填。填后厨工作台的名称，要和系统里的一致。"},
 		{"限量库存", 10, false, false, "选填。填数字限量；填“不限”取消限量。"},
-		{"口味模板", 16, false, false, "选填。填店里口味模板的名字，多个用逗号隔开，最多 3 个，例如：奶茶类，通用。模板要先在菜单页“口味模板”里建好。更新时填“无”去掉。"},
+		{"口味模板", 16, false, false, "选填。填店里口味模板的名字，多个用逗号隔开，最多 3 个，例如：奶茶类，通用。模板要先在商品页“口味模板”里建好。更新时填“无”去掉。"},
 	}
 }
 
@@ -235,7 +235,7 @@ func (a *App) MenuTemplate(ctx context.Context, branchID int64, withMenu bool) (
 	var extra []templateCol
 	for _, p := range m.Platforms {
 		extra = append(extra, templateCol{head: "平台价:" + p.Prefix, width: 12,
-			note: "选填。这道菜在 " + p.Name + " 上的价格。不填就按店内价加价 " + strconv.FormatFloat(float64(p.Markup)/100, 'f', -1, 64) +
+			note: "选填。这件商品在 " + p.Name + " 上的价格。不填就按店内价加价 " + strconv.FormatFloat(float64(p.Markup)/100, 'f', -1, 64) +
 				"% 后取整；更新时填“无”改回自动算。"})
 	}
 	cats := []string{}
@@ -284,12 +284,12 @@ func (a *App) MenuTemplate(ctx context.Context, branchID int64, withMenu bool) (
 	return buildTemplate(m.Branch.Currency, rows, cats, stations, notes, extra)
 }
 
-// buildTemplate writes the 菜品 sheet (rows nil: the examples) and the
+// buildTemplate writes the 商品 sheet (rows nil: the examples) and the
 // 填写说明 sheet.
 func buildTemplate(currency string, rows [][]any, cats, stations, notes []string, extra []templateCol) ([]byte, error) {
 	f := excelize.NewFile()
 	defer f.Close()
-	const sheet, help = "菜品", "填写说明"
+	const sheet, help = "商品", "填写说明"
 	if err := f.SetSheetName("Sheet1", sheet); err != nil {
 		return nil, err
 	}
@@ -348,10 +348,10 @@ func buildTemplate(currency string, rows [][]any, cats, stations, notes []string
 	bold, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Size: 12}})
 	lines := [][]any{
 		{"怎么用"},
-		{"1. 在“菜品”表里一行填一个菜品，第一行表头不要改。带 * 的列必填，其余可以留空。"},
-		{"2. 保存后回到菜单页点“导入 Excel”上传。系统先给出预览，有错的行会标出原因，确认后才会写入。"},
-		{"3. 同一分类里菜名相同就更新这个菜品，留空的格子保持原样；否则新建。新菜品默认是草稿，上架列填“是”会直接上架。"},
-		{"4. 想批量改价或改图：先点“导出现有菜品”，改完再导入。"},
+		{"1. 在“商品”表里一行填一个商品，第一行表头不要改。带 * 的列必填，其余可以留空。"},
+		{"2. 保存后回到商品页点“导入 Excel”上传。系统先给出预览，有错的行会标出原因，确认后才会写入。"},
+		{"3. 同一分类里商品名相同就更新这个商品，留空的格子保持原样；否则新建。新商品默认是草稿，上架列填“是”会直接上架。"},
+		{"4. 想批量改价或改图：先点“导出现有商品”，改完再导入。"},
 		{""},
 		{"规格怎么写"},
 		{"一行一组：组名：选项，选项+加价。例如："},
@@ -363,7 +363,7 @@ func buildTemplate(currency string, rows [][]any, cats, stations, notes []string
 		{""},
 		{"图片"},
 		{"填图片网址（https:// 开头），例如 https://example.com/dish.jpg。更多图片最多 8 张，每行一个或用逗号隔开。"},
-		{"图片也可以导入后在菜品编辑里上传和裁剪。"},
+		{"图片也可以导入后在商品编辑里上传和裁剪。"},
 		{""},
 		{"各列说明"},
 	}

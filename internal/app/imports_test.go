@@ -104,10 +104,10 @@ func TestMenuImportFullDish(t *testing.T) {
 	noErr(t, err)
 	f, err := excelize.OpenReader(bytes.NewReader(file))
 	noErr(t, err)
-	if sh := f.GetSheetList(); len(sh) != 2 || sh[0] != "菜品" {
+	if sh := f.GetSheetList(); len(sh) != 2 || sh[0] != "商品" {
 		t.Fatalf("sheets: %v", sh)
 	}
-	h, _ := f.GetCellValue("菜品", "C1")
+	h, _ := f.GetCellValue("商品", "C1")
 	f.Close()
 	if h != "价格（PHP） *" {
 		t.Fatalf("price header: %q", h)

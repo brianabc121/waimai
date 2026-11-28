@@ -82,7 +82,7 @@ type MenuImport struct {
 // Headers are compared by normHeader, so "价格（PHP）*" is still 价格.
 var importColumns = map[string][]string{
 	"category":    {"分类", "category"},
-	"name":        {"菜名", "中文名", "商品名称", "name"},
+	"name":        {"商品名", "菜名", "中文名", "商品名称", "name"},
 	"price":       {"价格", "price"},
 	"name_en":     {"英文名", "englishname", "name_en"},
 	"description": {"描述", "简介", "description"},
@@ -343,7 +343,7 @@ func parseMenuSheet(content []byte) ([]ImportRow, error) {
 			}
 			for _, need := range []string{"category", "name", "price"} {
 				if _, ok := col[need]; !ok {
-					return nil, fmt.Errorf("the first row must have the columns 分类, 菜名 and 价格")
+					return nil, fmt.Errorf("the first row must have the columns 分类, 商品名 and 价格")
 				}
 			}
 			header = true

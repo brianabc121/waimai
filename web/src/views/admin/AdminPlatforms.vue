@@ -10,15 +10,15 @@ import { LANGS } from '../../langs'
 import { type DeliveryPlatform, bpToPct, pctToBp, platformName } from '../../platforms'
 
 extend({
-  'ad.pf.hint': ['商家在“设置 → 外卖平台”里勾选上架的平台，菜单里给每道菜设平台价；店员在“点单 → 平台下单”录入平台订单，单号是“前缀 + 平台单号”。佣金、加价是默认值，商家可以改成自己谈的。停用后老订单照常显示，不能删除。',
-    'Merchants turn platforms on in Settings → Delivery platforms and set platform prices on the menu; staff enter platform orders under Order → Platform order, numbered "prefix + the platform\'s number". Commission and markup are defaults a merchant may change. A stopped platform still shows on old orders; platforms cannot be deleted.'],
+  'ad.pf.hint': ['商家在“设置 → 外卖平台”里勾选上架的平台，商品里给每件商品设平台价；店员在“点单 → 平台下单”录入平台订单，单号是“前缀 + 平台单号”。佣金、加价是默认值，商家可以改成自己谈的。停用后老订单照常显示，不能删除。',
+    'Merchants turn platforms on in Settings → Delivery platforms and set platform prices on the catalog; staff enter platform orders under Order → Platform order, numbered "prefix + the platform\'s number". Commission and markup are defaults a merchant may change. A stopped platform still shows on old orders; platforms cannot be deleted.'],
   'ad.pf.name': ['名字', 'Name'], 'ad.pf.names': ['各语言名字（不填就显示名字）', 'Names by language (empty shows the name)'],
   'ad.pf.prefix': ['单号前缀', 'Order prefix'], 'ad.pf.countries': ['国家（两位代码，逗号分开，空 = 所有国家）', 'Countries (2-letter codes, comma separated; empty = all)'],
   'ad.pf.ccol': ['国家', 'Countries'], 'ad.pf.color': ['颜色', 'Colour'], 'ad.pf.logo': ['图标链接', 'Logo link'],
   'ad.pf.no_hint': ['平台单号示例', 'Order number example'], 'ad.pf.no_pattern': ['平台单号格式（正则，可空）', 'Order number pattern (regular expression, optional)'],
   'ad.pf.commission': ['默认佣金 %', 'Default commission %'], 'ad.pf.base': ['佣金按', 'Commission on'],
   'ad.pf.base_after': ['商家优惠后的金额', 'the amount after the merchant\'s discount'], 'ad.pf.base_orig': ['原价（优惠前）', 'the original amount'],
-  'ad.pf.markup': ['默认菜品加价 %', 'Default price markup %'],
+  'ad.pf.markup': ['默认商品加价 %', 'Default price markup %'],
   'ad.pf.active': ['启用', 'On'], 'ad.pf.stores': ['上架的店', 'Stores'],
   'ad.pf.new': ['新增平台', 'Add a platform'], 'ad.pf.edit': ['编辑', 'Edit'], 'ad.pf.save': ['保存', 'Save'], 'ad.pf.cancel': ['取消', 'Cancel'],
   'ad.pf.all': ['所有国家', 'All countries'], 'ad.pf.none': ['还没有外卖平台', 'No delivery platforms yet'],

@@ -78,7 +78,7 @@ function wait(s: number): string {
   if (s < 3600) return t('ad.n_minutes', { n: Math.floor(s / 60) })
   return shown.value === 'zh' ? `${Math.floor(s / 3600)} 小时` : `${Math.floor(s / 3600)} h`
 }
-// "短信 3 · 菜单导入 1" for the kinds that have any
+// "短信 3 · 商品导入 1" for the kinds that have any
 function split(field: keyof Omit<QueueKind, 'kind'>): string {
   return (status.value?.queue.by_kind ?? []).filter(k => k[field] > 0).map(k => `${kindName(k.kind)} ${k[field]}`).join(' · ')
 }
