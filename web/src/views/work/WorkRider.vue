@@ -2,6 +2,7 @@
 // Rider identity: the deliveries assigned to this person. A list of task
 // cards, and one page per delivery with a single main button for the next
 // step: pick up, arrived, delivered (with the cash collected).
+import AddrText from '../AddrText.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError, get, post, upload } from '../../api'
@@ -212,7 +213,8 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
         <template v-else>
           <div class="card stack">
             <div><b style="font-size:16px">{{ contactName(cur) }}</b>
-              <div>{{ cur.zone_name }} · {{ cur.address_line }} <b>{{ cur.address_unit }}</b>
+              <div class="wk-addr"><AddrText :o="cur" />
+                <span class="small muted">{{ cur.zone_name }}</span>
                 <span v-if="cur.zone_distance_m" class="tag warn">{{ t('outside_zone', { n: cur.zone_distance_m }) }}</span></div>
               <div v-if="cur.address_note" class="banner warn small" style="margin-top:6px">{{ t('wk.customer_note') }}：{{ cur.address_note }}</div></div>
             <div class="row">
@@ -305,7 +307,7 @@ const geoText = computed(() => !duty.on ? t('wk.duty.off_hint') : !props.active 
             <span class="tag" :class="st(o) === 'assigned' ? 'brand' : 'info'">{{ st(o) === 'assigned' ? t('wk.to_pickup') : t('f.' + o.fulfillment_status) }}</span></div>
           <div v-if="st(o) === 'assigned'" class="line"><span class="pt s"></span><span>{{ branchName }} ·
             <b :style="{ color: o.packing_status === 'packed' ? 'var(--ok)' : 'var(--warn)' }">{{ o.packing_status === 'packed' ? `${t('p.packed')} ${o.bags ?? ''} ${t('bags')}` : t('not_packed') }}</b></span></div>
-          <div class="line"><span class="pt"></span><span>{{ o.zone_name }} · {{ o.address_line }} {{ o.address_unit }}</span></div>
+          <div class="line"><span class="pt"></span><span><AddrText :o="o" :lead="o.zone_name ? o.zone_name + ' · ' : ''" /></span></div>
           <div class="row between small muted"><span>{{ itemsText(o) }}</span>
             <span style="white-space:nowrap">{{ due(o) ? t('wk.cod_short') : t('wk.prepaid') }} <span v-if="due(o) && was(o)" class="small muted">{{ was(o) }} </span><b v-if="due(o)" style="color:var(--brand-dark);font-size:16px">{{ money(collect(o), o.currency) }}</b></span></div>
           <button class="btn block" :class="{ primary: st(o) === 'assigned' }" data-act="open" @click="open(o)">{{ st(o) === 'assigned' ? t('wk.go_pickup') : t('wk.continue') }}</button>

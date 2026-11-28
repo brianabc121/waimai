@@ -142,6 +142,8 @@ export interface Order {
   // the brand it was placed under (docs/MULTI_BRAND_DESIGN.md §6)
   brand_id?: number; brand_name?: string; brand_color?: string
   customer_name: string; customer_phone: string; zone_name: string; address_line: string; address_unit: string
+  // the leading part of address_line that names the place (a tower, a mall), and Google's id of it
+  place_name?: string; place_id?: string
   // from the saved address: who to call (may differ from the account that ordered), other ways to reach them, a photo of the door
   contact_phone: string; contact_title: '' | 'mr' | 'ms'; contact_wechat: string; contact_telegram: string; contact_line: string; contact_whatsapp: string; address_photo: boolean
   address_note: string; note: string; currency: string; totals: Totals; payment_method: string
@@ -214,10 +216,11 @@ export interface AddonQuote { currency: string; lines: QuoteLine[]; subtotal: nu
 export interface StoreMember {
   id: number; brand_id?: number; no: number; status: 'temp' | 'active'; phone: string; name: string; source: string; contact: string
   address_line: string; address_unit: string; address_note: string; lat: number | null; lng: number | null; note: string
+  place_name?: string; place_id?: string
   expires_at: string | null; created_at: string
   stats?: { week: number; month: number; quarter: number; orders: number; spent: number; last_at: string | null; favorites: string[] }
 }
-export interface AddressHint { line: string; unit: string; note: string; lat: number | null; lng: number | null; mine: boolean; kind?: 'mine' | 'book' | 'store'; zone_name: string; fee: number | null }
+export interface AddressHint { line: string; unit: string; note: string; lat: number | null; lng: number | null; place_name?: string; place_id?: string; mine: boolean; kind?: 'mine' | 'book' | 'store'; zone_name: string; fee: number | null }
 export interface TableDevice { id: number; name: string; paired: boolean; paired_at: string | null }
 export interface TableSummary { id: number; order_id: number; public_no: string; guests: number; opened_at: string; total: number; item_count: number; unserved: number
   unserved_qty: number; rounds: number; tags: string[] }

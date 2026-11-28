@@ -123,9 +123,12 @@
   // What was asked is kept in window.__fakeAsked, for tests to look at.
   //   - a point (reverse geocoding) is always somewhere in Makati;
   //   - an address is found only when window.__fakeGeocodes is set, as one
-  //     result in the country asked for;
-  //   - the Places library exists only when window.__fakePlaces is set.
-  const asked = window.__fakeAsked = { geocode: [], suggest: [] }
+  //     result in the country asked for. A building asked for by name
+  //     ("... tower") comes back the way Google answers: the street it stands
+  //     on, without its name;
+  //   - the Places library exists only when window.__fakePlaces is set. A
+  //     chosen place has a full street address, in the language asked for.
+  const asked = window.__fakeAsked = { geocode: [], suggest: [], text: [], details: [] }
   const comp = (long_name, short_name, ...types) => ({ long_name, short_name, types })
   class Geocoder {
     geocode(req) {
@@ -137,7 +140,25 @@
       }] })
       if (!window.__fakeGeocodes) return Promise.reject(new Error('ZERO_RESULTS'))
       const where = req.componentRestrictions?.country ?? 'anywhere'
-      return Promise.resolve({ results: [{ formatted_address: `${req.address}, ${where}`, geometry: { location: new LatLng(14.5601, 121.0253) } }] })
+      const street = /tower/i.test(req.address) ? 'Makati Ave, Makati City, Metro Manila' : req.address
+      return Promise.resolve({ results: [{ formatted_address: `${street}, ${where}`, place_id: 'geo-1', geometry: { location: new LatLng(14.5601, 121.0253) } }] })
+    }
+  }
+  class Place {
+    constructor(o) { this.id = o.id; this.requestedLanguage = o.requestedLanguage }
+    fetchFields(req) {
+      asked.details.push({ id: this.id, language: this.requestedLanguage, fields: [...req.fields] })
+      this.location = new LatLng(14.5601, 121.0253)
+      this.formattedAddress = `1 Kalayaan Ave, Poblacion, Makati (${this.requestedLanguage ?? 'browser'})`
+      this.types = ['premise', 'point_of_interest']
+      return Promise.resolve({ place: this })
+    }
+    static searchNearby() { return Promise.resolve({ places: [] }) }
+    static searchByText(req) {
+      asked.text.push(req)
+      const p = new Place({ id: 'text-1' })
+      p.displayName = req.textQuery; p.formattedAddress = '1 Kalayaan Ave, Poblacion, Makati'; p.location = new LatLng(14.5601, 121.0253)
+      return Promise.resolve({ places: [p] })
     }
   }
   const places = {
@@ -145,10 +166,10 @@
     AutocompleteSuggestion: { fetchAutocompleteSuggestions(req) {
       asked.suggest.push(req)
       const where = (req.includedRegionCodes ?? ['anywhere']).join()
-      return Promise.resolve({ suggestions: [{ placePrediction: { mainText: { text: req.input }, secondaryText: { text: `Places, ${where}` },
-        toPlace: () => ({ location: new LatLng(14.5601, 121.0253), fetchFields: () => Promise.resolve() }) } }] })
+      return Promise.resolve({ suggestions: [{ placePrediction: { placeId: 'place-1', types: ['premise'], mainText: { text: req.input }, secondaryText: { text: `Places, ${where}` },
+        toPlace: () => new Place({ id: 'place-1' }) } }] })
     } },
-    Place: { searchNearby: () => Promise.resolve({ places: [] }) },
+    Place,
   }
   const importLibrary = name => name === 'places' && window.__fakePlaces ? Promise.resolve(places) : Promise.reject(new Error('no library'))
   window.google = { maps: { Map, OverlayView, LatLng, Point, Geocoder, importLibrary } }

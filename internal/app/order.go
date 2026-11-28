@@ -136,8 +136,12 @@ type Order struct {
 	ContactLine     string `json:"contact_line"`
 	ContactWhatsapp string `json:"contact_whatsapp"`
 	// AddressPhoto says the customer added a photo of the door.
-	AddressPhoto      bool      `json:"address_photo"`
-	AddressLine       string    `json:"address_line"`
+	AddressPhoto bool   `json:"address_photo"`
+	AddressLine  string `json:"address_line"`
+	// PlaceName is the leading part of AddressLine that names the place (a
+	// tower, a mall); PlaceID is Google's id of it. Both '' for a plain address.
+	PlaceName         string    `json:"place_name"`
+	PlaceID           string    `json:"place_id"`
 	AddressUnit       string    `json:"address_unit"`
 	AddressNote       string    `json:"address_note"`
 	Note              string    `json:"note"`
@@ -286,7 +290,7 @@ const orderCols = `o.id, o.merchant_id, o.branch_id, o.public_no, o.pickup_code,
 	COALESCE(o.pay_channel_id, 0), COALESCE((SELECT pc.status FROM payment_checks pc WHERE pc.order_id = o.id), ''),
 	COALESCE((SELECT pc.note FROM payment_checks pc WHERE pc.order_id = o.id), ''), o.order_type, o.dine_source,
 	o.brand_id, o.brand_name, COALESCE((SELECT br.color FROM brands br WHERE br.id = o.brand_id), ''), o.credit_paid,
-	o.stored_principal_paid, o.stored_bonus_paid`
+	o.stored_principal_paid, o.stored_bonus_paid, o.place_name, o.place_id`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	o := &Order{Items: []OrderItem{}, Discounts: []OrderDiscount{}, Voids: []OrderVoid{}, Refunds: []OrderRefund{}}
@@ -305,7 +309,7 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 		&t.AdjPercentBP, &t.StaffDiscount, &t.AdjMode, &t.RoundOff, &o.AdjReason, &o.AdjBy, &o.AdjApprovedBy, &o.AdjAt,
 		&o.PayType, &o.PayChannelID, &o.PayCheck, &o.PayCheckNote, &o.OrderType, &o.DineSource,
 		&o.BrandID, &o.BrandName, &o.BrandColor, &o.CreditPaid,
-		&o.StoredPrincipalPaid, &o.StoredBonusPaid)
+		&o.StoredPrincipalPaid, &o.StoredBonusPaid, &o.PlaceName, &o.PlaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -674,8 +678,10 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 		// A saved address fills in who and where; the order keeps its own copy.
 		var addressID *int64
 		var contact Address
+		var placeName string
 		if ad := cur.address; ad != nil {
 			addressID, contact = &ad.ID, *ad
+			placeName = ad.placeOfLine()
 			contact.onlyAsked(b)
 			in.CustomerName, in.AddressLine, in.AddressUnit, in.AddressNote = ad.ContactName, ad.line(), ad.Unit, ad.Note
 			destLat, destLng = ad.Lat, ad.Lng
@@ -690,11 +696,11 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			service_charge, tax_amount, tax_inclusive, tax_rate_bp, discount, total, payment_method, accept_deadline,
 			promotion_id, promotion_name, promotion_name_en, scheduled_for, release_at, dest_lat, dest_lng,
 			zone_distance_m, address_id, contact_phone, contact_title, contact_wechat, contact_telegram,
-			contact_line, contact_whatsapp, customer_lang, brand_id)
+			contact_line, contact_whatsapp, customer_lang, brand_id, place_name)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
 				now() + make_interval(mins => $27), NULLIF($28, 0), $29, $30,
 				$31::timestamptz, $31::timestamptz - make_interval(mins => $32), $33, $34, $35, $36, $37, $38, $39, $40,
-				$41, $42, $43, NULLIF($44, 0))
+				$41, $42, $43, NULLIF($44, 0), $45)
 			RETURNING id`,
 			b.MerchantID, b.ID, publicNo, pickupCode, hashToken(token), nonce, cur.ServiceType, in.CustomerName,
 			phone, cur.ZoneID, cur.ZoneName, in.AddressLine, in.AddressUnit, in.AddressNote, in.Note, b.Currency,
@@ -702,7 +708,7 @@ func (a *App) PlaceOrder(ctx context.Context, slug, phone, idemKey string, in Pl
 			t.Discount, t.Total, payMethod, b.AcceptTimeoutMinutes, t.PromotionID, t.PromotionName,
 			t.PromotionNameEn, cur.ScheduledFor, b.PrepMinutes, destLat, destLng, cur.ZoneDistanceM,
 			addressID, contact.Phone, contact.Title, contact.Wechat, contact.Telegram,
-			contact.Line, contact.Whatsapp, langOrEmpty(cur.Input.Lang), cur.Input.BrandID).Scan(&orderID)
+			contact.Line, contact.Whatsapp, langOrEmpty(cur.Input.Lang), cur.Input.BrandID, placeName).Scan(&orderID)
 		if err != nil {
 			return wrap("insert order", err)
 		}

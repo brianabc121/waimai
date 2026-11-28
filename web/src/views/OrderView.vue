@@ -2,6 +2,7 @@
 // One order as its customer sees it: where it is, what can be done about it
 // (cancel, ask for a refund, call, order again, review), what was paid, and
 // where it goes. Anyone holding the link sees it; the list needs a login.
+import AddrText from './AddrText.vue'
 import { storePath } from '../site'
 import { tagNames } from '../notes'
 import { fromLineOptions } from '../extras'
@@ -338,8 +339,7 @@ async function copyNo() {
           <h2>{{ t('od.info') }}</h2>
           <div v-if="order.service_type === 'delivery'" class="od-where">
             <div><small><svg class="pin" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M12 2.500a7 7 0 0 0-7 7c0 5.100 7 12 7 12s7-6.900 7-12a7 7 0 0 0-7-7zm0 9.600a2.600 2.600 0 1 1 0-5.200 2.600 2.600 0 0 1 0 5.200z" /></svg>{{ t('od.address') }}</small>
-              <b>{{ order.address_line }}</b>
-              <b v-if="order.address_unit">{{ order.address_unit }}</b>
+              <AddrText :o="order" />
               <span>{{ contactName(order) }}<i v-if="contactName(order)" class="gap"></i>{{ prettyPhone(contactPhone(order)) }}</span>
               <span v-if="order.address_note" class="note">{{ order.address_note }}</span></div>
           </div>

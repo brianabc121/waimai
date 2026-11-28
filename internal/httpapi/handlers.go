@@ -554,6 +554,7 @@ func kitchenView(o *app.Order) *app.Order {
 	o.CustomerPhone, o.ContactPhone, o.ContactTitle = "", "", ""
 	o.ContactWechat, o.ContactTelegram, o.ContactLine, o.ContactWhatsapp = "", "", "", ""
 	o.AddressLine, o.AddressUnit, o.AddressNote, o.AddressPhoto = "", "", "", false
+	o.PlaceName, o.PlaceID = "", ""
 	o.DestLat, o.DestLng, o.ZoneDistanceM = nil, nil, nil
 	o.Cash, o.Aftersale, o.MemberNo = nil, nil, nil
 	o.Totals = app.Totals{}

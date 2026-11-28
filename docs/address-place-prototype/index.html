@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>地标型地址 效果图</title>
+<style>
+  :root { --red:#8f1d1d; --cream:#fffaf2; --line:#e6d9c3; --gold:#f7e4b0; --ink:#2b1d14; --mut:#8a7a68; --warn:#fff4d6; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px; background:#f4ecdf; color:var(--ink); font:14px/1.5 "Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif; }
+  h1 { font-size:20px; margin:0 0 4px; } .sub { color:var(--mut); margin-bottom:20px; }
+  .grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:20px; }
+  .card { background:var(--cream); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .card h2 { font-size:15px; margin:0 0 4px; } .card .why { color:var(--mut); font-size:12px; margin-bottom:12px; }
+  .tag { display:inline-block; font-size:12px; padding:1px 8px; border-radius:10px; background:#eadfcd; margin-right:6px; }
+  .tag.bad { background:#f6d5d0; color:#8f1d1d; } .tag.ok { background:#d9efd9; color:#1d5b2a; }
+  .box { border:1.5px solid var(--red); border-radius:8px; padding:8px 12px; background:#fff; min-height:40px; }
+  .drop { border:1px solid var(--line); border-radius:8px; margin-top:6px; background:#fff; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,.08); }
+  .drop .hd { background:#f1e7d6; color:#7a5a3a; font-weight:700; font-size:12px; padding:6px 12px; }
+  .drop .it { padding:8px 12px; border-top:1px solid #f1e7d6; } .drop .it.on { background:var(--gold); }
+  .drop .it b { display:block; } .drop .it small { color:var(--mut); }
+  .drop .warn { background:var(--warn); color:#7a5200; font-size:12px; padding:6px 12px; }
+  .row { display:flex; gap:10px; align-items:center; margin-top:10px; } .row label { width:92px; color:#7a3b1d; font-weight:700; flex:none; }
+  .in { flex:1; border:1px solid var(--line); border-radius:8px; padding:7px 10px; background:#fff; }
+  .in.need { border-color:#d59a00; background:var(--warn); }
+  .place { flex:1; border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:#fff; }
+  .place b { font-size:15px; } .place small { color:var(--mut); display:block; }
+  .btn { display:inline-block; border:1px solid var(--red); color:var(--red); border-radius:8px; padding:4px 10px; font-size:12px; background:#fff; }
+  .rider { background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px; }
+  .rider .big { font-size:17px; font-weight:800; } .rider .unit { color:var(--red); font-weight:800; }
+  .rider small { color:var(--mut); display:block; } .rider .note { margin-top:6px; background:var(--warn); border-radius:6px; padding:4px 8px; font-size:13px; }
+  .full { grid-column:1 / -1; }
+  @media (max-width:760px) { .grid { grid-template-columns:1fr; } body { padding:16px; } }
+</style>
+</head>
+<body>
+<h1>地标型地址（例：输入 trump tower）效果图</h1>
+<div class="sub">示意图，地址文字是举例，实际以谷歌返回为准。对应 docs/ADDRESS_PLACE_DESIGN.md。</div>
+<div class="grid">
+
+  <div class="card">
+    <h2><span class="tag bad">现在</span>下拉只有一条大街</h2>
+    <div class="why">走的是“地理编码”退路：只拿到一串街道文字，地点名丢了。</div>
+    <div class="box">trump tower</div>
+    <div class="drop">
+      <div class="it"><b style="color:#8f1d1d">更多…</b></div>
+      <div class="hd">谷歌推荐</div>
+      <div class="it on">Makati Ave, Makati City, Metro Manila, 菲律宾</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="tag ok">改后</span>地点名在上，地址在下</h2>
+    <div class="why">用谷歌“地点推荐”：每条都有名字，同名的能分清；地址固定用当地语言。</div>
+    <div class="box">trump tower</div>
+    <div class="drop">
+      <div class="it"><b style="color:#8f1d1d">更多…</b></div>
+      <div class="hd">谷歌推荐</div>
+      <div class="it on"><b>Trump Tower at Century City</b><small>Kalayaan Ave, Makati City, Metro Manila · 1.2 公里</small></div>
+      <div class="it"><b>Trump Tower Manila Sales Office</b><small>Century City Mall, Makati City · 1.3 公里</small></div>
+    </div>
+    <div class="drop" style="margin-top:10px">
+      <div class="warn">⚠ 谷歌“地点搜索”没有开启，下面的结果可能只有街道名。请平台管理员到 密钥设置 检查。</div>
+      <div class="it"><b>trump tower</b><small>Makati Ave, Makati City, Metro Manila（店员输入的名字 + 谷歌给的街道）</small></div>
+    </div>
+    <div class="why" style="margin:6px 0 0">↑ 没开启时的样子：明确提示，并保留店员输入的名字。</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="tag ok">改后</span>选中以后的地址栏</h2>
+    <div class="why">地点名和街道地址分开存；大楼类地点提醒补楼栋、楼层、房号。</div>
+    <div class="row"><label>地址 *</label>
+      <div class="place"><b>Trump Tower at Century City</b><small>Kalayaan Ave cor. Salamanca St, Poblacion, Makati City, Metro Manila</small></div>
+      <span class="btn">查看</span>
+    </div>
+    <div class="row"><label>楼栋/楼层/房号</label><div class="in need">这是一栋大楼，请问顾客要楼层和房号</div></div>
+    <div class="row"><label>送达备注</label><div class="in" style="color:#8a7a68">如：交给大堂前台 / 到了打电话（选填）</div></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="tag ok">改后</span>骑手、小票、订单上看到的</h2>
+    <div class="why">所有地方同一个顺序：地点名 + 房号 最大，街道第二行，备注第三行。</div>
+    <div class="rider">
+      <div class="big">Trump Tower at Century City <span class="unit">· 32F Unit 3205</span></div>
+      <small>Kalayaan Ave cor. Salamanca St, Poblacion, Makati City</small>
+      <div class="note">备注：交给大堂前台，到了打电话</div>
+      <div style="margin-top:8px"><span class="btn">导航</span> <span class="btn">打电话</span></div>
+    </div>
+    <div class="why" style="margin:10px 0 0">现在骑手看到的是：<b>Makati Ave, Makati City, Metro Manila, 菲律宾</b></div>
+  </div>
+
+</div>
+</body>
+</html>

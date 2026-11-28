@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AddrText from './AddrText.vue'
+import { googleMapsLink } from '../maps'
 import { ORDER_TYPES, colorOf, typeLabel } from '../orderTypes'
 import { brandsHere, multiBrand, useBrandPick } from '../brands'
 import BrandSeg from './brands/BrandSeg.vue'
@@ -373,9 +375,9 @@ async function decideAddon(o: Order, seq: number, action: 'accept' | 'reject', r
               <span v-if="selected.contact_phone && selected.contact_phone !== selected.customer_phone" class="small muted"> · {{ t('oc.ordered_by') }} {{ selected.customer_phone }}</span></div>
             <div v-if="contactApps(selected).length" class="small" data-testid="order-im">
               <span v-for="(c, i) in contactApps(selected)" :key="c.field"><template v-if="i"> · </template>{{ c.label }} <b>{{ c.value }}</b></span></div>
-            <div v-if="selected.service_type === 'delivery'">{{ selected.zone_name }} · {{ selected.address_line }} {{ selected.address_unit }}
+            <div v-if="selected.service_type === 'delivery'"><AddrText :o="selected" :lead="selected.zone_name ? selected.zone_name + ' · ' : ''" />
               <span v-if="selected.zone_distance_m" class="tag warn" data-testid="outside-zone">{{ t('outside_zone', { n: selected.zone_distance_m }) }}</span>
-              <a v-if="selected.dest_lat != null" class="small" target="_blank" rel="noopener" :href="`https://www.google.com/maps/search/?api=1&query=${selected.dest_lat},${selected.dest_lng}`">{{ t('view_on_map') }}</a></div>
+              <a v-if="selected.dest_lat != null" class="small" target="_blank" rel="noopener" :href="googleMapsLink(selected.dest_lat, selected.dest_lng!, selected.place_id)">{{ t('view_on_map') }}</a></div>
             <div v-else-if="!selected.platform">{{ t('pickup_code') }} <b>{{ selected.pickup_code }}</b></div>
             <div v-if="selected.address_note" class="small">{{ t('address_note') }}: {{ selected.address_note }}</div>
             <div v-if="selected.address_photo" class="small" data-testid="door-photo">{{ t('oc.door_photo') }} <a :href="`/api/v1/merchant/orders/${selected.id}/address-photo`" target="_blank" rel="noopener">{{ t('oc.view') }}</a></div>

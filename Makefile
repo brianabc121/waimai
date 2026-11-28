@@ -77,6 +77,7 @@ e2e:
 	$(E2E_NODE) e2e/addon.cjs
 	$(E2E_NODE) e2e/members.cjs
 	$(E2E_NODE) e2e/addressbook.cjs
+	$(E2E_NODE) e2e/placename.cjs
 	$(E2E_NODE) e2e/deliverystats.cjs
 	$(E2E_NODE) e2e/menuimport.cjs
 	$(E2E_NODE) e2e/coupons.cjs

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AddrText from './AddrText.vue'
 import { computed, onMounted, ref } from 'vue'
 import { get } from '../api'
 import { both, money, t, whenText } from '../i18n'
@@ -54,7 +55,7 @@ const sorted = computed(() => [...mine.value].sort((a, b) => a.basket - b.basket
     <p v-if="o.service_type === 'dine_in'" data-testid="ticket-table"><b>{{ t('table') }} {{ o.table_name }}</b><template v-if="o.table_tags?.length"> · {{ o.table_tags.join(' · ') }}</template></p>
     <p v-else>{{ contactName(o) }} · {{ contactPhone(o) }}
       <template v-for="c in contactApps(o)" :key="c.field"><br />{{ c.label }} {{ c.value }}</template></p>
-    <p v-if="o.service_type === 'delivery'">{{ o.zone_name }} · {{ o.address_line }} {{ o.address_unit }}<br />{{ o.address_note }}</p>
+    <p v-if="o.service_type === 'delivery'"><AddrText :o="o" :lead="o.zone_name ? o.zone_name + ' · ' : ''" /><br v-if="o.address_note" />{{ o.address_note }}</p>
     <p v-else-if="o.service_type === 'pickup'">{{ t('pickup_code') }}: <b>{{ o.pickup_code }}</b></p>
     <p v-if="o.note"><b>{{ t('order_note') }}: {{ o.note }}</b></p>
     <hr />

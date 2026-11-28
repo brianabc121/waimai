@@ -2,6 +2,7 @@
 // The customer confirms the dishes they add to an order (docs/ADD_ON_ORDER_DESIGN.md §8.2):
 // no address, time or payment to choose, all of it stays as on the order. The
 // page shows the order before and after, and what the add-on costs more.
+import { addrText } from '../place'
 import { storePath } from '../site'
 import '../checkout'
 import { computed, onMounted, ref } from 'vue'
@@ -86,7 +87,7 @@ function newOrder() {
         <button v-if="closed && cart?.lines.length" class="btn small" style="margin-inline-start:8px" @click="newOrder">{{ t('ao.c.new_order') }}</button></div>
       <template v-if="order">
         <div class="card ac-card">
-          <div class="ac-where">{{ delivery ? t('ao.c.to', { s: [order.address_line, order.address_unit].filter(Boolean).join(' · ') }) : t('ao.c.pickup', { s: order.pickup_code }) }}</div>
+          <div class="ac-where">{{ delivery ? t('ao.c.to', { s: addrText(order) }) : t('ao.c.pickup', { s: order.pickup_code }) }}</div>
           <div class="muted small">{{ order.public_no }} · {{ t(order.payment_method) }}</div>
         </div>
         <div class="card ac-card">
