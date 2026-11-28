@@ -25,6 +25,7 @@ const pages: [string, string[]][] = [
   ['/merchant/brands', ['brand.manage', 'settings']],
   ['/merchant/brand-menu', ['menu.edit']],
   ['/merchant/promos', ['promo']],
+  ['/merchant/item-promos', ['promo']],
   ['/merchant/marketing', ['promo', 'wallet.view']],
   ['/merchant/cash', ['cash']],
   ['/merchant/bills', ['bills']],

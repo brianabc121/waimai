@@ -149,7 +149,7 @@ R 这一组是最重要的：任何一条改金额的路径如果绕开了 `load
 |---|---|---|
 | 1 | 外卖、自取、堂食三种，含税和不含税两种 | 样例 S1、S4、S7；`TestDineInFullLoop`、`TestVoidDelivery` |
 | 2 | 满减、折扣（含封顶）、免配送费，自动挑最省的；堂食、外卖活动互不通用 | 样例 S2、S7；`TestCouponsStackInOrder`、`TestDineCheckoutDiscount` |
-| 3 | 指定菜品打折、第二份优惠；菜品活动之后满减按折后金额算门槛 | 样例 S5；`TestDishPromotions`、`TestDishPromotionAddon` |
+| 3 | 指定菜品打折、第二份优惠（两件一组：第 2、4 件优惠，第 3、5 件原价）；菜品活动之后满减按折后金额算门槛；商品限购（每单、每人每天）只拦下单、不改金额，被拦下的加单不动订单 | 样例 S5、S19；`TestDishPromotions`、`TestDishPromotionAddon`、`TestPricingSampleS19_SecondHalfInPairs`、`TestItemLimitPerOrder`、`TestItemLimitPerDay`、`TestItemLimitDineIn` |
 | 4 | 店铺券（满减券、无门槛券、配送费券）、平台券，固定顺序叠加；平台券在税后 | 样例 S3；`TestCouponsStackInOrder`、`TestPricingCheckChain` |
 | 5 | 结账打折、抹零、改实收；打折只打菜品，抹零和改实收不影响税 | 样例 S3、S6；`TestDineCheckoutDiscount`、`TestStaffOrderDiscountAndPrepaid` |
 | 6 | 规格加价、加料 | `TestStaffOrderOptionQuantities`、`TestToppingTemplates` |
@@ -406,6 +406,18 @@ PRICING_REVIEW.md 问题 1 的门店：含税 12%、服务费 5%。鸡 169.00 ×
 - 前天的对账：退款 20.00，现金退款 **0**（那天钱箱没出钱）
 - 今天的对账：现金退款 **20.00**
 - 改之前：这 20.00 算在前天的现金退款里，两天的钱箱都对不上
+
+### S19 第二件半价按两件一组算，第三、第五件原价（真库测试 `TestPricingSampleS19_SecondHalfInPairs`，商品营销）
+
+门店同 S12：自取，税 12% 另加、服务费 5%、包装费 10.00，水每瓶 30.00，水第二件半价。每两件一组，每组里便宜的那件半价；单出来的那件原价。
+
+| | 商品 | 优惠 | 服务费 | 包装 | 税 | 应付 |
+|---|---|---|---|---|---|---|
+| 3 瓶（第 3 瓶原价，同 S12） | 90.00 | −15.00 | 3.75 | 10.00 | 10.65 | **99.40** |
+| 4 瓶（第 2、4 瓶半价） | 120.00 | 2 × −15.00 = −30.00 | 90.00 × 5% = 4.50 | 10.00 | 104.50 × 12% = 12.54 | **117.04** |
+| 5 瓶（第 5 瓶原价） | 150.00 | −30.00 | 120.00 × 5% = 6.00 | 10.00 | 136.00 × 12% = 16.32 | **152.32** |
+
+商品限购（每单限购、每人每天限购，`internal/app/item_limits.go`）不是优惠：它只在报价、下单、加单、堂食点单时拦住超出的数量（错误码 `ITEM_LIMIT`），不进计价引擎，订单上不留任何记录，所以退货、退款、重放验算都不读它。场景测试里每一步（到上限的单、被拦下的加单、退一件后再加单）都 `checked`。平台订单不受本店限购管。
 
 ## 5. 改动流程（每个涉及金额的 PR 都要做）
 

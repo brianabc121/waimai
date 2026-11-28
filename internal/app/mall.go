@@ -569,7 +569,7 @@ func (a *App) mallPromos(ctx context.Context, list []*MallStore) error {
 	}
 	byID := cardsByStore(list)
 	rows, err := a.DB.Query(ctx, `SELECT p.branch_id, `+promoCols+`, 0 FROM promotions p
-		WHERE p.branch_id = ANY($1) AND p.status = 'active' AND p.scope = 'delivery' ORDER BY p.branch_id, p.id`, storeIDs(list))
+		WHERE p.branch_id = ANY($1) AND p.status = 'active' AND p.scope = 'delivery' AND `+notLimitSQL+` ORDER BY p.branch_id, p.id`, storeIDs(list))
 	if err != nil {
 		return err
 	}

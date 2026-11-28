@@ -36,7 +36,7 @@ const groupPages: Record<string, string[]> = {
   pos: ['/merchant/order/', '/merchant/queue'], orders: ['/merchant/progress', '/merchant/voids'],
   cm: ['/merchant/members', '/merchant/addresses'], msg: ['/merchant/messages', '/merchant/support'],
   deco: ['/merchant/media', '/merchant/templates', '/merchant/site-link'], fin: ['/merchant/cash', '/merchant/bills', '/merchant/reconcile', '/merchant/credit'],
-  dlv: ['/merchant/riders', '/merchant/delivery-map'], mk: ['/merchant/marketing', '/merchant/promos'],
+  dlv: ['/merchant/riders', '/merchant/delivery-map'], mk: ['/merchant/marketing', '/merchant/promos', '/merchant/item-promos'],
 }
 const openGrps = ref<Record<string, boolean>>({})
 const isOpen = (g: string) => !!openGrps.value[g]
@@ -159,10 +159,11 @@ function backToAdmin() { setAdminView(null); location.href = '/admin/merchants' 
             <router-link v-if="show('/merchant/site-link')" to="/merchant/site-link" class="navsub" data-testid="nav-site-link">{{ t('sl.title') }}</router-link>
           </template>
         </template>
-        <template v-if="show('/merchant/marketing') || show('/merchant/promos')">
+        <template v-if="show('/merchant/marketing') || show('/merchant/promos') || show('/merchant/item-promos')">
           <button class="navgrp" :class="{ open: isOpen('mk') }" :aria-expanded="isOpen('mk')" data-testid="nav-mk" @click="toggleGrp('mk')"><span class="grow">{{ t('mk.nav') }}</span><i class="caret"></i></button>
           <template v-if="isOpen('mk')">
             <router-link v-if="show('/merchant/marketing')" to="/merchant/marketing" class="navsub" data-testid="nav-marketing">{{ t('mk.campaigns') }}</router-link>
+            <router-link v-if="show('/merchant/item-promos')" to="/merchant/item-promos" class="navsub" data-testid="nav-item-promos">{{ t('ip.page') }}</router-link>
             <router-link v-if="show('/merchant/promos')" to="/merchant/promos" class="navsub" data-testid="nav-promos">{{ t('promos') }}</router-link>
           </template>
         </template>

@@ -76,6 +76,7 @@ export const router = createRouter({
         { path: 'brands', component: () => import('./views/brands/BrandsView.vue') },
         { path: 'brand-menu/:id', component: () => import('./views/brands/BrandMenuView.vue') },
         { path: 'promos', component: () => import('./views/PromosView.vue') },
+        { path: 'item-promos', component: () => import('./views/PromosView.vue'), props: { items: true } },
         { path: 'marketing', component: () => import('./views/marketing/MarketingView.vue') },
         { path: 'cash', component: () => import('./views/CashView.vue') },
         { path: 'bills', component: () => import('./views/BillsView.vue') },

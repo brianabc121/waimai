@@ -27,6 +27,10 @@ type promoRule struct {
 	// units is what a dish rule takes off one dish, given what each of its
 	// units costs, dearest first.
 	units func(p *Promotion, units []int64) int64
+	// limit marks a purchase limit on chosen items (item_limits.go): "order"
+	// is at most Value of an item on one order, "day" at most Value per
+	// customer per day. A limit takes no money off and is never priced.
+	limit string
 	// check checks the merchant's settings and clears what does not apply.
 	check func(in *PromotionInput) error
 }
@@ -117,6 +121,8 @@ var promoRules = map[string]promoRule{
 			return checkDishes(in)
 		},
 	},
+	KindLimitOrder: {limit: "order", check: checkLimit},
+	KindLimitDay:   {limit: "day", check: checkLimit},
 }
 
 // checkDishes checks a dish promotion's dishes. It counts on what the dishes

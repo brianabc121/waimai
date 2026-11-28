@@ -212,8 +212,14 @@ const dict: Record<string, [string, string]> = {
   promo_name: ['活动', 'Promotion'], promo_rule: ['规则', 'Rule'], promo_when: ['时间', 'When'], promo_usage: ['已用', 'Used'],
   promo_name_ph: ['例如：满300减30', 'e.g. Spend 300, save 30'], promo_kind: ['类型', 'Type'],
   'kind.amount_off': ['满减', 'Amount off'], 'kind.percent_off': ['折扣', 'Percent off'], 'kind.free_delivery': ['免配送费', 'Free delivery'],
-  'kind.dish_percent': ['指定商品打折', 'Items at a discount'], 'kind.dish_second': ['第二份优惠', 'Second one off'],
-  'promo.second_pct': ['第二份减（%，50 为半价，100 为买一送一）', 'Off the second one (%: 50 is half price, 100 is free)'],
+  'kind.dish_percent': ['指定商品打折', 'Items at a discount'], 'kind.dish_second': ['第二件优惠', 'Second one off'],
+  'kind.dish_limit_order': ['每单限购', 'Limit per order'], 'kind.dish_limit_day': ['每日限购', 'Limit per day'],
+  'promo.limit_n': ['最多可买（件）', 'At most (pieces)'],
+  'promo.limit_hint': ['每单限购：一张订单里这件商品最多买这么多，加单也算在内。每日限购：同一位顾客（按手机号）当天在本店最多买这么多，取消的订单和退掉的不算；堂食没有手机号时只按每单限购。限购不减钱，可以和第二件半价一起用。', 'Per order: at most this many of the item on one order, add-ons included. Per day: at most this many for one customer (by phone number) at this store in a day; cancelled orders and returned items do not count, and a table without a phone number is held to the limit per order only. A limit takes no money off and works together with second one half price.'],
+  'ip.page': ['商品营销', 'Item marketing'], 'ip.sub': ['给指定商品设置活动：每单限购、每日限购、第二件半价、指定商品打折', 'Deals and limits on chosen items: limit per order, limit per day, second one half price, items at a discount'],
+  'ip.new': ['新建商品活动', 'New item deal'], 'ip.none': ['还没有商品活动', 'No item deals yet'],
+  'ip.second_note': ['每两件一组：第 2、4、6 件优惠，第 3、5 件原价；规格不同时便宜的那件优惠。', 'Counted in pairs: the 2nd, 4th and 6th get the discount, the 3rd and 5th are at full price; with different options the cheaper ones get it.'],
+  'promo.second_pct': ['第二件减（%，50 为半价，100 为买一送一）', 'Off the second one (%: 50 is half price, 100 is free)'],
   'promo.dishes': ['参加的商品', 'Items in the promotion'], 'promo.dishes_n': ['已选 {n} 件', '{n} chosen'],
   'promo.dish_search': ['搜索商品名或编号', 'Search by name or code'],
   'promo.dish_hint': ['商品活动可以和满减一起用，满减按商品优惠后的金额算门槛；同一件商品参加多个商品活动时，自动用最省的那个。', 'Item promotions add to a promotion on the whole order, whose minimum spend counts what the items cost after them. An item in several item promotions gets the one that saves the most.'],
@@ -319,8 +325,9 @@ const dict: Record<string, [string, string]> = {
   cat_required_hint: ['必选分类：顾客至少要从里面选一样才能下单', 'Required: a customer must choose at least one item from it'],
   'pr.amount_off': ['减{amt}', '{amt} off'], 'pr.percent_off': ['{zhe}折', '{pct}% off'], 'pr.cap': ['（最多减{amt}）', ' (up to {amt})'],
   'pr.free_delivery': ['免配送费', 'Free delivery'],
-  'pr.dish_percent': ['指定商品{zhe}折', 'Chosen items {pct}% off'], 'pr.dish_second': ['第二份{zhe}折', 'Second one {pct}% off'],
-  'pr.dish_half': ['第二份半价', 'Second one half price'], 'pr.dish_free': ['买一送一', 'Buy one, get one free'], 'pr.over': ['满{th}{what}', '{what} over {th}'],
+  'pr.dish_percent': ['指定商品{zhe}折', 'Chosen items {pct}% off'], 'pr.dish_second': ['第二件{zhe}折', 'Second one {pct}% off'],
+  'pr.dish_half': ['第二件半价', 'Second one half price'],
+  'pr.limit_order': ['每单限购 {n} 件', 'Max {n} per order'], 'pr.limit_day': ['每人每天限购 {n} 件', 'Max {n} per person per day'], 'pr.dish_free': ['买一送一', 'Buy one, get one free'], 'pr.over': ['满{th}{what}', '{what} over {th}'],
   'pr.amount_off_sp': ['减 {amt}', '{amt} off'], 'pr.percent_off_sp': ['{zhe} 折', '{pct}% off'], 'pr.cap_sp': ['，最多减 {amt}', ', up to {amt}'],
   lang: ['语言', 'Language'], lang_auto: ['跟随浏览器', 'Same as browser'], lang_remember: ['选好后这个浏览器会记住', 'This browser will remember your choice'],
   'ago.s': ['{n} 秒前', '{n}s ago'], 'ago.m': ['{n} 分钟前', '{n}m ago'], 'ago.h': ['{n} 小时前', '{n}h ago'],
@@ -473,6 +480,8 @@ export function money(minor: number, currency = 'PHP'): string {
 
 // promoLabel describes a promotion's rule in the current language.
 export function promoLabel(p: { kind: string; threshold: number; value: number; max_discount: number | null }, currency: string): string {
+  if (p.kind === 'dish_limit_order') return t('pr.limit_order', { n: p.value })
+  if (p.kind === 'dish_limit_day') return t('pr.limit_day', { n: p.value })
   const th = p.threshold > 0 ? money(p.threshold, currency) : ''
   let what = ''
   if (p.kind === 'amount_off') what = t('pr.amount_off', { amt: money(p.value, currency) })

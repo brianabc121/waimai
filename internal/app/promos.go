@@ -182,7 +182,7 @@ func (a *App) ListPromotions(ctx context.Context, branchID int64) ([]Promotion, 
 // livePromotions is what the storefront advertises: promotions of one scope
 // (delivery or dine_in) that apply right now, at a brand (0 = the main one).
 func livePromotions(ctx context.Context, q Querier, b *Branch, brandID int64, scope string) ([]Promotion, error) {
-	ps, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND p.scope="+scopeSQL(scope)+" AND "+brandPromoSQL(brandID), "")
+	ps, err := loadPromotions(ctx, q, b.ID, "p.status='active' AND "+notLimitSQL+" AND p.scope="+scopeSQL(scope)+" AND "+brandPromoSQL(brandID), "")
 	if err != nil {
 		return nil, err
 	}
@@ -242,6 +242,10 @@ func (in *PromotionInput) validate() error {
 	switch in.Scope {
 	case "", "delivery":
 		in.Scope = "delivery"
+		// a purchase limit holds for delivery and pickup alike
+		if promoRules[in.Kind].limit != "" {
+			in.AppliesDelivery, in.AppliesPickup = true, true
+		}
 	case "dine_in":
 		// Dine-in bills have no delivery fee, and guests rarely leave a phone.
 		if in.Kind == "free_delivery" {
@@ -269,7 +273,7 @@ func (in *PromotionInput) validate() error {
 	if !ok {
 		return ErrValidation("unknown kind of promotion")
 	}
-	if !r.dish {
+	if !r.dish && r.limit == "" {
 		in.ItemIDs = nil
 	}
 	return r.check(in)
@@ -454,7 +458,7 @@ func (a *App) TrialPromotions(ctx context.Context, branchID int64, in TrialInput
 	}
 	// an amount of dishes says nothing of which dishes: the trial is for
 	// promotions on the whole order
-	ps, err := loadPromotions(ctx, a.DB, branchID, "p.status <> 'ended' AND p.kind NOT IN ('dish_percent','dish_second') AND p.scope="+
+	ps, err := loadPromotions(ctx, a.DB, branchID, "p.status <> 'ended' AND p.kind NOT IN ('dish_percent','dish_second') AND "+notLimitSQL+" AND p.scope="+
 		scopeSQL(scope)+" AND "+brandPromoSQL(in.BrandID), "")
 	if err != nil {
 		return nil, err

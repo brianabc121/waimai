@@ -4336,5 +4336,18 @@
  "wl.a.store_bonus_void": "Cửa hàng · tiền tặng hủy",
  "wl.a.platform_balance": "Khách · số dư nền tảng",
  "wl.a.platform_bonus": "Khách · thưởng nền tảng",
- "wl.a.platform_issued": "Nền tảng · đã phát hành"
+ "wl.a.platform_issued": "Nền tảng · đã phát hành",
+ "kind.dish_limit_order": "Giới hạn mỗi đơn",
+ "kind.dish_limit_day": "Giới hạn mỗi ngày",
+ "promo.limit_n": "Mua tối đa (món)",
+ "promo.limit_hint": "Mỗi đơn: một đơn hàng chỉ được mua tối đa số lượng này của sản phẩm, tính cả phần gọi thêm. Mỗi ngày: cùng một khách (theo số điện thoại) trong ngày chỉ được mua tối đa số lượng này tại cửa hàng; đơn đã hủy và sản phẩm đã trả không tính. Bàn ăn tại chỗ không có số điện thoại thì chỉ áp dụng giới hạn mỗi đơn. Giới hạn không giảm tiền và dùng chung được với ưu đãi món thứ hai nửa giá.",
+ "ip.page": "Tiếp thị sản phẩm",
+ "ip.sub": "Đặt ưu đãi và giới hạn cho sản phẩm được chọn: giới hạn mỗi đơn, giới hạn mỗi ngày, món thứ hai nửa giá, giảm giá sản phẩm",
+ "ip.new": "Tạo ưu đãi sản phẩm",
+ "ip.none": "Chưa có ưu đãi sản phẩm",
+ "ip.second_note": "Tính theo từng cặp: món thứ 2, 4, 6 được giảm, món thứ 3, 5 giữ nguyên giá; nếu khác tùy chọn thì món rẻ hơn được giảm.",
+ "pr.limit_order": "Tối đa {n} mỗi đơn",
+ "pr.limit_day": "Tối đa {n} mỗi người mỗi ngày",
+ "lim.order": "“{name}”: mỗi đơn tối đa {n}",
+ "lim.day": "“{name}”: mỗi người tối đa {n} mỗi ngày; hôm nay còn mua được {left}"
 }

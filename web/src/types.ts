@@ -57,8 +57,10 @@ export interface NoteTemplate { id: number; name: string; icon: string; sort: nu
 // A chosen tag as the order line keeps it.
 export interface LineNoteTag { id: number; group: string; name: string; group_tr?: string; name_tr?: string }
 export interface Category { id: number; name: string; name_en: string; sort: number; required?: boolean; items: Item[]; name_tr?: string }
+// How many of an item may be bought: on one order, by one customer in a day.
+export interface ItemLimit { item_id: number; per_order?: number; per_day?: number }
 export interface Promotion {
-  id: number; name: string; name_en: string; kind: 'amount_off' | 'percent_off' | 'free_delivery' | 'dish_percent' | 'dish_second'
+  id: number; name: string; name_en: string; kind: 'amount_off' | 'percent_off' | 'free_delivery' | 'dish_percent' | 'dish_second' | 'dish_limit_order' | 'dish_limit_day'
   item_ids?: number[]
   threshold: number; value: number; max_discount: number | null; applies_delivery: boolean; applies_pickup: boolean
   starts_at: string | null; ends_at: string | null; daily_start: string; daily_end: string
@@ -71,7 +73,7 @@ export interface Promotion {
 export interface Template { layout: 'list' | 'featured' | 'grid'; theme_color: string; logo_url: string; cover_url: string }
 export type Channel = 'delivery' | 'qr' | 'ipad'
 export interface ChannelTemplate { channel: Channel; published: Template; draft: Template | null; published_at: string | null }
-export interface Storefront { branch: Branch; brand?: BrandRef | null; zones: Zone[]; categories: Category[]; promotions: Promotion[]; dine_promotions?: Promotion[]; slots: string[]; templates: Record<Channel, Template>
+export interface Storefront { branch: Branch; brand?: BrandRef | null; zones: Zone[]; categories: Category[]; promotions: Promotion[]; dine_promotions?: Promotion[]; item_limits?: ItemLimit[]; dine_item_limits?: ItemLimit[]; slots: string[]; templates: Record<Channel, Template>
   sales: number; rating: ReviewSummary; media?: PromoMedia[]
   // some of the menu is shown machine translated
   machine_translated?: boolean }

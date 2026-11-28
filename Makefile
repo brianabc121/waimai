@@ -58,6 +58,7 @@ e2e:
 	$(E2E_NODE) e2e/stored.cjs
 	$(E2E_NODE) e2e/toppings.cjs
 	$(E2E_NODE) e2e/pospages.cjs
+	$(E2E_NODE) e2e/itempromos.cjs
 	$(E2E_NODE) e2e/menupage.cjs
 	$(E2E_NODE) e2e/mapzones.cjs
 	$(E2E_NODE) e2e/mapgoogle.cjs

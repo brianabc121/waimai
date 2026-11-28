@@ -188,6 +188,16 @@ func TestPricingCheckSamples(t *testing.T) {
 		{"S16 外卖茶加一瓶水", Input{Lines: []Line{{Key: "tea", Amount: 6900}, {Key: "water", Amount: 3000}},
 			Fees: Fees{TaxRateBP: 1200, ServiceChargeBP: 500, Packaging: 1000, Delivery: 6900}},
 			want{svc: 495, tax: 1367, total: 19662, disc: []int64{0, 0}, svcs: []int64{345, 150}, taxs: []int64{869, 378}}},
+		// S19: the second one at half price counts in pairs. Waters at 30.00, pickup.
+		// 4: 120.00 − 2 × 15.00 = 90.00, service 4.50, packaging 10.00, tax 104.50 × 12% = 12.54: 117.04.
+		// 5: the fifth is at its price again. 150.00 − 30.00 = 120.00, service 6.00, tax 136.00 × 12% = 16.32: 152.32.
+		// The water's own tax leaves out the packaging's 1.20: 94.50 × 12% = 11.34 and 126.00 × 12% = 15.12.
+		{"S19 自取四瓶水，第二件半价（两件一组）", Input{Lines: []Line{{Key: "water", Amount: 12000}}, Fees: pickup, Adjustments: []Adjustment{
+			{Kind: "dish_second", Stage: StageItem, Amount: 3000, Lines: []string{"water"}}}},
+			want{goods: 3000, svc: 450, tax: 1254, total: 11704, disc: []int64{3000}, svcs: []int64{450}, taxs: []int64{1134}}},
+		{"S19 自取五瓶水，第五件原价", Input{Lines: []Line{{Key: "water", Amount: 15000}}, Fees: pickup, Adjustments: []Adjustment{
+			{Kind: "dish_second", Stage: StageItem, Amount: 3000, Lines: []string{"water"}}}},
+			want{goods: 3000, svc: 600, tax: 1632, total: 15232, disc: []int64{3000}, svcs: []int64{600}, taxs: []int64{1512}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
