@@ -81,6 +81,15 @@ const view = await device.webView({ pkg: PKG })
 let app = await view.page()
 app.setDefaultTimeout(60000)
 await app.waitForURL('**/login**')
+// The pages follow the phone's language and the emulator's is English, while
+// this script reads the Chinese texts: pick Chinese the way a link would
+// (?lang= is remembered in a cookie).
+{
+  const u = new URL(app.url())
+  u.searchParams.set('lang', 'zh')
+  await app.goto(u.toString())
+  await app.waitForSelector('input[autocomplete=username]')
+}
 const ua = await app.evaluate(() => navigator.userAgent)
 const isNative = await app.evaluate(() => !!window.Capacitor?.isNativePlatform?.())
 if (!/WorkbenchApp\/1/.test(ua) || !isNative) throw new Error('not running inside the app shell: ' + ua)
