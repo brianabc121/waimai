@@ -71,6 +71,8 @@ extend({
   'vd.r.row': ['已退款 {s} · {m} · {r} · {at}', 'Refunded {s} · {m} · {r} · {at}'],
   'vd.r.total': ['已退款合计 {s}', 'Refunded in all {s}'],
   'vd.r.need': ['按菜退款要售后权限', 'Refunds need the after-sales permission'],
+  'vd.err.REFUND_NOT_PAID': ['这张单没有收到还没退的钱，不能退款', 'Nothing was received for this order that is not refunded yet'],
+  'vd.r.received': ['这张单应付 {t}，实际只收到 {r}：最多退收到的部分', 'This order was {t} but only {r} was received: at most that can be refunded'],
   'vd.err.REFUND_NOT_YET': ['顾客还没收到，先退菜就好', 'The customer has not received it yet: void the dish instead'],
   // the kitchen
   'vd.k.alert': ['退菜 {n} 份：{name}（{r}）', 'Void {n}: {name} ({r})'],

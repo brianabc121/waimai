@@ -4195,6 +4195,8 @@
 "vd.r.total":"已退款合計 {s}",
 "vd.r.need":"按菜退款要售後許可權",
 "vd.err.REFUND_NOT_YET":"顧客還沒收到，先退菜就好",
+"vd.err.REFUND_NOT_PAID":"這張單沒有收到還沒退的錢，不能退款",
+"vd.r.received":"這張單應付 {t}，實際只收到 {r}：最多退收到的部分",
 "vd.k.alert":"退菜 {n} 份：{name}（{r}）",
 "vd.k.ack":"知道了",
 "vd.k.voided":"已退",

@@ -151,6 +151,8 @@ async function go(headers?: Record<string, string>) {
           </div>
         </template>
         <template v-if="quote">
+          <div v-if="quote.received != null && quote.received < order.totals.total" class="banner warn small" data-testid="refund-received">
+            {{ t('vd.r.received', { t: m(order.totals.total), r: m(quote.received) }) }}</div>
           <label class="field" style="margin:0"><span>{{ t('vd.r.amount') }} · {{ t('vd.r.suggested', { s: m(quote.suggested) }) }}</span>
             <input v-model="s.amount" inputmode="decimal" :placeholder="(quote.suggested / 100).toFixed(2)" data-testid="refund-amount" /></label>
           <div v-if="s.toCredit" class="banner info small" data-testid="refund-split">{{ t('sc.r.split_credit', { s: m(amount) }) }}</div>

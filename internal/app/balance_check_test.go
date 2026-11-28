@@ -221,3 +221,41 @@ func TestBalanceSampleTrialBalance(t *testing.T) {
 	}
 	walletClean(t)
 }
+
+// B-S7 (rule W5a): an order that was not paid in full is refunded from what
+// it took in. Tea delivered, 161.34: 50.00 from the balance, 100.00 of the
+// 111.34 due collected, so 150.00 received. All of it back: cash
+// ⌊15000 × 10000 ÷ 15000⌋ = 100.00 outside the books, 50.00 back into the
+// balance against store_sales; store_refund only holds the 50.00 that first
+// went in.
+func TestBalanceSampleUnderpaidRefund(t *testing.T) {
+	s := newStore(t, false)
+	ctx, a := context.Background(), testApp
+	cust, phone := customer(t)
+	first, err := s.placeAs(t, phone, "pickup", []app.QuoteLineInput{{ItemID: s.chicken, Qty: 1, OptionIDs: []int64{s.spiceMild}}}, false, nil)
+	noErr(t, err)
+	first = finishPickup(t, first, s.staff)
+	_, _, err = a.Refund(ctx, first.ID, app.RefundInput{Lines: refundLines(first.Items[0].ID, 1), Reason: "x", ToCredit: true,
+		Amount: i64(5000), Consent: "in_person"}, s.staff)
+	noErr(t, err)
+	wantBooks(t, "50.00 in", storeBooks(t, s.branchID), map[string]int64{"store_refund": -5000})
+
+	o, err := s.placeAs(t, phone, "delivery", []app.QuoteLineInput{{ItemID: s.tea, Qty: 1}}, true, i64(5000))
+	noErr(t, err)
+	if o.Totals.Total != 16134 || o.CreditPaid != 5000 {
+		t.Fatalf("total %d, from the balance %d, hand-worked 16134 and 5000", o.Totals.Total, o.CreditPaid)
+	}
+	wantBooks(t, "spent", storeBooks(t, s.branchID), map[string]int64{"store_refund": -5000, "store_sales": 5000})
+	o = deliverCollect(t, s, o, 10000)
+	rq, _, err := a.Refund(ctx, o.ID, app.RefundInput{Lines: refundLines(o.Items[0].ID, 1), ReasonKind: "store", Reason: "x", Method: "现金"}, s.staff)
+	noErr(t, err)
+	if rq.Received != 15000 || rq.CashPart != 10000 || rq.CreditPart != 5000 {
+		t.Fatalf("refund %+v, hand-worked received 15000, cash 10000, balance 5000", rq)
+	}
+	checked(t, "B-S7 refunded", o.ID)
+	wantBooks(t, "refunded", storeBooks(t, s.branchID), map[string]int64{"store_refund": -5000, "store_sales": 0})
+	if c := creditAt(t, cust, s.branchID); c != 5000 {
+		t.Fatalf("balance %d, hand-worked 5000", c)
+	}
+	walletClean(t)
+}

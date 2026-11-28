@@ -151,11 +151,26 @@ func TestDishPictures(t *testing.T) {
 	noErr(t, err)
 	noErr(t, a.SaveTemplateDraft(ctx, s.branchID, "delivery", app.Template{Layout: "list", ThemeColor: "#d9480f", LogoURL: logo}))
 
+	// So can a brand: its logo, its cover and a dish's picture on its menu
+	// (docs/CODE_REVIEW_FIX_PLAN.md M13).
+	brandLogo, err := a.AddImage(ctx, s.branchID, tinyJPEG)
+	noErr(t, err)
+	brandCover, err := a.AddImage(ctx, s.branchID, tinyJPEG)
+	noErr(t, err)
+	brandDish, err := a.AddImage(ctx, s.branchID, tinyJPEG)
+	noErr(t, err)
+	_, err = a.DB.Exec(ctx, `UPDATE brands SET logo_url=$2, cover_url=$3 WHERE branch_id=$1 AND is_main`, s.branchID, brandLogo, brandCover)
+	noErr(t, err)
+	_, err = a.DB.Exec(ctx, `INSERT INTO brand_items (brand_id, item_id, image_url)
+		SELECT b.id, m.id, $2 FROM brands b, menu_items m WHERE b.branch_id=$1 AND b.is_main AND m.branch_id=$1 AND m.name='pictured'`,
+		s.branchID, brandDish)
+	noErr(t, err)
+
 	// The clean-up drops only old pictures nothing points at.
 	_, err = a.DB.Exec(ctx, `UPDATE store_images SET created_at = now() - interval '8 days' WHERE branch_id=$1`, s.branchID)
 	noErr(t, err)
 	noErr(t, a.Cleanup(ctx))
-	for url, want := range map[string]bool{used: true, logo: true, unused: false} {
+	for url, want := range map[string]bool{used: true, logo: true, unused: false, brandLogo: true, brandCover: true, brandDish: true} {
 		_, err := a.Image(ctx, url[len("/api/v1/images/"):])
 		if (err == nil) != want {
 			t.Fatalf("%s kept = %v, want %v", url, err == nil, want)

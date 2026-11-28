@@ -3032,6 +3032,8 @@
  "vd.r.total": "Remboursé au total {s}",
  "vd.r.need": "Les remboursements demandent le droit après-vente",
  "vd.err.REFUND_NOT_YET": "Le client ne l’a pas encore reçu : annulez plutôt le plat",
+ "vd.err.REFUND_NOT_PAID": "Rien n’a été encaissé pour cette commande qui ne soit déjà remboursé",
+ "vd.r.received": "Cette commande était de {t} mais seuls {r} ont été encaissés : on ne rembourse pas plus",
  "vd.k.alert": "Annulation {n} : {name} ({r})",
  "vd.k.ack": "Vu",
  "vd.k.voided": "Annulé",

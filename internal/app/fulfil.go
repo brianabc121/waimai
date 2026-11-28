@@ -623,7 +623,9 @@ func (a *App) RiderDeliverPaid(ctx context.Context, taskID, riderID, collected i
 				o.ID, o.BranchID, riderID, due, collected); err != nil {
 				return err
 			}
-			if collected == due {
+			// more than was due is paid too; the difference shows when the
+			// cash is counted
+			if collected >= due {
 				paid = "paid"
 			}
 		}
