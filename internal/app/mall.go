@@ -498,9 +498,13 @@ func (a *App) mallNames(ctx context.Context, list []*MallStore, lang string) err
 		return err
 	}
 	for _, s := range list {
-		// the store's translations are of the main brand's name
-		if s.brand == nil || s.brand.IsMain {
-			s.NameTr = t[s.id].Name
+		if s.branch == nil {
+			continue
+		}
+		x := t[s.branch.textsKey()]
+		s.NameTr = x.Name
+		if x.Tagline != "" {
+			s.Tagline = x.Tagline
 		}
 	}
 	return nil

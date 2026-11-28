@@ -8,6 +8,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ApiError, del, get, post, put } from '../api'
 import { currencySymbol, money, t, toMajor, toMinor } from '../i18n'
+import LangsButton from './LangsButton.vue'
 import '../toppings'
 import '../menuPage'
 import MxIcon from './MxIcon.vue'
@@ -173,6 +174,7 @@ const sym = computed(() => currencySymbol(props.cur))
       <!-- the chosen template -->
       <section v-if="sel !== 0" class="tp-card tp-edit" data-testid="tp-editor">
         <div class="tp-eh"><h2>{{ form.id ? t('mx.tp_edit') : t('mx.tp_new_title') }}</h2><span class="grow"></span>
+          <LangsButton :base="base" :scope="form.id ? `topping_template/${form.id}` : null" :name="form.name" :readonly="!canEdit" />
           <span v-if="form.id && !dirty" class="tp-saved">✓ {{ t('mx.saved') }}</span>
           <span v-else-if="canEdit" class="tp-dirty">{{ t('mx.unsaved') }}</span></div>
         <div class="tp-eb">

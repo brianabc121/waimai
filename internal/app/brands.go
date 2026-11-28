@@ -134,6 +134,7 @@ func (b *Branch) forBrand(br *Brand) *Branch {
 		return b
 	}
 	b.Paused = b.Paused || br.Paused || br.Status != "active"
+	b.brandID, b.brandNamed, b.brandIntro = br.ID, !br.IsMain, br.Intro
 	if br.OpenTime != "" && br.OpenTime != br.CloseTime {
 		b.OpenTime, b.CloseTime = br.OpenTime, br.CloseTime
 	}

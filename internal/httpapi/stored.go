@@ -26,8 +26,8 @@ func (s *Server) storedRoutes(api, auth, admin *gin.RouterGroup) {
 
 	auth.GET("/merchant/branches/:bid/marketing", s.storedOverview)
 	auth.POST("/merchant/branches/:bid/marketing/terms", s.acceptStoredTerms)
-	auth.POST("/merchant/branches/:bid/stored-campaigns", s.saveStoredCampaign)
-	auth.PUT("/merchant/branches/:bid/stored-campaigns/:id", s.saveStoredCampaign)
+	auth.POST("/merchant/branches/:bid/stored-campaigns", s.menuChanged, s.saveStoredCampaign)
+	auth.PUT("/merchant/branches/:bid/stored-campaigns/:id", s.menuChanged, s.saveStoredCampaign)
 	auth.POST("/merchant/branches/:bid/stored-campaigns/:id/status", s.setStoredCampaignStatus)
 	auth.GET("/merchant/branches/:bid/topups", s.branchTopups)
 	auth.POST("/merchant/branches/:bid/topups", s.startStaffTopup)
@@ -75,6 +75,25 @@ func (s *Server) storeStored(c *gin.Context) {
 		cid = cu.ID
 	}
 	r, err := s.App.StoredOffers(c, c.Param("slug"), cid)
+	if err == nil && r.Campaign != nil { // its texts in the customer's language
+		lang, k := reqLang(c), r.Campaign
+		var name, note, labels map[int64]string
+		ids := make([]int64, len(k.Tiers))
+		for i, t := range k.Tiers {
+			ids[i] = t.ID
+		}
+		if name, err = s.App.Texts(c, lang, "stored_campaign", "name", []int64{k.ID}); err == nil {
+			if note, err = s.App.Texts(c, lang, "stored_campaign", "note", []int64{k.ID}); err == nil {
+				labels, err = s.App.Texts(c, lang, "stored_tier", "label", ids)
+			}
+		}
+		if err == nil {
+			k.NameTr, k.NoteTr = name[k.ID], note[k.ID]
+			for i := range k.Tiers {
+				k.Tiers[i].LabelTr = labels[k.Tiers[i].ID]
+			}
+		}
+	}
 	reply(c, r, err)
 }
 

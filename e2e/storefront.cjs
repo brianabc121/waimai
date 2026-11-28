@@ -50,7 +50,7 @@ try {
 // ---- the owner writes a notice and makes drinks a required category ----
 await owner.goto(BASE + '/merchant/settings')
 await owner.fill('textarea[name=notice]', NOTICE)
-await owner.locator('form:has(textarea[name=notice]) button.primary').click()
+await owner.locator('form:has(textarea[name=notice]) button.primary').first().click()
 await owner.waitForSelector('.banner.ok')
 await owner.goto(BASE + '/merchant/menu')
 await drinks.waitFor()

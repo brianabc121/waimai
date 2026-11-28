@@ -174,6 +174,18 @@ func (s *Server) myCoupons(c *gin.Context) {
 			}
 			list = mine
 		}
+		if err == nil {
+			ids := make([]int64, len(list))
+			for i, x := range list {
+				ids[i] = x.ID
+			}
+			var tr map[int64]string
+			if tr, err = s.App.CouponTexts(c, reqLang(c), ids); err == nil {
+				for i := range list {
+					list[i].NameTr = tr[list[i].ID]
+				}
+			}
+		}
 		reply(c, gin.H{"coupons": list}, err)
 	}
 }

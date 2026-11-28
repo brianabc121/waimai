@@ -20,7 +20,7 @@ const setVideo = (id: number) => (el: unknown) => { if (el) videos.set(id, el as
 const current = computed(() => props.media[index.value] ?? props.media[0])
 const label = computed(() => {
   const m = current.value
-  const name = m.title || (m.kind === 'video' ? t('pm.video') : '')
+  const name = m.title_tr || m.title || (m.kind === 'video' ? t('pm.video') : '')
   const pos = props.media.length > 1 ? `${index.value + 1}/${props.media.length}` : ''
   return [name, pos].filter(Boolean).join(' · ')
 })
@@ -98,7 +98,7 @@ watch(() => props.media.length, () => { index.value = 0; go(0, false); rest() })
           <button v-else class="mute" :aria-label="t(muted ? 'pm.sound_on' : 'pm.sound_off')" @click="mute">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5l4.5 4v-13l-4.5 4z" fill="currentColor" /><path v-if="muted" d="m16 9.5 5 5m0-5-5 5" /><path v-else d="M16 9a4.2 4.2 0 0 1 0 6m2.6-8.6a8 8 0 0 1 0 11.2" /></svg></button>
         </template>
-        <img v-else :src="m.url" :alt="m.title" :style="cropStyle(m.crop)" :loading="i ? 'lazy' : 'eager'" draggable="false" />
+        <img v-else :src="m.url" :alt="m.title_tr || m.title" :style="cropStyle(m.crop)" :loading="i ? 'lazy' : 'eager'" draggable="false" />
       </div>
     </div>
     <template v-if="media.length > 1">

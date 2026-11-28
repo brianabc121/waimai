@@ -11,6 +11,7 @@ import { currentRole, session } from '../../session'
 import { brandById, brandsHere } from '../../brands'
 import type { Category, Item } from '../../types'
 import ImageUpload from '../ImageUpload.vue'
+import LangsButton from '../LangsButton.vue'
 import '../../officeStrings'
 
 interface Menu { own_menu: boolean; categories: { id: number; name: string; name_en: string }[]
@@ -26,6 +27,8 @@ const brand = computed(() => brandById(id))
 const lib = ref<Category[]>([])
 const own = ref(false)
 const cats = ref<{ key: string; name: string; name_en: string }[]>([])
+// the items whose own name here is saved: only those have translations yet
+const named = ref(new Set<number>())
 const rows = reactive<Record<number, Row>>({})
 const order = ref<number[]>([])
 const error = ref(''), notice = ref(''), busy = ref(false), q = ref('')
@@ -35,6 +38,7 @@ const dishes = computed<Item[]>(() => lib.value.flatMap(c => c.items))
 function fill(m: Menu) {
   own.value = m.own_menu
   cats.value = m.categories.map(c => ({ key: 'c' + c.id, name: c.name, name_en: c.name_en }))
+  named.value = new Set(m.items.filter(i => i.name).map(i => i.item_id))
   const picked = new Map(m.items.map(i => [i.item_id, i]))
   for (const d of dishes.value) {
     const p = picked.get(d.id)
@@ -118,7 +122,7 @@ async function save() {
         <div class="row between"><b>{{ t('bm.cats') }}</b><button type="button" class="btn small" data-testid="bm-add-cat" @click="addCat">＋ {{ t('bm.add_cat') }}</button></div>
         <div v-for="(c, i) in cats" :key="c.key" class="row wrap catrow">
           <input v-model="c.name" :placeholder="t('bm.cat_name')" maxlength="40" data-testid="bm-cat-name" />
-          <input v-model="c.name_en" :placeholder="t('br.name_en')" maxlength="80" />
+          <LangsButton small :base="base" :scope="c.key.startsWith('c') ? `brand_category/${c.key.slice(1)}` : null" :name="c.name" />
           <button type="button" class="btn small" :disabled="i === 0" @click="moveCat(i, -1)">↑</button>
           <button type="button" class="btn small" :disabled="i === cats.length - 1" @click="moveCat(i, 1)">↓</button>
           <button type="button" class="btn small danger" @click="dropCat(c.key)">{{ t('delete') }}</button>
@@ -142,7 +146,7 @@ async function save() {
                 <td><input v-model="rows[d.id].on" type="checkbox" :aria-label="d.name" data-testid="bm-pick" /></td>
                 <td><span v-if="d.code" class="muted">{{ d.code }} </span><b>{{ d.name }}</b><div class="muted small">{{ money(d.price, cur) }}</div></td>
                 <td><input v-model="rows[d.id].name" :placeholder="d.name" :disabled="!rows[d.id].on" maxlength="80" data-testid="bm-name" />
-                  <input v-model="rows[d.id].name_en" :placeholder="d.name_en || t('br.name_en')" :disabled="!rows[d.id].on" maxlength="160" class="small" /></td>
+                  <LangsButton v-if="rows[d.id].on && rows[d.id].name" small :base="base" :scope="named.has(d.id) ? `brand_item/${id * 4294967296 + d.id}` : null" :name="rows[d.id].name" /></td>
                 <td><input v-model="rows[d.id].price" type="number" min="0" step="0.01" :placeholder="String(toMajor(d.price))" :disabled="!rows[d.id].on" class="price" data-testid="bm-price" /></td>
                 <td><select v-model="rows[d.id].cat" :disabled="!rows[d.id].on">
                   <option value="">{{ t('bm.cat_more') }}</option>

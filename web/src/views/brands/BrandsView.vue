@@ -5,6 +5,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ApiError, get, post, put } from '../../api'
 import { money, t } from '../../i18n'
+import LangsButton from '../LangsButton.vue'
 import { can, currentRole, reloadUser, session } from '../../session'
 import { storeURL } from '../../site'
 import ImageUpload from '../ImageUpload.vue'
@@ -46,8 +47,9 @@ function suggest() {
   if (f.id || f.code) return
   clearTimeout(codeTimer)
   codeTimer = window.setTimeout(async () => {
-    if (!f.name_en.trim() || f.code) return
-    try { f.code = (await get<{ code: string }>(`${base}/brand-code?name_en=${encodeURIComponent(f.name_en)}`)).code } catch { /* type one */ }
+    const from = f.name_en.trim() || f.name.trim()
+    if (!from || f.code) return
+    try { f.code = (await get<{ code: string }>(`${base}/brand-code?name_en=${encodeURIComponent(from)}`)).code } catch { /* type one */ }
   }, 400)
 }
 const preview = computed(() => {
@@ -118,12 +120,12 @@ const hours = (b: Brand) => b.open_time ? `${b.open_time}–${b.close_time}` : t
     <div class="banner warn small">{{ t('br.rules', { n: LIMIT }) }}</div>
 
     <template v-if="f.open">
-      <div class="sheet-mask" @click="f.open = false"></div>
-      <form class="sheet bsheet" data-testid="brand-form" @submit.prevent="save()">
-        <div class="sheet-head"><h2>{{ f.id ? t('br.edit') : t('br.add') }}</h2></div>
-        <div class="stack">
-          <label class="field">{{ t('br.name') }}<input v-model="f.name" maxlength="40" required data-testid="brand-f-name" /></label>
-          <label class="field">{{ t('br.name_en') }}<input v-model="f.name_en" maxlength="60" data-testid="brand-f-name-en" @input="suggest" /></label>
+      <div class="sheet-mask" @click.self="f.open = false">
+      <form class="sheet center bsheet" data-testid="brand-form" @submit.prevent="save()">
+        <div class="sheet-head row between"><h2>{{ f.id ? t('br.edit') : t('br.add') }}</h2>
+          <LangsButton :base="base" :scope="!f.id ? null : f.is_main ? `branch/${session.branchId}` : `brand/${f.id}`" :name="f.name" /></div>
+        <div class="sheet-body stack">
+          <label class="field">{{ t('br.name') }}<input v-model="f.name" maxlength="40" required data-testid="brand-f-name" @input="suggest" /></label>
           <label class="field">{{ t('br.code') }}<input v-model="f.code" maxlength="8" required class="mono" style="text-transform:uppercase" data-testid="brand-f-code" />
             <span class="muted small">{{ t('br.code_hint') }}</span><span class="small" data-testid="brand-f-preview">{{ preview }}</span></label>
           <div class="field">{{ t('br.color') }}
@@ -150,7 +152,7 @@ const hours = (b: Brand) => b.open_time ? `${b.open_time}–${b.close_time}` : t
           <label class="check"><input v-model="f.paused" type="checkbox" data-testid="brand-f-paused" />{{ t('br.paused') }}</label>
           <div v-if="f.error" class="banner bad" data-testid="brand-f-error">{{ f.error }}</div>
         </div>
-        <div class="row between" style="margin-top:14px">
+        <div class="row between bfoot">
           <button v-if="f.id && !f.is_main" type="button" class="btn" :class="{ danger: f.status === 'active' }" data-testid="brand-f-toggle" @click="toggle">
             {{ f.status === 'active' ? t('br.disable') : t('br.enable') }}</button>
           <span v-else></span>
@@ -160,6 +162,7 @@ const hours = (b: Brand) => b.open_time ? `${b.open_time}–${b.close_time}` : t
           </span>
         </div>
       </form>
+      </div>
     </template>
   </div>
 </template>
@@ -176,6 +179,7 @@ const hours = (b: Brand) => b.open_time ? `${b.open_time}–${b.close_time}` : t
 .sw { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
 .sw.on { box-shadow: 0 0 0 2px var(--ink, #3b1f14); }
 .bsheet { max-width: 520px; }
+.bfoot { padding: 12px 16px; border-top: 1px solid var(--line); }
 .field { display: grid; gap: 4px; font-weight: 600; font-size: 13px; }
 .field .check { font-weight: 400; }
 </style>

@@ -119,7 +119,7 @@ const ready = computed(() => !!camp.value && (chosen.value ? !chosen.value.close
         <div class="tiers">
           <button v-for="x in camp.tiers" :key="x.id" class="tier" :class="{ on: pick === x.id, off: !!x.closed }" :disabled="!!x.closed"
             data-testid="offers-tier" @click="pick = x.id">
-            <span v-if="x.label" class="hot">{{ x.label }}</span>
+            <span v-if="x.label" class="hot">{{ x.label_tr || x.label }}</span>
             <span class="pay">{{ t('sv.t.pay', { amt: '' }) }}<b>{{ m(x.pay) }}</b></span>
             <span class="give">{{ t('sv.t.give', { amt: m(x.bonus) }) }}<small v-if="bonusRate(x)"> {{ t('sv.t.rate', { pct: bonusRate(x) }) }}</small></span>
             <span v-if="x.coupon_qty" class="cp">{{ tierCoupon(x, cur) }}</span>
@@ -130,7 +130,7 @@ const ready = computed(() => !!camp.value && (chosen.value ? !chosen.value.close
             <span class="pay"><b>{{ t('sv.c.amount') }}</b></span><span class="lim">{{ t('sv.t.custom', { min: m(camp.custom_min) }) }}</span></button>
         </div>
         <input v-if="!pick && camp.custom_ok" v-model="other" class="other" inputmode="decimal" :placeholder="t('sv.c.amount')" />
-        <p v-if="camp.note" class="small muted">{{ camp.note }}</p>
+        <p v-if="camp.note" class="small muted">{{ camp.note_tr || camp.note }}</p>
         <button class="btn primary go" :disabled="busy || !ready" data-testid="offers-go" @click="go">{{ t('sv.c.go') }}</button>
         <div class="rules"><b class="small">{{ t('sv.c.rules') }}</b>
           <ol class="small muted"><li>{{ t('sv.c.rule1') }}</li><li>{{ t('sv.c.rule2') }}</li><li>{{ t('sv.c.rule3') }}</li></ol></div>

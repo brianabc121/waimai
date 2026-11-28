@@ -3,6 +3,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ApiError, del, get, patch, put, upload } from '../api'
 import { t } from '../i18n'
+import LangsButton from './LangsButton.vue'
 import '../media'
 import '../officeStrings'
 import { currentRole, session } from '../session'
@@ -184,6 +185,7 @@ async function saved(r: CropResult) { await save(r); stamp.value = Date.now() }
                 <span class="muted small">{{ mb(m.size) }}</span>
               </div>
               <div class="ox-ops acts">
+                <LangsButton v-if="m.title" small :base="`/merchant/branches/${bid}`" :scope="`media/${m.id}`" :name="m.title" />
                 <button class="op" :disabled="list.indexOf(m) === 0" :aria-label="t('pm.up')" :title="t('pm.up')" data-testid="media-up" @click="shift(list.indexOf(m), -1)">↑</button>
                 <button class="op" :disabled="list.indexOf(m) === list.length - 1" :aria-label="t('pm.down')" :title="t('pm.down')" data-testid="media-down" @click="shift(list.indexOf(m), 1)">↓</button>
                 <button class="op red" data-testid="media-crop" @click="edit(m)">{{ t('pm.crop') }}</button>

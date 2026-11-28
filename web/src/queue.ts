@@ -30,7 +30,7 @@ export interface QueueDesk {
   stats: { waiting: number; called: number; seated: number; skipped: number; cancelled: number; avg_wait: number; by_source: Record<string, number> }
   timezone: string; now: string
 }
-export interface PublicGroup { id: number; letter: string; preset: string; label: string; label_en: string
+export interface PublicGroup { id: number; letter: string; preset: string; label: string; label_en: string; label_tr?: string
   min_people: number; max_people: number; waiting: number; est_minutes: number; current: string; next: string[] }
 export interface QueueCall { number: string; people: number; table: string; calls: number; at: string }
 export interface QueuePublic {
@@ -308,7 +308,8 @@ export function qErr(e: unknown): string {
 type Txt = (key: string, vars?: Record<string, string | number>) => string
 
 // groupName is a group's name in a language: the store's own, else the preset's.
-export function groupName(g: { preset: string; label: string; label_en: string; letter: string }, tx: Txt = t, lang?: string): string {
+export function groupName(g: { preset: string; label: string; label_en: string; label_tr?: string; letter: string }, tx: Txt = t, lang?: string): string {
+  if (!lang && g.label_tr) return g.label_tr // the reader's own language, from the server
   const zh = lang ? lang === 'zh' || lang === 'zh-Hant' : isZh()
   const own = zh ? (g.label || g.label_en) : (g.label_en || g.label)
   if (own) return own

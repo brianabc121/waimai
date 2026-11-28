@@ -172,6 +172,10 @@ func (a *App) SaveBrandMenu(ctx context.Context, branchID, brandID int64, actor 
 		if in.OwnMenu && len(ids) == 0 {
 			return Err(http.StatusUnprocessableEntity, "BRAND_MENU_EMPTY", "pick at least one dish")
 		}
+		catsBefore, err := brandCategoryNames(ctx, tx, brandID)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `DELETE FROM brand_items WHERE brand_id=$1`, brandID); err != nil {
 			return err
 		}
@@ -196,6 +200,9 @@ func (a *App) SaveBrandMenu(ctx context.Context, branchID, brandID int64, actor 
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, brandID, it.ItemID, cat, it.Name, it.NameEn, it.ImageURL, it.Price, it.Published, i); err != nil {
 				return err
 			}
+		}
+		if err := carryBrandTranslations(ctx, tx, brandID, catsBefore); err != nil {
+			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE brands SET own_menu=$2 WHERE id=$1`, brandID, in.OwnMenu); err != nil {
 			return err
@@ -234,6 +241,7 @@ func brandItems(ctx context.Context, q Querier, branchID int64, brand *Brand, pu
 		}
 		if bi.Name != "" && bi.Name != it.Name {
 			it.BaseName = it.Name
+			it.brandKey = brandItemKey(brand.ID, it.ID)
 			it.Name, it.NameEn = bi.Name, bi.NameEn
 			// the store's translations are of the store's name
 			it.NameTr = ""

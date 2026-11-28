@@ -10,12 +10,12 @@ import (
 // A store's brands (docs/MULTI_BRAND_DESIGN.md §14).
 func (s *Server) brandRoutes(auth *gin.RouterGroup) {
 	auth.GET("/merchant/branches/:bid/brands", s.listBrands)
-	auth.POST("/merchant/branches/:bid/brands", s.createBrand)
-	auth.PUT("/merchant/branches/:bid/brands/:id", s.updateBrand)
+	auth.POST("/merchant/branches/:bid/brands", s.menuChanged, s.createBrand)
+	auth.PUT("/merchant/branches/:bid/brands/:id", s.menuChanged, s.updateBrand)
 	auth.GET("/merchant/branches/:bid/brand-code", s.suggestBrandCode)
 	auth.PUT("/merchant/branches/:bid/staff/:id/brands", s.setStaffBrands)
 	auth.GET("/merchant/branches/:bid/brands/:id/menu", s.brandMenu)
-	auth.PUT("/merchant/branches/:bid/brands/:id/menu", s.saveBrandMenu)
+	auth.PUT("/merchant/branches/:bid/brands/:id/menu", s.menuChanged, s.saveBrandMenu)
 }
 
 // A brand's own menu (docs/MULTI_BRAND_DESIGN.md §5).

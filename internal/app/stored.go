@@ -109,6 +109,8 @@ type StoredTier struct {
 	CouponDays  int    `json:"coupon_days"`
 	CouponQty   int    `json:"coupon_qty"`
 	Label       string `json:"label"`
+	// LabelTr is the label in the customer's language, when it differs.
+	LabelTr     string `json:"label_tr,omitempty"`
 	PerCustomer *int   `json:"per_customer"`
 	FirstOnly   bool   `json:"first_only"`
 	Quota       *int   `json:"quota"`
@@ -133,6 +135,9 @@ type StoredCampaign struct {
 	BrandIDs  []int64      `json:"brand_ids"`
 	Note      string       `json:"note"`
 	Tiers     []StoredTier `json:"tiers"`
+	// NameTr and NoteTr are the texts in the customer's language, when they differ.
+	NameTr string `json:"name_tr,omitempty"`
+	NoteTr string `json:"note_tr,omitempty"`
 	// what it brought in
 	Count int   `json:"count"`
 	Paid  int64 `json:"paid"`

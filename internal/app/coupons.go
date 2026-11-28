@@ -56,6 +56,8 @@ type CustomerCoupon struct {
 	Currency    string `json:"currency"`
 	Name        string `json:"name"`
 	NameEn      string `json:"name_en"`
+	// NameTr is the name in the customer's language, when it differs.
+	NameTr string `json:"name_tr,omitempty"`
 	// Value is the amount off; 0 on a delivery coupon means the whole fee.
 	Value     int64      `json:"value"`
 	Threshold int64      `json:"threshold"`
