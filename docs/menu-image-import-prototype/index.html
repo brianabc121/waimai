@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>图片识别导入 · 原型</title>
+<link rel="stylesheet" href="proto.css">
+</head>
+<body>
+<div id="app"></div>
+<script>
+// 原型：index.html?s=1…8。店名、商品、价格、用量都是示意数据。
+const s = new URLSearchParams(location.search).get('s') || '1'
+const nav = (on, items, shop) => `<aside class="side"><div class="shop">${shop}</div>${items.map(x => `<div class="${x === on ? 'on' : ''}">${x}</div>`).join('')}</aside>`
+const MNAV = ['订单', '点单', '消息', '客户管理', '桌台', '后厨', '商品', '店铺装修', '市场营销', '财务', '配送管理', '员工', '设置']
+const tabs = `<div class="tabs"><button>商品 <span class="num">86</span></button><button>口味模板</button><button>加料模板</button><button class="on">批量导入<span class="new">新</span></button></div>`
+const page = (body, extra = '') => `<div class="ox">${nav('商品', MNAV, '阿明茶饮 · Pasay<small><b>店主</b> owner5</small>')}<main>
+<div class="ph"><div><h1>商品管理</h1><p>商品、口味模板、加料模板和批量导入</p></div></div>${tabs}${body}${extra}</main></div>`
+const tag = (k) => ({ new: '<span class="tag new">新增</span>', same: '<span class="tag same">已存在</span>', price: '<span class="tag price">价格不同</span>', maybe: '<span class="tag maybe">可能重复</span>', fix: '<span class="tag fix">需要补充</span>' })[k]
+const cb = (on) => `<span class="cb ${on ? 'on' : ''}">${on ? '✓' : ''}</span>`
+const XLS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/></svg>'
+const CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
+
+// 一张假的纸质价目表
+const paper = (hl = '') => `<div class="paper"><div class="t">阿明茶饮</div>
+<div class="c">招牌奶茶</div>
+<div class="l"><small>A1</small><span>珍珠奶茶</span><i></i><small>中</small><b>95</b><small>大</small><b>110</b></div>
+<div class="l ${hl === 'maybe' ? 'hl' : ''}"><small>A2</small><span>黑糖波霸鲜奶</span><i></i><b>130</b></div>
+<div class="l"><small>A3</small><span>芋泥啵啵奶茶</span><i></i><b>125</b></div>
+<div class="l"><small>A4</small><span>生椰拿铁</span><i></i><b>135</b></div>
+<div class="c">鲜果茶</div>
+<div class="l ${hl === 'price' ? 'hl' : ''}"><small>B1</small><span>冰柠檬茶</span><i></i><b>80</b></div>
+<div class="l"><small>B2</small><span>百香果绿茶</span><i></i><b>90</b></div>
+<div class="l"><small>B3</small><span>满杯橙橙</span><i></i><b>120</b></div>
+<div class="l h2"><small>B4</small><span>季节限定水果茶</span><i></i><b class="hand">时价</b></div>
+<div class="c">小吃</div>
+<div class="l"><small>C1</small><span>盐酥鸡</span><i></i><b>150</b></div>
+<div class="l"><small>C2</small><span>炸鱿鱼圈</span><i></i><b>160</b></div>
+<div class="l"><small>C3</small><span>薯条</span><i></i><b>85</b></div>
+<div class="l"><span>加料：珍珠 / 椰果 / 布丁</span><i></i><b>+15</b></div></div>`
+
+const hist = `<div class="card"><div class="row" style="margin-bottom:8px"><h2>导入记录</h2><span class="sp"></span><span class="muted">保留最近 50 次</span></div>
+<table><tr><th>时间</th><th>方式</th><th>来源</th><th>结果</th><th>操作人</th><th>状态</th><th></th></tr>
+<tr><td class="num">今天 14:20</td><td>图片识别</td><td>3 张图片</td><td>识别 46 件，还没确认</td><td>owner5</td><td><span class="tag price">待确认</span></td><td><a>继续确认</a></td></tr>
+<tr><td class="num">11-26 10:05</td><td>图片识别</td><td>2 张图片</td><td>新增 18 件，改价 2 件，跳过 5 件</td><td>owner5</td><td><span class="tag done">已导入</span></td><td><a>查看</a>　<a>撤销</a></td></tr>
+<tr><td class="num">11-23 16:41</td><td>Excel</td><td>商品目录-11月.xlsx</td><td>新增 40 件，更新 6 件</td><td>owner5</td><td><span class="tag done">已导入</span></td><td><a>查看</a></td></tr>
+<tr><td class="num">11-20 09:12</td><td>图片识别</td><td>1 张图片</td><td>图片看不清，没有识别到商品</td><td>manager2</td><td><span class="tag fix">失败</span></td><td><a>查看</a></td></tr></table></div>`
+
+const S = {}
+
+// 1 批量导入首页
+S[1] = () => page(`<div class="ways">
+<div class="card way"><div class="ic">${XLS}</div><div><h2>Excel 导入</h2><p>下载模板，在表格里填好商品再上传。适合商品多、要一次填全规格、图片链接、平台价的情况。</p>
+<ul><li>可以先导出现有商品，改完再传回来</li><li>上传后先预览，确认才写入</li></ul>
+<div class="row"><button class="btn pri">上传 Excel</button><button class="btn">下载模板</button><button class="btn">导出现有商品</button></div></div></div>
+<div class="card way ai"><div class="ic">${CAM}</div><div><h2>图片识别导入 <span class="tag new">新</span></h2><p>拍下或上传纸质价目表、点单牌、海报的照片，系统自动认出商品名、价格、分类和规格，你确认后一次导入。</p>
+<ul><li>自动标出哪些是新商品、哪些店里已经有、哪些价格不一样</li><li>新商品先放草稿，不会直接让顾客看到</li></ul>
+<div class="row"><button class="btn pri">上传图片</button><span class="muted">一次最多 20 张 · JPG / PNG / WebP · 今天还能识别 57 张</span></div></div></div>
+</div>${hist}`)
+
+// 2 上传和识别进度
+const th = (name, st, cls = '', pct = 0) => `<div class="th ${cls}"><div class="pic">${paper()}</div>${pct ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ''}<div class="cap"><span>${name}</span>${st}</div></div>`
+S[2] = () => page(`<div class="card"><div class="row" style="margin-bottom:12px"><a class="lnk">← 返回批量导入</a><h2>图片识别导入</h2><span class="sp"></span><span class="muted">第 1 步 上传图片　›　第 2 步 确认商品　›　第 3 步 导入</span></div>
+<div class="drop"><b>把图片拖到这里，或点击选择图片</b>可以一次选多张，手机上可以直接拍照。每张不超过 10 MB，上传前会自动压缩。</div>
+<div class="thumbs">
+${th('第 1 页.jpg', '<span class="tag done">认出 14 件</span>')}
+${th('第 2 页.jpg', '<span class="tag done">认出 19 件</span>')}
+${th('饮品单.png', '<span class="tag run">识别中…</span>', '', 62)}
+${th('IMG_2291.jpg', '<span class="tag same">排队中</span>')}
+${th('IMG_2292.jpg', '<span class="tag fix">看不清</span>', 'bad')}
+<div class="th" style="display:grid;place-items:center;color:#8a7b6f;border-style:dashed;min-height:186px">＋ 再加几张</div>
+</div>
+<div class="note" style="margin-top:12px"><b>IMG_2292.jpg 没有识别出来：</b>图片太模糊，看不清价格。可以 <a class="lnk">重新识别</a>、<a class="lnk">换一张</a> 或 <a class="lnk">去掉这张</a>，其他图片不受影响。</div>
+<div class="tips"><div><b>拍正、拍清楚</b>价格数字要看得清，尽量不要反光</div><div><b>一张拍一页</b>内容多的价目表分几张拍，识别更准</div><div><b>可以离开这页</b>识别在后台进行，回来在“导入记录”里继续</div><div><b>不会直接生效</b>认出来的商品要你确认后才导入</div></div>
+<div class="row" style="margin-top:14px"><span class="muted">已识别 2 张，共 33 件商品；1 张识别中，1 张排队，1 张失败</span><span class="sp"></span><button class="btn">取消本次导入</button><button class="btn pri">先确认已识别的 33 件</button></div></div>`)
+
+// 3 确认页（核心）
+const r = (o) => `<tr class="${o.cls || ''}"><td>${cb(o.on)}</td><td><div class="in num" style="width:48px">${o.code || ''}</div></td><td><div class="in ${o.nameErr ? 'err' : ''}" style="min-width:150px">${o.name}</div>${o.spec ? `<div class="spec">${o.spec}</div>` : ''}</td>
+<td><div class="in num ${o.err ? 'err' : ''}" style="width:74px">${o.price}</div></td><td>${tag(o.st)}</td><td>${o.info || ''}</td><td>${o.act ? `<span class="act">${o.act}</span>` : ''}</td></tr>`
+const reviewTable = `<table><tr><th style="width:30px">${cb(true)}</th><th>编号</th><th>商品名</th><th>价格 ₱</th><th>状态</th><th>和店里现有商品对比</th><th>怎么处理</th></tr>
+<tr class="grp"><td colspan="7">招牌奶茶 <small>店里已有这个分类</small></td></tr>
+${r({ code: 'A1', name: '珍珠奶茶', price: '95', st: 'same', spec: '规格（必选）：中 +0 / 大 +15', info: '<span class="was">店里已有，价格一样 ₱95</span>', act: '跳过', cls: 'off' })}
+${r({ on: 1, code: 'A2', name: '黑糖波霸鲜奶', price: '130', st: 'maybe', info: '<span class="was">店里有“<b>黑糖波霸牛奶</b>” ₱125，编号也是 <b>A2</b></span><br><a>对比</a>', act: '请选择', cls: 'sel' })}
+${r({ on: 1, code: 'A3', name: '芋泥啵啵奶茶', price: '125', st: 'new', act: '新增为草稿' })}
+${r({ on: 1, code: 'A4', name: '生椰拿铁', price: '135', st: 'new', act: '新增为草稿' })}
+<tr class="grp"><td colspan="7">鲜果茶 <small>新分类，导入时自动新建</small></td></tr>
+${r({ on: 1, code: 'B1', name: '冰柠檬茶', price: '80', st: 'price', info: '<span class="was">店里现在 <s>₱75</s> → 图片上 <b>₱80</b>（+5）</span>', act: '更新价格' })}
+${r({ on: 1, code: 'B2', name: '百香果绿茶', price: '90', st: 'new', act: '新增为草稿' })}
+${r({ on: 1, code: 'B3', name: '满杯橙橙', price: '120', st: 'new', act: '新增为草稿' })}
+${r({ code: 'B4', name: '季节限定水果茶', price: '', err: 1, st: 'fix', info: '<span class="was">图片上写的是“时价”，没有数字。填上价格才能导入</span>', act: '跳过' })}
+<tr class="grp"><td colspan="7">小吃 <small>店里已有这个分类</small></td></tr>
+${r({ on: 1, code: 'C1', name: '盐酥鸡', price: '150', st: 'new', act: '新增为草稿' })}
+${r({ code: 'C3', name: '薯条', price: '85', st: 'maybe', info: '<span class="was">店里有“<b>炸薯条</b>” ₱85，名字很像</span><br><a>对比</a>', act: '当作同一件，跳过', cls: 'off' })}
+</table>`
+const review = (extra = '') => page(`<div class="row" style="margin-bottom:10px"><a class="lnk">← 返回</a><h2 style="font-size:18px">确认识别结果</h2><span class="muted">3 张图片，共认出 46 件商品。认错的地方直接点格子改。</span><span class="sp"></span><button class="btn sm">＋ 手动加一行</button></div>
+<div class="rev"><div class="card view"><div class="pg"><button class="on">第 1 页</button><button>第 2 页</button><button>饮品单</button><span class="sp"></span><button>放大</button><button>旋转</button></div>
+<div class="frame">${paper('maybe')}</div><p class="muted" style="margin-top:8px">点右边一行，这里会框出它在图片上的位置，方便对照。虚线框是没认全的地方。</p></div>
+<div><div class="chips"><span class="chip on">全部<b>46</b></span><span class="chip">${tag('new')}<b>31</b></span><span class="chip">${tag('same')}<b>8</b></span><span class="chip">${tag('price')}<b>3</b></span><span class="chip">${tag('maybe')}<b>2</b></span><span class="chip">${tag('fix')}<b>2</b></span></div>
+<div class="card" style="padding:6px 10px">${reviewTable}</div>
+<div class="foot row"><span>将 <b>新增 32 件</b>（草稿）、<b>更新价格 3 件</b>、跳过 10 件</span><span class="tag maybe">还有 1 件“可能重复”没选</span><span class="sp"></span><button class="btn">保存，稍后继续</button><button class="btn pri">下一步：核对并导入</button></div></div></div>`, extra)
+S[3] = () => review()
+
+// 4 可能重复：对比
+S[4] = () => review(`<div class="mask"><div class="dlg"><div class="row"><h2>这是同一件商品吗？</h2><span class="tag maybe">可能重复</span><span class="sp"></span><button class="btn sm">✕</button></div>
+<p class="muted">编号一样，名字差一个字，系统不敢自己决定，请你选一下。</p>
+<div class="cmp"><div class="box"><h3>图片上认出来的（第 1 页）</h3><div class="n">黑糖波霸<mark>鲜奶</mark></div><div>编号 A2　₱130　分类：招牌奶茶</div><div class="paper" style="padding:6px 10px;margin-top:8px;border-radius:6px"><div class="l hl"><small>A2</small><span>黑糖波霸鲜奶</span><i></i><b>130</b></div></div></div>
+<div class="vs">对比</div>
+<div class="box"><h3>店里现有的商品</h3><div class="n">黑糖波霸<mark>牛奶</mark></div><div>编号 A2　₱125　分类：招牌奶茶　<span class="tag done">上架中</span></div><div class="muted" style="margin-top:8px">上月卖出 214 件 · 有 2 组规格、1 个加料模板</div></div></div>
+<div class="opts">
+<div class="opt on"><span class="rd"></span><div><b>是同一件，只把价格改成 ₱130</b><div class="muted">商品名、编号、图片、规格、销量都保持不变，只改价格（₱125 → ₱130）。</div></div></div>
+<div class="opt"><span class="rd"></span><div><b>是同一件，什么都不改</b><div class="muted">跳过这一行。</div></div></div>
+<div class="opt"><span class="rd"></span><div><b>不是同一件，新增“黑糖波霸鲜奶”</b><div class="muted">作为一件新商品放进草稿，店里会同时有两件，编号 A2 会重复，需要你改一个。</div></div></div></div>
+<div class="row" style="margin-top:14px"><span class="muted">还有 1 件可能重复：薯条 / 炸薯条</span><span class="sp"></span><button class="btn">上一件</button><button class="btn pri">确定，看下一件</button></div></div></div>`)
+
+// 5 导入前核对
+S[5] = () => review(`<div class="mask"><div class="dlg"><h2>核对后导入</h2><p class="muted">确认后一次全部写入；中途出错会整批不写入，不会只导一半。</p>
+<div class="sum"><div><b style="color:#1f7a35">32</b>新增商品（草稿）</div><div><b style="color:#a35c00">3</b>更新价格</div><div><b>1</b>新建分类</div><div><b style="color:#8a7b6f">10</b>跳过</div></div>
+<h3 style="font-size:14px;margin:6px 0">要改价格的 3 件，请再看一眼</h3>
+<table><tr><th>商品</th><th>现在的价格</th><th>改成</th><th>差额</th><th>来源</th></tr>
+<tr><td>冰柠檬茶</td><td class="num">₱75</td><td class="num"><b>₱80</b></td><td class="num">+5</td><td class="muted">第 1 页</td></tr>
+<tr><td>黑糖波霸牛奶</td><td class="num">₱125</td><td class="num"><b>₱130</b></td><td class="num">+5</td><td class="muted">第 1 页（图片上叫“黑糖波霸鲜奶”）</td></tr>
+<tr><td>原味鸡排</td><td class="num">₱180</td><td class="num"><b>₱168</b></td><td class="num" style="color:#b3261e">−12</td><td class="muted">第 2 页</td></tr></table>
+<div class="note" style="margin-top:12px">改价只影响以后新下的订单，已经下的订单金额不变。新增的 32 件先是<b>草稿</b>，顾客看不到，你检查后再上架。</div>
+<div class="row" style="margin-top:10px">${cb(false)}<span>新增的商品直接上架（不建议，建议先检查图片和规格）</span></div>
+<div class="row" style="margin-top:14px"><span class="muted">7 天内可以在“导入记录”里撤销这次导入</span><span class="sp"></span><button class="btn">返回修改</button><button class="btn pri">确认导入</button></div></div></div>`)
+
+// 6 导入完成和撤销
+S[6] = () => page(`<div class="ok"><b style="font-size:22px">✓</b><div><b>导入完成：新增 32 件（草稿）、更新价格 3 件、新建 1 个分类。</b><div>新商品已经自动翻译成其他语言，现在还是草稿。</div></div><span class="sp"></span><button class="btn">查看这 32 件草稿</button><button class="btn pri">全部上架</button></div>
+${hist.replace('识别 46 件，还没确认', '新增 32 件，改价 3 件，跳过 10 件').replace('<span class="tag price">待确认</span></td><td><a>继续确认</a>', '<span class="tag done">已导入</span></td><td><a>查看</a>　<a>撤销</a>')}`,
+`<div class="mask"><div class="dlg" style="width:640px"><h2>撤销这次导入？</h2><p class="muted">今天 14:20 · 图片识别 · 新增 32 件，改价 3 件</p>
+<table style="margin:12px 0"><tr><th>内容</th><th>撤销后</th><th>数量</th></tr>
+<tr><td>还是草稿、没被改过、没卖出过的新商品</td><td>删除</td><td class="num"><b>29</b></td></tr>
+<tr><td>已经上架或已经卖出过的新商品</td><td><b>保留</b>，不动</td><td class="num">3</td></tr>
+<tr><td>被改过价格、之后没再改的商品</td><td>价格改回原来的</td><td class="num"><b>2</b></td></tr>
+<tr><td>改价后你又手动改过的商品</td><td><b>保留</b>现在的价格</td><td class="num">1</td></tr>
+<tr><td>这次新建、撤销后空了的分类</td><td>删除</td><td class="num">0</td></tr></table>
+<div class="note">已经下的订单不受影响。保留下来的 4 件会列在记录里，需要的话你可以自己下架或改价。</div>
+<div class="row" style="margin-top:14px"><span class="sp"></span><button class="btn">不撤销</button><button class="btn pri">确认撤销</button></div></div></div>`)
+
+// 7 手机版
+const it = (n, p, st, sub, act) => `<div class="it"><div class="r1"><span class="n">${n}</span>${tag(st)}</div><div class="r2"><span>${sub}</span><b class="num" style="color:#2b211c;font-size:15px">${p}</b></div>${act ? `<div class="r2">${act}</div>` : ''}</div>`
+S[7] = () => `<div class="phones">
+<div><div class="phone"><div class="bar">← 图片识别导入</div><div class="body">
+<div class="drop" style="padding:16px"><b>拍照 或 从相册选</b>一次最多 20 张</div>
+<div class="row" style="margin:12px 0"><button class="btn pri" style="flex:1;padding:12px">拍照</button><button class="btn" style="flex:1;padding:12px">从相册选</button></div>
+<div class="thumbs" style="grid-template-columns:1fr 1fr">${th('第 1 页', '<span class="tag done">14 件</span>')}${th('第 2 页', '<span class="tag run">识别中…</span>', '', 45)}</div>
+<p class="muted" style="margin-top:10px">识别在后台进行，可以先去忙别的，回来在“导入记录”里继续。</p></div>
+<div class="fx"><span class="muted">已认出 14 件</span><span class="sp"></span><button class="btn pri">去确认</button></div></div><div class="cap2">手机：拍照上传</div></div>
+<div><div class="phone"><div class="bar">← 确认识别结果 <span class="sp"></span><span class="muted">46 件</span></div><div class="body">
+<div class="chips"><span class="chip on">全部<b>46</b></span><span class="chip">新增<b>31</b></span><span class="chip">价格不同<b>3</b></span><span class="chip">可能重复<b>2</b></span></div>
+<div class="muted" style="margin:4px 2px 6px">鲜果茶 · 新分类</div>
+${it('冰柠檬茶', '₱80', 'price', '店里现在 ₱75，图片上 ₱80', '<span class="act">更新价格</span><a class="lnk">看图片</a>')}
+${it('百香果绿茶', '₱90', 'new', '新增为草稿', '')}
+${it('季节限定水果茶', '<span class="in err" style="display:inline-block;width:70px">　</span>', 'fix', '图片上是“时价”，请填价格', '<span class="act">跳过</span><a class="lnk">看图片</a>')}
+<div class="muted" style="margin:4px 2px 6px">招牌奶茶</div>
+${it('黑糖波霸鲜奶', '₱130', 'maybe', '店里有“黑糖波霸牛奶” ₱125', '<span class="act">请选择</span><a class="lnk">对比</a>')}
+${it('珍珠奶茶', '₱95', 'same', '店里已有，价格一样', '')}</div>
+<div class="fx"><span style="font-size:13px">新增 32 · 改价 3</span><span class="sp"></span><button class="btn pri">核对并导入</button></div></div><div class="cap2">手机：一件一张卡片，点“看图片”对照原图</div></div></div>`
+
+// 8 平台后台：密钥设置
+S[8] = () => `<div class="ox adm">${nav('密钥设置', ['总览', '商户', '商品', '会员', '地址库', '顾客服务', '语言适配', '密钥设置'], '河马点餐 · 平台后台<small>admin</small>')}<main>
+<div class="ph"><div><h1>密钥设置</h1><p>外部服务的密钥都在这里填，保存后几秒内生效</p></div></div>
+<div class="card"><div class="row" style="margin-bottom:6px"><h2>图片识别导入</h2><span class="tag done">已开通</span><span class="sp"></span><button class="btn sm">测试一下</button></div>
+<div class="set"><div><b>Anthropic 密钥</b><small>和“自动翻译”共用同一个</small></div><div class="in">sk-ant-••••••••••••3fQA　<span class="muted">已在“翻译”一组填写</span></div><span class="muted">ANTHROPIC_API_KEY</span></div>
+<div class="set"><div><b>识别用的模型</b><small>越强越准，也越贵</small></div><div class="in">Claude Opus 5.5（推荐，最准）　▾</div><span class="muted">MENU_VISION_MODEL</span></div>
+<div class="set"><div><b>每家店每天最多识别</b><small>防止误用把费用刷高</small></div><div class="in">60 张图片</div><span class="muted">MENU_VISION_DAILY_LIMIT</span></div>
+<div class="set"><div><b>价格二次核对（可不填）</b><small>填了 Google Vision 密钥，就用文字识别再对一遍价格数字</small></div><div class="in" style="color:#8a7b6f">没填，不做二次核对</div><span class="muted">GOOGLE_VISION_API_KEY</span></div>
+<div class="set" style="border:0"><div><b>关闭图片识别</b><small>关掉后商家只看到 Excel 导入</small></div><div>${cb(false)} 关闭</div><span></span></div></div>
+<div class="card"><div class="row" style="margin-bottom:10px"><h2>本月用量</h2><span class="muted">2026 年 11 月，按接口返回的实际用量统计</span></div>
+<div class="use"><div><b>412</b>识别图片（张）</div><div><b>5,930</b>认出商品（件）</div><div><b>US$ 51.80</b>估算费用</div><div><b>3.4%</b>识别失败</div></div>
+<table style="margin-top:12px"><tr><th>门店</th><th>图片</th><th>商品</th><th>失败</th><th>估算费用</th><th>最近一次</th></tr>
+<tr><td>阿明茶饮 · Pasay</td><td class="num">23</td><td class="num">318</td><td class="num">1</td><td class="num">US$ 2.90</td><td class="num">今天 14:20</td></tr>
+<tr><td>马卡蒂小馆</td><td class="num">41</td><td class="num">655</td><td class="num">2</td><td class="num">US$ 5.20</td><td class="num">昨天 18:03</td></tr>
+<tr><td>BGC 便利超市</td><td class="num">60</td><td class="num">1,204</td><td class="num">0</td><td class="num">US$ 7.60</td><td class="num">11-26（当天到上限）</td></tr></table></div></main></div>`
+
+document.getElementById('app').innerHTML = (S[s] || S[1])()
+</script>
+</body>
+</html>
